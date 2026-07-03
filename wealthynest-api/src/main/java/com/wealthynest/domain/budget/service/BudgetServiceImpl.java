@@ -1,0 +1,168 @@
+package com.wealthynest.domain.budget.service;
+
+import com.wealthynest.common.exception.AccessDeniedException;
+import com.wealthynest.common.exception.ResourceNotFoundException;
+import com.wealthynest.domain.budget.dto.request.CreateBudgetRequest;
+import com.wealthynest.domain.budget.dto.request.UpdateBudgetRequest;
+import com.wealthynest.domain.budget.dto.response.BudgetResponse;
+import com.wealthynest.domain.budget.entity.Budget;
+import com.wealthynest.domain.budget.entity.BudgetType;
+import com.wealthynest.domain.budget.mapper.BudgetMapper;
+import com.wealthynest.domain.budget.repository.BudgetRepository;
+import com.wealthynest.domain.category.entity.Category;
+import com.wealthynest.domain.category.repository.CategoryRepository;
+import com.wealthynest.domain.expense.repository.ExpenseRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class BudgetServiceImpl implements BudgetService {
+    private final BudgetRepository   budgetRepository;
+    private final CategoryRepository categoryRepository;
+    private final ExpenseRepository  expenseRepository;
+    private final BudgetMapper       budgetMapper;
+
+    @Override
+    @Transactional
+    public BudgetResponse createOrUpdateBudget(UUID userId, UUID familyId, CreateBudgetRequest request) {
+        BudgetType type = request.getBudgetType() != null ? request.getBudgetType() : BudgetType.MONTHLY;
+
+        // Budgets are always personal — the family tab reads them per-user via the user's own token
+        Budget budget = budgetRepository.findByUserIdAndCategoryIdAndBudgetType(userId, request.getCategoryId(), type)
+            .orElseGet(() -> Budget.builder().userId(userId).categoryId(request.getCategoryId())
+                .periodMonth(0).periodYear(0).build());
+        budget.setAmount(request.getAmount());
+        budget.setBudgetType(type);
+        budget.setPeriodMonth(0);
+        budget.setPeriodYear(0);
+        if (request.getAlertThreshold() != null) budget.setAlertThreshold(request.getAlertThreshold());
+
+        LocalDate now = LocalDate.now();
+        return enrich(budgetMapper.toResponse(budgetRepository.save(budget)), userId, null, now.getYear(), now.getMonthValue());
+    }
+
+    @Override
+    @Transactional
+    public BudgetResponse updateBudget(UUID budgetId, UUID userId, UUID familyId, UpdateBudgetRequest request) {
+        Budget budget = budgetRepository.findById(budgetId)
+            .orElseThrow(() -> new ResourceNotFoundException("Budget", "id", budgetId));
+        boolean owned = (familyId != null && familyId.equals(budget.getFamilyId()))
+                     || (userId   != null && userId.equals(budget.getUserId()));
+        if (!owned) throw new AccessDeniedException();
+
+        if (request.getAmount() != null)          budget.setAmount(request.getAmount());
+        if (request.getAlertThreshold() != null)  budget.setAlertThreshold(request.getAlertThreshold());
+        if (request.getCategoryId() != null)      budget.setCategoryId(request.getCategoryId());
+
+        LocalDate now = LocalDate.now();
+        return enrich(budgetMapper.toResponse(budgetRepository.save(budget)), userId, familyId, now.getYear(), now.getMonthValue());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<BudgetResponse> getBudgets(UUID userId, UUID familyId, int year, int month) {
+        // Always personal — combined family budgets are not a concept; each member owns their budgets
+        List<Budget> all = budgetRepository.findByUserId(userId);
+        // Batch-load all categories upfront to avoid N+1
+        Set<UUID> catIds = all.stream().map(Budget::getCategoryId).collect(Collectors.toSet());
+        Map<UUID, Category> catMap = categoryRepository.findAllById(catIds).stream()
+            .collect(Collectors.toMap(Category::getId, c -> c));
+        return all.stream()
+            .map(b -> enrich(budgetMapper.toResponse(b), userId, null, year, month, catMap))
+            .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<BudgetResponse> getBudgetsForCategory(UUID userId, UUID categoryId, int year, int month) {
+        return budgetRepository.findByUserIdAndCategoryId(userId, categoryId)
+            .stream().map(b -> enrich(budgetMapper.toResponse(b), userId, null, year, month)).toList();
+    }
+
+    @Override
+    @Transactional
+    public void deleteBudget(UUID budgetId, UUID userId, UUID familyId) {
+        Budget budget = budgetRepository.findById(budgetId)
+            .orElseThrow(() -> new ResourceNotFoundException("Budget", "id", budgetId));
+        boolean owned = (familyId != null && familyId.equals(budget.getFamilyId()))
+                     || (userId   != null && userId.equals(budget.getUserId()));
+        if (!owned) throw new AccessDeniedException();
+        budgetRepository.delete(budget);
+    }
+
+    @Override
+    @Transactional
+    public int copyBudgets(UUID userId, UUID familyId, int fromYear, int fromMonth, int toYear, int toMonth) {
+        List<Budget> source = budgetRepository.findByUserIdAndPeriodYearAndPeriodMonthAndBudgetType(userId, fromYear, fromMonth, BudgetType.MONTHLY);
+        if (source.isEmpty()) return 0;
+        int copied = 0;
+        for (Budget b : source) {
+            Optional<Budget> existing = budgetRepository.findByUserIdAndCategoryIdAndPeriodYearAndPeriodMonthAndBudgetType(userId, b.getCategoryId(), toYear, toMonth, BudgetType.MONTHLY);
+            if (existing.isEmpty()) {
+                budgetRepository.save(Budget.builder()
+                    .userId(userId)
+                    .familyId(null)
+                    .categoryId(b.getCategoryId())
+                    .amount(b.getAmount())
+                    .budgetType(BudgetType.MONTHLY)
+                    .alertThreshold(b.getAlertThreshold())
+                    .periodYear(toYear)
+                    .periodMonth(toMonth)
+                    .build());
+                copied++;
+            }
+        }
+        return copied;
+    }
+
+    private BudgetResponse enrich(BudgetResponse r, UUID userId, UUID familyId, int year, int month) {
+        return enrich(r, userId, familyId, year, month, null);
+    }
+
+    private BudgetResponse enrich(BudgetResponse r, UUID userId, UUID familyId, int year, int month,
+                                   Map<UUID, Category> preloadedCats) {
+        Category cat = preloadedCats != null
+            ? preloadedCats.get(r.getCategoryId())
+            : categoryRepository.findById(r.getCategoryId()).orElse(null);
+        BigDecimal spent;
+        if (r.getBudgetType() == BudgetType.YEARLY) {
+            spent = familyId != null
+                ? expenseRepository.sumByFamilyCategoryAndYear(familyId, r.getCategoryId(), year)
+                : expenseRepository.sumByUserCategoryAndYear(userId, r.getCategoryId(), year);
+        } else {
+            spent = familyId != null
+                ? expenseRepository.sumByFamilyCategoryAndMonth(familyId, r.getCategoryId(), year, month)
+                : expenseRepository.sumByUserCategoryAndMonth(userId, r.getCategoryId(), year, month);
+        }
+        if (spent == null) spent = BigDecimal.ZERO;
+        BigDecimal remaining = r.getAmount().subtract(spent);
+        double pct = r.getAmount().compareTo(BigDecimal.ZERO) > 0
+            ? spent.divide(r.getAmount(), 4, RoundingMode.HALF_UP)
+                   .multiply(BigDecimal.valueOf(100)).doubleValue()
+            : 0.0;
+        BigDecimal threshold = r.getAlertThreshold() != null ? r.getAlertThreshold() : BigDecimal.valueOf(80);
+        return BudgetResponse.builder()
+            .id(r.getId()).categoryId(r.getCategoryId())
+            .categoryName(cat != null ? cat.getName() : null)
+            .categoryIcon(cat != null ? cat.getIcon() : null)
+            .categoryColor(cat != null ? cat.getColor() : null)
+            .amount(r.getAmount()).spent(spent).remaining(remaining)
+            .percentUsed(pct).overBudget(pct > 100.0)
+            .periodMonth(month).periodYear(year)
+            .alertThreshold(threshold)
+            .alertTriggered(pct >= threshold.doubleValue())
+            .budgetType(r.getBudgetType() != null ? r.getBudgetType() : BudgetType.MONTHLY)
+            .build();
+    }
+}

@@ -1,0 +1,9 @@
+spring:
+  jpa:
+    show-sql: false
+  flyway:
+    baseline-on-migrate: false
+logging:
+  level:
+    com.wealthynest: INFO
+    org.springframework.security: WARN

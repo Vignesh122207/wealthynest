@@ -1,0 +1,2 @@
+ALTER TABLE investments ADD COLUMN IF NOT EXISTS gold_karat INTEGER DEFAULT 22;
+ALTER TABLE gold_price_cache ADD COLUMN IF NOT EXISTS price_18k_per_gram NUMERIC(10,2);

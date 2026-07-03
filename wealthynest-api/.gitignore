@@ -1,0 +1,13 @@
+# Maven build output
+target/
+*.jar
+*.war
+*.class
+
+# Spring Boot local config overrides
+application-local.yml
+
+# IDE
+.idea/
+*.iml
+.mvn/wrapper/maven-wrapper.jar

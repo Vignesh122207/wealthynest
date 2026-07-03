@@ -1,0 +1,31 @@
+package com.wealthynest.domain.investment.repository;
+
+import com.wealthynest.domain.investment.entity.InvestmentIncomeLog;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+@Repository
+public interface InvestmentIncomeLogRepository extends JpaRepository<InvestmentIncomeLog, UUID> {
+
+    boolean existsByInvestmentIdAndIncomeTypeAndEventDate(
+            UUID investmentId, String incomeType, LocalDate eventDate);
+
+    @Query("SELECT l FROM InvestmentIncomeLog l WHERE l.userId = :userId " +
+           "AND YEAR(l.eventDate) = :year ORDER BY l.eventDate DESC")
+    List<InvestmentIncomeLog> findByUserIdAndYear(@Param("userId") UUID userId, @Param("year") int year);
+
+    @Query("SELECT COALESCE(SUM(l.amount), 0) FROM InvestmentIncomeLog l " +
+           "WHERE l.userId = :userId AND l.incomeType = :incomeType")
+    java.math.BigDecimal sumByUserAndIncomeType(@Param("userId") UUID userId,
+                                                @Param("incomeType") String incomeType);
+
+    List<InvestmentIncomeLog> findByInvestmentIdAndIncomeTypeOrderByEventDateDesc(
+            UUID investmentId, String incomeType);
+
+    List<InvestmentIncomeLog> findByInvestmentId(UUID investmentId);
+}

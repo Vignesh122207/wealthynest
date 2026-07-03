@@ -1,0 +1,94 @@
+"use client";
+
+import { ArrowLeft, Bell } from "lucide-react";
+import Link from "next/link";
+import { Header } from "@/components/layout/Header";
+import { PageWrapper } from "@/components/layout/PageWrapper";
+import { useNotificationStore, type NotifPrefs } from "@/store/notification.store";
+
+const NOTIF_ITEMS: { key: keyof NotifPrefs; label: string; description: string; emoji: string }[] = [
+  { key: "budgets",  emoji: "🎯", label: "Budget alerts",       description: "Get warned when a budget category is nearly full or exceeded" },
+  { key: "income",   emoji: "💰", label: "Income events",       description: "Dividends, bond coupons, and FD maturities credited in the last 7 days" },
+  { key: "goals",    emoji: "🏁", label: "Goal milestones",     description: "Notify when a goal hits 50% or is fully achieved" },
+  { key: "maturity", emoji: "⏰", label: "Upcoming maturities", description: "Alert for FDs and bonds maturing within the next 30 days" },
+];
+
+function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${
+        checked ? "bg-indigo-600" : "bg-muted-foreground/25"
+      }`}
+    >
+      <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform ${
+        checked ? "translate-x-5" : "translate-x-0"
+      }`} />
+    </button>
+  );
+}
+
+export default function NotificationsPage() {
+  const { prefs, setPref } = useNotificationStore();
+
+  const allOn  = Object.values(prefs).every(Boolean);
+  const allOff = Object.values(prefs).every(v => !v);
+
+  return (
+    <div className="flex flex-col flex-1">
+      <Header title="Notifications" />
+      <PageWrapper>
+        <div className="max-w-lg mx-auto space-y-6">
+
+          <Link href="/settings" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Settings
+          </Link>
+
+          {/* Icon header */}
+          <div className="flex flex-col items-center gap-3 py-2">
+            <div className="w-16 h-16 rounded-2xl bg-rose-500/10 flex items-center justify-center">
+              <Bell className="w-8 h-8 text-rose-500" />
+            </div>
+            <div className="text-center">
+              <p className="text-base font-semibold text-foreground">Notification Preferences</p>
+              <p className="text-xs text-muted-foreground mt-1">Choose which alerts you want to receive in the app.</p>
+            </div>
+          </div>
+
+          {/* All-at-once toggle */}
+          <div className="bg-card border border-border rounded-2xl p-4 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-foreground">All notifications</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {allOn ? "All alerts are on" : allOff ? "All alerts are off" : "Some alerts are on"}
+              </p>
+            </div>
+            <Toggle
+              checked={!allOff}
+              onChange={v => (Object.keys(prefs) as (keyof NotifPrefs)[]).forEach(k => setPref(k, v))}
+            />
+          </div>
+
+          {/* Individual toggles */}
+          <div className="bg-card border border-border rounded-2xl overflow-hidden divide-y divide-border">
+            {NOTIF_ITEMS.map(({ key, emoji, label, description }) => (
+              <div key={key} className="flex items-start gap-4 px-4 py-4">
+                <span className="text-xl mt-0.5 shrink-0">{emoji}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground">{label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{description}</p>
+                </div>
+                <Toggle checked={prefs[key]} onChange={v => setPref(key, v)} />
+              </div>
+            ))}
+          </div>
+
+        </div>
+      </PageWrapper>
+    </div>
+  );
+}

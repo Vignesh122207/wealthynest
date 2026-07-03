@@ -1,0 +1,117 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: wealthynest-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       wealthynest
+      POSTGRES_USER:     wealthynest
+      POSTGRES_PASSWORD: wealthynest
+    ports:
+      - "5432:5432"
+    volumes:
+      - wealthynest-postgres-data:/var/lib/postgresql/data
+    networks:
+      - wealthynest-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wealthynest -d wealthynest"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: wealthynest-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - wealthynest-redis-data:/data
+    networks:
+      - wealthynest-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  wealthynest-api:
+    build:
+      context: ./wealthynest-api
+      dockerfile: Dockerfile
+    container_name: wealthynest-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    ports:
+      - "8080:8080"
+    environment:
+      APP_ENV:      prod
+      DB_URL:       jdbc:postgresql://postgres:5432/wealthynest
+      DB_USERNAME:  wealthynest
+      DB_PASSWORD:  wealthynest
+      REDIS_HOST:   redis
+      REDIS_PORT:   6379
+      JWT_SECRET:          ${JWT_SECRET}
+      JWT_ACCESS_EXPIRY:   7200000
+      CORS_ORIGINS:        ${CORS_ORIGINS}
+      PORT:         8080
+      MAIL_HOST:     ${MAIL_HOST}
+      MAIL_PORT:     ${MAIL_PORT}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      FRONTEND_URL:  ${FRONTEND_URL}
+    networks:
+      - wealthynest-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  wealthynest-web:
+    build:
+      context: ./wealthynest-web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${API_URL}
+    container_name: wealthynest-web
+    restart: unless-stopped
+    depends_on:
+      wealthynest-api:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: ${API_URL}
+    networks:
+      - wealthynest-net
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: wealthynest-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    volumes:
+      - ~/.cloudflared:/home/nonroot/.cloudflared:ro
+    depends_on:
+      wealthynest-api:
+        condition: service_healthy
+      wealthynest-web:
+        condition: service_started
+    networks:
+      - wealthynest-net
+
+networks:
+  wealthynest-net:
+    driver: bridge
+
+volumes:
+  wealthynest-postgres-data:
+  wealthynest-redis-data:
