@@ -11,10 +11,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
   PieChart as RechartsPie, Pie, Cell, Tooltip, ResponsiveContainer, Legend, Sector,
-  LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine,
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, ReferenceLine,
 } from "recharts";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
+import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
 import { useChartTheme } from "@/hooks/useChartTheme";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -351,6 +352,16 @@ export default function NetWorthPage() {
 
   const { data: summary, isLoading: loadingSum } = useNetWorthSummary();
   const { data: nwHistory = [] }                 = useNetWorthHistory();
+  const [histViewMode, setHistViewMode] = useState<"monthly" | "yearly">("monthly");
+
+  const yearlyNwData = useMemo(() => {
+    const byYear = new Map<number, { year: number; netWorth: number }>();
+    for (const pt of nwHistory) {
+      byYear.set(pt.year, { year: pt.year, netWorth: pt.netWorth });
+    }
+    return Array.from(byYear.values()).sort((a, b) => a.year - b.year);
+  }, [nwHistory]);
+
   const { data: rawAssets = [], isLoading: loadingAssets } = useAssets();
   // Exclude any asset whose type is an investment type — those are shown as aggregates above
   const assets = rawAssets.filter(a => !INVESTMENT_TYPE_KEYS.has(a.assetType));
@@ -502,7 +513,7 @@ export default function NetWorthPage() {
         </div>
       )}
 
-      <main className="flex-1 p-4 md:p-5 lg:p-6 pb-24 lg:pb-6 overflow-auto">
+      <main className="flex-1 p-4 md:p-5 lg:p-6 pb-36 lg:pb-24 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-5">
 
         {/* ── Net Worth Banner ─────────────────────────────────────────────── */}
@@ -839,31 +850,69 @@ export default function NetWorthPage() {
 
         {/* ── Net Worth History ── */}
         <section>
-          <h2 className="text-sm font-semibold text-foreground mb-3">Net Worth History</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-foreground">Net Worth History</h2>
+            {nwHistory.length > 1 && (
+              <div className="flex gap-1 bg-muted/50 rounded-lg p-0.5">
+                {(["monthly", "yearly"] as const).map((mode) => (
+                  <button key={mode} onClick={() => setHistViewMode(mode)}
+                    className={cn(
+                      "px-3 py-1 rounded-md text-xs font-medium transition-all",
+                      histViewMode === mode
+                        ? "bg-card text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}>
+                    {mode === "monthly" ? "Monthly" : "Yearly"}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="bg-card border border-border rounded-2xl p-5">
             {nwHistory.length > 1 ? (
-              <>
-                <p className="text-xs text-muted-foreground mb-4">Monthly net worth trend (last {nwHistory.length} months)</p>
-                <ResponsiveContainer width="100%" height={220}>
-                  <LineChart data={nwHistory}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={chart.gridColor} vertical={false} />
-                    <XAxis dataKey="label" tick={{ fill: chart.axisColor, fontSize: 10 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: chart.axisColor, fontSize: 10 }} axisLine={false} tickLine={false}
-                      tickFormatter={(v) => `₹${Math.abs(v) >= 100000 ? `${(v / 100000).toFixed(1)}L` : `${(v / 1000).toFixed(0)}K`}`} />
-                    <Tooltip
-                      contentStyle={chart.tooltipStyle} labelStyle={chart.labelStyle} itemStyle={chart.itemStyle}
-                      cursor={chart.cursorStyle}
-                      formatter={(v: number) => [formatCurrency(v), "Net Worth"]}
-                    />
-                    <ReferenceLine y={0} stroke={chart.gridColor} strokeWidth={1.5} />
-                    <Line
-                      type="monotone" dataKey="netWorth" stroke="#6366f1" strokeWidth={2.5}
-                      dot={{ fill: "#6366f1", r: 3.5, strokeWidth: 0 }}
-                      activeDot={{ r: 5, fill: "#a78bfa", strokeWidth: 0 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </>
+              histViewMode === "monthly" ? (
+                <>
+                  <p className="text-xs text-muted-foreground mb-4">Monthly net worth trend (last {nwHistory.length} months)</p>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <LineChart data={nwHistory}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={chart.gridColor} vertical={false} />
+                      <XAxis dataKey="label" tick={{ fill: chart.axisColor, fontSize: 10 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: chart.axisColor, fontSize: 10 }} axisLine={false} tickLine={false}
+                        tickFormatter={(v) => `₹${Math.abs(v) >= 100000 ? `${(v / 100000).toFixed(1)}L` : `${(v / 1000).toFixed(0)}K`}`} />
+                      <Tooltip
+                        contentStyle={chart.tooltipStyle} labelStyle={chart.labelStyle} itemStyle={chart.itemStyle}
+                        cursor={chart.cursorStyle}
+                        formatter={(v: number) => [formatCurrency(v), "Net Worth"]}
+                      />
+                      <ReferenceLine y={0} stroke={chart.gridColor} strokeWidth={1.5} />
+                      <Line
+                        type="monotone" dataKey="netWorth" stroke="#6366f1" strokeWidth={2.5}
+                        dot={{ fill: "#6366f1", r: 3.5, strokeWidth: 0 }}
+                        activeDot={{ r: 5, fill: "#a78bfa", strokeWidth: 0 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-muted-foreground mb-4">Year-end net worth snapshot ({yearlyNwData.length} {yearlyNwData.length === 1 ? "year" : "years"})</p>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={yearlyNwData} barCategoryGap="35%">
+                      <CartesianGrid strokeDasharray="3 3" stroke={chart.gridColor} vertical={false} />
+                      <XAxis dataKey="year" tick={{ fill: chart.axisColor, fontSize: 10 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: chart.axisColor, fontSize: 10 }} axisLine={false} tickLine={false}
+                        tickFormatter={(v) => `₹${Math.abs(v) >= 100000 ? `${(v / 100000).toFixed(1)}L` : `${(v / 1000).toFixed(0)}K`}`} />
+                      <Tooltip
+                        contentStyle={chart.tooltipStyle} labelStyle={chart.labelStyle} itemStyle={chart.itemStyle}
+                        cursor={{ fill: "rgba(99,102,241,0.06)" }}
+                        formatter={(v: number) => [formatCurrency(v), "Net Worth"]}
+                      />
+                      <ReferenceLine y={0} stroke={chart.gridColor} strokeWidth={1.5} />
+                      <Bar dataKey="netWorth" fill="#6366f1" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </>
+              )
             ) : (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <TrendingUp className="w-8 h-8 text-muted mb-2" />
@@ -879,6 +928,12 @@ export default function NetWorthPage() {
 
         </div>
       </main>
+
+      {/* ── Floating Action Button ── */}
+      <FloatingActionButton actions={[
+        { icon: Plus,    label: "Add Asset",     color: "emerald", onClick: () => { setShowAssetForm(true); setEditAsset(null); } },
+        { icon: Banknote, label: "Add Liability", color: "rose",    onClick: () => { setShowLiabForm(true); setEditLiability(null); } },
+      ]} />
     </div>
   );
 }

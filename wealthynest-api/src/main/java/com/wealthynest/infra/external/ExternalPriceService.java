@@ -24,6 +24,13 @@ public interface ExternalPriceService {
     /** Returns current market price for an NSE stock symbol (appends .NS if needed). Null on failure. */
     BigDecimal fetchStockPrice(String symbol);
 
+    /**
+     * Search Yahoo Finance for BSE-listed stocks matching query.
+     * Returns results with exchange="BSE" and symbol without .BO suffix.
+     * Only called by searchStocks to supplement the local NSE master DB.
+     */
+    List<com.wealthynest.domain.investment.dto.response.InvestmentSearchResult> searchBSEStocks(String query);
+
     /** Like fetchGoldPriceData() but bypasses the in-memory TTL cache, forcing a fresh API call. */
     GoldPriceData fetchGoldPriceDataFresh();
 

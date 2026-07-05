@@ -113,6 +113,85 @@ function MemberRow({
   );
 }
 
+// ─── Admin-leave modal ────────────────────────────────────────────────────────
+
+function AdminLeaveModal({
+  open, familyName, nonAdminMembers, memberColorMap, targetMember, setTargetMember,
+  onConfirm, onCancel, transferring, leaving,
+}: {
+  open: boolean; familyName: string; nonAdminMembers: FamilyMember[];
+  memberColorMap: Map<string, string>; targetMember: FamilyMember | null;
+  setTargetMember: (m: FamilyMember | null) => void;
+  onConfirm: () => void; onCancel: () => void;
+  transferring: boolean; leaving: boolean;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-card border border-border rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-5">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+            <AlertTriangle className="w-4 h-4 text-amber-500" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-foreground">Transfer admin before leaving</p>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+              Select a member to become the new admin, then you will leave{" "}
+              <span className="font-medium text-foreground">{familyName}</span>.
+            </p>
+          </div>
+          <button onClick={onCancel} className="text-muted-foreground hover:text-foreground transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {nonAdminMembers.length === 0 ? (
+          <p className="text-xs text-muted-foreground bg-muted/60 rounded-xl px-3 py-2.5">
+            No other members to transfer to. Remove all members first, or delete the group.
+          </p>
+        ) : (
+          <div className="space-y-1.5 max-h-52 overflow-y-auto pr-0.5">
+            {nonAdminMembers.map((m, i) => (
+              <button key={m.id}
+                onClick={() => setTargetMember(targetMember?.id === m.id ? null : m)}
+                className={cn(
+                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all text-left",
+                  targetMember?.id === m.id
+                    ? "bg-indigo-500/10 border-indigo-500/40"
+                    : "bg-muted/40 border-border hover:border-indigo-500/30"
+                )}>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+                  style={{ background: (memberColorMap.get(m.id) ?? MEMBER_COLORS[i]) + "26" }}>
+                  <span className="text-[10px] font-bold" style={{ color: memberColorMap.get(m.id) ?? MEMBER_COLORS[i] }}>
+                    {initials(m.fullName)}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{m.fullName}</p>
+                  <p className="text-xs text-muted-foreground truncate">{m.email}</p>
+                </div>
+                {targetMember?.id === m.id && <Check className="w-4 h-4 text-indigo-500 shrink-0" />}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex gap-2 pt-1">
+          <button onClick={onConfirm} disabled={!targetMember || transferring || leaving}
+            className="flex-1 flex items-center justify-center gap-2 h-10 rounded-xl text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-all disabled:opacity-60">
+            {(transferring || leaving) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}
+            Transfer & Leave
+          </button>
+          <button onClick={onCancel}
+            className="h-10 px-4 rounded-xl text-sm text-muted-foreground bg-muted hover:bg-muted/80 transition-all">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function FamilyPage() {
@@ -247,11 +326,11 @@ export default function FamilyPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // ── Danger-zone section (rendered at the bottom) ───────────────────────────
+  // ── Danger-zone section (always rendered at the very bottom) ─────────────────
   const DangerZone = () => {
     if (mode === "confirmLeave") {
       return (
-        <div className="bg-red-500/8 border border-red-500/25 rounded-2xl p-5 space-y-3">
+        <div className="bg-red-500/8 border border-red-500/20 rounded-2xl p-5 space-y-3">
           <p className="text-sm font-medium text-foreground">
             Leave <span className="font-semibold">{family?.name}</span>? Your personal data stays in your account.
           </p>
@@ -267,61 +346,9 @@ export default function FamilyPage() {
       );
     }
 
-    if (mode === "adminLeave") {
-      return (
-        <div className="bg-card border border-amber-500/30 rounded-2xl p-5 space-y-4">
-          <div className="flex items-start gap-2.5">
-            <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-semibold text-foreground">Promote an admin before leaving</p>
-              <p className="text-xs text-muted-foreground mt-1">Select a member to become admin, then you will leave the group.</p>
-            </div>
-          </div>
-          {nonAdminMembers.length === 0 ? (
-            <p className="text-xs text-muted-foreground bg-muted/60 rounded-xl px-3 py-2">
-              No other members to transfer to. Remove all members first, or delete the group.
-            </p>
-          ) : (
-            <div className="space-y-1.5">
-              {nonAdminMembers.map((m, i) => (
-                <button key={m.id}
-                  onClick={() => setTargetMember(prev => prev?.id === m.id ? null : m)}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all text-left",
-                    targetMember?.id === m.id
-                      ? "bg-indigo-500/10 border-indigo-500/40"
-                      : "bg-muted/40 border-border hover:border-indigo-500/30"
-                  )}>
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
-                    style={{ background: (memberColorMap.get(m.id) ?? MEMBER_COLORS[i]) + "26" }}>
-                    <span className="text-[10px] font-bold" style={{ color: memberColorMap.get(m.id) ?? MEMBER_COLORS[i] }}>
-                      {initials(m.fullName)}
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{m.fullName}</p>
-                    <p className="text-xs text-muted-foreground truncate">{m.email}</p>
-                  </div>
-                  {targetMember?.id === m.id && <ChevronRight className="w-4 h-4 text-indigo-500 shrink-0" />}
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="flex gap-2 pt-1">
-            <button onClick={handleTransferAndLeave} disabled={!targetMember || transferring || leaving}
-              className="flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-all disabled:opacity-60">
-              {(transferring || leaving) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}
-              Transfer & Leave
-            </button>
-            <button onClick={reset} className="h-9 px-4 rounded-xl text-sm text-muted-foreground bg-muted hover:bg-muted/80 transition-all">Cancel</button>
-          </div>
-        </div>
-      );
-    }
-
     if (mode === "confirmDelete") {
       return (
-        <div className="bg-red-500/8 border border-red-500/25 rounded-2xl p-5 space-y-3">
+        <div className="bg-red-500/8 border border-red-500/20 rounded-2xl p-5 space-y-3">
           <p className="text-sm font-medium text-foreground">
             Delete <span className="font-semibold">{family?.name}</span>? All {members.length} members will be removed.
             Everyone's individual data stays in their own accounts.
@@ -340,25 +367,28 @@ export default function FamilyPage() {
 
     // idle — show buttons
     return (
-      <div className="flex gap-2">
-        {isAdmin ? (
-          <>
-            <button
-              onClick={() => members.length <= 1 ? setMode("confirmLeave") : setMode("adminLeave")}
-              className="flex items-center gap-2 h-9 px-4 rounded-xl text-sm text-red-400 border border-red-500/25 hover:bg-red-500/8 transition-all">
+      <div className="space-y-2">
+        <p className="text-[11px] font-semibold text-red-500/70 uppercase tracking-widest px-0.5">Danger Zone</p>
+        <div className="bg-card border border-red-500/20 rounded-2xl p-4 flex flex-wrap gap-2">
+          {isAdmin ? (
+            <>
+              <button
+                onClick={() => members.length <= 1 ? setMode("confirmLeave") : setMode("adminLeave")}
+                className="flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium text-red-600 dark:text-red-500 bg-red-500/8 border border-red-500/30 hover:bg-red-500/15 transition-all">
+                <LogOut className="w-3.5 h-3.5" /> Leave Group
+              </button>
+              <button onClick={() => setMode("confirmDelete")}
+                className="flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium text-red-600 dark:text-red-500 bg-red-500/8 border border-red-500/30 hover:bg-red-500/15 transition-all">
+                <Trash2 className="w-3.5 h-3.5" /> Delete Group
+              </button>
+            </>
+          ) : (
+            <button onClick={() => setMode("confirmLeave")} disabled={leaving}
+              className="flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium text-red-600 dark:text-red-500 bg-red-500/8 border border-red-500/30 hover:bg-red-500/15 transition-all disabled:opacity-60">
               <LogOut className="w-3.5 h-3.5" /> Leave Group
             </button>
-            <button onClick={() => setMode("confirmDelete")}
-              className="flex items-center gap-2 h-9 px-4 rounded-xl text-sm text-red-400 border border-red-500/25 hover:bg-red-500/8 transition-all">
-              <Trash2 className="w-3.5 h-3.5" /> Delete Group
-            </button>
-          </>
-        ) : (
-          <button onClick={() => setMode("confirmLeave")} disabled={leaving}
-            className="flex items-center gap-2 h-9 px-4 rounded-xl text-sm text-red-400 border border-red-500/25 hover:bg-red-500/8 transition-all disabled:opacity-60">
-            <LogOut className="w-3.5 h-3.5" /> Leave Group
-          </button>
-        )}
+          )}
+        </div>
       </div>
     );
   };
@@ -593,9 +623,6 @@ export default function FamilyPage() {
                   </div>
                 )}
 
-                {/* Danger zone — always at bottom of left col */}
-                <DangerZone />
-
               </div>{/* end left col */}
 
               {/* ── Right column ────────────────────────────── */}
@@ -744,6 +771,10 @@ export default function FamilyPage() {
 
               </div>{/* end right col */}
             </div>{/* end grid */}
+
+            {/* Danger zone — always at the bottom on all screen sizes */}
+            <DangerZone />
+
           </div>
 
         ) : (
@@ -880,6 +911,18 @@ export default function FamilyPage() {
         danger
         onConfirm={handleRemove}
         onCancel={reset}
+      />
+      <AdminLeaveModal
+        open={mode === "adminLeave"}
+        familyName={family?.name ?? ""}
+        nonAdminMembers={nonAdminMembers}
+        memberColorMap={memberColorMap}
+        targetMember={targetMember}
+        setTargetMember={m => setTargetMember(m)}
+        onConfirm={handleTransferAndLeave}
+        onCancel={reset}
+        transferring={transferring}
+        leaving={leaving}
       />
     </div>
   );

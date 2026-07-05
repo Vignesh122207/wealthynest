@@ -19,5 +19,7 @@ public class UpdateDebtRequest {
     @Size(max = 255)
     private String description;
 
+    private LocalDate debtDate;
+
     private LocalDate dueDate;
 }

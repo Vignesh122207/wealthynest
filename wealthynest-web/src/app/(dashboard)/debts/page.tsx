@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Header } from "@/components/layout/Header";
 import { PageWrapper } from "@/components/layout/PageWrapper";
+import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
 import {
   Plus, Pencil, Trash2, X, Check,
   ChevronDown, ChevronUp, User, Phone,
@@ -34,16 +35,18 @@ function DebtFormModal({ initial, defaultType, accounts, onSave, onClose, saving
   initial?:     Partial<DebtRecord>;
   defaultType?: DebtType;
   accounts:     { id: string; name: string }[];
-  onSave:       (v: { type: DebtType; contactName: string; contactPhone: string; amount: number; description: string; dueDate: string; accountId?: string }) => void;
+  onSave:       (v: { type: DebtType; contactName: string; contactPhone: string; amount: number; description: string; debtDate: string; dueDate: string; accountId?: string }) => void;
   onClose:      () => void;
   saving:       boolean;
 }) {
+  const today = new Date().toISOString().split("T")[0];
   const isEdit = !!initial?.id;
   const [type,         setType]         = useState<DebtType>(initial?.type ?? defaultType ?? "LENT");
   const [contactName,  setContactName]  = useState(initial?.contactName  ?? "");
   const [contactPhone, setContactPhone] = useState(initial?.contactPhone ?? "");
   const [amount,       setAmount]       = useState(initial?.amount?.toString() ?? "");
   const [description,  setDescription]  = useState(initial?.description  ?? "");
+  const [debtDate,     setDebtDate]     = useState(initial?.debtDate?.slice(0, 10) ?? today);
   const [dueDate,      setDueDate]      = useState(initial?.dueDate?.slice(0, 10) ?? "");
   const [accountId,    setAccountId]    = useState(initial?.accountId ?? "");
 
@@ -89,7 +92,7 @@ function DebtFormModal({ initial, defaultType, accounts, onSave, onClose, saving
                 className={cn(
                   "flex-1 h-10 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2",
                   type === "BORROWED"
-                    ? "bg-amber-600 text-white shadow-sm shadow-amber-600/30"
+                    ? "bg-rose-600 text-white shadow-sm shadow-rose-600/30"
                     : "text-muted-foreground hover:text-foreground"
                 )}>
                 <ArrowDownLeft className="w-4 h-4" /> I Borrowed
@@ -128,6 +131,19 @@ function DebtFormModal({ initial, defaultType, accounts, onSave, onClose, saving
 
             <div className="grid grid-cols-2 gap-3">
               <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                  {type === "LENT" ? "Date Lent" : "Date Borrowed"}
+                </label>
+                <FormDatePicker value={debtDate} onChange={v => setDebtDate(v)} placeholder="Pick date" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Due Date <span className="text-muted-foreground/60">(optional)</span></label>
+                <FormDatePicker value={dueDate} onChange={v => setDueDate(v)} placeholder="Pick date" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-1.5">Phone <span className="text-muted-foreground/60">(optional)</span></label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50" />
@@ -135,9 +151,10 @@ function DebtFormModal({ initial, defaultType, accounts, onSave, onClose, saving
                     className="w-full h-11 pl-8 pr-3 rounded-xl text-sm bg-background border border-border text-foreground placeholder-muted-foreground/40 outline-none focus:border-indigo-500 transition-all" />
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Due Date <span className="text-muted-foreground/60">(optional)</span></label>
-                <FormDatePicker value={dueDate} onChange={v => setDueDate(v)} placeholder="Pick date" />
+              <div className="flex items-end">
+                <p className="text-[11px] text-muted-foreground/60 leading-relaxed pb-1">
+                  Phone is optional — used for contact reference only.
+                </p>
               </div>
             </div>
 
@@ -179,11 +196,11 @@ function DebtFormModal({ initial, defaultType, accounts, onSave, onClose, saving
               Cancel
             </button>
             <button
-              onClick={() => valid && onSave({ type, contactName, contactPhone, amount: Number(amount), description, dueDate, accountId: accountId || undefined })}
+              onClick={() => valid && onSave({ type, contactName, contactPhone, amount: Number(amount), description, debtDate, dueDate, accountId: accountId || undefined })}
               disabled={saving || !valid} type="button"
               className={cn(
                 "flex-1 h-12 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2",
-                !isEdit && type === "LENT" ? "bg-teal-600 hover:bg-teal-500" : !isEdit ? "bg-amber-600 hover:bg-amber-500" : "bg-indigo-600 hover:bg-indigo-500"
+                !isEdit && type === "LENT" ? "bg-teal-600 hover:bg-teal-500" : !isEdit ? "bg-rose-600 hover:bg-rose-500" : "bg-indigo-600 hover:bg-indigo-500"
               )}>
               {saving ? (
                 <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -539,7 +556,7 @@ export default function DebtsPage() {
 
           <div className="flex gap-2 ml-auto">
             <button onClick={() => setModal({ mode: "create", defaultType: "BORROWED" })}
-              className="flex items-center gap-1.5 h-9 px-3 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white transition-all">
+              className="flex items-center gap-1.5 h-9 px-3 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition-all">
               <ArrowDownLeft className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">I </span>Borrowed
             </button>
@@ -573,7 +590,7 @@ export default function DebtsPage() {
                 <ArrowUpRight className="w-4 h-4" /> I Lent
               </button>
               <button onClick={() => setModal({ mode: "create", defaultType: "BORROWED" })}
-                className="flex items-center gap-1.5 h-10 px-4 rounded-xl text-sm font-semibold bg-amber-600 hover:bg-amber-500 text-white transition-all">
+                className="flex items-center gap-1.5 h-10 px-4 rounded-xl text-sm font-semibold bg-rose-600 hover:bg-rose-500 text-white transition-all">
                 <ArrowDownLeft className="w-4 h-4" /> I Borrowed
               </button>
             </div>
@@ -660,6 +677,12 @@ export default function DebtsPage() {
           </div>
         </div>
       )}
+
+      {/* ── Floating Action Button ── */}
+      <FloatingActionButton actions={[
+        { icon: ArrowUpRight,   label: "I Lent",     color: "emerald", onClick: () => setModal({ mode: "create", defaultType: "LENT" }) },
+        { icon: ArrowDownLeft,  label: "I Borrowed",  color: "rose",    onClick: () => setModal({ mode: "create", defaultType: "BORROWED" }) },
+      ]} />
     </div>
   );
 }

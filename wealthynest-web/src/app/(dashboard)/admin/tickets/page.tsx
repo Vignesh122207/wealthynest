@@ -4,7 +4,7 @@ import { useState } from "react";
 import {
   Loader2, Send, ShieldCheck, ChevronRight, ArrowLeft,
   Search, MessageSquare, Clock, RefreshCw, ChevronLeft, X,
-  AlertTriangle, Ticket,
+  Ticket, Circle, CheckCircle2, XCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
@@ -21,18 +21,78 @@ import { cn } from "@/lib/utils";
 
 const STATUS_OPTIONS: TicketStatus[] = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"];
 
-const STATUS_CONFIG: Record<TicketStatus, { label: string; color: string }> = {
-  OPEN:        { label: "Open",        color: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20" },
-  IN_PROGRESS: { label: "In Progress", color: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" },
-  RESOLVED:    { label: "Resolved",    color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" },
-  CLOSED:      { label: "Closed",      color: "bg-slate-500/10 text-slate-500 border border-slate-500/20" },
+const STATUS_CONFIG: Record<TicketStatus, {
+  label: string;
+  badge: string;
+  activePill: string;
+  icon: React.ElementType;
+  dot: string;
+}> = {
+  OPEN:        {
+    label: "Open",
+    badge: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20",
+    activePill: "bg-blue-500 text-white border-blue-500 shadow-sm",
+    icon: Circle,
+    dot: "bg-blue-500",
+  },
+  IN_PROGRESS: {
+    label: "In Progress",
+    badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20",
+    activePill: "bg-amber-500 text-white border-amber-500 shadow-sm",
+    icon: Clock,
+    dot: "bg-amber-500",
+  },
+  RESOLVED:    {
+    label: "Resolved",
+    badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20",
+    activePill: "bg-emerald-500 text-white border-emerald-500 shadow-sm",
+    icon: CheckCircle2,
+    dot: "bg-emerald-500",
+  },
+  CLOSED:      {
+    label: "Closed",
+    badge: "bg-slate-500/10 text-slate-500 border border-slate-500/20",
+    activePill: "bg-slate-500 text-white border-slate-500 shadow-sm",
+    icon: XCircle,
+    dot: "bg-slate-400",
+  },
 };
 
-const PRIORITY_CONFIG: Record<TicketPriority, { label: string; bar: string; text: string }> = {
-  LOW:    { label: "Low",    bar: "bg-slate-400",   text: "text-slate-500" },
-  MEDIUM: { label: "Medium", bar: "bg-amber-400",   text: "text-amber-600 dark:text-amber-400" },
-  HIGH:   { label: "High",   bar: "bg-orange-500",  text: "text-orange-600 dark:text-orange-400" },
-  URGENT: { label: "Urgent", bar: "bg-red-500",     text: "text-red-600 dark:text-red-400" },
+const PRIORITY_CONFIG: Record<TicketPriority, {
+  label: string;
+  bar: string;
+  dot: string;
+  badge: string;
+  activePill: string;
+}> = {
+  LOW:    {
+    label: "Low",
+    bar: "bg-slate-400",
+    dot: "bg-slate-400",
+    badge: "bg-slate-500/10 text-slate-500 dark:text-slate-400 border border-slate-500/20",
+    activePill: "bg-slate-500 text-white border-slate-500 shadow-sm",
+  },
+  MEDIUM: {
+    label: "Medium",
+    bar: "bg-amber-400",
+    dot: "bg-amber-400",
+    badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20",
+    activePill: "bg-amber-500 text-white border-amber-500 shadow-sm",
+  },
+  HIGH:   {
+    label: "High",
+    bar: "bg-orange-500",
+    dot: "bg-orange-500",
+    badge: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20",
+    activePill: "bg-orange-500 text-white border-orange-500 shadow-sm",
+  },
+  URGENT: {
+    label: "Urgent",
+    bar: "bg-red-500",
+    dot: "bg-red-500",
+    badge: "bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20",
+    activePill: "bg-red-500 text-white border-red-500 shadow-sm",
+  },
 };
 
 const CATEGORY_CONFIG: Record<string, { emoji: string; label: string }> = {
@@ -42,6 +102,11 @@ const CATEGORY_CONFIG: Record<string, { emoji: string; label: string }> = {
   DATA_SYNC_ISSUE:  { emoji: "🔄", label: "Data / Sync" },
   GENERAL_QUESTION: { emoji: "❓", label: "General Question" },
 };
+
+function userInitial(name?: string | null) {
+  if (!name) return "?";
+  return name.trim().split(/\s+/).map(n => n[0]).join("").slice(0, 2).toUpperCase();
+}
 
 // ─── Pagination bar ───────────────────────────────────────────────────────────
 
@@ -73,27 +138,23 @@ function PaginationBar({ page, totalPages, totalElements, pageSize, onPage }: {
 // ─── Ticket Detail ────────────────────────────────────────────────────────────
 
 function TicketDetail({ ticketId, onBack }: { ticketId: string; onBack: () => void }) {
-  const { data: ticket, isLoading } = useAdminTicket(ticketId);
-  const { mutate: sendReply, isPending: sendingReply }   = useAdminReply(ticketId);
-  const { mutate: updateStatus, isPending: updatingStatus } = useAdminUpdateStatus(ticketId);
+  const { data: ticket, isLoading }                          = useAdminTicket(ticketId);
+  const { mutate: sendReply, isPending: sendingReply }       = useAdminReply(ticketId);
+  const { mutate: updateStatus, isPending: updatingStatus }  = useAdminUpdateStatus(ticketId);
   const [reply, setReply] = useState("");
-
-  function handleReply(e: React.FormEvent) {
-    e.preventDefault();
-    if (!reply.trim()) return;
-    sendReply({ message: reply.trim() }, { onSuccess: () => setReply("") });
-  }
 
   if (isLoading || !ticket) {
     return (
       <div className="space-y-3">
-        {[1,2,3].map(i => <div key={i} className="h-20 bg-muted/50 rounded-2xl animate-pulse" />)}
+        {[1, 2, 3].map(i => <div key={i} className="h-20 bg-muted/50 rounded-2xl animate-pulse" />)}
       </div>
     );
   }
 
   const cat = CATEGORY_CONFIG[ticket.category];
   const pri = PRIORITY_CONFIG[ticket.priority];
+  const sts = STATUS_CONFIG[ticket.status];
+  const StatusIcon = sts.icon;
 
   return (
     <div className="space-y-4">
@@ -104,89 +165,134 @@ function TicketDetail({ ticketId, onBack }: { ticketId: string; onBack: () => vo
 
       {/* Header card */}
       <div className="bg-card border border-border rounded-2xl overflow-hidden">
-        <div className={cn("h-1 w-full", pri.bar)} />
-        <div className="p-5 space-y-3">
+        <div className={cn("h-1.5 w-full", pri.bar)} />
+        <div className="p-5 space-y-4">
           <div className="flex items-start gap-3 justify-between">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-lg">{cat?.emoji}</span>
-                <span className="text-xs text-muted-foreground">{cat?.label}</span>
+            <div className="flex-1 min-w-0 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-base">{cat?.emoji}</span>
+                <span className="text-xs font-medium text-muted-foreground">{cat?.label}</span>
               </div>
               <p className="text-base font-semibold text-foreground leading-snug">{ticket.subject}</p>
-              <p className="text-xs text-muted-foreground mt-1.5">
-                From: <span className="font-medium text-foreground">{ticket.userName ?? "Unknown"}</span>
-                {ticket.userEmail && <span className="opacity-60"> · {ticket.userEmail}</span>}
-              </p>
-              <p className="text-xs text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-full bg-indigo-500/15 flex items-center justify-center shrink-0">
+                  <span className="text-[9px] font-bold text-indigo-500">{userInitial(ticket.userName)}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">{ticket.userName ?? "Unknown"}</span>
+                  {ticket.userEmail && <span className="opacity-60"> · {ticket.userEmail}</span>}
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground/60">
                 {new Date(ticket.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
               </p>
             </div>
-            <span className={cn("text-[11px] font-semibold px-2.5 py-1 rounded-full shrink-0", STATUS_CONFIG[ticket.status].color)}>
-              {STATUS_CONFIG[ticket.status].label}
+            <span className={cn("inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full shrink-0", sts.badge)}>
+              <StatusIcon className="w-3 h-3" />
+              {sts.label}
             </span>
           </div>
 
-          <div className="pt-3 border-t border-border text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+          <div className="pt-4 border-t border-border text-sm text-foreground leading-relaxed whitespace-pre-wrap">
             {ticket.description}
           </div>
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="bg-card border border-border rounded-2xl p-4">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">Manage</p>
-        <div className="flex flex-wrap gap-3">
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Status</label>
-            <select value={ticket.status}
-              onChange={e => updateStatus({ status: e.target.value as TicketStatus })}
-              disabled={updatingStatus}
-              className="bg-background border border-border rounded-xl px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/40">
-              {STATUS_OPTIONS.map(s => (
-                <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>
-              ))}
-            </select>
+      {/* Manage — visual button pickers */}
+      <div className="bg-card border border-border rounded-2xl p-5 space-y-5">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Manage</p>
+
+        {/* Status picker */}
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-foreground">Status</p>
+          <div className="flex flex-wrap gap-2">
+            {STATUS_OPTIONS.map(s => {
+              const cfg = STATUS_CONFIG[s];
+              const Icon = cfg.icon;
+              const isActive = ticket.status === s;
+              return (
+                <button key={s}
+                  onClick={() => !isActive && updateStatus({ status: s })}
+                  disabled={updatingStatus}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all",
+                    isActive
+                      ? cfg.activePill
+                      : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}>
+                  {updatingStatus && isActive
+                    ? <Loader2 className="w-3 h-3 animate-spin" />
+                    : <Icon className="w-3 h-3" />
+                  }
+                  {cfg.label}
+                </button>
+              );
+            })}
           </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Priority</label>
-            <select value={ticket.priority}
-              onChange={e => updateStatus({ priority: e.target.value as TicketPriority })}
-              disabled={updatingStatus}
-              className="bg-background border border-border rounded-xl px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/40">
-              {(Object.keys(PRIORITY_CONFIG) as TicketPriority[]).map(p => (
-                <option key={p} value={p}>{PRIORITY_CONFIG[p].label}</option>
-              ))}
-            </select>
+        </div>
+
+        {/* Priority picker */}
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-foreground">Priority</p>
+          <div className="flex flex-wrap gap-2">
+            {(Object.keys(PRIORITY_CONFIG) as TicketPriority[]).map(p => {
+              const cfg = PRIORITY_CONFIG[p];
+              const isActive = ticket.priority === p;
+              return (
+                <button key={p}
+                  onClick={() => !isActive && updateStatus({ priority: p })}
+                  disabled={updatingStatus}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all",
+                    isActive
+                      ? cfg.activePill
+                      : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}>
+                  <div className={cn("w-2 h-2 rounded-full shrink-0", isActive ? "bg-white/80" : cfg.dot)} />
+                  {cfg.label}
+                </button>
+              );
+            })}
           </div>
-          {updatingStatus && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground self-end mb-2" />}
         </div>
       </div>
 
       {/* Thread */}
       {(ticket.replies?.length ?? 0) > 0 && (
         <div className="space-y-2">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest px-1">Thread</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest px-1">
+            Thread · {ticket.replies!.length} {ticket.replies!.length === 1 ? "message" : "messages"}
+          </p>
           {ticket.replies!.map(r => (
-            <div key={r.id}
-              className={cn(
-                "rounded-2xl px-4 py-3.5 space-y-1.5",
-                r.adminReply
-                  ? "bg-indigo-500/8 border border-indigo-500/20"
-                  : "bg-card border border-border"
+            <div key={r.id} className={cn(
+              "rounded-2xl border overflow-hidden",
+              r.adminReply ? "border-indigo-500/20" : "border-border"
+            )}>
+              <div className={cn(
+                "flex items-center gap-2.5 px-4 py-2.5",
+                r.adminReply ? "bg-indigo-500/8" : "bg-muted/40"
               )}>
-              <div className="flex items-center gap-2">
-                {r.adminReply
-                  ? <ShieldCheck className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                  : <div className="w-3.5 h-3.5 rounded-full bg-muted-foreground/20 shrink-0" />
-                }
-                <p className={cn("text-xs font-semibold", r.adminReply ? "text-indigo-600 dark:text-indigo-400" : "text-foreground")}>
-                  {r.adminReply ? `${r.authorName} (Support)` : r.authorName}
+                {r.adminReply ? (
+                  <div className="w-7 h-7 rounded-full bg-indigo-500 flex items-center justify-center shrink-0">
+                    <ShieldCheck className="w-3.5 h-3.5 text-white" />
+                  </div>
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-muted-foreground/20 flex items-center justify-center shrink-0">
+                    <span className="text-[10px] font-bold text-muted-foreground">{userInitial(r.authorName)}</span>
+                  </div>
+                )}
+                <p className={cn("text-xs font-semibold flex-1", r.adminReply ? "text-indigo-600 dark:text-indigo-400" : "text-foreground")}>
+                  {r.adminReply ? `${r.authorName} · Support` : r.authorName}
                 </p>
-                <span className="text-[11px] text-muted-foreground ml-auto">
+                <span className="text-[11px] text-muted-foreground shrink-0">
                   {new Date(r.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                 </span>
               </div>
-              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap pl-5">{r.message}</p>
+              <div className={cn("px-4 py-3 text-sm text-foreground leading-relaxed whitespace-pre-wrap",
+                r.adminReply ? "bg-indigo-500/4" : "bg-card")}>
+                {r.message}
+              </div>
             </div>
           ))}
         </div>
@@ -194,24 +300,36 @@ function TicketDetail({ ticketId, onBack }: { ticketId: string; onBack: () => vo
 
       {/* Reply */}
       {ticket.status !== "CLOSED" ? (
-        <form onSubmit={handleReply} className="space-y-3">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest px-1">Reply as Support</p>
-          <textarea
-            value={reply}
-            onChange={e => setReply(e.target.value)}
-            rows={4}
-            placeholder="Type your reply to the user..."
-            className="w-full bg-card border border-border rounded-2xl px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/40 resize-none"
-          />
-          <button type="submit" disabled={sendingReply || !reply.trim()}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors">
-            {sendingReply ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            Send Reply
-          </button>
+        <form onSubmit={e => { e.preventDefault(); if (reply.trim()) sendReply({ message: reply.trim() }, { onSuccess: () => setReply("") }); }}
+          className="bg-card border border-border rounded-2xl overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/30">
+            <div className="w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-3 h-3 text-white" />
+            </div>
+            <p className="text-xs font-semibold text-foreground">Reply as Support</p>
+          </div>
+          <div className="p-4 space-y-3">
+            <textarea
+              value={reply}
+              onChange={e => setReply(e.target.value)}
+              rows={4}
+              placeholder="Write your reply to the user…"
+              className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/40 resize-none placeholder:text-muted-foreground"
+            />
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">{reply.length > 0 ? `${reply.length} chars` : ""}</span>
+              <button type="submit" disabled={sendingReply || !reply.trim()}
+                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors">
+                {sendingReply ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                Send Reply
+              </button>
+            </div>
+          </div>
         </form>
       ) : (
-        <div className="text-center text-sm text-muted-foreground bg-muted/50 rounded-2xl py-4 border border-border">
-          This ticket is closed.
+        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground bg-muted/40 rounded-2xl py-5 border border-border">
+          <XCircle className="w-4 h-4 text-slate-400" />
+          This ticket is closed — no further replies can be sent.
         </div>
       )}
     </div>
@@ -224,37 +342,51 @@ function TicketCard({ ticket, onClick }: { ticket: TicketType; onClick: () => vo
   const cat = CATEGORY_CONFIG[ticket.category];
   const pri = PRIORITY_CONFIG[ticket.priority];
   const sts = STATUS_CONFIG[ticket.status];
+  const StatusIcon = sts.icon;
 
   return (
     <button onClick={onClick}
-      className="w-full flex items-stretch bg-card border border-border rounded-2xl overflow-hidden hover:bg-muted/30 transition-colors group text-left">
-      {/* Priority bar */}
-      <div className={cn("w-1 shrink-0", pri.bar)} />
-      {/* Content */}
-      <div className="flex-1 min-w-0 px-4 py-3.5">
-        <div className="flex items-start gap-2 justify-between">
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground truncate leading-snug">{ticket.subject}</p>
-            <p className="text-xs text-muted-foreground mt-0.5 truncate">
-              {ticket.userName ?? "Unknown"}
-              {ticket.userEmail && <span className="opacity-60"> · {ticket.userEmail}</span>}
-            </p>
+      className="w-full flex items-stretch bg-card border border-border rounded-2xl overflow-hidden hover:border-indigo-500/30 hover:shadow-sm transition-all group text-left">
+      <div className={cn("w-1.5 shrink-0", pri.bar)} />
+      <div className="flex-1 min-w-0 px-4 py-3.5 space-y-2.5">
+        {/* Row 1 */}
+        <div className="flex items-start gap-3 justify-between">
+          <div className="flex items-start gap-2.5 flex-1 min-w-0">
+            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0 mt-0.5">
+              <span className="text-[10px] font-bold text-muted-foreground">{userInitial(ticket.userName)}</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-foreground truncate leading-snug">{ticket.subject}</p>
+              <p className="text-xs text-muted-foreground truncate mt-0.5">
+                {ticket.userName ?? "Unknown"}
+                {ticket.userEmail && <span className="opacity-60"> · {ticket.userEmail}</span>}
+              </p>
+            </div>
           </div>
-          <ChevronRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0 mt-0.5" />
+          <ChevronRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-indigo-500 transition-colors shrink-0 mt-1" />
         </div>
-        <div className="flex items-center gap-2 mt-2 flex-wrap">
-          <span className="text-lg shrink-0">{cat?.emoji}</span>
-          <span className={cn("text-[11px] font-semibold px-2 py-0.5 rounded-full", sts.color)}>
+
+        {/* Row 2 — badges */}
+        <div className="flex items-center gap-2 flex-wrap pl-10">
+          <span className="text-base shrink-0">{cat?.emoji}</span>
+
+          <span className={cn("inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full", sts.badge)}>
+            <StatusIcon className="w-2.5 h-2.5" />
             {sts.label}
           </span>
-          <span className={cn("text-[11px] font-medium", pri.text)}>{pri.label}</span>
+
+          <span className={cn("inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border", pri.badge)}>
+            <div className={cn("w-1.5 h-1.5 rounded-full", pri.dot)} />
+            {pri.label}
+          </span>
+
           {ticket.replyCount > 0 && (
             <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
               <MessageSquare className="w-3 h-3" /> {ticket.replyCount}
             </span>
           )}
-          <span className="ml-auto flex items-center gap-1 text-[11px] text-muted-foreground">
-            <Clock className="w-3 h-3" />
+
+          <span className="ml-auto text-[11px] text-muted-foreground">
             {new Date(ticket.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
           </span>
         </div>
@@ -313,7 +445,7 @@ export default function AdminTicketsPage() {
               </div>
 
               {/* Filters */}
-              <div className="bg-card border border-border rounded-2xl p-3 space-y-3">
+              <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
                 {/* Search */}
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
@@ -331,19 +463,27 @@ export default function AdminTicketsPage() {
                   )}
                 </div>
 
-                {/* Status tabs */}
-                <div className="flex items-center gap-1 flex-wrap">
-                  {["", ...STATUS_OPTIONS].map(s => (
-                    <button key={s} onClick={() => handleStatusChange(s)}
-                      className={cn(
-                        "px-3 py-1.5 rounded-xl text-xs font-medium transition-all",
-                        statusFilter === s
-                          ? "bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted border border-transparent"
-                      )}>
-                      {s === "" ? "All" : STATUS_CONFIG[s as TicketStatus].label}
-                    </button>
-                  ))}
+                {/* Status pills */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {["", ...STATUS_OPTIONS].map(s => {
+                    const isActive = statusFilter === s;
+                    const cfg = s ? STATUS_CONFIG[s as TicketStatus] : null;
+                    const Icon = cfg?.icon;
+                    return (
+                      <button key={s} onClick={() => handleStatusChange(s)}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all border",
+                          isActive
+                            ? s === ""
+                              ? "bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/30"
+                              : cfg!.activePill
+                            : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted"
+                        )}>
+                        {Icon && <Icon className="w-3 h-3" />}
+                        {s === "" ? "All" : cfg!.label}
+                      </button>
+                    );
+                  })}
                   {isLoading && <RefreshCw className="w-3.5 h-3.5 animate-spin text-muted-foreground ml-auto" />}
                 </div>
               </div>
@@ -351,7 +491,9 @@ export default function AdminTicketsPage() {
               {/* Ticket list */}
               {!isLoading && filtered.length === 0 ? (
                 <div className="bg-card border border-border rounded-2xl p-12 flex flex-col items-center gap-3 text-center">
-                  <Ticket className="w-10 h-10 text-muted-foreground/30" />
+                  <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center">
+                    <Ticket className="w-6 h-6 text-muted-foreground/40" />
+                  </div>
                   <div>
                     <p className="text-sm font-semibold text-foreground">No tickets found</p>
                     <p className="text-xs text-muted-foreground mt-1">

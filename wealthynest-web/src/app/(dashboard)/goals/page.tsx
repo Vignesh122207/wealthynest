@@ -9,6 +9,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Header } from "@/components/layout/Header";
+import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { TableRowSkeleton } from "@/components/shared/LoadingSkeleton";
@@ -619,7 +620,7 @@ export default function GoalsPage() {
         </div>
       )}
 
-      <main className="flex-1 p-4 md:p-5 lg:p-6 pb-24 lg:pb-6 overflow-auto">
+      <main className="flex-1 p-4 md:p-5 lg:p-6 pb-36 lg:pb-24 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-5">
 
         {/* Summary banner */}
@@ -758,6 +759,11 @@ export default function GoalsPage() {
         )}
         </div>
       </main>
+
+      {/* ── Floating Action Button ── */}
+      <FloatingActionButton actions={[
+        { icon: Target, label: "Add Goal", color: "indigo", onClick: () => { setShowCreate(true); setEditGoal(null); } },
+      ]} />
     </div>
   );
 }

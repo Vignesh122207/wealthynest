@@ -114,7 +114,7 @@ export default function SettingsPage() {
     <div className="flex flex-col flex-1">
       <Header title="Settings" />
       <PageWrapper>
-        <div className="max-w-lg mx-auto space-y-6">
+        <div className="space-y-6">
 
           {/* ── Profile Card ─────────────────────────────────────── */}
           <Link
@@ -136,101 +136,115 @@ export default function SettingsPage() {
             <ChevronRight className="w-4 h-4 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors shrink-0" />
           </Link>
 
-          {/* ── Account ──────────────────────────────────────────── */}
-          <MenuGroup label="Account">
-            <MenuItem href="/settings/profile"
-              icon={User} iconBg="bg-indigo-500"
-              label="Profile" description="Edit your name and email address" />
-            <MenuItem href="/settings/security"
-              icon={Lock} iconBg="bg-slate-500"
-              label="Security" description="Change your password" />
-          </MenuGroup>
+          {/* ── Two-column grid on desktop ────────────────────────── */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-          {/* ── Preferences ──────────────────────────────────────── */}
-          <MenuGroup label="Preferences">
-            <MenuItem href="/settings/appearance"
-              icon={Sun} iconBg="bg-amber-500"
-              label="Appearance" description="Dark mode, light mode, and currency" />
-            <MenuItem href="/settings/notifications"
-              icon={Bell} iconBg="bg-rose-500"
-              label="Notifications" description="Budget alerts, goals, and maturity reminders" />
-            <MenuItem href="/settings/categories"
-              icon={Tag} iconBg="bg-violet-500"
-              label="Categories" description="Manage expense and income categories" />
-            <MenuItem href="/settings/recurring"
-              icon={RefreshCw} iconBg="bg-indigo-500"
-              label="Recurring Income" description="Auto-credit salary and monthly income" />
-          </MenuGroup>
+            {/* Left column */}
+            <div className="space-y-4">
 
-          {/* ── Data ─────────────────────────────────────────────── */}
-          <MenuGroup label="Data">
-            <MenuItem href="/reports"
-              icon={Download} iconBg="bg-emerald-500"
-              label="Reports & Exports" description="Monthly and annual reports, CSV downloads" />
-          </MenuGroup>
+              {/* ── Account ─────────────────────────────────────── */}
+              <MenuGroup label="Account">
+                <MenuItem href="/settings/profile"
+                  icon={User} iconBg="bg-indigo-500"
+                  label="Profile" description="Edit your name and email address" />
+                <MenuItem href="/settings/security"
+                  icon={Lock} iconBg="bg-slate-500"
+                  label="Security" description="Change your password" />
+              </MenuGroup>
 
-          {/* ── Get Help ─────────────────────────────────────────── */}
-          <MenuGroup label="Get Help">
-            <MenuItem href="/settings/support/contact"
-              icon={Mail} iconBg="bg-indigo-500"
-              label="Contact Us" description="Email support · reply within 48 hours" />
-            <MenuItem href="/settings/support/tickets"
-              icon={Ticket} iconBg="bg-violet-500"
-              label="My Tickets" description="View and track your support requests" />
-            <MenuItem href="/settings/support/tickets/new"
-              icon={Plus} iconBg="bg-emerald-500"
-              label="Create a Ticket" description="Report a bug or ask a question" />
-          </MenuGroup>
+              {/* ── Preferences ─────────────────────────────────── */}
+              <MenuGroup label="Preferences">
+                <MenuItem href="/settings/appearance"
+                  icon={Sun} iconBg="bg-amber-500"
+                  label="Appearance" description="Dark mode, light mode, and currency" />
+                <MenuItem href="/settings/notifications"
+                  icon={Bell} iconBg="bg-rose-500"
+                  label="Notifications" description="Budget alerts, goals, and maturity reminders" />
+                <MenuItem href="/settings/categories"
+                  icon={Tag} iconBg="bg-violet-500"
+                  label="Categories" description="Manage expense and income categories" />
+                <MenuItem href="/settings/recurring"
+                  icon={RefreshCw} iconBg="bg-indigo-500"
+                  label="Recurring Income" description="Auto-credit salary and monthly income" />
+              </MenuGroup>
 
-          {/* ── Information ──────────────────────────────────────── */}
-          <MenuGroup label="Information">
-            <MenuItem href="/settings/support/faq"
-              icon={HelpCircle} iconBg="bg-cyan-500"
-              label="FAQ" description="Answers to common questions" />
-            <MenuItem href="/privacy"
-              icon={Shield} iconBg="bg-slate-500"
-              label="Privacy Policy" description="How we handle your data" />
-            <MenuItem href="/terms"
-              icon={FileText} iconBg="bg-slate-500"
-              label="Terms of Service" description="Terms & conditions of use" />
-          </MenuGroup>
+              {/* ── Data ────────────────────────────────────────── */}
+              <MenuGroup label="Data">
+                <MenuItem href="/reports"
+                  icon={Download} iconBg="bg-emerald-500"
+                  label="Reports & Exports" description="Monthly and annual reports, CSV downloads" />
+              </MenuGroup>
 
-          {/* ── Support the App ──────────────────────────────────── */}
-          <MenuGroup label="Support the App">
-            <MenuItem href="/settings/support/coffee"
-              icon={Coffee} iconBg="bg-indigo-500"
-              label="Support WealthyNest" description="Help keep the app free · pay via UPI" />
-          </MenuGroup>
+            </div>
 
-          {/* ── Danger zone ──────────────────────────────────────── */}
+            {/* Right column */}
+            <div className="space-y-4">
+
+              {/* ── Get Help ────────────────────────────────────── */}
+              <MenuGroup label="Get Help">
+                <MenuItem href="/settings/support/contact"
+                  icon={Mail} iconBg="bg-indigo-500"
+                  label="Contact Us" description="Email support · reply within 48 hours" />
+                <MenuItem href="/settings/support/tickets"
+                  icon={Ticket} iconBg="bg-violet-500"
+                  label="My Tickets" description="View and track your support requests" />
+                <MenuItem href="/settings/support/tickets/new"
+                  icon={Plus} iconBg="bg-emerald-500"
+                  label="Create a Ticket" description="Report a bug or ask a question" />
+              </MenuGroup>
+
+              {/* ── Information ─────────────────────────────────── */}
+              <MenuGroup label="Information">
+                <MenuItem href="/settings/support/faq"
+                  icon={HelpCircle} iconBg="bg-cyan-500"
+                  label="FAQ" description="Answers to common questions" />
+                <MenuItem href="/privacy"
+                  icon={Shield} iconBg="bg-slate-500"
+                  label="Privacy Policy" description="How we handle your data" />
+                <MenuItem href="/terms"
+                  icon={FileText} iconBg="bg-slate-500"
+                  label="Terms of Service" description="Terms & conditions of use" />
+              </MenuGroup>
+
+              {/* ── Support the App ─────────────────────────────── */}
+              <MenuGroup label="Support the App">
+                <MenuItem href="/settings/support/coffee"
+                  icon={Coffee} iconBg="bg-indigo-500"
+                  label="Support WealthyNest" description="Help keep the app free · pay via UPI" />
+              </MenuGroup>
+
+            </div>
+          </div>
+
+          {/* ── Danger zone (full-width) ──────────────────────────── */}
           <div>
             <p className="text-[11px] font-semibold text-red-500/70 uppercase tracking-widest px-1 mb-1.5">Danger Zone</p>
-          <div className="bg-card border border-red-500/20 rounded-2xl overflow-hidden divide-y divide-border/60">
-            <button
-              onClick={() => setShowLogout(true)}
-              className="w-full flex items-center gap-3.5 px-4 py-3.5 hover:bg-red-500/5 transition-colors text-left"
-            >
-              <div className="w-9 h-9 rounded-xl bg-red-500/10 flex items-center justify-center shrink-0">
-                <LogOut className="w-4 h-4 text-red-500" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-red-500">Sign out</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Sign out of your account on this device</p>
-              </div>
-            </button>
-            <button
-              onClick={() => setShowClose(true)}
-              className="w-full flex items-center gap-3.5 px-4 py-3.5 hover:bg-red-500/5 transition-colors text-left"
-            >
-              <div className="w-9 h-9 rounded-xl bg-red-500/10 flex items-center justify-center shrink-0">
-                <Trash2 className="w-4 h-4 text-red-500" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-red-500">Close account</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Deactivate your account — data retained, admin must reactivate</p>
-              </div>
-            </button>
-          </div>
+            <div className="bg-card border border-red-500/20 rounded-2xl overflow-hidden divide-y divide-border/60">
+              <button
+                onClick={() => setShowLogout(true)}
+                className="w-full flex items-center gap-3.5 px-4 py-3.5 hover:bg-red-500/5 transition-colors text-left"
+              >
+                <div className="w-9 h-9 rounded-xl bg-red-500/10 flex items-center justify-center shrink-0">
+                  <LogOut className="w-4 h-4 text-red-500" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-red-500">Sign out</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Sign out of your account on this device</p>
+                </div>
+              </button>
+              <button
+                onClick={() => setShowClose(true)}
+                className="w-full flex items-center gap-3.5 px-4 py-3.5 hover:bg-red-500/5 transition-colors text-left"
+              >
+                <div className="w-9 h-9 rounded-xl bg-red-500/10 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-4 h-4 text-red-500" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-red-500">Close account</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Deactivate your account — data retained, admin must reactivate</p>
+                </div>
+              </button>
+            </div>
           </div>
 
           <p className="text-[11px] text-muted-foreground/50 text-center pb-4">

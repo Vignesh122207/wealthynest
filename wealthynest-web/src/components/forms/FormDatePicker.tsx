@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   format, parse, isValid, startOfMonth, endOfMonth, eachDayOfInterval,
   isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek,
@@ -35,21 +36,54 @@ export function FormDatePicker({
   label, error, hint, value, onChange, onBlur,
   placeholder = "Select date", disabled, name,
 }: FormDatePickerProps) {
-  const [open, setOpen]     = useState(false);
-  const [view, setView]     = useState<View>("day");
-  const [cursor, setCursor] = useState<Date>(() => parseDate(value) ?? new Date());
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen]       = useState(false);
+  const [view, setView]       = useState<View>("day");
+  const [cursor, setCursor]   = useState<Date>(() => parseDate(value) ?? new Date());
+  const [dropPos, setDropPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const inputRef   = useRef<HTMLDivElement>(null);
+  const dropRef    = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const d = parseDate(value);
     if (d) setCursor(d);
   }, [value]);
 
+  const recalcPos = useCallback(() => {
+    if (!inputRef.current) return;
+    const rect = inputRef.current.getBoundingClientRect();
+    setDropPos({
+      top:   rect.bottom + window.scrollY + 6,
+      left:  rect.left   + window.scrollX,
+      width: rect.width,
+    });
+  }, []);
+
+  const openCalendar = () => {
+    if (disabled) return;
+    recalcPos();
+    setOpen(v => !v);
+    setView("day");
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onScroll = () => recalcPos();
+    const onResize = () => recalcPos();
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [open, recalcPos]);
+
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (!containerRef.current?.contains(e.target as Node)) {
-        setOpen(false); onBlur?.();
+      const target = e.target as Node;
+      if (!inputRef.current?.contains(target) && !dropRef.current?.contains(target)) {
+        setOpen(false);
+        onBlur?.();
       }
     };
     document.addEventListener("mousedown", handler);
@@ -100,14 +134,14 @@ export function FormDatePicker({
 
         <div className="grid grid-cols-7 gap-y-0.5">
           {days.map(day => {
-            const sel      = selectedDate && isSameDay(day, selectedDate);
-            const today    = isSameDay(day, new Date());
-            const inMonth  = isSameMonth(day, cursor);
+            const sel     = selectedDate && isSameDay(day, selectedDate);
+            const today   = isSameDay(day, new Date());
+            const inMonth = isSameMonth(day, cursor);
             return (
               <button key={day.toISOString()} type="button" onClick={() => selectDay(day)}
                 className={cn(
                   "w-7 h-7 mx-auto flex items-center justify-center rounded-lg text-xs transition-all",
-                  sel      && "bg-indigo-600 text-white font-bold",
+                  sel     && "bg-indigo-600 text-white font-bold",
                   !sel && today   && "ring-1 ring-indigo-500 text-indigo-400 font-semibold",
                   !sel && !today  && inMonth  && "text-slate-300 hover:bg-slate-700",
                   !sel && !today  && !inMonth && "text-slate-700 hover:bg-slate-800",
@@ -195,13 +229,26 @@ export function FormDatePicker({
     );
   };
 
+  const dropdown = open && dropPos ? createPortal(
+    <div
+      ref={dropRef}
+      style={{ position: "absolute", top: dropPos.top, left: dropPos.left, minWidth: dropPos.width, zIndex: 9999 }}
+      className="w-64 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-3 shadow-black/60"
+    >
+      {view === "day"   && renderDays()}
+      {view === "month" && renderMonths()}
+      {view === "year"  && renderYears()}
+    </div>,
+    document.body
+  ) : null;
+
   return (
-    <div className="space-y-1.5" ref={containerRef}>
+    <div className="space-y-1.5">
       {label && <label className="block text-sm font-medium text-slate-300">{label}</label>}
-      <div className="relative">
+      <div className="relative" ref={inputRef}>
         <input type="text" name={name} value={displayValue} readOnly placeholder={placeholder}
           disabled={disabled}
-          onClick={() => { if (!disabled) { setOpen(v => !v); setView("day"); } }}
+          onClick={openCalendar}
           className={cn(
             "w-full h-10 pl-3 pr-9 rounded-xl text-sm transition-all outline-none cursor-pointer select-none",
             "bg-slate-800/60 border border-slate-700/60 text-slate-100 placeholder-slate-500",
@@ -218,17 +265,10 @@ export function FormDatePicker({
           )}
           <CalendarDays className="w-4 h-4 text-slate-500 pointer-events-none" />
         </div>
-
-        {open && (
-          <div className="absolute top-full left-0 z-[100] mt-1.5 w-64 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-3 shadow-black/50">
-            {view === "day"   && renderDays()}
-            {view === "month" && renderMonths()}
-            {view === "year"  && renderYears()}
-          </div>
-        )}
       </div>
       {error && <p className="text-xs text-red-400">{error}</p>}
       {hint && !error && <p className="text-xs text-slate-500">{hint}</p>}
+      {dropdown}
     </div>
   );
 }

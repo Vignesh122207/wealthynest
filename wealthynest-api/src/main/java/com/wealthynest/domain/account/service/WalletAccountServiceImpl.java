@@ -80,6 +80,19 @@ public class WalletAccountServiceImpl implements WalletAccountService {
         WalletAccount acct = accountRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Account", "id", id));
         if (!acct.getUserId().equals(userId)) throw new AccessDeniedException();
+
+        // Singleton types (CASH_WALLET, EMERGENCY_FUND) can only have one active account at a time.
+        // Block the restore if there is already an active account of the same type.
+        boolean singleton = acct.getAccountType() != AccountType.BANK_ACCOUNT
+                         && acct.getAccountType() != AccountType.CREDIT_CARD;
+        if (singleton && accountRepository.existsByUserIdAndAccountTypeAndArchivedFalse(userId, acct.getAccountType())) {
+            String typeName = acct.getAccountType().name().replace('_', ' ').toLowerCase();
+            throw new BusinessException(
+                "You already have an active " + typeName + " account. Archive it first before restoring this one.",
+                HttpStatus.CONFLICT
+            );
+        }
+
         acct.setArchived(false);
         return enrich(accountRepository.save(acct));
     }
@@ -91,8 +104,20 @@ public class WalletAccountServiceImpl implements WalletAccountService {
         // BANK_ACCOUNT and CREDIT_CARD can be created multiple times; others are singletons
         boolean singleton = req.getAccountType() != AccountType.BANK_ACCOUNT
                          && req.getAccountType() != AccountType.CREDIT_CARD;
-        if (singleton && accountRepository.existsByUserIdAndAccountTypeAndArchivedFalse(userId, req.getAccountType())) {
-            throw new IllegalStateException("You already have a " + req.getAccountType().name().replace('_', ' ').toLowerCase() + " account.");
+        if (singleton) {
+            String typeName = req.getAccountType().name().replace('_', ' ').toLowerCase();
+            // Block if an active account of this type already exists
+            if (accountRepository.existsByUserIdAndAccountTypeAndArchivedFalse(userId, req.getAccountType())) {
+                throw new BusinessException("You already have an active " + typeName + " account.", HttpStatus.CONFLICT);
+            }
+            // Block if an archived account of this type exists — force restore instead of creating a duplicate
+            if (accountRepository.existsByUserIdAndAccountType(userId, req.getAccountType())) {
+                throw new BusinessException(
+                    "You have an archived " + typeName + " account with existing history. " +
+                    "Restore it to keep your records, or delete it permanently before creating a new one.",
+                    HttpStatus.CONFLICT
+                );
+            }
         }
         WalletAccount account = WalletAccount.builder()
                 .userId(userId)

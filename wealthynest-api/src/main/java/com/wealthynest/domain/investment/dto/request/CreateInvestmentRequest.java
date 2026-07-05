@@ -29,6 +29,7 @@ public class CreateInvestmentRequest {
     private LocalDate purchaseDate;
 
     // Bond / FD fields
+    @Positive private BigDecimal faceValue;                 // par value per bond unit (e.g. ₹1000); used for coupon & maturity calc
     @PositiveOrZero @DecimalMax("100") private BigDecimal couponRate;
     @Size(max = 20) private String couponFrequency;       // MONTHLY, QUARTERLY, HALF_YEARLY, ANNUALLY
     @Min(1) @Max(31) private Integer couponCreditDay;     // day of month for coupon payment
@@ -45,6 +46,12 @@ public class CreateInvestmentRequest {
 
     // Optional: debit this account when creating the investment
     private UUID debitAccountId;
+
+    // TDS rate for bond coupons (0–30%)
+    @PositiveOrZero @DecimalMax("30") private BigDecimal tdsRate;
+
+    // Brokerage paid on stock/bond purchase (added to debit amount, separate from investedAmount)
+    @PositiveOrZero private BigDecimal brokerage;
 
     private String notes;
 }

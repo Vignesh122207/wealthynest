@@ -66,6 +66,7 @@ public class DebtServiceImpl implements DebtService {
                 .contactPhone(request.getContactPhone())
                 .amount(request.getAmount())
                 .description(request.getDescription())
+                .debtDate(request.getDebtDate() != null ? request.getDebtDate() : LocalDate.now())
                 .dueDate(request.getDueDate())
                 .build();
         record = debtRecordRepository.save(record);
@@ -122,6 +123,7 @@ public class DebtServiceImpl implements DebtService {
         if (request.getContactName()  != null) record.setContactName(request.getContactName());
         if (request.getContactPhone() != null) record.setContactPhone(request.getContactPhone());
         if (request.getDescription()  != null) record.setDescription(request.getDescription());
+        if (request.getDebtDate()     != null) record.setDebtDate(request.getDebtDate());
         if (request.getDueDate()      != null) record.setDueDate(request.getDueDate());
 
         if (request.getAmount() != null && request.getAmount().compareTo(record.getAmount()) != 0) {
@@ -316,6 +318,7 @@ public class DebtServiceImpl implements DebtService {
                 .contactPhone(r.getContactPhone())
                 .amount(r.getAmount())
                 .description(r.getDescription())
+                .debtDate(r.getDebtDate())
                 .dueDate(r.getDueDate())
                 .status(r.getStatus().name())
                 .amountSettled(r.getAmountSettled())

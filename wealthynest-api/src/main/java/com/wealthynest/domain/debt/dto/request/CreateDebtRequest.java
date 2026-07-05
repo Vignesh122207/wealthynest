@@ -26,5 +26,7 @@ public class CreateDebtRequest {
     @Size(max = 255)
     private String description;
 
+    private LocalDate debtDate;
+
     private LocalDate dueDate;
 }

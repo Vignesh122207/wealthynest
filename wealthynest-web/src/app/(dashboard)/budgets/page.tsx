@@ -8,6 +8,7 @@ import {
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Header } from "@/components/layout/Header";
+import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { TableRowSkeleton } from "@/components/shared/LoadingSkeleton";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -111,10 +112,7 @@ function BudgetBar({ b }: { b: Budget }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
           {b.overBudget && <AlertTriangle className="w-3.5 h-3.5 text-red-600 dark:text-red-400 shrink-0" />}
-          <span className="text-sm font-medium text-foreground truncate">{b.categoryName ?? "Budget"}</span>
-          {b.budgetType === "YEARLY" && (
-            <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 shrink-0">YEARLY</span>
-          )}
+          <span className="text-sm font-medium text-foreground truncate" title={b.categoryName ?? "Budget"}>{b.categoryName ?? "Budget"}</span>
         </div>
         <div className="flex items-center gap-2 shrink-0 ml-4 text-xs text-muted-foreground">
           <CurrencyDisplay amount={b.spent} size="sm" color="muted" />
@@ -406,7 +404,7 @@ export default function BudgetsPage() {
         </div>
       )}
 
-      <main className="flex-1 p-4 md:p-5 lg:p-6 pb-24 lg:pb-6 overflow-auto">
+      <main className="flex-1 p-4 md:p-5 lg:p-6 pb-36 lg:pb-24 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-5">
 
         {/* Navigator + Actions */}
@@ -551,6 +549,11 @@ export default function BudgetsPage() {
         )}
         </div>
       </main>
+
+      {/* ── Floating Action Button ── */}
+      <FloatingActionButton actions={[
+        { icon: Target, label: "Add Budget", color: "indigo", onClick: () => setShowForm(true) },
+      ]} />
     </div>
   );
 }

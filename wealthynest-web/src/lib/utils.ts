@@ -59,3 +59,7 @@ export function getGreeting(): string {
   if (hour < 17) return "afternoon";
   return "evening";
 }
+
+export function monthLabel(year: number, month: number): string {
+  return new Date(year, month - 1).toLocaleString("en-IN", { month: "short", year: "numeric" });
+}

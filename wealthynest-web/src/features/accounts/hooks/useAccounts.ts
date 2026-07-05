@@ -6,6 +6,14 @@ import { QUERY_KEYS } from "@/lib/constants";
 import { accountsApi } from "../api/accounts.api";
 import type { CreateAccountPayload, TransferPayload } from "../types/account.types";
 
+function apiMessage(e: unknown, fallback: string): string {
+  if (e && typeof e === "object" && "response" in e) {
+    const data = (e as { response?: { data?: { message?: string } } }).response?.data;
+    if (data?.message) return data.message;
+  }
+  return fallback;
+}
+
 export function useAccounts() {
   return useQuery({
     queryKey: QUERY_KEYS.ACCOUNTS,
@@ -30,7 +38,7 @@ export function useCreateAccount() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.GOALS });
       toast.success("Account created");
     },
-    onError: (e: Error) => toast.error(e.message ?? "Failed to create account"),
+    onError: (e: unknown) => toast.error(apiMessage(e, "Failed to create account")),
   });
 }
 
@@ -73,7 +81,7 @@ export function useUnarchiveAccount() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.GOALS });
       toast.success("Account restored");
     },
-    onError: () => toast.error("Failed to restore account"),
+    onError: (e: unknown) => toast.error(apiMessage(e, "Failed to restore account")),
   });
 }
 

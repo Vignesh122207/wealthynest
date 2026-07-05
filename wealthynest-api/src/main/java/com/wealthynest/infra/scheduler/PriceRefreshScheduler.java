@@ -14,8 +14,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.List;
 
 
 // Stock prices now come from NSE bhavcopy via StockDataService.updateEODPrices() (NSE_EOD job).
@@ -42,6 +41,8 @@ public class PriceRefreshScheduler {
                 log.warn("Gold price fetch returned null — skipping cache update");
                 return;
             }
+
+            // Update the single gold price cache row
             GoldPriceCache cache = goldPriceCacheRepository.findById(1)
                 .orElse(GoldPriceCache.builder().id(1).build());
             cache.setPrice22kPerGram(data.price22k());
@@ -52,21 +53,13 @@ public class PriceRefreshScheduler {
             cache.setLastUpdated(Instant.now());
             goldPriceCacheRepository.save(cache);
 
-            investmentRepository.findAll().stream()
-                .filter(i -> i.isActive() &&
-                    (i.getInvestmentType() == InvestmentType.GOLD ||
-                     i.getInvestmentType() == InvestmentType.GOLD_ETF) &&
-                    i.getQuantityGrams() != null)
-                .forEach(inv -> {
-                    int karat = inv.getGoldKarat() != null ? inv.getGoldKarat() : 22;
-                    BigDecimal price = data.priceForKarat(karat);
-                    if (price == null) price = data.price22k();
-                    inv.setCurrentPrice(price);
-                    inv.setCurrentValue(inv.getQuantityGrams().multiply(price));
-                    investmentRepository.save(inv);
-                });
-            log.info("Gold price refresh: 24K=₹{}/g, 22K=₹{}/g, 18K=₹{}/g",
-                data.price24k(), data.price22k(), data.price18k());
+            // Single SQL UPDATE handles all karats and all users in one round-trip
+            BigDecimal p22 = data.price22k();
+            BigDecimal p18 = data.price18k() != null ? data.price18k() : p22;
+            BigDecimal p24 = data.price24k() != null ? data.price24k() : p22;
+            int rows = investmentRepository.bulkUpdateGoldPrice(p22, p18, p24);
+            log.info("Gold price refresh: 24K=₹{}/g, 22K=₹{}/g, 18K=₹{}/g — {} investment rows updated",
+                data.price24k(), data.price22k(), data.price18k(), rows);
         } catch (Exception e) {
             log.warn("Gold price refresh failed: {}", e.getMessage());
         }
@@ -74,17 +67,17 @@ public class PriceRefreshScheduler {
 
     @Transactional
     public void refreshMFNav() {
-        Set<String> schemeCodes = investmentRepository.findAll().stream()
-            .filter(i -> i.isActive() && i.getInvestmentType() == InvestmentType.MUTUAL_FUND
-                && i.getSchemeCode() != null)
-            .map(Investment::getSchemeCode)
-            .collect(Collectors.toSet());
+        // Single DB query for distinct scheme codes — no full table scan
+        List<String> schemeCodes = investmentRepository.findDistinctActiveSchemeCodesForMF();
 
         DateTimeFormatter mfFmt = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+        int totalRows = 0;
         for (String code : schemeCodes) {
             try {
                 MFNavData nav = externalPriceService.fetchMFNav(code);
                 if (nav == null || nav.nav() == null) continue;
+
+                // Update NAV cache
                 MFNavCache cache = mfNavCacheRepository.findById(code)
                     .orElse(MFNavCache.builder().schemeCode(code).build());
                 cache.setNav(nav.nav());
@@ -96,18 +89,14 @@ public class PriceRefreshScheduler {
                 cache.setLastUpdated(Instant.now());
                 mfNavCacheRepository.save(cache);
 
-                investmentRepository.findAll().stream()
-                    .filter(i -> i.isActive() && code.equals(i.getSchemeCode()) && i.getUnits() != null)
-                    .forEach(inv -> {
-                        inv.setCurrentPrice(nav.nav());
-                        inv.setCurrentValue(inv.getUnits().multiply(nav.nav()));
-                        investmentRepository.save(inv);
-                    });
+                // Single bulk UPDATE per scheme code — O(1) round-trip regardless of holders
+                int rows = investmentRepository.bulkUpdateNavBySchemeCode(code, nav.nav());
+                totalRows += rows;
             } catch (Exception e) {
                 log.warn("MF NAV refresh failed for {}: {}", code, e.getMessage());
             }
         }
-        log.info("MF NAV refresh complete for {} schemes", schemeCodes.size());
+        log.info("MF NAV refresh complete: {} schemes, {} investment rows updated", schemeCodes.size(), totalRows);
     }
 
 }

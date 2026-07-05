@@ -6,11 +6,14 @@ import {
   Plus, Receipt, Trash2, Search, ChevronLeft, ChevronRight,
   Banknote, Building2, CreditCard, Pencil, X, Check, Download, ChevronDown, RefreshCw,
   ArrowUpRight, ArrowDownLeft, ArrowLeftRight,
+  Briefcase, Laptop, Home, Gift, Percent, Coins, TrendingUp, type LucideIcon,
 } from "lucide-react";
+import { getCategoryMeta } from "@/lib/categoryMeta";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Header } from "@/components/layout/Header";
+import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { TableRowSkeleton } from "@/components/shared/LoadingSkeleton";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -47,6 +50,17 @@ function pad(n: number) { return String(n).padStart(2, "0"); }
 function monthLabel(year: number, month: number) {
   return new Date(year, month - 1).toLocaleString("en-IN", { month: "long", year: "numeric" });
 }
+
+const INCOME_ICON_MAP: Record<string, { icon: LucideIcon; color: string }> = {
+  SALARY:    { icon: Briefcase,   color: "#34C759" },
+  FREELANCE: { icon: Laptop,      color: "#007AFF" },
+  BUSINESS:  { icon: Building2,   color: "#BF5AF2" },
+  RENTAL:    { icon: Home,        color: "#30B0C7" },
+  BONUS:     { icon: Gift,        color: "#FF9500" },
+  INTEREST:  { icon: Percent,     color: "#5AC8FA" },
+  DIVIDEND:  { icon: TrendingUp,  color: "#32D74B" },
+  OTHER:     { icon: Coins,       color: "#8E8E93" },
+};
 
 // ─── CSV Export ───────────────────────────────────────────────────────────────
 
@@ -520,31 +534,34 @@ function ExpenseRow({ expense, accountName, onEdit, onDelete }: {
   onEdit:      () => void;
   onDelete:    () => void;
 }) {
-  const color = expense.categoryColor ?? "#6366f1";
+  const catMeta  = getCategoryMeta(expense.categoryName ?? "");
+  const catColor = expense.categoryColor ?? catMeta.color;
+  const CatIcon  = catMeta.icon;
   return (
-    <div className="group flex items-center gap-3.5 px-4 py-3.5 hover:bg-muted/40 transition-colors">
-      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+    <div className="group flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors">
+      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+        style={{ backgroundColor: catColor + "20" }}>
+        <CatIcon className="w-[18px] h-[18px]" style={{ color: catColor }} strokeWidth={1.75} />
+      </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-foreground truncate leading-5">
+        <p className="text-sm font-medium text-foreground truncate leading-5">
           {expense.description || expense.categoryName || "Expense"}
         </p>
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           {expense.categoryName && (
-            <span className="text-xs px-1.5 py-0.5 rounded-md font-medium min-w-[80px] inline-block"
-              style={{ backgroundColor: color + "18", color }}>{expense.categoryName}</span>
+            <span className="text-xs px-1.5 py-0.5 rounded-md font-medium"
+              style={{ backgroundColor: catColor + "18", color: catColor }}>{expense.categoryName}</span>
           )}
           {accountName && (
             <span className="text-xs text-muted-foreground/50">{accountName}</span>
           )}
           {expense.paymentMethod === "CREDIT_CARD" && (
-            <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-500/15 text-rose-500 dark:text-rose-400 font-medium flex items-center gap-0.5">
-              <CreditCard className="w-2.5 h-2.5" /> Card
-            </span>
+            <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-500/15 text-rose-500 dark:text-rose-400 font-medium">Card</span>
           )}
         </div>
       </div>
-      <p className="text-sm font-bold text-red-500 dark:text-red-400 tabular-nums shrink-0 text-right min-w-[80px]">−{formatCurrency(expense.amount)}</p>
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+      <p className="text-sm font-bold text-red-500 dark:text-red-400 tabular-nums shrink-0">−{formatCurrency(expense.amount)}</p>
+      <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
         <button onClick={onEdit}
           className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:text-indigo-500 hover:bg-indigo-500/15 transition-all">
           <Pencil className="w-3.5 h-3.5" />
@@ -564,24 +581,28 @@ function IncomeRow({ entry, accountName, onEdit, onDelete }: {
   onEdit:      () => void;
   onDelete:    () => void;
 }) {
+  const src     = INCOME_ICON_MAP[entry.source] ?? INCOME_ICON_MAP.OTHER;
+  const IncIcon = src.icon;
   return (
-    <div className="group flex items-center gap-3.5 px-4 py-3.5 hover:bg-muted/40 transition-colors">
-      <div className="w-7 h-7 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
-        <span className="text-sm leading-none">{INCOME_SOURCE_ICONS[entry.source] ?? "💰"}</span>
+    <div className="group flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors">
+      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+        style={{ backgroundColor: src.color + "20" }}>
+        <IncIcon className="w-[18px] h-[18px]" style={{ color: src.color }} strokeWidth={1.75} />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-foreground truncate leading-5">
+        <p className="text-sm font-medium text-foreground truncate leading-5">
           {entry.description || INCOME_SOURCES.find(s => s.value === entry.source)?.label || entry.source}
         </p>
         <div className="flex items-center gap-1.5 mt-0.5">
-          <span className="text-xs px-1.5 py-0.5 rounded-md font-medium bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+          <span className="text-xs px-1.5 py-0.5 rounded-md font-medium"
+            style={{ backgroundColor: src.color + "20", color: src.color }}>
             {INCOME_SOURCES.find(s => s.value === entry.source)?.label ?? entry.source}
           </span>
           {accountName && <span className="text-xs text-muted-foreground/50">{accountName}</span>}
         </div>
       </div>
-      <p className="text-sm font-bold text-emerald-500 dark:text-emerald-400 tabular-nums shrink-0 text-right min-w-[80px]">+{formatCurrency(entry.amount)}</p>
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+      <p className="text-sm font-bold text-emerald-500 dark:text-emerald-400 tabular-nums shrink-0">+{formatCurrency(entry.amount)}</p>
+      <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
         <button onClick={onEdit}
           className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:text-indigo-500 hover:bg-indigo-500/15 transition-all">
           <Pencil className="w-3.5 h-3.5" />
@@ -601,20 +622,20 @@ function TransferRow({ transfer, onEdit, onDelete }: {
   onDelete: () => void;
 }) {
   return (
-    <div className="group flex items-center gap-3.5 px-4 py-3.5 hover:bg-muted/40 transition-colors">
-      <div className="w-7 h-7 rounded-full bg-blue-500/15 flex items-center justify-center shrink-0">
-        <ArrowLeftRight className="w-3.5 h-3.5 text-blue-500" />
+    <div className="group flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors">
+      <div className="w-9 h-9 rounded-xl bg-violet-500/10 flex items-center justify-center shrink-0">
+        <ArrowLeftRight className="w-[18px] h-[18px] text-violet-500 dark:text-violet-400" strokeWidth={1.75} />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-foreground truncate leading-5">
+        <p className="text-sm font-medium text-foreground truncate leading-5">
           {transfer.description || `${transfer.fromAccountName} → ${transfer.toAccountName}`}
         </p>
-        <p className="text-xs text-muted-foreground/80 mt-0.5">
+        <p className="text-xs text-muted-foreground/60 mt-0.5">
           {transfer.fromAccountName} → {transfer.toAccountName}
         </p>
       </div>
-      <p className="text-sm font-bold text-blue-500 tabular-nums shrink-0 text-right min-w-[80px]">{formatCurrency(transfer.amount)}</p>
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+      <p className="text-sm font-bold text-violet-500 dark:text-violet-400 tabular-nums shrink-0">{formatCurrency(transfer.amount)}</p>
+      <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
         <button onClick={onEdit}
           className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:text-indigo-500 hover:bg-indigo-500/15 transition-all">
           <Pencil className="w-3.5 h-3.5" />
@@ -639,6 +660,28 @@ function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
   );
 }
 
+// ─── Sort Pills ───────────────────────────────────────────────────────────────
+
+function SortPills<T extends string>({
+  value, onChange, options,
+}: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[] }) {
+  return (
+    <div className="flex items-center gap-0.5 p-0.5 bg-muted/60 rounded-xl border border-border/50">
+      {options.map(o => (
+        <button key={o.value} type="button" onClick={() => onChange(o.value)}
+          className={cn(
+            "px-2.5 h-8 rounded-lg text-xs font-medium transition-all whitespace-nowrap",
+            value === o.value
+              ? "bg-card text-foreground shadow-sm border border-border/40"
+              : "text-muted-foreground hover:text-foreground",
+          )}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ─── Type Tab Bar ─────────────────────────────────────────────────────────────
 
 function TypeTabs({ value, onChange, counts }: { value: TxType; onChange: (t: TxType) => void; counts: Record<TxType, number> }) {
@@ -659,7 +702,7 @@ function TypeTabs({ value, onChange, counts }: { value: TxType; onChange: (t: Tx
               : "text-muted-foreground hover:text-foreground"
           )}>
           {t.icon} {t.label}
-          <span className="ml-1 text-xs bg-slate-700 px-1.5 py-0.5 rounded-full text-slate-300">{counts[t.key]}</span>
+          <span className="ml-1 text-xs bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground tabular-nums">{counts[t.key]}</span>
         </button>
       ))}
     </div>
@@ -1285,7 +1328,7 @@ export default function TransactionsPage() {
         </div>
       )}
 
-      <main className="flex-1 p-4 md:p-5 lg:p-6 pb-24 lg:pb-6 overflow-auto">
+      <main className="flex-1 p-4 md:p-5 lg:p-6 pb-36 lg:pb-24 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-4">
 
         {/* Type tabs */}
@@ -1315,13 +1358,16 @@ export default function TransactionsPage() {
                 <input placeholder="Search expenses…" value={search} onChange={e => setSearch(e.target.value)}
                   className="w-full h-10 pl-9 pr-3 rounded-xl text-sm bg-background border border-border text-foreground placeholder-muted-foreground/50 outline-none focus:border-indigo-500 transition-all" />
               </div>
-              <select value={sortKey} onChange={e => setSortKey(e.target.value as SortKey)}
-                className="h-10 px-3 rounded-xl text-xs font-medium bg-slate-800 border border-slate-700/60 text-slate-300 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer hover:text-slate-100">
-                <option value="date-desc" style={{ backgroundColor: "#1e293b", color: "#f1f5f9" }}>Newest first</option>
-                <option value="date-asc"  style={{ backgroundColor: "#1e293b", color: "#f1f5f9" }}>Oldest first</option>
-                <option value="amount-desc" style={{ backgroundColor: "#1e293b", color: "#f1f5f9" }}>Highest first</option>
-                <option value="amount-asc"  style={{ backgroundColor: "#1e293b", color: "#f1f5f9" }}>Lowest first</option>
-              </select>
+              <SortPills
+                value={sortKey}
+                onChange={v => setSortKey(v as SortKey)}
+                options={[
+                  { value: "date-desc",   label: "Newest" },
+                  { value: "date-asc",    label: "Oldest" },
+                  { value: "amount-desc", label: "Highest" },
+                  { value: "amount-asc",  label: "Lowest" },
+                ]}
+              />
               {expenses.length > 0 && (
                 <button onClick={() => exportCsv(expenses, csvLabel, accountMap, accountTypeMap)}
                   className="flex items-center gap-2 h-10 px-4 rounded-xl text-sm font-medium bg-muted border border-border text-muted-foreground hover:text-foreground transition-all">
@@ -1440,36 +1486,30 @@ export default function TransactionsPage() {
 
             {/* Summary */}
             {!expensesLoading && expenses.length > 0 && (
-              <div className="bg-card border border-border rounded-2xl px-5 py-3 flex items-center gap-6 flex-wrap">
-                <div>
-                  <p className="text-xs text-muted-foreground/80 uppercase tracking-wide mb-0.5">Total spent</p>
-                  <p className="text-lg font-bold text-red-500 dark:text-red-400 tabular-nums">−{formatCurrency(totalSpent)}</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="bg-red-500/5 border border-red-500/10 rounded-2xl px-4 py-3">
+                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mb-1">Total Spent</p>
+                  <p className="text-xl font-bold text-red-500 dark:text-red-400 tabular-nums">−{formatCurrency(totalSpent)}</p>
                   {dateMode === "month" && prevMonthTotal > 0 && (() => {
                     const diff = totalSpent - prevMonthTotal;
                     const isMore = diff > 0;
                     return (
-                      <p className={cn("text-xs mt-0.5 font-medium", isMore ? "text-red-500/70" : "text-emerald-500/80")}>
+                      <p className={cn("text-xs mt-1 font-medium", isMore ? "text-red-500/70" : "text-emerald-500")}>
                         {isMore ? "▲" : "▼"} {formatCurrency(Math.abs(diff))} vs last month
                       </p>
                     );
                   })()}
                 </div>
-                <div className="h-8 w-px bg-border" />
-                <div>
-                  <p className="text-xs text-muted-foreground/80 uppercase tracking-wide mb-0.5">Transactions</p>
-                  <p className="text-lg font-bold text-foreground tabular-nums">{serverTotal}</p>
+                <div className="bg-muted/40 border border-border/50 rounded-2xl px-4 py-3">
+                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mb-1">Transactions</p>
+                  <p className="text-xl font-bold text-foreground tabular-nums">{serverTotal}</p>
                 </div>
                 {topCategory && (
-                  <>
-                    <div className="h-8 w-px bg-border" />
-                    <div>
-                      <p className="text-xs text-muted-foreground/80 uppercase tracking-wide mb-0.5">Top category</p>
-                      <p className="text-sm font-semibold text-foreground">
-                        {topCategory.name}
-                        <span className="ml-1.5 text-muted-foreground/80 font-normal">{formatCurrency(topCategory.total)}</span>
-                      </p>
-                    </div>
-                  </>
+                  <div className="bg-indigo-500/5 border border-indigo-500/10 rounded-2xl px-4 py-3 col-span-2 sm:col-span-1">
+                    <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mb-1">Top Category</p>
+                    <p className="text-sm font-bold text-foreground truncate">{topCategory.name}</p>
+                    <p className="text-xs text-muted-foreground/70 tabular-nums mt-0.5">{formatCurrency(topCategory.total)}</p>
+                  </div>
                 )}
               </div>
             )}
@@ -1500,8 +1540,8 @@ export default function TransactionsPage() {
                     const dayTotal = grouped[date].reduce((s, e) => s + e.amount, 0);
                     return (
                       <div key={date}>
-                        <div className="flex items-center justify-between px-4 py-2 bg-muted/40 border-b border-t border-border/60">
-                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{formatDate(date)}</span>
+                        <div className="flex items-center justify-between px-4 py-2 bg-muted/50 border-b border-border/50">
+                          <span className="text-xs font-semibold text-foreground/60 uppercase tracking-widest">{formatDate(date)}</span>
                           <span className="text-xs font-semibold text-red-500/70 tabular-nums">−{formatCurrency(dayTotal)}</span>
                         </div>
                         <div className="divide-y divide-border/50">
@@ -1552,13 +1592,16 @@ export default function TransactionsPage() {
                 <input placeholder="Search income…" value={incomeSearch} onChange={e => setIncomeSearch(e.target.value)}
                   className="w-full h-10 pl-9 pr-3 rounded-xl text-sm bg-background border border-border text-foreground placeholder-muted-foreground/50 outline-none focus:border-indigo-500 transition-all" />
               </div>
-              <select value={incomeSort} onChange={e => setIncomeSort(e.target.value as "newest"|"oldest"|"high"|"low")}
-                className="h-10 px-3 rounded-xl text-xs font-medium bg-slate-800 border border-slate-700/60 text-slate-300 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer hover:text-slate-100">
-                <option value="newest" style={{ backgroundColor: "#1e293b", color: "#f1f5f9" }}>Newest first</option>
-                <option value="oldest" style={{ backgroundColor: "#1e293b", color: "#f1f5f9" }}>Oldest first</option>
-                <option value="high"   style={{ backgroundColor: "#1e293b", color: "#f1f5f9" }}>Amount: High to Low</option>
-                <option value="low"    style={{ backgroundColor: "#1e293b", color: "#f1f5f9" }}>Amount: Low to High</option>
-              </select>
+              <SortPills
+                value={incomeSort}
+                onChange={v => setIncomeSort(v as "newest"|"oldest"|"high"|"low")}
+                options={[
+                  { value: "newest", label: "Newest" },
+                  { value: "oldest", label: "Oldest" },
+                  { value: "high",   label: "Highest" },
+                  { value: "low",    label: "Lowest" },
+                ]}
+              />
               {searchedIncome.length > 0 && (
                 <button onClick={() => exportIncomeCsv(searchedIncome, csvLabel, accountMap)}
                   className="flex items-center gap-2 h-10 px-4 rounded-xl text-sm font-medium bg-muted border border-border text-muted-foreground hover:text-foreground transition-all">
@@ -1572,15 +1615,14 @@ export default function TransactionsPage() {
             </div>
 
             {searchedIncome.length > 0 && (
-              <div className="bg-card border border-border rounded-2xl px-5 py-3 flex items-center gap-6">
-                <div>
-                  <p className="text-xs text-muted-foreground/80 uppercase tracking-wide mb-0.5">Total income</p>
-                  <p className="text-lg font-bold text-emerald-500 tabular-nums">+{formatCurrency(searchedIncome.reduce((s, i) => s + i.amount, 0))}</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl px-4 py-3">
+                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mb-1">Total Income</p>
+                  <p className="text-xl font-bold text-emerald-500 dark:text-emerald-400 tabular-nums">+{formatCurrency(searchedIncome.reduce((s, i) => s + i.amount, 0))}</p>
                 </div>
-                <div className="h-8 w-px bg-border" />
-                <div>
-                  <p className="text-xs text-muted-foreground/80 uppercase tracking-wide mb-0.5">Entries</p>
-                  <p className="text-lg font-bold text-foreground tabular-nums">{searchedIncome.length}</p>
+                <div className="bg-muted/40 border border-border/50 rounded-2xl px-4 py-3">
+                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mb-1">Entries</p>
+                  <p className="text-xl font-bold text-foreground tabular-nums">{searchedIncome.length}</p>
                 </div>
               </div>
             )}
@@ -1602,8 +1644,8 @@ export default function TransactionsPage() {
                 <div>
                   {incomeSortedDates.map(date => (
                     <div key={date}>
-                      <div className="flex items-center justify-between px-4 py-2 bg-muted/40 border-b border-t border-border/60">
-                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{formatDate(date)}</span>
+                      <div className="flex items-center justify-between px-4 py-2 bg-muted/50 border-b border-border/50">
+                        <span className="text-xs font-semibold text-foreground/60 uppercase tracking-widest">{formatDate(date)}</span>
                         <span className="text-xs font-semibold text-emerald-500/80 tabular-nums">
                           +{formatCurrency(incomeGrouped[date].reduce((s, i) => s + i.amount, 0))}
                         </span>
@@ -1633,13 +1675,16 @@ export default function TransactionsPage() {
                 <input placeholder="Search transfers…" value={transferSearch} onChange={e => setTransferSearch(e.target.value)}
                   className="w-full h-10 pl-9 pr-3 rounded-xl text-sm bg-background border border-border text-foreground placeholder-muted-foreground/50 outline-none focus:border-indigo-500 transition-all" />
               </div>
-              <select value={transferSort} onChange={e => setTransferSort(e.target.value as "newest"|"oldest"|"high"|"low")}
-                className="h-10 px-3 rounded-xl text-xs font-medium bg-slate-800 border border-slate-700/60 text-slate-300 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer hover:text-slate-100">
-                <option value="newest" style={{ backgroundColor: "#1e293b", color: "#f1f5f9" }}>Newest first</option>
-                <option value="oldest" style={{ backgroundColor: "#1e293b", color: "#f1f5f9" }}>Oldest first</option>
-                <option value="high"   style={{ backgroundColor: "#1e293b", color: "#f1f5f9" }}>Amount: High to Low</option>
-                <option value="low"    style={{ backgroundColor: "#1e293b", color: "#f1f5f9" }}>Amount: Low to High</option>
-              </select>
+              <SortPills
+                value={transferSort}
+                onChange={v => setTransferSort(v as "newest"|"oldest"|"high"|"low")}
+                options={[
+                  { value: "newest", label: "Newest" },
+                  { value: "oldest", label: "Oldest" },
+                  { value: "high",   label: "Highest" },
+                  { value: "low",    label: "Lowest" },
+                ]}
+              />
               {searchedTransfers.length > 0 && (
                 <button onClick={() => exportTransfersCsv(searchedTransfers, csvLabel)}
                   className="flex items-center gap-2 h-10 px-4 rounded-xl text-sm font-medium bg-muted border border-border text-muted-foreground hover:text-foreground transition-all">
@@ -1653,15 +1698,14 @@ export default function TransactionsPage() {
             </div>
 
             {searchedTransfers.length > 0 && (
-              <div className="bg-card border border-border rounded-2xl px-5 py-3 flex items-center gap-6">
-                <div>
-                  <p className="text-xs text-muted-foreground/80 uppercase tracking-wide mb-0.5">Total transferred</p>
-                  <p className="text-lg font-bold text-blue-500 tabular-nums">{formatCurrency(searchedTransfers.reduce((s, t) => s + t.amount, 0))}</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-violet-500/5 border border-violet-500/10 rounded-2xl px-4 py-3">
+                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mb-1">Total Transferred</p>
+                  <p className="text-xl font-bold text-violet-500 dark:text-violet-400 tabular-nums">{formatCurrency(searchedTransfers.reduce((s, t) => s + t.amount, 0))}</p>
                 </div>
-                <div className="h-8 w-px bg-border" />
-                <div>
-                  <p className="text-xs text-muted-foreground/80 uppercase tracking-wide mb-0.5">Transfers</p>
-                  <p className="text-lg font-bold text-foreground tabular-nums">{searchedTransfers.length}</p>
+                <div className="bg-muted/40 border border-border/50 rounded-2xl px-4 py-3">
+                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mb-1">Transfers</p>
+                  <p className="text-xl font-bold text-foreground tabular-nums">{searchedTransfers.length}</p>
                 </div>
               </div>
             )}
@@ -1683,9 +1727,9 @@ export default function TransactionsPage() {
                 <div>
                   {transferSortedDates.map(date => (
                     <div key={date}>
-                      <div className="flex items-center justify-between px-4 py-2 bg-muted/40 border-b border-t border-border/60">
-                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{formatDate(date)}</span>
-                        <span className="text-xs font-semibold text-blue-500/70 tabular-nums">
+                      <div className="flex items-center justify-between px-4 py-2 bg-muted/50 border-b border-border/50">
+                        <span className="text-xs font-semibold text-foreground/60 uppercase tracking-widest">{formatDate(date)}</span>
+                        <span className="text-xs font-semibold text-violet-500/70 tabular-nums">
                           {formatCurrency(transferGrouped[date].reduce((s, t) => s + t.amount, 0))}
                         </span>
                       </div>
@@ -1708,31 +1752,28 @@ export default function TransactionsPage() {
         {txType === "all" && (
           <div className="space-y-3">
             {mergedRows.length > 0 && (
-              <div className="bg-card border border-border rounded-2xl px-5 py-3 flex items-center gap-6 flex-wrap">
-                <div>
-                  <p className="text-xs text-muted-foreground/80 uppercase tracking-wide mb-0.5">Money out</p>
-                  <p className="text-base font-bold text-red-500 tabular-nums">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-red-500/5 border border-red-500/10 rounded-2xl px-4 py-3">
+                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mb-1">Money Out</p>
+                  <p className="text-lg font-bold text-red-500 dark:text-red-400 tabular-nums">
                     −{formatCurrency(mergedRows.filter(r => r.kind === "expense").reduce((s, r) => s + (r.data as Expense).amount, 0))}
                   </p>
                 </div>
-                <div className="h-8 w-px bg-border" />
-                <div>
-                  <p className="text-xs text-muted-foreground/80 uppercase tracking-wide mb-0.5">Money in</p>
-                  <p className="text-base font-bold text-emerald-500 tabular-nums">
+                <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl px-4 py-3">
+                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mb-1">Money In</p>
+                  <p className="text-lg font-bold text-emerald-500 dark:text-emerald-400 tabular-nums">
                     +{formatCurrency(mergedRows.filter(r => r.kind === "income").reduce((s, r) => s + (r.data as IncomeEntry).amount, 0))}
                   </p>
                 </div>
-                <div className="h-8 w-px bg-border" />
-                <div>
-                  <p className="text-xs text-muted-foreground/80 uppercase tracking-wide mb-0.5">Transfers</p>
-                  <p className="text-base font-bold text-blue-500 tabular-nums">
+                <div className="bg-violet-500/5 border border-violet-500/10 rounded-2xl px-4 py-3">
+                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mb-1">Transferred</p>
+                  <p className="text-lg font-bold text-violet-500 dark:text-violet-400 tabular-nums">
                     {formatCurrency(mergedRows.filter(r => r.kind === "transfer").reduce((s, r) => s + (r.data as AccountTransfer).amount, 0))}
                   </p>
                 </div>
-                <div className="h-8 w-px bg-border" />
-                <div>
-                  <p className="text-xs text-muted-foreground/80 uppercase tracking-wide mb-0.5">Total entries</p>
-                  <p className="text-base font-bold text-foreground tabular-nums">{mergedRows.length}</p>
+                <div className="bg-muted/40 border border-border/50 rounded-2xl px-4 py-3">
+                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mb-1">Entries</p>
+                  <p className="text-lg font-bold text-foreground tabular-nums">{mergedRows.length}</p>
                 </div>
               </div>
             )}
@@ -1763,21 +1804,24 @@ export default function TransactionsPage() {
                 <div>
                   {allSortedDates.map(date => (
                     <div key={date}>
-                      <div className="px-4 py-2 bg-muted/40 border-b border-t border-border/60">
-                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{formatDate(date)}</span>
+                      <div className="px-4 py-2 bg-muted/50 border-b border-border/50">
+                        <span className="text-xs font-semibold text-foreground/60 uppercase tracking-widest">{formatDate(date)}</span>
                       </div>
                       <div className="divide-y divide-border/50">
                         {allGrouped[date].map((row, i) => {
                           if (row.kind === "expense") {
                             const e = row.data as Expense;
-                            const color = e.categoryColor ?? "#6366f1";
+                            const catMeta2  = getCategoryMeta(e.categoryName ?? "");
+                            const catColor2 = e.categoryColor ?? catMeta2.color;
+                            const CatIcon2  = catMeta2.icon;
                             return (
-                              <div key={i} className="group flex items-center gap-3.5 px-4 py-3.5 hover:bg-muted/40 transition-colors">
-                                <div className="w-6 h-6 rounded-full bg-red-500/15 flex items-center justify-center shrink-0">
-                                  <ArrowDownLeft className="w-3.5 h-3.5 text-red-500" />
+                              <div key={i} className="group flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors">
+                                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                                  style={{ backgroundColor: catColor2 + "20" }}>
+                                  <CatIcon2 className="w-[18px] h-[18px]" style={{ color: catColor2 }} strokeWidth={1.75} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-semibold text-foreground truncate leading-5">
+                                  <p className="text-sm font-medium text-foreground truncate leading-5">
                                     {e.description || e.categoryName || "Expense"}
                                   </p>
                                   <div className="flex items-center gap-1.5 mt-0.5">
@@ -1785,15 +1829,15 @@ export default function TransactionsPage() {
                                       <span className="text-xs px-1.5 py-0.5 rounded-md font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400">Debt</span>
                                     ) : e.categoryName && (
                                       <span className="text-xs px-1.5 py-0.5 rounded-md font-medium"
-                                        style={{ backgroundColor: color + "18", color }}>{e.categoryName}</span>
+                                        style={{ backgroundColor: catColor2 + "18", color: catColor2 }}>{e.categoryName}</span>
                                     )}
                                     {e.accountId && accountMap[e.accountId] && (
                                       <span className="text-xs text-muted-foreground/50">{accountMap[e.accountId]}</span>
                                     )}
                                   </div>
                                 </div>
-                                <p className="text-sm font-bold text-red-500 tabular-nums shrink-0 text-right min-w-[80px]">−{formatCurrency(e.amount)}</p>
-                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                <p className="text-sm font-bold text-red-500 dark:text-red-400 tabular-nums shrink-0">−{formatCurrency(e.amount)}</p>
+                                <div className="flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
                                   <button onClick={() => { setShowCreate(false); setEditExpense(e); }}
                                     className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:text-indigo-500 hover:bg-indigo-500/15 transition-all">
                                     <Pencil className="w-3.5 h-3.5" />
@@ -1808,25 +1852,29 @@ export default function TransactionsPage() {
                           }
                           if (row.kind === "income") {
                             const income = row.data as IncomeEntry;
+                            const src2 = INCOME_ICON_MAP[income.source] ?? INCOME_ICON_MAP.OTHER;
+                            const IncIcon2 = src2.icon;
                             return (
-                              <div key={i} className="group flex items-center gap-3.5 px-4 py-3.5 hover:bg-muted/40 transition-colors">
-                                <div className="w-6 h-6 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
-                                  <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500" />
+                              <div key={i} className="group flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors">
+                                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                                  style={{ backgroundColor: src2.color + "20" }}>
+                                  <IncIcon2 className="w-[18px] h-[18px]" style={{ color: src2.color }} strokeWidth={1.75} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-semibold text-foreground truncate leading-5">
+                                  <p className="text-sm font-medium text-foreground truncate leading-5">
                                     {income.description || INCOME_SOURCES.find(s => s.value === income.source)?.label || income.source}
                                   </p>
                                   {income.debt ? (
                                     <span className="text-xs px-1.5 py-0.5 rounded-md font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400">Debt</span>
                                   ) : (
-                                    <span className="text-xs px-1.5 py-0.5 rounded-md font-medium bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                                    <span className="text-xs px-1.5 py-0.5 rounded-md font-medium"
+                                      style={{ backgroundColor: src2.color + "20", color: src2.color }}>
                                       {INCOME_SOURCES.find(s => s.value === income.source)?.label ?? income.source}
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-sm font-bold text-emerald-500 tabular-nums shrink-0 text-right min-w-[80px]">+{formatCurrency(income.amount)}</p>
-                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                <p className="text-sm font-bold text-emerald-500 dark:text-emerald-400 tabular-nums shrink-0">+{formatCurrency(income.amount)}</p>
+                                <div className="flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
                                   <button onClick={() => setEditIncome(income)}
                                     className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:text-indigo-500 hover:bg-indigo-500/15 transition-all">
                                     <Pencil className="w-3.5 h-3.5" />
@@ -1841,20 +1889,20 @@ export default function TransactionsPage() {
                           }
                           const transfer = row.data as AccountTransfer;
                           return (
-                            <div key={i} className="group flex items-center gap-3.5 px-4 py-3.5 hover:bg-muted/40 transition-colors">
-                              <div className="w-6 h-6 rounded-full bg-blue-500/15 flex items-center justify-center shrink-0">
-                                <ArrowLeftRight className="w-3.5 h-3.5 text-blue-500" />
+                            <div key={i} className="group flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors">
+                              <div className="w-9 h-9 rounded-xl bg-violet-500/10 flex items-center justify-center shrink-0">
+                                <ArrowLeftRight className="w-[18px] h-[18px] text-violet-500 dark:text-violet-400" strokeWidth={1.75} />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold text-foreground truncate leading-5">
+                                <p className="text-sm font-medium text-foreground truncate leading-5">
                                   {transfer.description || `${transfer.fromAccountName} → ${transfer.toAccountName}`}
                                 </p>
-                                <p className="text-xs text-muted-foreground/80 mt-0.5">
+                                <p className="text-xs text-muted-foreground/60 mt-0.5">
                                   {transfer.fromAccountName} → {transfer.toAccountName}
                                 </p>
                               </div>
-                              <p className="text-sm font-bold text-blue-500 tabular-nums shrink-0 text-right min-w-[80px]">{formatCurrency(transfer.amount)}</p>
-                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                              <p className="text-sm font-bold text-violet-500 dark:text-violet-400 tabular-nums shrink-0">{formatCurrency(transfer.amount)}</p>
+                              <div className="flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
                                 <button onClick={() => setEditTransfer(transfer)}
                                   className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:text-indigo-500 hover:bg-indigo-500/15 transition-all">
                                   <Pencil className="w-3.5 h-3.5" />
@@ -1902,6 +1950,13 @@ export default function TransactionsPage() {
 
 </div>
       </main>
+
+      {/* ── Floating Action Button ── */}
+      <FloatingActionButton actions={[
+        { icon: Receipt,        label: "Add Expense", color: "rose",    onClick: () => { setShowCreate(true); setEditExpense(null); }, disabled: allAccounts.length === 0 },
+        { icon: Banknote,       label: "Add Income",  color: "emerald", onClick: () => { setShowAddIncome(true); setEditIncome(null); }, disabled: allAccounts.filter(a => a.accountType !== "CREDIT_CARD").length === 0 },
+        { icon: ArrowLeftRight, label: "Transfer",    color: "indigo",  onClick: () => { setShowAddTransfer(true); setEditTransfer(null); }, disabled: allAccounts.length < 2 },
+      ]} />
     </div>
   );
 }

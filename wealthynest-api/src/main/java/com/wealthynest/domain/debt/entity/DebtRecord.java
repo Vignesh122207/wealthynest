@@ -39,6 +39,9 @@ public class DebtRecord {
     @Column(length = 255)
     private String description;
 
+    @Column(name = "debt_date")
+    private LocalDate debtDate;
+
     @Column(name = "due_date")
     private LocalDate dueDate;
 

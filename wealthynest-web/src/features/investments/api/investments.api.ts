@@ -8,6 +8,8 @@ import type {
   CreateSipPayload,
   DividendSuggestion,
   IncomeHistory,
+  StockTransaction,
+  CreateStockTransactionPayload,
 } from "../types/investment.types";
 
 export const investmentsApi = {
@@ -63,5 +65,21 @@ export const investmentsApi = {
     incomeType: string; exDate: string; amount: number; perShare?: number; shares?: number;
   }): Promise<void> => {
     await apiClient.post(`/investments/${investmentId}/log-income`, data);
+  },
+
+  // Dismiss a dividend suggestion
+  dismissDividend: async (investmentId: string, exDate: string): Promise<void> => {
+    await apiClient.post(`/investments/${investmentId}/dismiss-dividend`, { exDate });
+  },
+
+  // Stock buy/sell transactions (buy-more, sell)
+  getStockTransactions: async (investmentId: string): Promise<StockTransaction[]> =>
+    (await apiClient.get<ApiResponse<StockTransaction[]>>(`/investments/${investmentId}/stock-transactions`)).data.data ?? [],
+
+  addStockTransaction: async (investmentId: string, data: CreateStockTransactionPayload): Promise<StockTransaction> =>
+    (await apiClient.post<ApiResponse<StockTransaction>>(`/investments/${investmentId}/stock-transactions`, data)).data.data,
+
+  deleteStockTransaction: async (investmentId: string, txnId: number): Promise<void> => {
+    await apiClient.delete(`/investments/${investmentId}/stock-transactions/${txnId}`);
   },
 };

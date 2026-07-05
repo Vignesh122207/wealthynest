@@ -28,6 +28,7 @@ public class StockDataServiceImpl implements StockDataService {
     private final RestClient                nseClient;
 
     private static final String NSE_EQUITY_URL  = "/content/equities/EQUITY_L.csv";
+    private static final DateTimeFormatter BSE_DATE = DateTimeFormatter.ofPattern("ddMMyyyy");
     private static final String NSE_BHAV_URL    =
         "/content/cm/BhavCopy_NSE_CM_0_0_0_{date}_F_0000.csv.zip";
     private static final String NSE_CA_URL      = "/content/equities/CA_0_0_0_P_EquityList.csv";
@@ -88,6 +89,131 @@ public class StockDataServiceImpl implements StockDataService {
         }
     }
 
+    // ── Phase 1: BSE stock master via bhavcopy ────────────────────────────────
+
+    @Override
+    @Transactional
+    public int refreshBSEMaster() {
+        log.info("Downloading BSE equity bhavcopy for stock master …");
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Kolkata"));
+        // Try last 5 calendar days to account for weekends/holidays
+        for (int i = 0; i <= 5; i++) {
+            LocalDate date = today.minusDays(i);
+            int count = tryBSEBhavcopy(date);
+            if (count > 0) {
+                log.info("BSE master refresh complete from {}: {} symbols upserted", date, count);
+                return count;
+            }
+        }
+        log.warn("BSE bhavcopy not available for last 5 days — BSE master not refreshed");
+        return 0;
+    }
+
+    private int tryBSEBhavcopy(LocalDate date) {
+        // BSE provides publicly downloadable bhavcopy ZIPs — no authentication required.
+        // Format: https://www.bseindia.com/download/BhavCopy/Equity/EQ{DDMMYYYY}_CSV.ZIP
+        // CSV inside has: SC_CODE,SC_NAME,SC_GROUP,SC_TYPE,OPEN,HIGH,LOW,CLOSE,...,ISIN_CODE
+        String dateStr = date.format(BSE_DATE);
+        String url = "https://www.bseindia.com/download/BhavCopy/Equity/EQ" + dateStr + "_CSV.ZIP";
+        try {
+            java.net.http.HttpClient httpClient = java.net.http.HttpClient.newBuilder()
+                .connectTimeout(java.time.Duration.ofSeconds(15))
+                .followRedirects(java.net.http.HttpClient.Redirect.NORMAL)
+                .build();
+            java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
+                .uri(java.net.URI.create(url))
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120")
+                .header("Accept", "application/zip,application/octet-stream,*/*")
+                .header("Referer", "https://www.bseindia.com/")
+                .GET().build();
+            java.net.http.HttpResponse<byte[]> resp =
+                httpClient.send(req, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
+
+            byte[] body = resp.body();
+            if (body == null || body.length < 500) return 0;
+            // Check magic bytes for ZIP
+            if (body[0] != 0x50 || body[1] != 0x4B) return 0;
+
+            Map<String, StockMaster> toSave = parseBSEBhavcopy(body);
+            if (toSave.isEmpty()) return 0;
+
+            int saved = 0;
+            List<StockMaster> batch = new ArrayList<>(toSave.values());
+            for (int i = 0; i < batch.size(); i += 200) {
+                List<StockMaster> chunk = batch.subList(i, Math.min(i + 200, batch.size()));
+                for (StockMaster sm : chunk) {
+                    stockMasterRepository.findBySymbolAndExchange(sm.getSymbol(), sm.getExchange())
+                        .ifPresentOrElse(
+                            existing -> {
+                                existing.setCompanyName(sm.getCompanyName());
+                                if (sm.getIsin() != null) existing.setIsin(sm.getIsin());
+                                existing.setActive(true);
+                                stockMasterRepository.save(existing);
+                            },
+                            () -> stockMasterRepository.save(sm)
+                        );
+                    saved++;
+                }
+            }
+            return saved;
+        } catch (Exception e) {
+            log.debug("BSE bhavcopy for {} not available: {}", date, e.getMessage());
+            return 0;
+        }
+    }
+
+    private Map<String, StockMaster> parseBSEBhavcopy(byte[] zipBytes) {
+        // BSE bhavcopy CSV: SC_CODE,SC_NAME,SC_GROUP,SC_TYPE,OPEN,HIGH,LOW,CLOSE,LAST,PREVCLOSE,NO_TRADES,NO_OF_SHRS,NET_TURNOV,TDCLOINDI,ISIN_CODE
+        Map<String, StockMaster> result = new LinkedHashMap<>();
+        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
+            var entry = zis.getNextEntry();
+            while (entry != null) {
+                if (entry.getName().toLowerCase().endsWith(".csv")) {
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(zis));
+                    String header = reader.readLine();
+                    if (header == null) break;
+                    // Detect column positions dynamically from the header
+                    String[] cols = header.split(",");
+                    int idxCode = -1, idxName = -1, idxIsin = -1;
+                    for (int i = 0; i < cols.length; i++) {
+                        String h = cols[i].trim().toUpperCase();
+                        if (h.equals("SC_CODE"))   idxCode = i;
+                        if (h.equals("SC_NAME"))   idxName = i;
+                        if (h.contains("ISIN"))    idxIsin = i;
+                    }
+                    if (idxCode < 0 || idxName < 0) break;
+
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        line = line.trim();
+                        if (line.isEmpty()) continue;
+                        String[] parts = line.split(",");
+                        if (parts.length <= Math.max(idxCode, idxName)) continue;
+                        String scCode = parts[idxCode].trim();
+                        String scName = parts[idxName].trim();
+                        String isin   = (idxIsin >= 0 && idxIsin < parts.length) ? parts[idxIsin].trim() : "";
+                        if (scCode.isEmpty() || scName.isEmpty()) continue;
+
+                        // Use SC_NAME as the searchable symbol (matches NSE symbol for dual-listed stocks)
+                        // Fall back to numeric SC_CODE only when SC_NAME is empty
+                        String symbol = scName.isEmpty() ? scCode : scName;
+                        result.putIfAbsent(symbol, StockMaster.builder()
+                            .symbol(symbol)
+                            .companyName(scName)
+                            .exchange("BSE")
+                            .isin(isin.startsWith("IN") ? isin : null)
+                            .active(true).build());
+                    }
+                    break;
+                }
+                entry = zis.getNextEntry();
+            }
+        } catch (Exception e) {
+            log.debug("BSE bhavcopy parse error: {}", e.getMessage());
+        }
+        return result;
+    }
+
     private StockMaster parseEquityLine(String line) {
         try {
             // Symbol is always the first field (no comma in NSE ticker symbols)
@@ -136,82 +262,144 @@ public class StockDataServiceImpl implements StockDataService {
                 return 0;
             }
 
-            Map<String, BigDecimal> prices = parseBhavcopyCsv(zipBytes);
-            if (prices.isEmpty()) {
+            Map<String, BhavRow> bhavData = parseBhavcopyCsv(zipBytes);
+            if (bhavData.isEmpty()) {
                 log.warn("Bhavcopy for {} parsed 0 prices", dateStr);
                 return 0;
             }
 
-            int updated = 0;
-            for (Map.Entry<String, BigDecimal> e : prices.entrySet()) {
+            // Build isin → price map for alias resolution
+            Map<String, BigDecimal> isinPrices = new java.util.HashMap<>();
+            for (Map.Entry<String, BhavRow> e : bhavData.entrySet()) {
+                if (e.getValue().isin() != null)
+                    isinPrices.put(e.getValue().isin(), e.getValue().price());
+            }
+
+            // Expand: find stock_master symbols whose ISIN matches a bhavcopy ISIN but
+            // whose own symbol is not in the bhavcopy (e.g. FINOLEXCAB → FINCABLES).
+            // This ensures investments entered under the display symbol still get updated.
+            Map<String, BigDecimal> aliasedPrices = new java.util.HashMap<>();
+            if (!isinPrices.isEmpty()) {
+                List<Object[]> alts = stockMasterRepository.findAltSymbolsByIsin(
+                    isinPrices.keySet(), bhavData.keySet());
+                for (Object[] row : alts) {
+                    String altSymbol = (String) row[0];
+                    String isin      = (String) row[1];
+                    aliasedPrices.put(altSymbol, isinPrices.get(isin));
+                }
+                if (!aliasedPrices.isEmpty())
+                    log.info("Bhavcopy alias resolution: {} alternate symbols added (e.g. FINOLEXCAB→FINCABLES)",
+                        aliasedPrices.size());
+            }
+
+            // Phase 1: batch-upsert stock_price_cache for all bhavcopy symbols + aliases.
+            Instant now = Instant.now();
+            Map<String, StockPriceCache> existing = new java.util.HashMap<>();
+            stockPriceCacheRepository.findAll().forEach(c -> existing.put(c.getSymbol(), c));
+
+            List<StockPriceCache> toSave = new java.util.ArrayList<>(bhavData.size() + aliasedPrices.size());
+            for (Map.Entry<String, BhavRow> e : bhavData.entrySet()) {
                 String symbol = e.getKey();
-                BigDecimal close = e.getValue();
-                // update stock_price_cache
-                StockPriceCache cache = stockPriceCacheRepository.findById(symbol)
-                    .orElse(StockPriceCache.builder().symbol(symbol).exchange("NSE").build());
+                BigDecimal close = e.getValue().price();
+                StockPriceCache cache = existing.getOrDefault(symbol,
+                    StockPriceCache.builder().symbol(symbol).exchange("NSE").build());
                 if (cache.getCurrentPrice() != null) {
                     BigDecimal prev = cache.getCurrentPrice();
                     cache.setPreviousClose(prev);
                     BigDecimal chg = close.subtract(prev);
                     cache.setDayChange(chg);
-                    if (prev.compareTo(BigDecimal.ZERO) > 0) {
+                    if (prev.compareTo(BigDecimal.ZERO) > 0)
                         cache.setDayChangePct(chg.divide(prev, 4, RoundingMode.HALF_UP)
                             .multiply(BigDecimal.valueOf(100)));
-                    }
                 }
                 cache.setCurrentPrice(close);
-                cache.setLastUpdated(Instant.now());
-                stockPriceCacheRepository.save(cache);
-
-                // update investment current_value for all users holding this symbol
-                investmentRepository.findAll().stream()
-                    .filter(inv -> inv.isActive()
-                        && inv.getInvestmentType() == InvestmentType.STOCK
-                        && symbol.equals(inv.getSymbol())
-                        && inv.getUnits() != null)
-                    .forEach(inv -> {
-                        inv.setCurrentPrice(close);
-                        inv.setCurrentValue(inv.getUnits().multiply(close));
-                        investmentRepository.save(inv);
-                    });
-                updated++;
+                cache.setLastUpdated(now);
+                toSave.add(cache);
             }
-            log.info("EOD price update for {}: {} symbols", dateStr, updated);
-            return updated;
+            // Alias entries: same price, linked via ISIN — allows investments saved under
+            // the display symbol (e.g. FINOLEXCAB) to receive the bhavcopy close price.
+            for (Map.Entry<String, BigDecimal> e : aliasedPrices.entrySet()) {
+                String symbol = e.getKey();
+                BigDecimal close = e.getValue();
+                StockPriceCache cache = existing.getOrDefault(symbol,
+                    StockPriceCache.builder().symbol(symbol).exchange("NSE").build());
+                if (cache.getCurrentPrice() != null) {
+                    BigDecimal prev = cache.getCurrentPrice();
+                    cache.setPreviousClose(prev);
+                    BigDecimal chg = close.subtract(prev);
+                    cache.setDayChange(chg);
+                    if (prev.compareTo(BigDecimal.ZERO) > 0)
+                        cache.setDayChangePct(chg.divide(prev, 4, RoundingMode.HALF_UP)
+                            .multiply(BigDecimal.valueOf(100)));
+                }
+                cache.setCurrentPrice(close);
+                cache.setLastUpdated(now);
+                toSave.add(cache);
+            }
+            stockPriceCacheRepository.saveAll(toSave);
+
+            // Phase 2: one SQL UPDATE to sync all active STOCK investments from cache.
+            // O(held symbols) instead of O(users × symbols).
+            int invUpdated = investmentRepository.syncStockCurrentValuesFromCache();
+            log.info("EOD price update for {}: {} bhavcopy symbols ({} aliases), {} investment rows synced",
+                dateStr, bhavData.size(), aliasedPrices.size(), invUpdated);
+            return bhavData.size();
         } catch (Exception e) {
             log.warn("Bhavcopy update failed for {}: {}", dateStr, e.getMessage());
             return 0;
         }
     }
 
-    private Map<String, BigDecimal> parseBhavcopyCsv(byte[] zipBytes) throws IOException {
-        Map<String, BigDecimal> prices = new HashMap<>();
+    private record BhavRow(BigDecimal price, String isin) {}
+
+    private Map<String, BhavRow> parseBhavcopyCsv(byte[] zipBytes) throws IOException {
+        Map<String, BhavRow> prices = new HashMap<>();
         try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
             var entry = zis.getNextEntry();
             while (entry != null) {
                 String name = entry.getName().toLowerCase();
                 if (name.endsWith(".csv") || name.endsWith(".txt")) {
-                    BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(zis));
-                    reader.readLine(); // skip header
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(zis));
+
+                    String headerLine = reader.readLine();
+                    if (headerLine == null) break;
+                    String[] headers = headerLine.split(",");
+                    int idxSymbol = -1, idxSeries = -1, idxClose = -1, idxIsin = -1;
+                    for (int i = 0; i < headers.length; i++) {
+                        String h = headers[i].trim().replaceAll("\"", "").toUpperCase();
+                        if (h.equals("TCKRSYMB")) idxSymbol = i;
+                        if (h.equals("SCTYSRS"))  idxSeries = i;
+                        if (h.equals("CLSPRIC"))  idxClose  = i;
+                        if (h.equals("ISIN"))     idxIsin   = i;
+                    }
+                    if (idxSymbol < 0 || idxSeries < 0 || idxClose < 0) {
+                        log.warn("NSE bhavcopy header unrecognised — could not find TckrSymb/SctySrs/ClsPric. Headers: {}",
+                            headerLine.substring(0, Math.min(200, headerLine.length())));
+                        break;
+                    }
+                    log.info("NSE bhavcopy columns: symbol={}, series={}, close={}, isin={}",
+                        idxSymbol, idxSeries, idxClose, idxIsin);
+
+                    int minCols = Math.max(idxSymbol, Math.max(idxSeries, idxClose)) + 1;
                     String line;
                     while ((line = reader.readLine()) != null) {
                         line = line.trim();
                         if (line.isEmpty()) continue;
                         String[] cols = line.split(",");
-                        // New NSE bhavcopy format:
-                        // col 7 = TckrSymb, col 8 = SctySrs, col 14 = ClsPric
-                        if (cols.length < 15) continue;
-                        String series = cols[8].trim();
+                        if (cols.length < minCols) continue;
+                        String series = cols[idxSeries].trim();
                         if (!"EQ".equalsIgnoreCase(series)) continue;
-                        String symbol   = cols[7].trim();
-                        String closeStr = cols[14].trim();
+                        String symbol   = cols[idxSymbol].trim();
+                        String closeStr = cols[idxClose].trim();
                         if (symbol.isEmpty() || closeStr.isEmpty()) continue;
+                        String isin = (idxIsin >= 0 && idxIsin < cols.length)
+                            ? cols[idxIsin].trim() : null;
+                        if (isin != null && !isin.startsWith("IN")) isin = null;
                         try {
-                            prices.put(symbol, new BigDecimal(closeStr));
+                            prices.put(symbol, new BhavRow(new BigDecimal(closeStr), isin));
                         } catch (NumberFormatException ignored) {}
                     }
-                    break; // only one CSV inside the ZIP
+                    break;
                 }
                 entry = zis.getNextEntry();
             }

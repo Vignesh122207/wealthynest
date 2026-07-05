@@ -26,6 +26,7 @@ public class InvestmentResponse {
     private BigDecimal sipAmount;
     private Integer    sipDay;
     private LocalDate  purchaseDate;
+    private BigDecimal faceValue;
     private BigDecimal couponRate;
     private String     couponFrequency;
     private Integer    couponCreditDay;
@@ -39,6 +40,8 @@ public class InvestmentResponse {
     private UUID       linkedAccountId;
     private UUID       debitAccountId;
     private String     debitAccountName;
+    private BigDecimal tdsRate;       // TDS % for bond coupons
+    private BigDecimal brokerage;     // Brokerage paid on purchase
     private String     notes;
     private boolean    active;
     private Instant    createdAt;

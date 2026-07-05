@@ -231,6 +231,34 @@ public class ExternalPriceServiceImpl implements ExternalPriceService {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
+    public List<com.wealthynest.domain.investment.dto.response.InvestmentSearchResult> searchBSEStocks(String query) {
+        try {
+            Map<String, Object> body = yahooClient.get()
+                .uri("/v1/finance/search?q={q}&quotesCount=20&newsCount=0&enableFuzzyQuery=false", query)
+                .retrieve().body(Map.class);
+            if (body == null || !body.containsKey("quotes")) return List.of();
+            List<Map<String, Object>> quotes = (List<Map<String, Object>>) body.get("quotes");
+            List<com.wealthynest.domain.investment.dto.response.InvestmentSearchResult> results = new ArrayList<>();
+            for (Map<String, Object> q : quotes) {
+                String sym = String.valueOf(q.getOrDefault("symbol", ""));
+                String type = String.valueOf(q.getOrDefault("quoteType", ""));
+                // Only include BSE equity listings
+                if (!sym.endsWith(".BO") || !"EQUITY".equalsIgnoreCase(type)) continue;
+                String baseSymbol = sym.substring(0, sym.length() - 3); // strip ".BO"
+                String shortName  = String.valueOf(q.getOrDefault("longname",
+                    q.getOrDefault("shortname", baseSymbol)));
+                results.add(com.wealthynest.domain.investment.dto.response.InvestmentSearchResult.builder()
+                    .symbol(baseSymbol).name(shortName).exchange("BSE").type("STOCK").build());
+            }
+            return results;
+        } catch (Exception e) {
+            log.debug("Yahoo BSE search failed for '{}': {}", query, e.getMessage());
+            return List.of();
+        }
+    }
+
+    @Override
     public GoldPriceData fetchGoldPriceDataFresh() {
         goldCacheExpiry    = Instant.EPOCH;
         goldNextRetryAfter = Instant.EPOCH;

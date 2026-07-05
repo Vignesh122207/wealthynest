@@ -45,4 +45,14 @@ public class Investment extends BaseEntity {
     @Column(name = "debit_expense_id")  private UUID debitExpenseId;
     @Column(name = "debit_account_id")  private UUID debitAccountId;
     @Column(name = "debit_transfer_id") private UUID debitTransferId;
+
+    // Face value per bond unit (par value, e.g. ₹1000). Coupon income and maturity principal
+    // are calculated on faceValue × units, not on avgBuyPrice (which may differ at discount/premium).
+    @Column(name = "face_value", precision = 14, scale = 4) private BigDecimal faceValue;
+
+    // TDS rate for bond coupons (e.g. 10 = 10% → net coupon = gross * 0.90)
+    @Column(name = "tds_rate", precision = 5, scale = 2) @Builder.Default private BigDecimal tdsRate = BigDecimal.ZERO;
+
+    // Brokerage paid when buying (deducted from source account on top of investedAmount, not included in investedAmount)
+    @Column(name = "brokerage", precision = 14, scale = 2) @Builder.Default private BigDecimal brokerage = BigDecimal.ZERO;
 }

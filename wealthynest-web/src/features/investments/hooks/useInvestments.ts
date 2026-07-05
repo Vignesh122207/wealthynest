@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { QUERY_KEYS } from "@/lib/constants";
 import { investmentsApi } from "../api/investments.api";
-import type { CreateInvestmentPayload, CreateSipPayload } from "../types/investment.types";
+import type { CreateInvestmentPayload, CreateSipPayload, CreateStockTransactionPayload } from "../types/investment.types";
 
 export function useInvestments() {
   return useQuery({ queryKey: QUERY_KEYS.INVESTMENTS, queryFn: investmentsApi.getInvestments });
@@ -43,7 +43,11 @@ export function useCreateInvestment() {
       // Invalidate income-history after a delay so the async backfill has time to complete
       const backfillTypes = ["STOCK", "BOND", "FD"];
       if (backfillTypes.includes(payload.investmentType)) {
-        setTimeout(() => qc.invalidateQueries({ queryKey: ["income-history"] }), 6000);
+        setTimeout(() => {
+          qc.invalidateQueries({ queryKey: ["income-history"] });
+          // Issue #1: refresh dividend suggestions so newly added stock appears immediately
+          qc.invalidateQueries({ queryKey: ["dividend-suggestions"] });
+        }, 6000);
       }
       toast.success("Investment added");
     },
@@ -153,5 +157,55 @@ export function useLogIncome() {
       toast.success("Dividend logged to income");
     },
     onError: () => toast.error("Failed to log dividend"),
+  });
+}
+
+// Dismiss a dividend suggestion (issue #3)
+export function useDismissDividend() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ investmentId, exDate }: { investmentId: string; exDate: string }) =>
+      investmentsApi.dismissDividend(investmentId, exDate),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["dividend-suggestions"] });
+    },
+    onError: () => toast.error("Failed to dismiss suggestion"),
+  });
+}
+
+// Stock transactions — buy more / sell (issues #6, #7)
+export function useStockTransactions(investmentId: string | null) {
+  return useQuery({
+    queryKey: ["stock-transactions", investmentId],
+    queryFn:  () => investmentsApi.getStockTransactions(investmentId!),
+    enabled:  !!investmentId,
+  });
+}
+
+export function useAddStockTransaction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ investmentId, data }: { investmentId: string; data: CreateStockTransactionPayload }) =>
+      investmentsApi.addStockTransaction(investmentId, data),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["stock-transactions", vars.investmentId] });
+      invalidateAll(qc);
+      toast.success("Transaction recorded");
+    },
+    onError: () => toast.error("Failed to record transaction"),
+  });
+}
+
+export function useDeleteStockTransaction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ investmentId, txnId }: { investmentId: string; txnId: number }) =>
+      investmentsApi.deleteStockTransaction(investmentId, txnId),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["stock-transactions", vars.investmentId] });
+      invalidateAll(qc);
+      toast.success("Transaction deleted");
+    },
+    onError: () => toast.error("Failed to delete transaction"),
   });
 }

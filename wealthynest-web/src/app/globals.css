@@ -3,59 +3,59 @@
 @tailwind utilities;
 
 @layer base {
-  /* ── Light theme (default) ──────────────────────────────── */
+  /* ── Light theme ─────────────────────────────────────────── */
   :root {
-    --background:  210 20% 97%;
-    --foreground:  222 47% 11%;
+    --background:  220 25% 97%;
+    --foreground:  222 47% 9%;
     --card:        0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 222 47% 9%;
     --panel:       0 0% 100%;
     --primary:     239 84% 62%;
     --primary-foreground: 0 0% 100%;
-    --secondary:   210 20% 93%;
+    --secondary:   220 20% 92%;
     --secondary-foreground: 222 47% 20%;
-    --muted:       210 20% 94%;
+    --muted:       220 20% 94%;
     --muted-foreground: 215 16% 47%;
-    --accent:      210 20% 93%;
-    --accent-foreground: 222 47% 11%;
+    --accent:      220 20% 92%;
+    --accent-foreground: 222 47% 9%;
     --destructive: 0 84% 55%;
     --destructive-foreground: 0 0% 100%;
-    --border:      214 32% 88%;
-    --border-subtle: 214 32% 92%;
-    --input:       214 32% 88%;
+    --border:      220 20% 88%;
+    --border-subtle: 220 20% 93%;
+    --input:       0 0% 100%;
     --ring:        239 84% 62%;
-    --radius:      0.75rem;
+    --radius:      0.875rem;
     --sidebar-bg:  0 0% 100%;
-    --sidebar-border: 214 32% 90%;
-    --chart-grid:  214 32% 92%;
-    --progress-bg: 214 20% 90%;
+    --sidebar-border: 220 20% 90%;
+    --chart-grid:  220 20% 92%;
+    --progress-bg: 220 20% 90%;
   }
 
-  /* ── Dark theme ─────────────────────────────────────────── */
+  /* ── Dark theme — premium deep navy ──────────────────────── */
   .dark {
-    --background:  222 47% 5%;
-    --foreground:  213 31% 91%;
-    --card:        222 47% 8%;
-    --card-foreground: 213 31% 91%;
-    --panel:       222 47% 10%;
-    --primary:     239 84% 67%;
+    --background:  213 72% 7%;
+    --foreground:  213 25% 92%;
+    --card:        213 52% 11%;
+    --card-foreground: 213 25% 92%;
+    --panel:       213 52% 13%;
+    --primary:     234 89% 74%;
     --primary-foreground: 0 0% 100%;
-    --secondary:   217 33% 15%;
-    --secondary-foreground: 213 31% 91%;
-    --muted:       217 33% 14%;
-    --muted-foreground: 215 20% 55%;
-    --accent:      217 33% 17%;
-    --accent-foreground: 213 31% 91%;
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
-    --border:      217 33% 16%;
-    --border-subtle: 217 33% 13%;
-    --input:       217 33% 14%;
-    --ring:        239 84% 67%;
-    --sidebar-bg:  222 47% 3%;
-    --sidebar-border: 217 33% 13%;
-    --chart-grid:  217 33% 12%;
-    --progress-bg: 217 33% 14%;
+    --secondary:   217 38% 16%;
+    --secondary-foreground: 213 25% 92%;
+    --muted:       217 38% 14%;
+    --muted-foreground: 215 18% 52%;
+    --accent:      217 38% 17%;
+    --accent-foreground: 213 25% 92%;
+    --destructive: 0 72% 71%;
+    --destructive-foreground: 0 0% 100%;
+    --border:      217 38% 16%;
+    --border-subtle: 217 38% 13%;
+    --input:       217 38% 14%;
+    --ring:        234 89% 74%;
+    --sidebar-bg:  213 80% 5%;
+    --sidebar-border: 217 38% 12%;
+    --chart-grid:  217 38% 12%;
+    --progress-bg: 217 38% 14%;
   }
 
   * { @apply border-border; }
@@ -66,8 +66,7 @@
   ::-webkit-scrollbar-thumb { @apply bg-slate-300 dark:bg-slate-700 rounded-full; }
   ::-webkit-scrollbar-thumb:hover { @apply bg-slate-400 dark:bg-slate-600; }
 
-  /* ── Autofill override — kills browser's yellow/blue highlight ── */
-  /* Auth pages (always dark, bg ≈ #0d0d1a) */
+  /* ── Auth autofill ── */
   .auth-input:-webkit-autofill,
   .auth-input:-webkit-autofill:hover,
   .auth-input:-webkit-autofill:focus {
@@ -77,7 +76,7 @@
     transition: background-color 5000s ease-in-out 0s;
   }
 
-  /* Dashboard inputs — light mode */
+  /* ── Dashboard autofill — light ── */
   input:-webkit-autofill,
   input:-webkit-autofill:hover,
   input:-webkit-autofill:focus {
@@ -87,21 +86,72 @@
     transition: background-color 5000s ease-in-out 0s;
   }
 
-  /* Dashboard inputs — dark mode */
+  /* ── Dashboard autofill — dark ── */
   .dark input:-webkit-autofill,
   .dark input:-webkit-autofill:hover,
   .dark input:-webkit-autofill:focus {
-    -webkit-box-shadow: 0 0 0 1000px hsl(222 47% 7%) inset !important;
-    -webkit-text-fill-color: hsl(213 31% 91%) !important;
-    caret-color: hsl(213 31% 91%);
+    -webkit-box-shadow: 0 0 0 1000px hsl(213 52% 11%) inset !important;
+    -webkit-text-fill-color: hsl(213 25% 92%) !important;
+    caret-color: hsl(213 25% 92%);
   }
+}
+
+/* ── Animation keyframes ──────────────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 @layer utilities {
   .tabular-nums { font-variant-numeric: tabular-nums; }
+  .animate-fade-in-up { animation: fadeInUp 0.4s cubic-bezier(.22,1,.36,1) both; }
+  .animate-fade-in    { animation: fadeIn 0.25s ease both; }
+  .animate-scale-in   { animation: scaleIn 0.25s cubic-bezier(.22,1,.36,1) both; }
+
+  /* Stagger delays for card grids */
+  .delay-0   { animation-delay:   0ms; }
+  .delay-75  { animation-delay:  75ms; }
+  .delay-150 { animation-delay: 150ms; }
+  .delay-225 { animation-delay: 225ms; }
+  .delay-300 { animation-delay: 300ms; }
+  .delay-375 { animation-delay: 375ms; }
+
+  /* Shimmer skeleton */
+  .shimmer {
+    background: linear-gradient(90deg,
+      hsl(var(--muted)) 25%,
+      hsl(var(--accent)) 50%,
+      hsl(var(--muted)) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  /* Card hover lift */
+  .card-hover {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+  }
+  .dark .card-hover:hover {
+    box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+  }
 }
 
-/* ── Semantic panel helpers ──────────────────────────────────────────────────── */
+/* ── Semantic helpers ─────────────────────────────────────────────────────── */
 .card-panel {
   background-color: hsl(var(--card));
   border: 1px solid hsl(var(--border));
@@ -116,113 +166,112 @@
   background-color: hsl(var(--progress-bg));
 }
 
+/* ── Hero gradient (works in both themes) ───────────────────────────────── */
+.hero-gradient {
+  background: linear-gradient(135deg, #4f46e5 0%, #5b21b6 60%, #7c3aed 100%);
+}
+.dark .hero-gradient {
+  background: linear-gradient(135deg, #3730a3 0%, #4c1d95 60%, #5b21b6 100%);
+}
+
 /* ─────────────────────────────────────────────────────────────────────────────
-   LIGHT MODE OVERRIDES
-   Maps every hardcoded dark slate-* Tailwind class to a light-mode value.
-   Only active when the .dark class is NOT on <html>.
-   Dark mode is unaffected — its existing Tailwind classes still win.
+   LIGHT MODE OVERRIDES — maps hardcoded slate-* Tailwind classes to light values
    ────────────────────────────────────────────────────────────────────────── */
 
-/* ── Page / layout backgrounds ────────────────────────────────────────────── */
-html:not(.dark) .bg-slate-950    { background-color: hsl(210 20% 97%); }
-html:not(.dark) .bg-slate-950\/80 { background-color: hsl(210 20% 97% / 0.85); }
-html:not(.dark) .bg-slate-950\/50 { background-color: hsl(210 20% 97% / 0.5); }
-html:not(.dark) .bg-slate-950\/30 { background-color: hsl(210 20% 97% / 0.3); }
+/* ── Page / layout backgrounds ─────────────────────────────────────────── */
+html:not(.dark) .bg-slate-950    { background-color: hsl(220 25% 97%); }
+html:not(.dark) .bg-slate-950\/80 { background-color: hsl(220 25% 97% / 0.85); }
+html:not(.dark) .bg-slate-950\/50 { background-color: hsl(220 25% 97% / 0.5); }
+html:not(.dark) .bg-slate-950\/30 { background-color: hsl(220 25% 97% / 0.3); }
 
-/* ── Card / surface backgrounds ────────────────────────────────────────────── */
+/* ── Card / surface backgrounds ────────────────────────────────────────── */
 html:not(.dark) .bg-slate-900    { background-color: hsl(0 0% 100%); }
 html:not(.dark) .bg-slate-900\/80 { background-color: hsl(0 0% 100% / 0.9); }
 html:not(.dark) .bg-slate-900\/70 { background-color: hsl(0 0% 100% / 0.85); }
 html:not(.dark) .bg-slate-900\/60 { background-color: hsl(0 0% 100%); }
 html:not(.dark) .bg-slate-900\/50 { background-color: hsl(0 0% 100% / 0.8); }
 html:not(.dark) .bg-slate-900\/40 { background-color: hsl(0 0% 100% / 0.7); }
-html:not(.dark) .bg-slate-900\/30 { background-color: hsl(210 20% 97%); }
+html:not(.dark) .bg-slate-900\/30 { background-color: hsl(220 25% 97%); }
 
-/* ── Secondary / hover backgrounds ─────────────────────────────────────────── */
-html:not(.dark) .bg-slate-800    { background-color: hsl(210 16% 93%); }
-html:not(.dark) .bg-slate-800\/60 { background-color: hsl(210 16% 93%); }
-html:not(.dark) .bg-slate-800\/50 { background-color: hsl(210 16% 93% / 0.8); }
-html:not(.dark) .bg-slate-800\/40 { background-color: hsl(210 16% 93% / 0.7); }
-html:not(.dark) .bg-slate-800\/30 { background-color: hsl(210 16% 93% / 0.5); }
-html:not(.dark) .bg-slate-800\/20 { background-color: hsl(210 16% 93% / 0.4); }
-html:not(.dark) .bg-slate-700    { background-color: hsl(210 14% 87%); }
-html:not(.dark) .bg-slate-700\/60 { background-color: hsl(210 14% 87% / 0.7); }
-html:not(.dark) .bg-slate-700\/40 { background-color: hsl(210 14% 87% / 0.5); }
+/* ── Secondary / hover backgrounds ─────────────────────────────────────── */
+html:not(.dark) .bg-slate-800    { background-color: hsl(220 16% 93%); }
+html:not(.dark) .bg-slate-800\/60 { background-color: hsl(220 16% 93%); }
+html:not(.dark) .bg-slate-800\/50 { background-color: hsl(220 16% 93% / 0.8); }
+html:not(.dark) .bg-slate-800\/40 { background-color: hsl(220 16% 93% / 0.7); }
+html:not(.dark) .bg-slate-800\/30 { background-color: hsl(220 16% 93% / 0.5); }
+html:not(.dark) .bg-slate-800\/20 { background-color: hsl(220 16% 95%); }
+html:not(.dark) .bg-slate-700    { background-color: hsl(220 14% 87%); }
+html:not(.dark) .bg-slate-700\/60 { background-color: hsl(220 14% 87% / 0.7); }
+html:not(.dark) .bg-slate-700\/40 { background-color: hsl(220 14% 87% / 0.5); }
 
-/* ── Hover backgrounds ──────────────────────────────────────────────────────── */
-html:not(.dark) .hover\:bg-slate-900\/60:hover { background-color: hsl(210 20% 95%); }
-html:not(.dark) .hover\:bg-slate-800:hover     { background-color: hsl(210 16% 90%); }
-html:not(.dark) .hover\:bg-slate-800\/60:hover  { background-color: hsl(210 16% 90%); }
-html:not(.dark) .hover\:bg-slate-800\/40:hover  { background-color: hsl(210 16% 92%); }
-html:not(.dark) .hover\:bg-slate-700:hover      { background-color: hsl(210 14% 85%); }
-html:not(.dark) .group:hover .group-hover\:bg-slate-800\/60 { background-color: hsl(210 16% 90%); }
+/* ── Hover backgrounds ──────────────────────────────────────────────────── */
+html:not(.dark) .hover\:bg-slate-900\/60:hover { background-color: hsl(220 20% 95%); }
+html:not(.dark) .hover\:bg-slate-800:hover     { background-color: hsl(220 16% 90%); }
+html:not(.dark) .hover\:bg-slate-800\/60:hover  { background-color: hsl(220 16% 90%); }
+html:not(.dark) .hover\:bg-slate-800\/40:hover  { background-color: hsl(220 16% 92%); }
+html:not(.dark) .hover\:bg-slate-700:hover      { background-color: hsl(220 14% 85%); }
+html:not(.dark) .group:hover .group-hover\:bg-slate-800\/60 { background-color: hsl(220 16% 90%); }
 
-/* ── Borders ──────────────────────────────────────────────────────────────── */
-html:not(.dark) .border-slate-800    { border-color: hsl(214 32% 85%); }
-html:not(.dark) .border-slate-800\/60 { border-color: hsl(214 32% 85%); }
-html:not(.dark) .border-slate-800\/50 { border-color: hsl(214 32% 87%); }
-html:not(.dark) .border-slate-800\/40 { border-color: hsl(214 32% 89%); }
-html:not(.dark) .border-slate-800\/30 { border-color: hsl(214 32% 91%); }
-html:not(.dark) .border-slate-700    { border-color: hsl(214 28% 80%); }
-html:not(.dark) .border-slate-700\/60 { border-color: hsl(214 28% 83%); }
-html:not(.dark) .border-slate-700\/40 { border-color: hsl(214 28% 86%); }
-html:not(.dark) .border-slate-600    { border-color: hsl(214 22% 75%); }
-html:not(.dark) .border-slate-500\/20 { border-color: hsl(214 18% 85%); }
+/* ── Borders ────────────────────────────────────────────────────────────── */
+html:not(.dark) .border-slate-800    { border-color: hsl(220 20% 85%); }
+html:not(.dark) .border-slate-800\/60 { border-color: hsl(220 20% 85%); }
+html:not(.dark) .border-slate-800\/50 { border-color: hsl(220 20% 87%); }
+html:not(.dark) .border-slate-800\/40 { border-color: hsl(220 20% 89%); }
+html:not(.dark) .border-slate-800\/30 { border-color: hsl(220 20% 91%); }
+html:not(.dark) .border-slate-700    { border-color: hsl(220 18% 80%); }
+html:not(.dark) .border-slate-700\/60 { border-color: hsl(220 18% 83%); }
+html:not(.dark) .border-slate-700\/40 { border-color: hsl(220 18% 86%); }
+html:not(.dark) .border-slate-600    { border-color: hsl(220 14% 75%); }
+html:not(.dark) .border-slate-500\/20 { border-color: hsl(220 14% 85%); }
 
-/* ── Text ─────────────────────────────────────────────────────────────────── */
-html:not(.dark) .text-slate-100 { color: hsl(222 47% 11%); }
-html:not(.dark) .text-slate-200 { color: hsl(222 40% 18%); }
-html:not(.dark) .text-slate-300 { color: hsl(220 22% 30%); }
+/* ── Text ───────────────────────────────────────────────────────────────── */
+html:not(.dark) .text-slate-100 { color: hsl(222 47% 9%); }
+html:not(.dark) .text-slate-200 { color: hsl(222 40% 16%); }
+html:not(.dark) .text-slate-300 { color: hsl(220 22% 28%); }
 html:not(.dark) .text-slate-400 { color: hsl(215 16% 47%); }
 html:not(.dark) .text-slate-500 { color: hsl(215 14% 40%); }
 html:not(.dark) .text-slate-600 { color: hsl(215 13% 35%); }
 
-/* ── Hover text ─────────────────────────────────────────────────────────────── */
-html:not(.dark) .hover\:text-slate-100:hover { color: hsl(222 47% 8%); }
-html:not(.dark) .hover\:text-slate-200:hover { color: hsl(222 47% 11%); }
-html:not(.dark) .hover\:text-slate-300:hover { color: hsl(220 22% 25%); }
+/* ── Hover text ─────────────────────────────────────────────────────────── */
+html:not(.dark) .hover\:text-slate-100:hover { color: hsl(222 47% 6%); }
+html:not(.dark) .hover\:text-slate-200:hover { color: hsl(222 47% 9%); }
+html:not(.dark) .hover\:text-slate-300:hover { color: hsl(220 22% 23%); }
 
-/* ── Group hover text ──────────────────────────────────────────────────────── */
-html:not(.dark) .group:hover .group-hover\:text-slate-200 { color: hsl(222 47% 11%); }
-html:not(.dark) .group:hover .group-hover\:text-slate-300 { color: hsl(220 22% 25%); }
+/* ── Group hover text ──────────────────────────────────────────────────── */
+html:not(.dark) .group:hover .group-hover\:text-slate-200 { color: hsl(222 47% 9%); }
+html:not(.dark) .group:hover .group-hover\:text-slate-300 { color: hsl(220 22% 23%); }
 
-/* ── Dividers / separators ─────────────────────────────────────────────────── */
-html:not(.dark) .divide-slate-800\/60 > :not([hidden]) ~ :not([hidden]) { border-color: hsl(214 32% 88%); }
-html:not(.dark) .divide-slate-700 > :not([hidden]) ~ :not([hidden])     { border-color: hsl(214 28% 82%); }
+/* ── Dividers ───────────────────────────────────────────────────────────── */
+html:not(.dark) .divide-slate-800\/60 > :not([hidden]) ~ :not([hidden]) { border-color: hsl(220 20% 88%); }
+html:not(.dark) .divide-slate-800\/30 > :not([hidden]) ~ :not([hidden]) { border-color: hsl(220 20% 90%); }
+html:not(.dark) .divide-slate-800\/40 > :not([hidden]) ~ :not([hidden]) { border-color: hsl(220 20% 88%); }
+html:not(.dark) .divide-slate-700 > :not([hidden]) ~ :not([hidden])     { border-color: hsl(220 18% 82%); }
 
-/* ── Ring (focus) ─────────────────────────────────────────────────────────── */
-html:not(.dark) .ring-slate-700 { --tw-ring-color: hsl(214 28% 80%); }
+/* ── Ring ───────────────────────────────────────────────────────────────── */
+html:not(.dark) .ring-slate-700 { --tw-ring-color: hsl(220 18% 80%); }
 
-/* ── Backdrop (header blur bar) ─────────────────────────────────────────────── */
+/* ── Backdrop ───────────────────────────────────────────────────────────── */
 html:not(.dark) .backdrop-blur-sm { backdrop-filter: blur(8px); }
 
-/* ── Additional inputs / inline styles in pages ────────────────────────────── */
+/* ── Inline inputs ──────────────────────────────────────────────────────── */
 html:not(.dark) input.bg-slate-900\/60,
 html:not(.dark) input[class*="bg-slate-9"] {
   background-color: hsl(0 0% 100%);
-  color: hsl(222 47% 11%);
-  border-color: hsl(214 32% 85%);
+  color: hsl(222 47% 9%);
+  border-color: hsl(220 20% 85%);
 }
 html:not(.dark) input.placeholder-slate-500::placeholder { color: hsl(215 14% 55%); }
 
-/* ── Progress bar tracks ────────────────────────────────────────────────────── */
+/* ── Progress bar tracks ────────────────────────────────────────────────── */
 html:not(.dark) .bg-slate-800.rounded-full,
 html:not(.dark) .h-1\.5.bg-slate-800,
 html:not(.dark) .h-2.bg-slate-800,
-html:not(.dark) .h-1.bg-slate-800  { background-color: hsl(214 20% 88%); }
+html:not(.dark) .h-1.bg-slate-800  { background-color: hsl(220 20% 88%); }
 
-/* ── Modal overlays ─────────────────────────────────────────────────────────── */
+/* ── Modal overlays ─────────────────────────────────────────────────────── */
 html:not(.dark) .bg-slate-900:not(.bg-slate-900\/60):not(.bg-slate-900\/70):not(.bg-slate-900\/50) {
   background-color: hsl(0 0% 100%);
 }
 
-/* ── Divide lines ───────────────────────────────────────────────────────────── */
-html:not(.dark) .divide-slate-800\/30 > :not([hidden]) ~ :not([hidden]) { border-color: hsl(214 32% 90%); }
-html:not(.dark) .divide-slate-800\/40 > :not([hidden]) ~ :not([hidden]) { border-color: hsl(214 32% 88%); }
-
-/* ── Inline small badges ────────────────────────────────────────────────────── */
-html:not(.dark) .bg-slate-800\/20 { background-color: hsl(210 20% 95%); }
-html:not(.dark) .bg-slate-800\/30 { background-color: hsl(210 16% 93%); }
-
-/* ── hover:bg-white/[0.02] rows in light mode ───────────────────────────────── */
-html:not(.dark) .hover\:bg-white\/\[0\.02\]:hover { background-color: hsl(210 20% 96%); }
+/* ── Row hover (tables) ─────────────────────────────────────────────────── */
+html:not(.dark) .hover\:bg-white\/\[0\.02\]:hover { background-color: hsl(220 20% 96%); }

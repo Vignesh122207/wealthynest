@@ -17,6 +17,7 @@ public class DebtRecordResponse {
     private String                   contactPhone;
     private BigDecimal               amount;
     private String                   description;
+    private LocalDate                debtDate;
     private LocalDate                dueDate;
     private String                   status;
     private BigDecimal               amountSettled;

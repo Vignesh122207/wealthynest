@@ -7,11 +7,14 @@ import {
   TrendingUp, TrendingDown, X, Building2, ChevronDown, Activity,
   CreditCard, MinusCircle, AlertCircle, Calendar, ChevronLeft, ChevronRight,
   Filter, Wifi, Download, Eye, EyeOff, RefreshCw, ArchiveRestore,
+  Briefcase, Laptop, Home, Gift, Percent, Coins, type LucideIcon,
 } from "lucide-react";
+import { getCategoryMeta } from "@/lib/categoryMeta";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Header } from "@/components/layout/Header";
+import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { FormCurrencyInput } from "@/components/forms/FormCurrencyInput";
@@ -83,11 +86,11 @@ type TransferForm      = z.infer<typeof transferSchema>;
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const ACCOUNT_TYPE_META: Record<AccountType, { label: string; icon: typeof Wallet; color: string; bg: string }> = {
-  CASH_WALLET:    { label: "Cash Wallet",    icon: Banknote,    color: "text-emerald-500 dark:text-emerald-400", bg: "bg-emerald-500/10" },
-  BANK_ACCOUNT:   { label: "Bank Account",   icon: Building2,   color: "text-indigo-500 dark:text-indigo-400",   bg: "bg-indigo-500/10"  },
-  EMERGENCY_FUND: { label: "Emergency Fund", icon: ShieldCheck, color: "text-amber-500 dark:text-amber-400",     bg: "bg-amber-500/10"   },
-  CREDIT_CARD:    { label: "Credit Card",    icon: CreditCard,  color: "text-white",                             bg: "bg-white/15"       },
+const ACCOUNT_TYPE_META: Record<AccountType, { label: string; icon: typeof Wallet; color: string; bg: string; hex: string }> = {
+  CASH_WALLET:    { label: "Cash Wallet",    icon: Banknote,    color: "text-emerald-500 dark:text-emerald-400", bg: "bg-emerald-500/10", hex: "#34C759" },
+  BANK_ACCOUNT:   { label: "Bank Account",   icon: Building2,   color: "text-indigo-500 dark:text-indigo-400",   bg: "bg-indigo-500/10",  hex: "#5856D6" },
+  EMERGENCY_FUND: { label: "Emergency Fund", icon: ShieldCheck, color: "text-amber-500 dark:text-amber-400",     bg: "bg-amber-500/10",   hex: "#FF9500" },
+  CREDIT_CARD:    { label: "Credit Card",    icon: CreditCard,  color: "text-white",                             bg: "bg-white/15",       hex: "#475569" },
 };
 
 const TXN_COLORS: Record<string, string> = {
@@ -108,6 +111,17 @@ const TXN_BG: Record<string, string> = {
 const TXN_SIGN: Record<string, string> = {
   INCOME: "+", EXPENSE: "−", TRANSFER_IN: "+", TRANSFER_OUT: "−",
   DEBT_OUT: "−", DEBT_IN: "+", ADJUSTMENT: "±",
+};
+
+const INCOME_ICON_MAP: Record<string, { icon: LucideIcon; color: string }> = {
+  SALARY:    { icon: Briefcase, color: "#34C759" },
+  FREELANCE: { icon: Laptop,    color: "#007AFF" },
+  BUSINESS:  { icon: Building2, color: "#BF5AF2" },
+  RENTAL:    { icon: Home,      color: "#30B0C7" },
+  BONUS:     { icon: Gift,      color: "#FF9500" },
+  INTEREST:  { icon: Percent,   color: "#5AC8FA" },
+  DIVIDEND:  { icon: TrendingUp,color: "#32D74B" },
+  OTHER:     { icon: Coins,     color: "#8E8E93" },
 };
 
 const INCOME_CATEGORY_SOURCE_MAP: Record<string, string> = {
@@ -197,9 +211,9 @@ function AccountCard({ account, linkedDebts = [], onAddMoney, onAddExpense, onTr
   if (isCreditCard) {
     // ── Credit card: premium card design ──────────────────────────────────────
     return (
-      <div className="relative overflow-hidden rounded-2xl">
+      <div className="relative overflow-hidden rounded-2xl shadow-sm hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 animate-fade-in-up">
         {/* Card gradient body */}
-        <div className="bg-gradient-to-br from-rose-600 via-rose-500 to-pink-600 dark:from-rose-700 dark:via-rose-600 dark:to-pink-700 p-5 relative">
+        <div className="bg-gradient-to-br from-slate-600 via-slate-700 to-zinc-800 dark:from-slate-700 dark:via-slate-800 dark:to-zinc-900 p-5 relative">
           {/* Decorative circles */}
           <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-white/10 pointer-events-none" />
           <div className="absolute -bottom-10 -right-2 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
@@ -288,14 +302,14 @@ function AccountCard({ account, linkedDebts = [], onAddMoney, onAddExpense, onTr
         </div>
 
         {/* Action buttons below card */}
-        <div className="bg-card border border-border border-t-0 rounded-b-2xl p-3 flex gap-2">
+        <div className="bg-card border border-border border-t-0 rounded-b-2xl px-3 py-2.5 flex gap-2">
           <button onClick={onAddExpense}
-            className="flex-1 h-8 rounded-xl text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 transition-all">
-            Charge Card
+            className="flex-1 h-8 rounded-xl text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 transition-all flex items-center justify-center gap-1.5">
+            <MinusCircle className="w-3.5 h-3.5" /> Charge
           </button>
           <button onClick={onTransfer}
-            className="flex-1 h-8 rounded-xl text-xs font-semibold bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 transition-all">
-            Pay Bill
+            className="flex-1 h-8 rounded-xl text-xs font-semibold bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 transition-all flex items-center justify-center gap-1.5">
+            <ArrowLeftRight className="w-3.5 h-3.5" /> Pay Bill
           </button>
         </div>
 
@@ -320,11 +334,12 @@ function AccountCard({ account, linkedDebts = [], onAddMoney, onAddExpense, onTr
   const Icon = meta.icon;
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-5 hover:border-border/80 hover:shadow-sm transition-all">
+    <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 animate-fade-in-up flex flex-col">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", meta.bg)}>
-            <Icon className={cn("w-5 h-5", meta.color)} />
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+            style={{ backgroundColor: meta.hex + "20" }}>
+            <Icon className="w-5 h-5" style={{ color: meta.hex }} strokeWidth={1.75} />
           </div>
           <div>
             <p className="text-sm font-semibold text-foreground">{account.name}</p>
@@ -434,21 +449,33 @@ function AccountCard({ account, linkedDebts = [], onAddMoney, onAddExpense, onTr
         </div>
       </div>
 
-      <div className="mb-1">
-        <p className="text-xs text-muted-foreground/80 uppercase tracking-wide mb-0.5">Balance</p>
+      <div className="mb-4">
+        <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mb-0.5">Balance</p>
         <p className={cn("text-2xl font-bold tabular-nums",
           account.currentBalance < 0 ? "text-red-500 dark:text-red-400" : "text-foreground")}>
           {formatCurrency(account.currentBalance)}
         </p>
       </div>
 
-      <div className="flex items-center gap-3 text-xs mb-3">
-        <span className="flex items-center gap-1 font-semibold text-emerald-500 dark:text-emerald-400">
-          <TrendingUp className="w-3 h-3" /> {formatCurrency(account.totalMoneyIn)}
-        </span>
-        <span className="flex items-center gap-1 font-semibold text-red-500 dark:text-red-400">
-          <TrendingDown className="w-3 h-3" /> {formatCurrency(account.totalMoneyOut)}
-        </span>
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl px-3 py-2">
+          <div className="flex items-center gap-1 mb-0.5">
+            <TrendingUp className="w-3 h-3 text-emerald-500" />
+            <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">In</p>
+          </div>
+          <p className="text-sm font-bold text-emerald-500 dark:text-emerald-400 tabular-nums">
+            {formatCurrency(account.totalMoneyIn)}
+          </p>
+        </div>
+        <div className="bg-red-500/5 border border-red-500/10 rounded-xl px-3 py-2">
+          <div className="flex items-center gap-1 mb-0.5">
+            <TrendingDown className="w-3 h-3 text-red-500" />
+            <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">Out</p>
+          </div>
+          <p className="text-sm font-bold text-red-500 dark:text-red-400 tabular-nums">
+            {formatCurrency(account.totalMoneyOut)}
+          </p>
+        </div>
       </div>
 
       {linkedDebts.filter(d => d.status !== "SETTLED").length > 0 && (
@@ -476,42 +503,38 @@ function AccountCard({ account, linkedDebts = [], onAddMoney, onAddExpense, onTr
       )}
 
       {account.totalMoneyIn > 0 && (
-        <div className="mb-4">
+        <div className="mb-3">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-muted-foreground/60 uppercase tracking-wide">Spending vs income</span>
+            <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wide">Spending</span>
             <span className={cn("text-xs font-semibold tabular-nums",
-              pct > 90 ? "text-red-500" : pct > 70 ? "text-amber-500" : "text-muted-foreground/80")}>
+              pct > 90 ? "text-red-500" : pct > 70 ? "text-amber-500" : "text-muted-foreground/70")}>
               {pct.toFixed(0)}%
             </span>
           </div>
-          <div className="h-1 bg-muted rounded-full overflow-hidden">
-            <div className={cn("h-full rounded-full transition-all",
-              pct > 90 ? "bg-red-500/70" : pct > 70 ? "bg-amber-500/70" : "bg-indigo-500/50")}
+          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+            <div className={cn("h-full rounded-full transition-all duration-700",
+              pct > 90 ? "bg-red-500/70" : pct > 70 ? "bg-amber-500/70" : "bg-indigo-500/60")}
               style={{ width: `${pct}%` }} />
           </div>
         </div>
       )}
 
-      <div className="flex gap-1.5">
+      <div className="flex-1" />
+
+      <div className="grid grid-cols-3 gap-1.5 pt-3 border-t border-border/40 mt-3">
         <button onClick={onAddMoney}
-          className="flex-1 h-8 rounded-xl text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 transition-all">
-          {account.accountType === "EMERGENCY_FUND" ? "Deposit" : "+ Income"}
+          className="h-8 rounded-xl text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 transition-all flex items-center justify-center gap-1">
+          <Plus className="w-3.5 h-3.5" /> Income
         </button>
         <button onClick={onAddExpense}
-          className="flex-1 h-8 rounded-xl text-xs font-semibold bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 transition-all">
-          {account.accountType === "EMERGENCY_FUND" ? "Withdraw" : "− Expense"}
+          className="h-8 rounded-xl text-xs font-semibold bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 transition-all flex items-center justify-center gap-1">
+          <MinusCircle className="w-3.5 h-3.5" /> Expense
         </button>
         <button onClick={onTransfer}
-          className="flex-1 h-8 rounded-xl text-xs font-semibold bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 transition-all">
-          ↕ Transfer
+          className="h-8 rounded-xl text-xs font-semibold bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 transition-all flex items-center justify-center gap-1">
+          <ArrowLeftRight className="w-3.5 h-3.5" /> Transfer
         </button>
       </div>
-
-      <Link href={`/expenses?tab=transfers&accountId=${account.id}`}
-        className="mt-2 flex items-center justify-center gap-1 text-[11px] text-muted-foreground/60 hover:text-indigo-500 transition-colors">
-        View transfers →
-      </Link>
-
     </div>
   );
 }
@@ -689,8 +712,10 @@ function ActivityFeed({ transfers, incomes, expenses, accounts, onEditIncome, on
   return (
     <section>
       {/* Header */}
-      <div className="flex items-center gap-2 mb-3">
-        <Activity className="w-4 h-4 text-violet-500 dark:text-violet-400" />
+      <div className="flex items-center gap-2 mb-4">
+        <div className="w-8 h-8 rounded-xl bg-violet-500/10 flex items-center justify-center">
+          <Activity className="w-4 h-4 text-violet-500 dark:text-violet-400" strokeWidth={1.75} />
+        </div>
         <h2 className="text-sm font-semibold text-foreground">Transaction Activity</h2>
       </div>
 
@@ -710,21 +735,23 @@ function ActivityFeed({ transfers, incomes, expenses, accounts, onEditIncome, on
         </div>
 
         {/* Summary pills */}
-        <div className="flex items-center gap-2 text-xs">
-          {totalIn  > 0 && <span className="text-emerald-500 dark:text-emerald-400 font-semibold">+{formatCurrencyCompact(totalIn)}</span>}
-          {totalOut > 0 && <span className="text-red-500 dark:text-red-400 font-semibold">−{formatCurrencyCompact(totalOut)}</span>}
-          {totalTxn > 0 && <span className="text-violet-500 dark:text-violet-400 font-medium">{formatCurrencyCompact(totalTxn)} moved</span>}
-          <span className="text-muted-foreground/80">{filtered.length} entries</span>
+        <div className="flex items-center gap-2 text-xs flex-wrap">
+          {totalIn  > 0 && <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold">+{formatCurrencyCompact(totalIn)}</span>}
+          {totalOut > 0 && <span className="px-2.5 py-1 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 font-semibold">−{formatCurrencyCompact(totalOut)}</span>}
+          {totalTxn > 0 && <span className="px-2.5 py-1 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400 font-medium">{formatCurrencyCompact(totalTxn)} moved</span>}
+          <span className="text-muted-foreground/60">{filtered.length} entries</span>
         </div>
       </div>
 
       {/* Filter row */}
-      <div className="flex items-center gap-2 mb-3 flex-wrap">
-        <div className="flex items-center gap-0.5 p-0.5 bg-muted/60 rounded-lg border border-border/60">
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <div className="flex items-center gap-0.5 p-0.5 bg-muted/60 rounded-xl border border-border/50">
           {(["ALL","INCOME","EXPENSE","TRANSFER"] as FeedKind[]).map(k => (
             <button key={k} onClick={() => { setKind(k); if (k !== "INCOME") setSrcFilter("ALL"); }}
-              className={cn("px-2.5 py-1 rounded-md text-xs font-medium transition-all",
-                kind === k ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+              className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+                kind === k
+                  ? "bg-background text-foreground shadow-sm border border-border/40"
+                  : "text-muted-foreground hover:text-foreground")}>
               {k === "ALL" ? "All" : k === "INCOME" ? "Income" : k === "EXPENSE" ? "Expenses" : "Transfers"}
             </button>
           ))}
@@ -755,88 +782,105 @@ function ActivityFeed({ transfers, incomes, expenses, accounts, onEditIncome, on
           </button>
         </div>
       ) : (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden">
+        <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm">
           {filtered.map((item, idx) => (
             <div key={item.id}
-              className={cn("group/af flex items-center gap-3 px-5 py-3 hover:bg-muted/30 transition-colors",
-                idx < filtered.length - 1 && "border-b border-border/50")}>
+              className={cn("group/af flex items-center gap-3 px-5 py-3.5 hover:bg-muted/30 transition-colors",
+                idx < filtered.length - 1 && "border-b border-border/40")}>
               {item.kind === "income" ? (
-                <>
-                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0 text-sm">
-                    {INCOME_SOURCE_ICONS[(item as any).source] ?? "💰"}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-foreground truncate">
-                      {item.description || INCOME_SOURCES.find(s => s.value === (item as any).source)?.label || (item as any).source}
-                    </p>
-                    <p className="text-xs text-muted-foreground/80">
-                      {formatDate(item.date)}
-                      {(item as any).accountName && <span className="ml-1.5 text-muted-foreground/60">· {(item as any).accountName}</span>}
-                    </p>
-                  </div>
-                  <p className="text-sm font-semibold text-emerald-500 dark:text-emerald-400 tabular-nums shrink-0">
-                    +{formatCurrency(item.amount)}
-                  </p>
-                  <div className="opacity-0 group-hover/af:opacity-100 flex items-center gap-0.5 transition-all shrink-0">
-                    <button onClick={() => onEditIncome({ id: item.id, amount: item.amount, description: item.description, date: item.date })}
-                      className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground/60 hover:text-indigo-500 hover:bg-indigo-500/10 transition-all">
-                      <Pencil className="w-3 h-3" />
-                    </button>
-                    <button onClick={() => onDeleteIncome(item.id)}
-                      className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground/60 hover:text-red-500 hover:bg-red-500/10 transition-all">
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                </>
+                (() => {
+                  const src  = INCOME_ICON_MAP[(item as any).source] ?? INCOME_ICON_MAP.OTHER;
+                  const IncIcon = src.icon;
+                  return (
+                    <>
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: src.color + "20" }}>
+                        <IncIcon className="w-[18px] h-[18px]" style={{ color: src.color }} strokeWidth={1.75} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {item.description || INCOME_SOURCES.find(s => s.value === (item as any).source)?.label || (item as any).source}
+                        </p>
+                        <p className="text-xs text-muted-foreground/60 mt-0.5">
+                          {formatDate(item.date)}
+                          {(item as any).accountName && <span className="mx-1.5 text-muted-foreground/25">·</span>}
+                          {(item as any).accountName && <span>{(item as any).accountName}</span>}
+                        </p>
+                      </div>
+                      <p className="text-sm font-bold text-emerald-500 dark:text-emerald-400 tabular-nums shrink-0">
+                        +{formatCurrency(item.amount)}
+                      </p>
+                      <div className="opacity-0 group-hover/af:opacity-100 flex items-center gap-0.5 transition-all shrink-0">
+                        <button onClick={() => onEditIncome({ id: item.id, amount: item.amount, description: item.description, date: item.date })}
+                          className="w-6 h-6 flex items-center justify-center rounded-lg text-muted-foreground/50 hover:text-indigo-500 hover:bg-indigo-500/10 transition-all">
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                        <button onClick={() => onDeleteIncome(item.id)}
+                          className="w-6 h-6 flex items-center justify-center rounded-lg text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/10 transition-all">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()
               ) : item.kind === "expense" ? (
-                <>
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: ((item as any).color ?? "#ef4444") + "18" }}>
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: (item as any).color ?? "#ef4444" }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-foreground truncate">{item.description || (item as any).categoryName}</p>
-                    <p className="text-xs text-muted-foreground/80">
-                      {formatDate(item.date)}
-                      {(item as any).accountName && <span className="ml-1.5 text-muted-foreground/60">· {(item as any).accountName}</span>}
-                      <span className="ml-1.5 text-xs font-medium" style={{ color: (item as any).color ?? "#ef4444" }}>{(item as any).categoryName}</span>
-                    </p>
-                  </div>
-                  <p className="text-sm font-semibold text-red-500 dark:text-red-400 tabular-nums shrink-0">
-                    −{formatCurrency(item.amount)}
-                  </p>
-                  <div className="opacity-0 group-hover/af:opacity-100 flex items-center gap-0.5 transition-all shrink-0">
-                    <button onClick={() => onEditExpense({ id: item.id, amount: item.amount, description: item.description, date: item.date })}
-                      className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground/60 hover:text-indigo-500 hover:bg-indigo-500/10 transition-all">
-                      <Pencil className="w-3 h-3" />
-                    </button>
-                    <button onClick={() => onDeleteExpense(item.id)}
-                      className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground/60 hover:text-red-500 hover:bg-red-500/10 transition-all">
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                </>
+                (() => {
+                  const catMeta  = getCategoryMeta((item as any).categoryName);
+                  const catColor = (item as any).color ?? catMeta.color;
+                  const CatIcon  = catMeta.icon;
+                  return (
+                    <>
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: catColor + "20" }}>
+                        <CatIcon className="w-[18px] h-[18px]" style={{ color: catColor }} strokeWidth={1.75} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{item.description || (item as any).categoryName}</p>
+                        <p className="text-xs text-muted-foreground/60 mt-0.5">
+                          {formatDate(item.date)}
+                          {(item as any).accountName && <span className="mx-1.5 text-muted-foreground/25">·</span>}
+                          {(item as any).accountName && <span>{(item as any).accountName}</span>}
+                          <span className="mx-1.5 text-muted-foreground/25">·</span>
+                          <span className="font-medium" style={{ color: catColor }}>{(item as any).categoryName}</span>
+                        </p>
+                      </div>
+                      <p className="text-sm font-bold text-red-500 dark:text-red-400 tabular-nums shrink-0">
+                        −{formatCurrency(item.amount)}
+                      </p>
+                      <div className="opacity-0 group-hover/af:opacity-100 flex items-center gap-0.5 transition-all shrink-0">
+                        <button onClick={() => onEditExpense({ id: item.id, amount: item.amount, description: item.description, date: item.date })}
+                          className="w-6 h-6 flex items-center justify-center rounded-lg text-muted-foreground/50 hover:text-indigo-500 hover:bg-indigo-500/10 transition-all">
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                        <button onClick={() => onDeleteExpense(item.id)}
+                          className="w-6 h-6 flex items-center justify-center rounded-lg text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/10 transition-all">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()
               ) : (
                 <>
-                  <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0">
-                    <ArrowLeftRight className="w-3.5 h-3.5 text-violet-500 dark:text-violet-400" />
+                  <div className="w-9 h-9 rounded-xl bg-violet-500/10 flex items-center justify-center shrink-0">
+                    <ArrowLeftRight className="w-[18px] h-[18px] text-violet-500 dark:text-violet-400" strokeWidth={1.75} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-foreground truncate">{(item as any).from} → {(item as any).to}</p>
-                    <p className="text-xs text-muted-foreground/80">
+                    <p className="text-sm font-medium text-foreground truncate">{(item as any).from} → {(item as any).to}</p>
+                    <p className="text-xs text-muted-foreground/60 mt-0.5">
                       {formatDate(item.date)}{item.description ? ` · ${item.description}` : ""}
                     </p>
                   </div>
-                  <p className="text-sm font-semibold text-violet-500 dark:text-violet-400 tabular-nums shrink-0">
+                  <p className="text-sm font-bold text-violet-500 dark:text-violet-400 tabular-nums shrink-0">
                     {formatCurrency(item.amount)}
                   </p>
                   <div className="opacity-0 group-hover/af:opacity-100 flex items-center gap-0.5 transition-all shrink-0">
                     <button onClick={() => onEditTransfer({ id: item.id, amount: item.amount, description: item.description, date: item.date })}
-                      className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground/60 hover:text-indigo-500 hover:bg-indigo-500/10 transition-all">
+                      className="w-6 h-6 flex items-center justify-center rounded-lg text-muted-foreground/50 hover:text-indigo-500 hover:bg-indigo-500/10 transition-all">
                       <Pencil className="w-3 h-3" />
                     </button>
                     <button onClick={() => onDeleteTransfer(item.id)}
-                      className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground/60 hover:text-red-500 hover:bg-red-500/10 transition-all">
+                      className="w-6 h-6 flex items-center justify-center rounded-lg text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/10 transition-all">
                       <Trash2 className="w-3 h-3" />
                     </button>
                   </div>
@@ -1561,63 +1605,61 @@ export default function AccountsPage() {
         </div>
       )}
 
-      <main className="flex-1 p-4 md:p-5 lg:p-6 pb-24 lg:pb-6 overflow-auto">
+      <main className="flex-1 p-4 md:p-5 lg:p-6 pb-36 lg:pb-24 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-5">
 
         {/* Banner */}
-        <div className="bg-gradient-to-br from-indigo-600/15 to-violet-600/8 border border-indigo-500/20 rounded-2xl p-5">
-          <div className="flex items-start justify-between gap-4 mb-3">
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Total Balance</p>
-              <p className={cn("text-3xl font-bold tabular-nums", totalBalance < 0 ? "text-red-500 dark:text-red-400" : "text-foreground")}>
-                {formatCurrency(totalBalance)}
-              </p>
-              <p className="text-xs text-muted-foreground/80 mt-0.5">Cash &amp; bank accounts</p>
-            </div>
-            <div className="text-right space-y-1">
-              {emergencyBal > 0 && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Emergency Fund</p>
-                  <p className="text-base font-bold text-amber-500 dark:text-amber-400 tabular-nums">{formatCurrency(emergencyBal)}</p>
-                </div>
-              )}
-              {creditCardDebt > 0 && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Card Debt</p>
-                  <p className="text-base font-bold text-rose-500 dark:text-rose-400 tabular-nums">{formatCurrency(creditCardDebt)}</p>
-                </div>
-              )}
-            </div>
-          </div>
-          {(totalIn > 0 || totalOut > 0) && (
-            <div className="grid grid-cols-2 gap-3 mb-3 pt-3 border-t border-indigo-500/15">
+        <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600/15 via-violet-600/8 to-transparent border border-indigo-500/20 rounded-2xl p-5 animate-fade-in-up">
+          {/* Decorative circles */}
+          <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-indigo-500/5 pointer-events-none" />
+          <div className="absolute -bottom-8 right-20 w-28 h-28 rounded-full bg-violet-500/5 pointer-events-none" />
+
+          <div className="relative">
+            <div className="flex items-start justify-between gap-4 mb-4">
               <div>
-                <p className="text-xs text-muted-foreground/80 uppercase tracking-wide mb-0.5">All-time In</p>
-                <p className="text-sm font-bold tabular-nums text-emerald-500 dark:text-emerald-400 flex items-center gap-1">
-                  <TrendingUp className="w-3.5 h-3.5" />{formatCurrency(totalIn)}
+                <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mb-1">Total Balance</p>
+                <p className={cn("text-3xl font-bold tabular-nums", totalBalance < 0 ? "text-red-500 dark:text-red-400" : "text-foreground")}>
+                  {formatCurrency(totalBalance)}
                 </p>
+                <p className="text-xs text-muted-foreground/60 mt-1">Cash &amp; bank accounts</p>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground/80 uppercase tracking-wide mb-0.5">All-time Out</p>
-                <p className="text-sm font-bold tabular-nums text-red-500 dark:text-red-400 flex items-center gap-1">
-                  <TrendingDown className="w-3.5 h-3.5" />{formatCurrency(totalOut)}
-                </p>
+              <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
+                {emergencyBal > 0 && (
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2 text-right">
+                    <p className="text-[10px] text-amber-600 dark:text-amber-400/80 uppercase tracking-wide">Emergency</p>
+                    <p className="text-sm font-bold text-amber-500 dark:text-amber-400 tabular-nums">{formatCurrency(emergencyBal)}</p>
+                  </div>
+                )}
+                {creditCardDebt > 0 && (
+                  <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2 text-right">
+                    <p className="text-[10px] text-rose-600 dark:text-rose-400/80 uppercase tracking-wide">Card Debt</p>
+                    <p className="text-sm font-bold text-rose-500 dark:text-rose-400 tabular-nums">{formatCurrency(creditCardDebt)}</p>
+                  </div>
+                )}
               </div>
             </div>
-          )}
-          <div className="flex gap-2 flex-wrap">
-            <button onClick={() => openAddMoney()} disabled={accounts.filter(a => a.accountType !== "CREDIT_CARD").length === 0}
-              className="flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-all disabled:opacity-40">
-              <Plus className="w-4 h-4" /> Add Income
-            </button>
-            <button onClick={() => openAddExpense()} disabled={accounts.length === 0}
-              className="flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-all disabled:opacity-40">
-              <MinusCircle className="w-4 h-4" /> Add Expense
-            </button>
-            <button onClick={() => openTransfer()} disabled={accounts.length < 2}
-              className="flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-all disabled:opacity-40">
-              <ArrowLeftRight className="w-4 h-4" /> Transfer
-            </button>
+            {(totalIn > 0 || totalOut > 0) && (
+              <div className="grid grid-cols-2 gap-3 pt-4 border-t border-indigo-500/15">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
+                    <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">All-time In</p>
+                    <p className="text-sm font-bold tabular-nums text-emerald-500 dark:text-emerald-400">{formatCurrency(totalIn)}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-red-500/10 flex items-center justify-center shrink-0">
+                    <TrendingDown className="w-3.5 h-3.5 text-red-500" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">All-time Out</p>
+                    <p className="text-sm font-bold tabular-nums text-red-500 dark:text-red-400">{formatCurrency(totalOut)}</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1644,15 +1686,19 @@ export default function AccountsPage() {
         ) : (
           <>
             {/* Bank Accounts */}
-            <section>
+            <section className="animate-fade-in-up delay-150">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+                  <div className="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                    <Building2 className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" strokeWidth={1.75} />
+                  </div>
                   <h2 className="text-sm font-semibold text-foreground">Bank Accounts</h2>
-                  <span className="text-xs text-muted-foreground">{bankAccounts.length}</span>
+                  {bankAccounts.length > 0 && (
+                    <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{bankAccounts.length}</span>
+                  )}
                 </div>
                 <button onClick={() => openCreate("BANK_ACCOUNT")}
-                  className="text-xs text-indigo-500 dark:text-indigo-400 hover:underline flex items-center gap-1 transition-colors">
+                  className="text-xs font-semibold text-indigo-500 dark:text-indigo-400 hover:underline flex items-center gap-1 transition-colors">
                   <Plus className="w-3 h-3" /> Add Bank
                 </button>
               </div>
@@ -1674,10 +1720,12 @@ export default function AccountsPage() {
             </section>
 
             {/* Cash & Emergency */}
-            <section>
+            <section className="animate-fade-in-up delay-200">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <Banknote className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
+                  <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                    <Banknote className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" strokeWidth={1.75} />
+                  </div>
                   <h2 className="text-sm font-semibold text-foreground">Cash &amp; Emergency</h2>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1722,12 +1770,16 @@ export default function AccountsPage() {
             </section>
 
             {/* Credit Cards */}
-            <section>
+            <section className="animate-fade-in-up delay-300">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <CreditCard className="w-4 h-4 text-rose-500 dark:text-rose-400" />
+                  <div className="w-7 h-7 rounded-lg bg-rose-500/10 flex items-center justify-center">
+                    <CreditCard className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" strokeWidth={1.75} />
+                  </div>
                   <h2 className="text-sm font-semibold text-foreground">Credit Cards</h2>
-                  {creditCards.length > 0 && <span className="text-xs text-muted-foreground">{creditCards.length}</span>}
+                  {creditCards.length > 0 && (
+                    <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{creditCards.length}</span>
+                  )}
                 </div>
                 <button onClick={() => openCreate("CREDIT_CARD")}
                   className="text-xs text-rose-500 dark:text-rose-400 hover:underline flex items-center gap-1 transition-colors">
@@ -1816,6 +1868,11 @@ export default function AccountsPage() {
 
         </div>
       </main>
+
+      {/* ── Floating Action Button ── */}
+      <FloatingActionButton actions={[
+        { icon: Wallet, label: "Add Account", color: "indigo", onClick: () => openCreate("BANK_ACCOUNT") },
+      ]} />
     </div>
   );
 }

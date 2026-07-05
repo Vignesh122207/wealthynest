@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   Plus, TrendingUp, TrendingDown, Search, Pencil, Trash2, X,
   RefreshCw, BarChart3, Layers, Coins, Building2, Percent, Info,
@@ -11,6 +11,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Header } from "@/components/layout/Header";
+import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { FormInput } from "@/components/forms/FormInput";
@@ -21,7 +22,8 @@ import {
   useInvestments, useCreateInvestment, useUpdateInvestment,
   useDeleteInvestment, useGoldPrice, useGoldPriceInfo,
   useSipTransactions, useAddSipTransaction, useDeleteSipTransaction, useXirr, useDividendSuggestions,
-  useIncomeHistory, useLogIncome,
+  useIncomeHistory, useLogIncome, useDismissDividend,
+  useStockTransactions, useAddStockTransaction,
 } from "@/features/investments/hooks/useInvestments";
 import { useAccounts } from "@/features/accounts/hooks/useAccounts";
 import { investmentsApi } from "@/features/investments/api/investments.api";
@@ -70,12 +72,12 @@ const TAB_COLORS: Record<string, string> = {
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
 const stockSchema = z.object({
-  units:           z.coerce.number().positive("Must be > 0"),
-  avgBuyPrice:     z.coerce.number().positive("Must be > 0"),
+  units:           z.coerce.number().positive("Quantity must be > 0"),
+  avgBuyPrice:     z.coerce.number().positive("Buy price must be > 0"),
   purchaseDate:    z.string().min(1, "Purchase date required"),
+  brokerage:       z.coerce.number().min(0).optional(),
   linkedAccountId: z.string().optional(),
   debitAccountId:  z.string().optional(),
-  notes:           z.string().optional(),
 });
 
 const mfSchema = z.object({
@@ -93,7 +95,6 @@ const goldSchema = z.object({
   avgBuyPrice:    z.coerce.number().positive("Buy price per gram required"),
   purchaseDate:   z.string().min(1, "Date required"),
   debitAccountId: z.string().optional(),
-  notes:          z.string().optional(),
 });
 
 const fdSchema = z.object({
@@ -105,21 +106,21 @@ const fdSchema = z.object({
   compoundingFrequency: z.string().default("QUARTERLY"),
   linkedAccountId:      z.string().optional(),
   debitAccountId:       z.string().optional(),
-  notes:                z.string().optional(),
 });
 
 const bondSchema = z.object({
   companyName:      z.string().min(1, "Bond name required"),
   faceValuePerBond: z.coerce.number().positive("Face value required"),
   quantity:         z.coerce.number().positive("Quantity required"),
+  totalInvested:    z.coerce.number().positive("Total invested required"),
   couponRate:       z.coerce.number().positive("Rate required").max(30),
   couponFrequency:  z.string().default("HALF_YEARLY"),
   couponCreditDay:  z.coerce.number().min(1).max(31).optional(),
+  tdsRate:          z.coerce.number().min(0).max(30).optional(),
   purchaseDate:     z.string().min(1, "Purchase date required"),
   maturityDate:     z.string().optional(),
   linkedAccountId:  z.string().optional(),
   debitAccountId:   z.string().optional(),
-  notes:            z.string().optional(),
 });
 
 const sipSchema = z.object({
@@ -138,6 +139,9 @@ interface LiveSearchProps {
   renderResult: (r: InvestmentSearchResult) => React.ReactNode;
   onSelect: (r: InvestmentSearchResult) => void;
 }
+
+/** Format a number to max 2dp, stripping trailing zeros: 10.00→"10", 106.67→"106.67", 10.50→"10.5" */
+const fmtNum = (v: number) => parseFloat(v.toFixed(2)).toString();
 
 function LiveSearch({ placeholder, minChars = 2, onSearch, renderResult, onSelect }: LiveSearchProps) {
   const [q, setQ] = useState("");
@@ -221,11 +225,150 @@ function SelectedChip({ label, sub, onClear }: { label: string; sub?: string; on
   );
 }
 
+// ─── Stock transaction modal (Buy More / Sell) ────────────────────────────────
+
+function StockTransactionModal({ inv, type, onClose, accountOptions }: {
+  inv: Investment; type: "BUY" | "SELL"; onClose: () => void;
+  accountOptions: { value: string; label: string }[];
+}) {
+  const isBuy = type === "BUY";
+  const maxQty = isBuy ? undefined : Number(inv.units ?? 0);
+
+  const stockTxnSchema = z.object({
+    transactionDate: z.string().min(1, "Date required"),
+    quantity:        z.coerce.number().positive("Must be > 0")
+                       .refine(v => isBuy || maxQty == null || v <= maxQty,
+                         { message: `Cannot sell more than ${maxQty?.toFixed(2)} shares held` }),
+    pricePerShare:   z.coerce.number().positive("Must be > 0"),
+    brokerage:       z.coerce.number().min(0).optional(),
+    accountId:       z.string().optional(),
+  });
+
+  const { mutate: addTxn, isPending } = useAddStockTransaction();
+  const form = useForm({ resolver: zodResolver(stockTxnSchema),
+    defaultValues: {
+      transactionDate: new Date().toISOString().slice(0, 10),
+      quantity: "",
+      pricePerShare: String(inv.livePrice ?? inv.currentPrice ?? ""),
+      brokerage: "",
+      accountId: "",
+    }
+  });
+
+  const qty       = Number(form.watch("quantity") ?? 0);
+  const price     = Number(form.watch("pricePerShare") ?? 0);
+  const brokerage = Number(form.watch("brokerage") ?? 0);
+  const avgBuy    = Number(inv.avgBuyPrice ?? 0);
+
+  const grossAmount = qty > 0 && price > 0 ? qty * price : null;
+  // BUY: total cost = qty × price + brokerage; SELL: net proceeds = qty × price − brokerage
+  const netAmount = grossAmount != null
+    ? (isBuy ? grossAmount + brokerage : grossAmount - brokerage) : null;
+  // Estimated realized P&L on sell
+  const realizedPnl = !isBuy && qty > 0 && price > 0 && avgBuy > 0
+    ? (price - avgBuy) * qty - brokerage : null;
+
+  const handleSubmit = (values: any) => {
+    addTxn({ investmentId: inv.id, data: {
+      transactionDate: values.transactionDate,
+      transactionType: type,
+      quantity:        Number(values.quantity),
+      pricePerShare:   Number(values.pricePerShare),
+      brokerage:       values.brokerage ? Number(values.brokerage) : undefined,
+      debitAccountId:  values.accountId || undefined,
+    } as any }, { onSuccess: onClose });
+  };
+
+  const accent = isBuy ? "bg-emerald-600 hover:bg-emerald-500" : "bg-red-600 hover:bg-red-500";
+  const title  = isBuy ? "Buy More" : "Sell Shares";
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="w-full max-w-md bg-card border border-border rounded-2xl p-5" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-foreground text-sm">
+            {title} — {inv.companyName ?? inv.symbol}
+          </h3>
+          <button onClick={onClose} className="text-muted-foreground/80 hover:text-foreground transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {!isBuy && inv.units != null && (
+          <div className="mb-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-between">
+            <span className="text-xs text-amber-400">Holdings</span>
+            <span className="text-xs font-semibold text-amber-300">{fmtNum(Number(inv.units))} shares @ avg ₹{fmtNum(avgBuy)}</span>
+          </div>
+        )}
+
+        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Controller control={form.control} name="transactionDate" render={({ field, fieldState }) => (
+              <FormDatePicker label="Date" value={field.value ?? ""} onChange={field.onChange}
+                onBlur={field.onBlur} error={fieldState.error?.message} />
+            )} />
+            <div>
+              <FormCurrencyInput
+                label={isBuy ? "Quantity (shares)" : `Quantity (max ${fmtNum(maxQty ?? 0)})`}
+                {...form.register("quantity")}
+                error={form.formState.errors.quantity?.message as string}
+              />
+            </div>
+            <FormCurrencyInput label="Price per Share (₹)" {...form.register("pricePerShare")}
+              error={form.formState.errors.pricePerShare?.message as string} />
+            <FormCurrencyInput label="Brokerage (₹)" placeholder="0" {...form.register("brokerage")} />
+          </div>
+
+          {/* Summary preview */}
+          {netAmount != null && (
+            <div className={cn("rounded-xl border px-3 py-2 space-y-1",
+              isBuy ? "bg-emerald-500/10 border-emerald-500/20" : "bg-red-500/10 border-red-500/20")}>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">{isBuy ? "Total cost" : "Net proceeds"}</span>
+                <span className={cn("text-sm font-bold tabular-nums", isBuy ? "text-emerald-400" : "text-red-300")}>
+                  {formatCurrency(netAmount)}
+                </span>
+              </div>
+              {!isBuy && realizedPnl != null && (
+                <div className="flex items-center justify-between border-t border-red-500/10 pt-1">
+                  <span className="text-xs text-muted-foreground">Estimated P&amp;L</span>
+                  <span className={cn("text-xs font-semibold tabular-nums", realizedPnl >= 0 ? "text-emerald-400" : "text-red-400")}>
+                    {realizedPnl >= 0 ? "+" : ""}{formatCurrency(realizedPnl)}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {accountOptions.length > 0 && (
+            <FormSelect
+              label={isBuy ? "Debit from Account (optional)" : "Credit proceeds to Account (optional)"}
+              options={[{ value: "", label: isBuy ? "None (no debit)" : "None (track only)" }, ...accountOptions]}
+              {...form.register("accountId")} />
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <button type="submit" disabled={isPending}
+              className={cn("flex-1 h-10 rounded-xl text-sm font-medium text-white transition-all disabled:opacity-60", accent)}>
+              {isPending ? "Saving…" : title}
+            </button>
+            <button type="button" onClick={onClose}
+              className="h-10 px-4 rounded-xl text-sm text-muted-foreground bg-muted/60 hover:bg-muted transition-all">
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Investment card ──────────────────────────────────────────────────────────
 
-function InvestmentCard({ inv, onEdit, onDelete, dividendRecords }: {
+function InvestmentCard({ inv, onEdit, onDelete, dividendRecords, accountOptions }: {
   inv: Investment; onEdit: () => void; onDelete: () => void;
   dividendRecords?: IncomeHistoryRecord[];
+  accountOptions?: { value: string; label: string }[];
 }) {
   const gain  = inv.gainLoss ?? (inv.currentValue - inv.investedAmount);
   const pct   = inv.gainLossPct ?? (inv.investedAmount > 0 ? ((inv.currentValue - inv.investedAmount) / inv.investedAmount) * 100 : 0);
@@ -238,17 +381,24 @@ function InvestmentCard({ inv, onEdit, onDelete, dividendRecords }: {
   }, [inv.maturityDate]);
 
   const couponPerPeriod = useMemo(() => {
-    if (inv.investmentType !== "BOND" || !inv.couponRate || !inv.investedAmount) return null;
+    if (inv.investmentType !== "BOND" || !inv.couponRate) return null;
     const n = inv.couponFrequency === "MONTHLY" ? 12 : inv.couponFrequency === "QUARTERLY" ? 4 :
               inv.couponFrequency === "HALF_YEARLY" ? 2 : 1;
-    // investedAmount is total invested (faceVal × qty), so coupon = total × rate / periods
-    return (inv.investedAmount * inv.couponRate / 100) / n;
+    // Coupon rate applies to face value (avgBuyPrice × units), not the secondary market price
+    const faceValueTotal = (inv.avgBuyPrice ?? 0) * (inv.units ?? 1);
+    if (faceValueTotal <= 0) return null;
+    return (faceValueTotal * inv.couponRate / 100) / n;
   }, [inv]);
 
   const displayName = inv.companyName ?? inv.symbol ?? inv.bankName ?? inv.investmentType;
   const initials = displayName.slice(0, 2).toUpperCase();
+  const [stockTxnModal, setStockTxnModal] = useState<"BUY" | "SELL" | null>(null);
 
   return (
+    <>
+    {stockTxnModal && (
+      <StockTransactionModal inv={inv} type={stockTxnModal} onClose={() => setStockTxnModal(null)} accountOptions={accountOptions ?? []} />
+    )}
     <div className="group bg-card border border-border rounded-2xl p-4 hover:border-indigo-500/40 hover:shadow-sm transition-all">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-3 min-w-0">
@@ -297,8 +447,8 @@ function InvestmentCard({ inv, onEdit, onDelete, dividendRecords }: {
         </div>
       </div>
 
-      <div className="flex items-center justify-between">
-        <div className={cn("flex items-center gap-1 text-xs font-semibold tabular-nums",
+      <div className="flex items-center justify-between flex-wrap gap-x-3 gap-y-1">
+        <div className={cn("flex items-center gap-1 text-xs font-semibold tabular-nums whitespace-nowrap",
           isPos ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
           {isPos ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
           {isPos ? "+" : ""}{formatCurrency(gain)}
@@ -306,8 +456,8 @@ function InvestmentCard({ inv, onEdit, onDelete, dividendRecords }: {
         </div>
 
         {inv.investmentType === "STOCK" && inv.units && (
-          <span className="text-xs text-muted-foreground/80 tabular-nums">
-            {inv.units} × {formatCurrency(inv.livePrice ?? inv.currentPrice ?? 0)}
+          <span className="text-xs text-muted-foreground/80 tabular-nums whitespace-nowrap">
+            {fmtNum(Number(inv.units))} shares × {formatCurrency(inv.livePrice ?? inv.currentPrice ?? 0)}
             {inv.dayChangePct != null && (
               <span className={cn("ml-1", inv.dayChangePct >= 0 ? "text-emerald-500" : "text-red-500")}>
                 ({inv.dayChangePct >= 0 ? "+" : ""}{inv.dayChangePct.toFixed(2)}%)
@@ -321,8 +471,8 @@ function InvestmentCard({ inv, onEdit, onDelete, dividendRecords }: {
           </span>
         )}
         {inv.investmentType === "MUTUAL_FUND" && inv.units && (
-          <span className="text-xs text-muted-foreground/80 tabular-nums">
-            {Number(inv.units).toFixed(3)} u × {formatCurrency(inv.livePrice ?? inv.currentPrice ?? 0)}
+          <span className="text-xs text-muted-foreground/80 tabular-nums whitespace-nowrap">
+            {fmtNum(Number(inv.units))} u × {formatCurrency(inv.livePrice ?? inv.currentPrice ?? 0)}
             {inv.priceLastUpdated && (
               <span className="ml-1 text-muted-foreground/60" title={`NAV as of ${new Date(inv.priceLastUpdated).toLocaleString()}`}>
                 · {new Date(inv.priceLastUpdated).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
@@ -331,7 +481,7 @@ function InvestmentCard({ inv, onEdit, onDelete, dividendRecords }: {
           </span>
         )}
         {(inv.investmentType === "GOLD" || inv.investmentType === "GOLD_ETF") && inv.quantityGrams && (
-          <span className="text-xs text-muted-foreground/80">
+          <span className="text-xs text-muted-foreground/80 whitespace-nowrap">
             {inv.quantityGrams}g · {inv.goldKarat ?? 22}K
             {inv.priceLastUpdated && (
               <span className="ml-1 text-muted-foreground/60" title={`Rate as of ${new Date(inv.priceLastUpdated).toLocaleString()}`}>
@@ -341,16 +491,20 @@ function InvestmentCard({ inv, onEdit, onDelete, dividendRecords }: {
           </span>
         )}
         {(inv.investmentType === "FD" || inv.investmentType === "BOND") && inv.maturityDate && (
-          <span className="text-xs text-muted-foreground/80">Matures {formatDate(inv.maturityDate)}</span>
+          <span className="text-xs text-muted-foreground/80 whitespace-nowrap">Matures {formatDate(inv.maturityDate)}</span>
         )}
       </div>
 
-      {inv.investmentType === "FD" && inv.accruedInterest != null && (
+      {(inv.investmentType === "FD" || inv.investmentType === "BOND") && inv.accruedInterest != null && (
         <div className="mt-2 pt-2 border-t border-border/60 grid grid-cols-2 gap-2">
           <div>
             <div className="flex items-center gap-1">
-              <p className="text-xs text-muted-foreground/80">Accrued so far</p>
-              <span title="Interest earned from purchase date to today. The full amount is credited to your income on the maturity date.">
+              <p className="text-xs text-muted-foreground/80">
+                {inv.investmentType === "BOND" ? "Coupon accrued" : "Accrued so far"}
+              </p>
+              <span title={inv.investmentType === "BOND"
+                ? "Pro-rata coupon income accrued from purchase date to today, net of TDS."
+                : "Interest earned from purchase date to today. The full amount is credited to your income on the maturity date."}>
                 <Info className="w-2.5 h-2.5 text-muted-foreground/60 cursor-help" />
               </span>
             </div>
@@ -399,7 +553,22 @@ function InvestmentCard({ inv, onEdit, onDelete, dividendRecords }: {
 
       {/* SIP section for Mutual Funds */}
       {inv.investmentType === "MUTUAL_FUND" && <SipSection investmentId={inv.id} />}
+
+      {/* Buy More / Sell buttons for Stocks */}
+      {inv.investmentType === "STOCK" && (
+        <div className="mt-2 pt-2 border-t border-border/60 flex gap-2">
+          <button onClick={() => setStockTxnModal("BUY")}
+            className="flex-1 h-7 rounded-lg text-xs font-semibold bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/20 transition-all">
+            + Buy More
+          </button>
+          <button onClick={() => setStockTxnModal("SELL")}
+            className="flex-1 h-7 rounded-lg text-xs font-semibold bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/20 transition-all">
+            Sell
+          </button>
+        </div>
+      )}
     </div>
+    </>
   );
 }
 
@@ -608,17 +777,26 @@ const INCOME_CONFIG: Record<IncomeType, {
   },
 };
 
+const INCOME_PAGE_SIZE = 10;
+
 function IncomeHistorySection({ incomeType, year, onYearChange }: {
   incomeType: IncomeType; year: number; onYearChange: (y: number) => void;
 }) {
   const currentYear = new Date().getFullYear();
   const { data: history, isLoading } = useIncomeHistory(year);
   const cfg = INCOME_CONFIG[incomeType];
+  const [page, setPage] = useState(1);
 
   const records = history?.records.filter(r => r.incomeType === incomeType) ?? [];
   const total   = incomeType === "DIVIDEND"    ? (history?.summary.dividendTotal   ?? 0)
                 : incomeType === "BOND_COUPON" ? (history?.summary.bondCouponTotal ?? 0)
                 :                                (history?.summary.fdMaturityTotal  ?? 0);
+
+  const totalPages = Math.max(1, Math.ceil(records.length / INCOME_PAGE_SIZE));
+  const pageRecords = records.slice((page - 1) * INCOME_PAGE_SIZE, page * INCOME_PAGE_SIZE);
+
+  // Reset to page 1 when year or type changes
+  useEffect(() => { setPage(1); }, [year, incomeType]);
 
   return (
     <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
@@ -650,54 +828,80 @@ function IncomeHistorySection({ incomeType, year, onYearChange }: {
           <div className={`w-4 h-4 border-2 ${cfg.spinColor} border-t-transparent rounded-full animate-spin`} />
         </div>
       ) : records.length > 0 ? (
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="text-left text-xs text-muted-foreground/80 uppercase tracking-wide pb-2 pr-4">Date</th>
-                <th className="text-left text-xs text-muted-foreground/80 uppercase tracking-wide pb-2 pr-4">
-                  {incomeType === "DIVIDEND" ? "Stock" : incomeType === "BOND_COUPON" ? "Bond" : "Bank / FD"}
-                </th>
-                {cfg.showPerShare && <>
-                  <th className="text-right text-xs text-muted-foreground/80 uppercase tracking-wide pb-2 pr-4">Per Share</th>
-                  <th className="text-right text-xs text-muted-foreground/80 uppercase tracking-wide pb-2 pr-4">Shares</th>
-                </>}
-                <th className="text-right text-xs text-muted-foreground/80 uppercase tracking-wide pb-2 pr-4">Amount</th>
-                <th className="text-left text-xs text-muted-foreground/80 uppercase tracking-wide pb-2">Account</th>
-              </tr>
-            </thead>
-            <tbody>
-              {records.map((r: IncomeHistoryRecord) => (
-                <tr key={r.id} className="border-b border-border/60 last:border-0 hover:bg-muted/20 transition-colors">
-                  <td className="py-2.5 pr-4 text-muted-foreground tabular-nums whitespace-nowrap">{formatDate(r.eventDate)}</td>
-                  <td className="py-2.5 pr-4">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <p className="text-foreground font-medium">{r.investmentName}</p>
-                      {!r.investmentActive && (
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/20">Sold</span>
-                      )}
-                    </div>
-                    {r.symbol && <p className="text-xs text-muted-foreground/60">{r.symbol}</p>}
-                  </td>
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left text-xs text-muted-foreground/80 uppercase tracking-wide pb-2 pr-4">Date</th>
+                  <th className="text-left text-xs text-muted-foreground/80 uppercase tracking-wide pb-2 pr-4">
+                    {incomeType === "DIVIDEND" ? "Stock" : incomeType === "BOND_COUPON" ? "Bond" : "Bank / FD"}
+                  </th>
                   {cfg.showPerShare && <>
-                    <td className="py-2.5 pr-4 text-right text-muted-foreground tabular-nums">
-                      {r.perShare != null ? `₹${Number(r.perShare).toFixed(2)}` : "—"}
-                    </td>
-                    <td className="py-2.5 pr-4 text-right text-muted-foreground tabular-nums">
-                      {r.units != null ? Number(r.units).toFixed(0) : "—"}
-                    </td>
+                    <th className="text-right text-xs text-muted-foreground/80 uppercase tracking-wide pb-2 pr-4">Per Share</th>
+                    <th className="text-right text-xs text-muted-foreground/80 uppercase tracking-wide pb-2 pr-4">Shares</th>
                   </>}
-                  <td className={`py-2.5 pr-4 text-right font-semibold ${cfg.accentColor} tabular-nums`}>
-                    +{formatCurrency(r.amount)}
-                  </td>
-                  <td className="py-2.5 text-muted-foreground">
-                    {r.accountName ?? <span className="text-muted-foreground/60 italic">Not linked</span>}
-                  </td>
+                  <th className="text-right text-xs text-muted-foreground/80 uppercase tracking-wide pb-2 pr-4">Amount</th>
+                  <th className="text-left text-xs text-muted-foreground/80 uppercase tracking-wide pb-2">Account</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {pageRecords.map((r: IncomeHistoryRecord, idx: number) => (
+                  <tr key={r.id ?? `${r.investmentId}-${r.eventDate}-${idx}`} className="border-b border-border/60 last:border-0 hover:bg-muted/20 transition-colors">
+                    <td className="py-2.5 pr-4 text-muted-foreground tabular-nums whitespace-nowrap">{formatDate(r.eventDate)}</td>
+                    <td className="py-2.5 pr-4">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="text-foreground font-medium">{r.investmentName}</p>
+                        {!r.investmentActive && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/20">Sold</span>
+                        )}
+                      </div>
+                      {r.symbol && <p className="text-xs text-muted-foreground/60">{r.symbol}</p>}
+                    </td>
+                    {cfg.showPerShare && <>
+                      <td className="py-2.5 pr-4 text-right text-muted-foreground tabular-nums">
+                        {r.perShare != null ? `₹${Number(r.perShare).toFixed(2)}` : "—"}
+                      </td>
+                      <td className="py-2.5 pr-4 text-right text-muted-foreground tabular-nums">
+                        {r.units != null ? Number(r.units).toFixed(0) : "—"}
+                      </td>
+                    </>}
+                    <td className={`py-2.5 pr-4 text-right font-semibold ${cfg.accentColor} tabular-nums`}>
+                      +{formatCurrency(r.amount)}
+                    </td>
+                    <td className="py-2.5 text-muted-foreground">
+                      {r.accountName ?? <span className="text-muted-foreground/60 italic">Not linked</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-2 border-t border-border/60">
+              <span className="text-xs text-muted-foreground/80">
+                {(page - 1) * INCOME_PAGE_SIZE + 1}–{Math.min(page * INCOME_PAGE_SIZE, records.length)} of {records.length}
+              </span>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                  className="h-7 w-7 flex items-center justify-center rounded-lg bg-muted/60 hover:bg-muted text-xs text-muted-foreground disabled:opacity-40 transition-all">
+                  ‹
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                  <button key={p} onClick={() => setPage(p)}
+                    className={cn("h-7 w-7 flex items-center justify-center rounded-lg text-xs transition-all",
+                      p === page ? "bg-indigo-600 text-white" : "bg-muted/60 hover:bg-muted text-muted-foreground")}>
+                    {p}
+                  </button>
+                ))}
+                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                  className="h-7 w-7 flex items-center justify-center rounded-lg bg-muted/60 hover:bg-muted text-xs text-muted-foreground disabled:opacity-40 transition-all">
+                  ›
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       ) : (
         <p className="text-xs text-muted-foreground/80 text-center py-4">
           No {cfg.title.toLowerCase()} recorded for {year}.
@@ -713,7 +917,15 @@ function IncomeHistorySection({ incomeType, year, onYearChange }: {
 function DividendSuggestionsSection({ stockCount }: { stockCount: number }) {
   const { data: suggestions = [], isLoading } = useDividendSuggestions();
   const { mutate: logIncome, isPending: logging } = useLogIncome();
+  const { mutate: dismissDividend, isPending: dismissing } = useDismissDividend();
   const pending = suggestions.filter(s => !s.alreadyLogged);
+
+  // Editable amounts — keyed by `${investmentId}|${exDate}`
+  const [amounts, setAmounts] = useState<Record<string, string>>({});
+  const getAmt = (s: (typeof pending)[0]) => {
+    const key = `${s.investmentId}|${s.exDate}`;
+    return key in amounts ? amounts[key] : String(s.suggestedIncome);
+  };
 
   if (isLoading || stockCount === 0) return null;
 
@@ -731,50 +943,90 @@ function DividendSuggestionsSection({ stockCount }: { stockCount: number }) {
     );
   }
 
+  const handleLog = (s: (typeof pending)[0]) => {
+    const amt = parseFloat(getAmt(s));
+    if (isNaN(amt) || amt <= 0) return;
+    logIncome({
+      investmentId: s.investmentId,
+      data: {
+        incomeType: "DIVIDEND",
+        exDate: s.exDate,
+        amount: amt,
+        perShare: s.dividendPerShare,
+        shares: s.sharesHeld,
+      },
+    });
+  };
+
+  const handleLogAll = () => {
+    pending.forEach(s => handleLog(s));
+  };
+
   return (
     <div className="space-y-2">
       {pending.length > 0 && (
         <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <Banknote className="w-4 h-4 text-amber-400 shrink-0" />
-            <h3 className="text-sm font-semibold text-amber-300">Dividend Income to Log</h3>
-            <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full">{pending.length}</span>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Banknote className="w-4 h-4 text-amber-400 shrink-0" />
+              <h3 className="text-sm font-semibold text-amber-300">Dividend Income to Log</h3>
+              <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full">{pending.length}</span>
+            </div>
+            {pending.length > 1 && (
+              <button
+                disabled={logging || dismissing}
+                onClick={handleLogAll}
+                className="h-7 px-3 rounded-lg text-xs font-semibold bg-amber-500/80 hover:bg-amber-500 text-black transition-all disabled:opacity-50 whitespace-nowrap">
+                Log All
+              </button>
+            )}
           </div>
           <div className="grid sm:grid-cols-2 gap-2">
-            {pending.map(s => (
-              <div key={`${s.investmentId}-${s.exDate}`}
-                className="flex items-center justify-between bg-card rounded-xl px-3 py-2.5 gap-3">
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold text-foreground truncate">{s.symbol}</p>
-                  <p className="text-xs text-muted-foreground/80">
-                    Ex-date {formatDate(s.exDate)} · ₹{Number(s.dividendPerShare).toFixed(2)}/share · {Number(s.sharesHeld).toFixed(0)} shares
-                  </p>
+            {pending.map(s => {
+              const key = `${s.investmentId}|${s.exDate}`;
+              return (
+                <div key={key}
+                  className="bg-card rounded-xl px-3 py-3 space-y-2 border border-border/40">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-foreground truncate">{s.symbol}</p>
+                      <p className="text-xs text-muted-foreground/80">
+                        Ex-date {formatDate(s.exDate)} · ₹{Number(s.dividendPerShare).toFixed(2)}/share · {Number(s.sharesHeld).toFixed(0)} shares
+                      </p>
+                    </div>
+                    <button
+                      disabled={dismissing || logging}
+                      onClick={() => dismissDividend({ investmentId: s.investmentId, exDate: s.exDate })}
+                      className="text-xs text-muted-foreground/60 hover:text-red-400 transition-colors shrink-0 mt-0.5"
+                      title="Dismiss this suggestion">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/80">₹</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={getAmt(s)}
+                        onChange={e => setAmounts(a => ({ ...a, [key]: e.target.value }))}
+                        className="w-full h-8 pl-6 pr-2 rounded-lg bg-muted/60 border border-border text-xs text-foreground tabular-nums focus:outline-none focus:border-amber-400 transition-all"
+                      />
+                    </div>
+                    <button
+                      disabled={logging || dismissing}
+                      onClick={() => handleLog(s)}
+                      className="h-8 px-3 rounded-lg text-xs font-semibold bg-indigo-600/80 hover:bg-indigo-600 text-white transition-all disabled:opacity-50 whitespace-nowrap">
+                      Log
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-xs font-bold text-amber-400 tabular-nums">
-                    +{formatCurrency(s.suggestedIncome)}
-                  </span>
-                  <button
-                    disabled={logging}
-                    onClick={() => logIncome({
-                      investmentId: s.investmentId,
-                      data: {
-                        incomeType: "DIVIDEND",
-                        exDate: s.exDate,
-                        amount: s.suggestedIncome,
-                        perShare: s.dividendPerShare,
-                        shares: s.sharesHeld,
-                      },
-                    })}
-                    className="h-6 px-2 rounded-lg text-xs font-semibold bg-indigo-600/80 hover:bg-indigo-600 text-white transition-all disabled:opacity-50 whitespace-nowrap">
-                    Log
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <p className="text-xs text-muted-foreground/60">
-            Click <strong className="text-muted-foreground/80">Log</strong> to record the income. Each entry is dedup-protected — logging twice has no effect.
+            Edit the amount if needed, then click <strong className="text-muted-foreground/80">Log</strong> to record each dividend.
+            Click <X className="w-3 h-3 inline" /> to dismiss a suggestion permanently.
           </p>
         </div>
       )}
@@ -865,9 +1117,9 @@ function StockForm({ defaultValues, onSubmit, onCancel, isPending, accountOption
 
       {selected && (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <FormCurrencyInput label="Quantity (shares)" {...form.register("units")}
+          <FormCurrencyInput label="Quantity (shares)" placeholder="0" {...form.register("units")}
             error={form.formState.errors.units?.message as string} />
-          <FormCurrencyInput label="Buy Price per Share (₹)" {...form.register("avgBuyPrice")}
+          <FormCurrencyInput label="Buy Price per Share (₹)" placeholder="0" {...form.register("avgBuyPrice")}
             error={form.formState.errors.avgBuyPrice?.message as string} />
           <Controller control={form.control} name="purchaseDate" render={({ field, fieldState }) => (
             <FormDatePicker label="Purchase Date" value={field.value ?? ""} onChange={field.onChange}
@@ -883,9 +1135,10 @@ function StockForm({ defaultValues, onSubmit, onCancel, isPending, accountOption
               options={[{ value: "", label: "None (no debit)" }, ...accountOptions]}
               {...form.register("debitAccountId")} />
           )}
-          <div>
-            <FormInput label="Notes" placeholder="Optional" {...form.register("notes")} />
-          </div>
+          {!isEditing && (
+            <FormCurrencyInput label="Brokerage (₹, optional)" placeholder="0"
+              {...form.register("brokerage")} />
+          )}
         </div>
       )}
 
@@ -1053,7 +1306,6 @@ function GoldForm({ defaultValues, onSubmit, onCancel, isPending, goldPrice, acc
             options={[{ value: "", label: "None (no debit)" }, ...accountOptions]}
             {...form.register("debitAccountId")} />
         )}
-        <FormInput label="Notes" {...form.register("notes")} />
       </div>
       <FormButtons onCancel={onCancel} isPending={isPending} label="Save Gold" color="amber" />
     </form>
@@ -1116,7 +1368,6 @@ function FDForm({ defaultValues, onSubmit, onCancel, isPending, accountOptions, 
             options={[{ value: "", label: "None (no debit)" }, ...accountOptions]}
             {...form.register("debitAccountId")} />
         )}
-        <FormInput label="Notes" {...form.register("notes")} />
       </div>
       <FormButtons onCancel={onCancel} isPending={isPending} label="Save FD" color="sky" />
     </form>
@@ -1130,20 +1381,36 @@ function BondForm({ defaultValues, onSubmit, onCancel, isPending, accountOptions
     resolver: zodResolver(bondSchema),
     defaultValues: { couponFrequency: "HALF_YEARLY", quantity: "1", ...defaultValues },
   });
-  const faceVal = Number(form.watch("faceValuePerBond") ?? 0);
-  const qty     = Number(form.watch("quantity")          ?? 1);
-  const rate    = Number(form.watch("couponRate")         ?? 0);
-  const freq    = form.watch("couponFrequency") ?? "HALF_YEARLY";
+  const faceVal  = Number(form.watch("faceValuePerBond") ?? 0);
+  const qty      = Number(form.watch("quantity")          ?? 1);
+  const rate     = Number(form.watch("couponRate")         ?? 0);
+  const freq     = form.watch("couponFrequency") ?? "HALF_YEARLY";
+  const tdsRateW = Number(form.watch("tdsRate")            ?? 0);
 
-  const totalInvested = faceVal > 0 && qty > 0 ? faceVal * qty : null;
-  const couponAmt = useMemo(() => {
+  // Auto-fill totalInvested when face value or quantity changes, but only if user hasn't overridden it
+  useEffect(() => {
+    if (faceVal > 0 && qty > 0) {
+      const current = Number(form.getValues("totalInvested") ?? 0);
+      const expected = faceVal * qty;
+      // Only auto-set if blank or still matches a previous face-value calculation
+      if (!current || Math.abs(current - expected) < 0.01) {
+        form.setValue("totalInvested", expected as any);
+      }
+    }
+  }, [faceVal, qty]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const grossCouponAmt = useMemo(() => {
     if (!faceVal || !qty || !rate) return null;
     const n = freq === "MONTHLY" ? 12 : freq === "QUARTERLY" ? 4 : freq === "HALF_YEARLY" ? 2 : 1;
     return (faceVal * qty * rate / 100) / n;
   }, [faceVal, qty, rate, freq]);
 
+  const netCouponAmt = grossCouponAmt != null && tdsRateW > 0
+    ? grossCouponAmt * (1 - tdsRateW / 100)
+    : grossCouponAmt;
+
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={form.handleSubmit(values => onSubmit({ ...values, _investedAmount: Number(values.totalInvested) }))} className="space-y-4">
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="sm:col-span-2 lg:col-span-3">
           <FormInput label="Bond Name" placeholder="e.g. RBI Savings Bond, Govt of India 7.26% 2032"
@@ -1153,15 +1420,14 @@ function BondForm({ defaultValues, onSubmit, onCancel, isPending, accountOptions
           error={form.formState.errors.faceValuePerBond?.message as string} />
         <FormInput label="Quantity (no. of bonds)" type="number" min="1"
           {...form.register("quantity")} error={form.formState.errors.quantity?.message as string} />
-        {totalInvested != null && (
-          <div className="bg-muted/30 rounded-xl px-3 py-2.5 flex flex-col justify-center">
-            <p className="text-xs text-muted-foreground/80">Total invested</p>
-            <p className="text-sm font-bold text-foreground tabular-nums">{formatCurrency(totalInvested)}</p>
-          </div>
-        )}
+        <FormCurrencyInput label="Total Invested (₹)" {...form.register("totalInvested")}
+          error={form.formState.errors.totalInvested?.message as string} />
         <FormInput label="Coupon Rate (% p.a.)" type="number" step="0.01"
           {...form.register("couponRate")} error={form.formState.errors.couponRate?.message as string} />
         <FormSelect label="Coupon Frequency" options={COUPON_FREQ} {...form.register("couponFrequency")} />
+        <FormInput label="TDS Rate (%, 0 if N/A)" type="number" step="0.01" min="0" max="30"
+          placeholder="e.g. 10"
+          {...form.register("tdsRate")} />
         <FormInput label="Credit Day of Month (1–31)" type="number" min="1" max="31"
           placeholder="e.g. 15"
           {...form.register("couponCreditDay")} />
@@ -1173,12 +1439,18 @@ function BondForm({ defaultValues, onSubmit, onCancel, isPending, accountOptions
           <FormDatePicker label="Maturity Date (optional)" value={field.value ?? ""} onChange={field.onChange}
             onBlur={field.onBlur} placeholder="Leave blank if perpetual" />
         )} />
-        {couponAmt != null && (
-          <div className="sm:col-span-2 lg:col-span-3 bg-violet-500/10 border border-violet-500/20 rounded-xl p-3 flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">
-              Coupon income per {freq.toLowerCase().replace("_", "-")} period
-            </span>
-            <span className="text-sm font-bold text-violet-400 tabular-nums">{formatCurrency(couponAmt)}</span>
+        {grossCouponAmt != null && (
+          <div className="sm:col-span-2 lg:col-span-3 bg-violet-500/10 border border-violet-500/20 rounded-xl p-3 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Gross coupon per {freq.toLowerCase().replace("_", "-")} period</span>
+              <span className="text-sm font-semibold text-violet-300/70 tabular-nums">{formatCurrency(grossCouponAmt)}</span>
+            </div>
+            {tdsRateW > 0 && netCouponAmt != null && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Net coupon after {tdsRateW}% TDS</span>
+                <span className="text-sm font-bold text-violet-400 tabular-nums">{formatCurrency(netCouponAmt)}</span>
+              </div>
+            )}
           </div>
         )}
         {accountOptions?.length > 0 && (
@@ -1191,7 +1463,6 @@ function BondForm({ defaultValues, onSubmit, onCancel, isPending, accountOptions
             options={[{ value: "", label: "None (no debit)" }, ...accountOptions]}
             {...form.register("debitAccountId")} />
         )}
-        <FormInput label="Notes" {...form.register("notes")} />
       </div>
       <FormButtons onCancel={onCancel} isPending={isPending} label="Save Bond" color="violet" />
     </form>
@@ -1265,7 +1536,7 @@ function TabSummaryBar({ investments, tab }: { investments: Investment[]; tab: T
 
     if (tab === "bonds") {
       const avgCoupon    = investments.reduce((s, i) => s + (i.couponRate ?? 0), 0) / investments.length;
-      const annualIncome = investments.reduce((s, i) => s + (i.investedAmount * (i.couponRate ?? 0) / 100), 0);
+      const annualIncome = investments.reduce((s, i) => s + ((i.avgBuyPrice ?? 0) * (i.units ?? 1) * (i.couponRate ?? 0) / 100), 0);
       return [
         { label: "Face Value",      value: formatCurrency(totalInvested),    color: "text-foreground",                   bg: "bg-muted/60 border-border" },
         { label: "Current Value",   value: formatCurrency(totalCurrent),     color: "text-violet-600 dark:text-violet-400", bg: "bg-violet-500/12 border-violet-500/15" },
@@ -1323,7 +1594,7 @@ function OverviewTab({ investments, year, onYearChange, incomeHistory }: {
   const chart          = useChartTheme();
   const currentYear    = new Date().getFullYear();
   const [incomeFilter, setIncomeFilter] = useState<IncomeFilter>("ALL");
-  const [showAllIncome, setShowAllIncome] = useState(false);
+  const [incomePage, setIncomePage] = useState(1);
   const INCOME_PAGE_SIZE = 10;
 
   const totalInvested = investments.reduce((s, i) => s + i.investedAmount, 0);
@@ -1448,7 +1719,7 @@ function OverviewTab({ investments, year, onYearChange, incomeHistory }: {
               { key: "FD_MATURITY" as IncomeFilter, label: "FD Maturity",  value: incomeHistory.summary.fdMaturityTotal, color: "text-sky-400",     ring: "ring-sky-500/40",     bg: "bg-sky-500/12 border-sky-500/15"         },
               { key: "ALL"         as IncomeFilter, label: "Total Income", value: incomeHistory.summary.grandTotal,      color: "text-emerald-400", ring: "ring-emerald-500/40", bg: "bg-emerald-500/12 border-emerald-500/15" },
             ].map(({ key, label, value, color, ring, bg }) => (
-              <button key={key} type="button" onClick={() => setIncomeFilter(k => k === key ? "ALL" : key)}
+              <button key={key} type="button" onClick={() => { setIncomeFilter(k => k === key ? "ALL" : key); setIncomePage(1); }}
                 className={cn(`rounded-xl border p-3 text-left transition-all`, bg,
                   incomeFilter === key && key !== "ALL" ? `ring-2 ${ring}` : "")}>
                 <p className="text-xs text-muted-foreground/80 uppercase tracking-wide mb-1 flex items-center gap-1">
@@ -1466,7 +1737,7 @@ function OverviewTab({ investments, year, onYearChange, incomeHistory }: {
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-muted-foreground/80 font-medium">Filter:</span>
             {(["ALL", "DIVIDEND", "BOND_COUPON", "FD_MATURITY"] as IncomeFilter[]).map(f => (
-              <button key={f} type="button" onClick={() => setIncomeFilter(f)}
+              <button key={f} type="button" onClick={() => { setIncomeFilter(f); setIncomePage(1); }}
                 className={cn("h-6 px-2.5 rounded-lg text-xs font-medium transition-all border",
                   incomeFilter === f
                     ? f === "DIVIDEND"     ? "bg-indigo-500/15 border-indigo-500/40 text-indigo-400"
@@ -1491,6 +1762,9 @@ function OverviewTab({ investments, year, onYearChange, incomeHistory }: {
             ? (incomeHistory?.records ?? [])
             : (incomeHistory?.records.filter(r => r.incomeType === incomeFilter) ?? []);
 
+          const totalIncomePages = Math.max(1, Math.ceil(visibleRecords.length / INCOME_PAGE_SIZE));
+          const pageIncomeRecords = visibleRecords.slice((incomePage - 1) * INCOME_PAGE_SIZE, incomePage * INCOME_PAGE_SIZE);
+
           return incomeHistory && incomeHistory.records.length > 0 ? (
             visibleRecords.length > 0 ? (<>
               <div className="overflow-x-auto">
@@ -1505,7 +1779,7 @@ function OverviewTab({ investments, year, onYearChange, incomeHistory }: {
                     </tr>
                   </thead>
                   <tbody>
-                    {(showAllIncome ? visibleRecords : visibleRecords.slice(0, INCOME_PAGE_SIZE)).map((r: IncomeHistoryRecord, idx: number) => (
+                    {pageIncomeRecords.map((r: IncomeHistoryRecord, idx: number) => (
                       <tr key={r.id ?? `hist-${idx}`} className={cn(
                         "border-b border-border/60 last:border-0 transition-colors",
                         r.credited ? "hover:bg-muted/20" : "opacity-60 hover:opacity-80 hover:bg-muted/10"
@@ -1539,11 +1813,29 @@ function OverviewTab({ investments, year, onYearChange, incomeHistory }: {
                   </tbody>
                 </table>
               </div>
-              {visibleRecords.length > INCOME_PAGE_SIZE && (
-                <button onClick={() => setShowAllIncome(v => !v)}
-                  className="w-full py-2.5 text-xs text-muted-foreground/80 hover:text-foreground flex items-center justify-center gap-1.5 transition-colors border-t border-border/60 mt-1">
-                  {showAllIncome ? "Show less" : `Show all ${visibleRecords.length} records`}
-                </button>
+              {totalIncomePages > 1 && (
+                <div className="flex items-center justify-between pt-2 border-t border-border/60">
+                  <span className="text-xs text-muted-foreground/80">
+                    {(incomePage - 1) * INCOME_PAGE_SIZE + 1}–{Math.min(incomePage * INCOME_PAGE_SIZE, visibleRecords.length)} of {visibleRecords.length}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setIncomePage(p => Math.max(1, p - 1))} disabled={incomePage === 1}
+                      className="h-7 w-7 flex items-center justify-center rounded-lg bg-muted/60 hover:bg-muted text-xs text-muted-foreground disabled:opacity-40 transition-all">
+                      ‹
+                    </button>
+                    {Array.from({ length: totalIncomePages }, (_, i) => i + 1).map(p => (
+                      <button key={p} onClick={() => setIncomePage(p)}
+                        className={cn("h-7 w-7 flex items-center justify-center rounded-lg text-xs transition-all",
+                          p === incomePage ? "bg-indigo-600 text-white" : "bg-muted/60 hover:bg-muted text-muted-foreground")}>
+                        {p}
+                      </button>
+                    ))}
+                    <button onClick={() => setIncomePage(p => Math.min(totalIncomePages, p + 1))} disabled={incomePage === totalIncomePages}
+                      className="h-7 w-7 flex items-center justify-center rounded-lg bg-muted/60 hover:bg-muted text-xs text-muted-foreground disabled:opacity-40 transition-all">
+                      ›
+                    </button>
+                  </div>
+                </div>
               )}
             </>) : (
               <p className="text-xs text-muted-foreground/80 text-center py-4">
@@ -1587,6 +1879,7 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
 
 export default function InvestmentsPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [tab,       setTab]       = useState<TabId>("overview");
 
   // Sync tab from URL param on every navigation (e.g. /investments?tab=stocks)
@@ -1597,7 +1890,8 @@ export default function InvestmentsPage() {
   const [showForm,  setShowForm]  = useState(false);
   const [editItem,  setEditItem]  = useState<Investment | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
-  const [sortKey,   setSortKey]   = useState<SortKey>("value_desc");
+  const [sortKey,      setSortKey]      = useState<SortKey>("value_desc");
+  const [stockSearch,  setStockSearch]  = useState("");
   const [incomeYear, setIncomeYear] = useState(new Date().getFullYear());
 
   const { data: investments = [], isLoading } = useInvestments();
@@ -1650,6 +1944,7 @@ export default function InvestmentsPage() {
         units, avgBuyPrice: price, currentPrice: price,
         investedAmount: units * price, currentValue: units * price,
         purchaseDate: values.purchaseDate,
+        brokerage: values.brokerage ? Number(values.brokerage) : undefined,
         linkedAccountId: values.linkedAccountId || undefined,
         debitAccountId: values.debitAccountId || undefined,
         notes: values.notes,
@@ -1700,13 +1995,15 @@ export default function InvestmentsPage() {
     // bonds
     const faceVal = Number(values.faceValuePerBond);
     const qty     = Number(values.quantity);
-    const total   = faceVal * qty;
+    // _investedAmount is set by BondForm.handleBondSubmit (accounts for secondary market price)
+    const total   = values._investedAmount ?? faceVal * qty;
     return {
       investmentType: "BOND", companyName: values.companyName,
       investedAmount: total, currentValue: total,
       units: qty, avgBuyPrice: faceVal,
       couponRate: Number(values.couponRate), couponFrequency: values.couponFrequency,
       couponCreditDay: values.couponCreditDay ? Number(values.couponCreditDay) : undefined,
+      tdsRate: values.tdsRate ? Number(values.tdsRate) : undefined,
       purchaseDate: values.purchaseDate,
       maturityDate: values.maturityDate || undefined,
       linkedAccountId: values.linkedAccountId || undefined,
@@ -1725,7 +2022,7 @@ export default function InvestmentsPage() {
   }, [editItem, create, update, buildPayload, tab]);
 
   const editDefaults = useCallback((inv: Investment) => {
-    const base = { linkedAccountId: inv.linkedAccountId, notes: inv.notes };
+    const base = { linkedAccountId: inv.linkedAccountId ?? "" };
     if (inv.investmentType === "FD")
       return { ...base, bankName: inv.bankName, investedAmount: inv.investedAmount,
         couponRate: inv.couponRate, purchaseDate: inv.purchaseDate,
@@ -1734,17 +2031,19 @@ export default function InvestmentsPage() {
       return { ...base, companyName: inv.companyName,
         faceValuePerBond: inv.avgBuyPrice,          // stored as avgBuyPrice (per bond)
         quantity: inv.units,
+        totalInvested: inv.investedAmount,
+        tdsRate: inv.tdsRate,
         couponRate: inv.couponRate, couponFrequency: inv.couponFrequency,
         couponCreditDay: inv.couponCreditDay,
         purchaseDate: inv.purchaseDate, maturityDate: inv.maturityDate };
     if (inv.investmentType === "GOLD" || inv.investmentType === "GOLD_ETF")
       return { companyName: inv.companyName, quantityGrams: inv.quantityGrams,
         goldKarat: inv.goldKarat ?? 22,
-        avgBuyPrice: inv.avgBuyPrice, purchaseDate: inv.purchaseDate, notes: inv.notes };
+        avgBuyPrice: inv.avgBuyPrice, purchaseDate: inv.purchaseDate };
     if (inv.investmentType === "MUTUAL_FUND")
-      return { ...base, units: inv.units, avgBuyPrice: inv.avgBuyPrice, purchaseDate: inv.purchaseDate };
-    // STOCK
-    return { ...base, units: inv.units, avgBuyPrice: inv.avgBuyPrice, purchaseDate: inv.purchaseDate };
+      return { ...base, units: Number(inv.units ?? 0).toFixed(2), avgBuyPrice: Number(inv.avgBuyPrice ?? 0).toFixed(2), purchaseDate: inv.purchaseDate };
+    // STOCK — allow correcting initial quantity and price (updates the seed transaction)
+    return { ...base, units: fmtNum(inv.units ?? 0), avgBuyPrice: fmtNum(inv.avgBuyPrice ?? 0), purchaseDate: inv.purchaseDate };
   }, []);
 
   const switchToTab = useCallback((inv: Investment): TabId => {
@@ -1755,9 +2054,7 @@ export default function InvestmentsPage() {
     return "bonds";
   }, []);
 
-  const canAdd = tab !== "overview";
-
-  const tabCounts = useMemo(() => investments.reduce((acc, i) => {
+const tabCounts = useMemo(() => investments.reduce((acc, i) => {
     acc.overview++;
     if (i.investmentType === "STOCK")       acc.stocks++;
     else if (i.investmentType === "MUTUAL_FUND") acc.mf++;
@@ -1782,7 +2079,7 @@ export default function InvestmentsPage() {
           onCancel={() => setConfirmId(null)} />
       )}
 
-      {(showForm || editItem) && canAdd && (
+      {(showForm || editItem) && tab !== "overview" && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeForm}>
           <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-card border border-border rounded-2xl p-5" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
@@ -1834,14 +2131,14 @@ export default function InvestmentsPage() {
         </div>
       )}
 
-      <main className="flex-1 p-4 md:p-5 lg:p-6 pb-24 lg:pb-6 overflow-auto">
+      <main className="flex-1 p-4 md:p-5 lg:p-6 pb-36 lg:pb-24 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-4">
         {/* Tabs + Add button in one row */}
         <div className="flex items-center gap-2">
           <div className="flex gap-1 overflow-x-auto pb-0 flex-1 min-w-0" style={{ scrollbarWidth: "none" }}>
             {TABS.map(({ id, label, icon: Icon }) => (
               <button key={id}
-                onClick={() => { setTab(id); closeForm(); }}
+                onClick={() => { setTab(id); closeForm(); router.replace(`/investments?tab=${id}`); }}
                 className={cn(
                   "flex items-center gap-2 h-9 px-4 rounded-xl text-xs font-medium whitespace-nowrap transition-all shrink-0",
                   tab === id ? "bg-indigo-600 text-white" : "bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -1857,13 +2154,6 @@ export default function InvestmentsPage() {
               </button>
             ))}
           </div>
-          {canAdd && (
-            <button onClick={() => setShowForm(true)}
-              className="flex items-center gap-2 h-9 px-4 rounded-xl text-xs font-medium bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/20 transition-all shrink-0">
-              <Plus className="w-3.5 h-3.5" />
-              Add {TABS.find(t => t.id === tab)?.label.replace(/s$/, "")}
-            </button>
-          )}
         </div>
 
         {/* Content */}
@@ -1909,6 +2199,23 @@ export default function InvestmentsPage() {
                 </div>
               </div>
             )}
+            {tab === "stocks" && (
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50 pointer-events-none" />
+                <input
+                  value={stockSearch}
+                  onChange={e => setStockSearch(e.target.value)}
+                  placeholder="Filter holdings by name or symbol…"
+                  className="w-full h-9 pl-9 pr-9 rounded-xl bg-muted/50 border border-border text-xs text-foreground placeholder-muted-foreground/40 focus:outline-none focus:border-indigo-500 transition-all"
+                />
+                {stockSearch && (
+                  <button onClick={() => setStockSearch("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs text-muted-foreground/80">{filtered.length} holding{filtered.length !== 1 ? "s" : ""}</p>
               <select value={sortKey} onChange={e => setSortKey(e.target.value as SortKey)}
@@ -1917,10 +2224,18 @@ export default function InvestmentsPage() {
               </select>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-              {filtered.map(inv => (
+              {(tab === "stocks" && stockSearch
+                ? filtered.filter(inv => {
+                    const q = stockSearch.toLowerCase();
+                    return (inv.companyName ?? "").toLowerCase().includes(q)
+                        || (inv.symbol ?? "").toLowerCase().includes(q);
+                  })
+                : filtered
+              ).map(inv => (
                 <InvestmentCard key={inv.id} inv={inv}
                   onEdit={() => { setTab(switchToTab(inv)); setEditItem(inv); setShowForm(true); }}
                   onDelete={() => setConfirmId(inv.id)}
+                  accountOptions={accountOptions}
                   dividendRecords={
                     inv.investmentType === "STOCK"
                       ? (incomeHistory?.records.filter(r => r.investmentId === inv.id && r.incomeType === "DIVIDEND") ?? [])
@@ -1934,6 +2249,21 @@ export default function InvestmentsPage() {
         )}
         </div>
       </main>
+
+      {/* ── Floating Action Button ── */}
+      <FloatingActionButton actions={
+        tab === "overview"
+          ? [
+              { icon: TrendingUp, label: "Stock",         color: "indigo",  onClick: () => { setTab("stocks"); setEditItem(null); setShowForm(true); } },
+              { icon: Layers,     label: "Mutual Fund",   color: "sky",     onClick: () => { setTab("mf");     setEditItem(null); setShowForm(true); } },
+              { icon: Coins,      label: "Gold",          color: "amber",   onClick: () => { setTab("gold");   setEditItem(null); setShowForm(true); } },
+              { icon: Building2,  label: "Fixed Deposit", color: "emerald", onClick: () => { setTab("fd");     setEditItem(null); setShowForm(true); } },
+              { icon: Percent,    label: "Bond",          color: "violet",  onClick: () => { setTab("bonds");  setEditItem(null); setShowForm(true); } },
+            ]
+          : [
+              { icon: Plus, label: `Add ${TABS.find(t => t.id === tab)?.label.replace(/s$/, "") ?? "Investment"}`, color: "indigo", onClick: () => { setEditItem(null); setShowForm(true); } },
+            ]
+      } />
     </div>
   );
 }

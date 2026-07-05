@@ -73,6 +73,19 @@ public class RestClientConfig {
             .build();
     }
 
+    /** BSE India public API — equity list download */
+    @Bean("bseClient")
+    public RestClient bseClient() {
+        return RestClient.builder()
+            .requestFactory(timeoutFactory(Duration.ofSeconds(15), Duration.ofSeconds(60)))
+            .baseUrl("https://api.bseindia.com")
+            .defaultHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120")
+            .defaultHeader("Accept", "application/json,text/plain,*/*")
+            .defaultHeader("Origin", "https://www.bseindia.com")
+            .defaultHeader("Referer", "https://www.bseindia.com/")
+            .build();
+    }
+
     /** frankfurter.app — fallback USD/INR rate */
     @Bean("frankfurterClient")
     public RestClient frankfurterClient() {

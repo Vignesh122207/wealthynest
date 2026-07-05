@@ -143,7 +143,7 @@ export default function AnalyticsPage() {
   return (
     <div className="flex flex-col flex-1 bg-background">
       <Header title="Analytics" />
-      <main className="flex-1 p-4 md:p-5 lg:p-6 pb-24 lg:pb-6 overflow-auto">
+      <main className="flex-1 p-4 md:p-5 lg:p-6 pb-36 lg:pb-24 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-5">
 
         {/* Month Navigator */}
@@ -364,7 +364,7 @@ export default function AnalyticsPage() {
         {hasInvestments ? (
           <div className="bg-card border border-border rounded-2xl p-5">
             <h3 className="font-semibold text-foreground text-sm mb-4">Investment Performance</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-5">
               {[
                 { label: "Amount Invested", value: current!.totalInvested,
                   color: "text-foreground",                                bg: "bg-muted/60" },
@@ -383,6 +383,34 @@ export default function AnalyticsPage() {
                   <p className={cn("text-base font-bold tabular-nums", color)}>{formatCurrency(value)}</p>
                 </div>
               ))}
+            </div>
+            {/* Invested vs Current Value bar comparison */}
+            <div className="border-t border-border pt-4">
+              <p className="text-xs text-muted-foreground mb-3">Invested vs Current Value</p>
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart
+                  data={[
+                    { label: "Invested",      value: current!.totalInvested },
+                    { label: "Current Value", value: current!.totalInvestmentValue },
+                  ]}
+                  barCategoryGap="40%"
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke={chart.gridColor} vertical={false} />
+                  <XAxis dataKey="label" tick={{ fill: chart.axisColor, fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: chart.axisColor, fontSize: 10 }} axisLine={false} tickLine={false}
+                    tickFormatter={(v) => `₹${Math.abs(v) >= 100000 ? `${(v / 100000).toFixed(1)}L` : `${(v / 1000).toFixed(0)}K`}`} />
+                  <Tooltip
+                    contentStyle={chart.tooltipStyle} labelStyle={chart.labelStyle} itemStyle={chart.itemStyle}
+                    cursor={{ fill: "rgba(99,102,241,0.06)" }}
+                    formatter={(v: number) => [formatCurrency(v), ""]}
+                  />
+                  <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                    {[current!.totalInvested, current!.totalInvestmentValue].map((_, i) => (
+                      <Cell key={i} fill={i === 0 ? "#94a3b8" : "#6366f1"} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
         ) : current && (

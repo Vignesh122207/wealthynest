@@ -8,6 +8,7 @@ export interface CreateDebtPayload {
   contactPhone?: string;
   amount:        number;
   description?:  string;
+  debtDate?:     string;
   dueDate?:      string;
   accountId?:    string;
 }
@@ -17,6 +18,7 @@ export interface UpdateDebtPayload {
   contactPhone?: string;
   amount?:       number;
   description?:  string;
+  debtDate?:     string;
   dueDate?:      string;
 }
 
