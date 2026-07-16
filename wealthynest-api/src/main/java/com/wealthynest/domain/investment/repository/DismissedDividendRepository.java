@@ -11,5 +11,4 @@ import java.util.UUID;
 public interface DismissedDividendRepository extends JpaRepository<DismissedDividend, UUID> {
     boolean existsByUserIdAndInvestmentIdAndExDate(UUID userId, UUID investmentId, LocalDate exDate);
     List<DismissedDividend> findByUserId(UUID userId);
-    void deleteByUserIdAndInvestmentIdAndExDate(UUID userId, UUID investmentId, LocalDate exDate);
 }

@@ -23,4 +23,8 @@ public class LiabilityResponse {
     private boolean    active;
     private Instant    createdAt;
     private Instant    updatedAt;
+
+    /** True for entries derived live from Accounts (loan accounts, credit-card dues) — edit at source. */
+    private boolean    derived;
+    private UUID       sourceAccountId;
 }

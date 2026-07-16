@@ -8,12 +8,13 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface AssetRepository extends JpaRepository<Asset, UUID> {
     List<Asset> findByUserIdAndActiveTrue(UUID userId);
-    List<Asset> findByFamilyIdAndActiveTrue(UUID familyId);
+    Optional<Asset> findByIdAndUserId(UUID id, UUID userId);
 
     @Query("SELECT COALESCE(SUM(a.currentValue),0) FROM Asset a WHERE a.userId = :userId AND a.active = true")
     BigDecimal sumCurrentValueByUser(UUID userId);
@@ -33,4 +34,9 @@ public interface AssetRepository extends JpaRepository<Asset, UUID> {
     @Modifying
     @Query("UPDATE Asset a SET a.familyId = null WHERE a.familyId = :familyId")
     void clearFamilyId(@Param("familyId") UUID familyId);
+
+    /** Detaches one departing member's own assets from the family. */
+    @Modifying
+    @Query("UPDATE Asset a SET a.familyId = null WHERE a.userId = :userId AND a.familyId = :familyId")
+    void clearFamilyIdForUser(@Param("userId") UUID userId, @Param("familyId") UUID familyId);
 }

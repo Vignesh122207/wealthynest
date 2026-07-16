@@ -13,14 +13,6 @@ export function useBudgets(year?: number, month?: number) {
   });
 }
 
-export function useBudgetsForCategory(categoryId: string | undefined, year: number, month: number) {
-  return useQuery({
-    queryKey: [...QUERY_KEYS.BUDGETS, "category", categoryId, year, month],
-    queryFn:  () => budgetsApi.getBudgetsForCategory(categoryId!, year, month),
-    enabled:  !!categoryId,
-  });
-}
-
 export function useCreateBudget() {
   const qc = useQueryClient();
   return useMutation({
@@ -57,20 +49,5 @@ export function useDeleteBudget() {
       toast.success("Budget deleted");
     },
     onError: () => toast.error("Failed to delete budget"),
-  });
-}
-
-export function useCopyBudgets() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ fromYear, fromMonth, toYear, toMonth }: {
-      fromYear: number; fromMonth: number; toYear: number; toMonth: number;
-    }) => budgetsApi.copyBudgets(fromYear, fromMonth, toYear, toMonth),
-    onSuccess: (count) => {
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.BUDGETS });
-      if (count === 0) toast.info("No new budgets to copy — this month already has all categories covered.");
-      else toast.success(`Copied ${count} budget${count === 1 ? "" : "s"} from last month`);
-    },
-    onError: () => toast.error("Failed to copy budgets"),
   });
 }

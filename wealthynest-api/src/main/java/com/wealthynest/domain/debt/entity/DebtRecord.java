@@ -48,11 +48,8 @@ public class DebtRecord {
     @Column(name = "account_id")
     private UUID accountId;
 
-    @Column(name = "linked_expense_id")
-    private UUID linkedExpenseId;
-
-    @Column(name = "linked_income_id")
-    private UUID linkedIncomeId;
+    @Column(name = "linked_transfer_id")
+    private UUID linkedTransferId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)

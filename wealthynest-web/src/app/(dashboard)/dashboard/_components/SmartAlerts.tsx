@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { X, Lightbulb, Bell, RefreshCw } from "lucide-react";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { useAmountFormatter } from "@/hooks/useAmountFormatter";
+import { PremiumIcon } from "@/components/icons/PremiumIcon";
 import type { Expense } from "@/features/expenses/types/expense.types";
 
 interface SmartInsight {
@@ -16,14 +18,12 @@ interface SmartAlertsProps {
   overBudgetCount:      number;
   overBudgetDismissed:  boolean;
   onDismissOverBudget:  () => void;
-  year:                 number;
-  month:                number;
 }
 
 export function SmartAlerts({
   smartInsights, upcomingBills, overBudgetCount, overBudgetDismissed, onDismissOverBudget,
-  year, month,
 }: SmartAlertsProps) {
+  const { fmt } = useAmountFormatter();
   const hasAlerts = !overBudgetDismissed && overBudgetCount > 0;
   const hasInsights = smartInsights.length > 0;
   const hasBills    = upcomingBills.length > 0;
@@ -53,9 +53,7 @@ export function SmartAlerts({
           {hasInsights && (
             <div className="rounded-2xl border border-border/50 bg-card p-4 shadow-sm space-y-2">
               <div className="flex items-center gap-2 mb-1">
-                <div className="w-6 h-6 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
-                  <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-                </div>
+                <PremiumIcon icon={Lightbulb} tone="yellow" size="xs" />
                 <p className="text-xs font-semibold text-foreground">Smart Insights</p>
               </div>
               {smartInsights.map((insight, i) => (
@@ -71,7 +69,7 @@ export function SmartAlerts({
                       ? "text-amber-600 dark:text-amber-400"
                       : "text-emerald-600 dark:text-emerald-400"
                   )}>
-                    {insight.delta > 0 ? "+" : ""}{formatCurrency(insight.delta)}
+                    {insight.delta > 0 ? "+" : ""}{fmt(insight.delta)}
                   </span>
                   <p className="text-xs text-muted-foreground leading-snug min-w-0 truncate">
                     in <span className="font-semibold text-foreground">{insight.category}</span> vs last month
@@ -85,9 +83,7 @@ export function SmartAlerts({
           {hasBills && (
             <div className="bg-card border border-border/50 rounded-2xl p-4 shadow-sm">
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-6 h-6 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0">
-                  <Bell className="w-3.5 h-3.5 text-violet-500" />
-                </div>
+                <PremiumIcon icon={Bell} tone="purple" size="xs" />
                 <p className="text-xs font-semibold text-foreground">Upcoming Bills — Next 7 Days</p>
               </div>
               <div className="space-y-2">
@@ -104,7 +100,7 @@ export function SmartAlerts({
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-xs font-bold text-red-500 dark:text-red-400 tabular-nums">
-                          −{formatCurrency(bill.amount)}
+                          −{fmt(bill.amount)}
                         </p>
                         <p className="text-[10px] text-muted-foreground/60">{dayName}</p>
                       </div>

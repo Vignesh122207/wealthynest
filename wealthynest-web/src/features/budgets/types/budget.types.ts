@@ -16,6 +16,7 @@ export interface Budget {
   alertThreshold: number;
   alertTriggered: boolean;
   budgetType:     BudgetType;
+  shared:         boolean;
 }
 
 export interface CreateBudgetPayload {

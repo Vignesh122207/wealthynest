@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { ScrollText } from "lucide-react";
-import { PublicNav, PublicFooter } from "@/components/layout/PublicNav";
+import { LegalPageChrome } from "@/components/layout/LegalPageChrome";
 
 export const metadata: Metadata = { title: "Terms of Service" };
 
@@ -15,9 +15,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
-      <PublicNav />
-
+    <LegalPageChrome>
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-16">
 
         {/* Header */}
@@ -33,7 +31,7 @@ export default function TermsPage() {
 
           <Section title="1. Acceptance of terms">
             <p>
-              By creating an account or using WealthyNest ("the App", "the Service"), you agree to these
+              By creating an account or using WealthyNest (&quot;the App&quot;, &quot;the Service&quot;), you agree to these
               Terms of Service. If you do not agree, please do not use the App.
             </p>
           </Section>
@@ -60,7 +58,7 @@ export default function TermsPage() {
             <p>You agree not to:</p>
             <ul className="list-disc list-inside space-y-1 pl-2">
               <li>Use the Service for any unlawful purpose or in violation of applicable Indian laws</li>
-              <li>Attempt to gain unauthorized access to other users' accounts or data</li>
+              <li>Attempt to gain unauthorized access to other users&apos; accounts or data</li>
               <li>Reverse engineer, decompile, or extract the source code of the App</li>
               <li>Use automated bots or scripts to scrape or abuse the Service</li>
               <li>Impersonate another person or entity</li>
@@ -151,8 +149,6 @@ export default function TermsPage() {
 
         </div>
       </main>
-
-      <PublicFooter />
-    </div>
+    </LegalPageChrome>
   );
 }

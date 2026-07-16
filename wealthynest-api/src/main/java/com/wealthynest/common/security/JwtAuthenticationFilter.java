@@ -15,6 +15,7 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
+import io.jsonwebtoken.Claims;
 import java.io.IOException;
 import java.util.UUID;
 
@@ -25,8 +26,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX        = "Bearer ";
 
-    private final JwtTokenProvider   jwtTokenProvider;
-    private final UserDetailsService  userDetailsService;
+    private final JwtTokenProvider        jwtTokenProvider;
+    private final UserDetailsService       userDetailsService;
+    private final TokenRevocationService   tokenRevocationService;
 
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,
@@ -43,6 +45,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     UserDetails userDetails = userDetailsService.loadUserByUsername(email);
                     if (!userDetails.isEnabled()) {
                         response.sendError(HttpServletResponse.SC_FORBIDDEN, "Account is disabled");
+                        return;
+                    }
+                    Claims claims = jwtTokenProvider.extractAllClaims(token);
+                    UUID userId = UUID.fromString(claims.getId());
+                    if (tokenRevocationService.isRevoked(userId, claims.getIssuedAt())) {
+                        response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Session expired, please log in again");
                         return;
                     }
                     UsernamePasswordAuthenticationToken authToken =

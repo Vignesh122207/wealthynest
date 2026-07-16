@@ -174,8 +174,16 @@ public class ReportController {
 
     private static String esc(String v) {
         if (v == null || v.isBlank()) return "";
-        return (v.contains(",") || v.contains("\"") || v.contains("\n"))
-                ? "\"" + v.replace("\"", "\"\"") + "\""
-                : v;
+        String value = v;
+        // Prevent CSV formula injection: Excel/Sheets treat a cell starting with
+        // =, +, -, @ (or a tab/CR) as a formula to evaluate, even when quoted.
+        // Prefixing a literal apostrophe forces it to be read as plain text.
+        char first = value.charAt(0);
+        if (first == '=' || first == '+' || first == '-' || first == '@' || first == '\t' || first == '\r') {
+            value = "'" + value;
+        }
+        return (value.contains(",") || value.contains("\"") || value.contains("\n"))
+                ? "\"" + value.replace("\"", "\"\"") + "\""
+                : value;
     }
 }

@@ -69,57 +69,6 @@ public class AutoIncomeScheduler {
         }
     }
 
-    @Transactional
-    public void processSingleStockDividends(Investment inv) {
-        long fromEpoch = inv.getPurchaseDate().atStartOfDay()
-            .toInstant(java.time.ZoneOffset.UTC).getEpochSecond();
-        Map<String, BigDecimal> divHistory;
-        try {
-            divHistory = externalPriceService.fetchDividendHistory(yahooTicker(inv), fromEpoch);
-        } catch (RuntimeException e) {
-            // fetchDividendHistory throws only after exhausting its own retries — skip this stock
-            // in the current batch run; the next scheduled run will try again.
-            log.warn("Dividend processing skipped for {} (Yahoo unavailable after retries): {}",
-                inv.getSymbol(), e.getMessage());
-            return;
-        }
-
-        try {
-            LocalDate monthStart = LocalDate.now().withDayOfMonth(1);
-            for (Map.Entry<String, BigDecimal> entry : divHistory.entrySet()) {
-                LocalDate  exDate   = LocalDate.parse(entry.getKey());
-                BigDecimal perShare = entry.getValue();
-                if (exDate.isBefore(inv.getPurchaseDate())) continue;
-                if (exDate.isAfter(LocalDate.now())) continue;
-                if (perShare == null || perShare.compareTo(BigDecimal.ZERO) <= 0) continue;
-
-                // Always save to corporate actions — used for display in investment history
-                if (!corporateActionRepository.existsBySymbolAndActionTypeAndExDate(
-                        inv.getSymbol(), "DIVIDEND", exDate)) {
-                    corporateActionRepository.save(NseCorporateAction.builder()
-                        .symbol(inv.getSymbol()).actionType("DIVIDEND")
-                        .exDate(exDate).dividendPerShare(perShare).build());
-                }
-
-                // Only credit income for current month onward (not historical backfill)
-                if (exDate.isBefore(monthStart)) continue;
-
-                if (incomeLogRepository.existsByInvestmentIdAndIncomeTypeAndEventDate(
-                        inv.getId(), "DIVIDEND", exDate)) continue;
-
-                BigDecimal units    = inv.getUnits() != null ? inv.getUnits() : BigDecimal.ONE;
-                BigDecimal totalDiv = perShare.multiply(units).setScale(2, RoundingMode.HALF_UP);
-
-                IncomeEntry income = createIncome(inv, totalDiv, exDate, IncomeSource.DIVIDEND,
-                    "Dividend: " + inv.getSymbol() + " ₹" + perShare + "/share");
-                saveIncomeLog(inv, income, "DIVIDEND", exDate, totalDiv);
-                log.info("Dividend ₹{} for {} on {}", totalDiv, inv.getSymbol(), exDate);
-            }
-        } catch (Exception e) {
-            log.warn("Dividend processing failed for {}: {}", inv.getSymbol(), e.getMessage());
-        }
-    }
-
     /**
      * Fetches dividend history from Yahoo ONCE for a symbol, then credits each holder's investment.
      * Replaces per-investment Yahoo calls — at scale this is O(distinct_symbols) API calls,

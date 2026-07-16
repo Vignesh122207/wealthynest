@@ -7,9 +7,11 @@ import { cn } from "@/lib/utils";
 export type FabAction = {
   icon:     React.ElementType;
   label:    string;
-  color:    "rose" | "emerald" | "indigo" | "amber" | "violet" | "sky";
+  color:    "rose" | "emerald" | "indigo" | "amber" | "violet" | "sky" | "fuchsia";
   onClick:  () => void;
   disabled?: boolean;
+  /** Shown as a native tooltip when disabled — explains why instead of leaving a dead-looking button. */
+  disabledReason?: string;
   hidden?:   boolean;
 };
 
@@ -20,15 +22,20 @@ const ITEM_STYLE: Record<string, { gradient: string; shadow: string }> = {
   amber:   { gradient: "from-amber-500 to-orange-500",  shadow: "shadow-amber-500/30" },
   violet:  { gradient: "from-violet-500 to-purple-600", shadow: "shadow-violet-500/30" },
   sky:     { gradient: "from-sky-500 to-cyan-600",      shadow: "shadow-sky-500/30" },
+  // Matches Goals' own fuchsia→purple identity (GoalForm/goals/page.tsx, matching the Sidebar
+  // nav gradient for /goals) exactly — added rather than reusing violet so the FAB action
+  // matches the form it opens pixel-for-pixel, not just approximately.
+  fuchsia: { gradient: "from-fuchsia-500 to-purple-600", shadow: "shadow-fuchsia-500/30" },
 };
 
-function FabItem({ icon: Icon, label, color, onClick, disabled, index }: FabAction & { index: number }) {
+function FabItem({ icon: Icon, label, color, onClick, disabled, disabledReason, index }: FabAction & { index: number }) {
   const style = ITEM_STYLE[color] ?? ITEM_STYLE.indigo;
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
+      title={disabled ? disabledReason : undefined}
       style={{ animationDelay: `${index * 35}ms` }}
       className={cn(
         "fab-item group flex items-center gap-3 h-11 pl-3 pr-5 rounded-2xl shadow-lg",

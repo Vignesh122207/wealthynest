@@ -2,8 +2,11 @@
 
 import Link from "next/link";
 import { Target } from "lucide-react";
-import { cn, formatCurrencyCompact, monthLabel } from "@/lib/utils";
-import { getCategoryColor, getCategoryMeta } from "@/lib/categoryMeta";
+import { cn, monthLabel } from "@/lib/utils";
+import { useAmountFormatter } from "@/hooks/useAmountFormatter";
+import { getCategoryColor, getCategoryIcon } from "@/lib/categoryMeta";
+import { PremiumIcon } from "@/components/icons/PremiumIcon";
+import { EmptyState } from "@/components/shared/EmptyState";
 import type { BudgetSummary } from "@/features/dashboard/types/dashboard.types";
 
 interface BudgetSectionProps {
@@ -13,11 +16,18 @@ interface BudgetSectionProps {
   isLoading:       boolean;
 }
 
+// Matches Recent Transactions' cap exactly
+const DISPLAY_COUNT = 8;
+
 export function BudgetSection({ budgetSummaries, year, month, isLoading }: BudgetSectionProps) {
   const label = monthLabel(year, month);
+  const { fmtC } = useAmountFormatter();
+
+  // Sorted by spending percentage (most at-risk first), not raw amount spent
+  const visible = [...budgetSummaries].sort((a, b) => b.percentUsed - a.percentUsed).slice(0, DISPLAY_COUNT);
 
   return (
-    <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm animate-fade-in-up delay-300 h-full flex flex-col">
+    <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm animate-fade-in-up delay-300 h-full flex flex-col card-hover">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h3 className="font-bold text-foreground">Budget Progress</h3>
@@ -30,7 +40,7 @@ export function BudgetSection({ budgetSummaries, year, month, isLoading }: Budge
       </div>
 
       {isLoading ? (
-        <div className="space-y-4">
+        <div className="flex-1 flex flex-col justify-center space-y-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="space-y-2">
               <div className="flex justify-between">
@@ -42,21 +52,17 @@ export function BudgetSection({ budgetSummaries, year, month, isLoading }: Budge
           ))}
         </div>
       ) : budgetSummaries.length > 0 ? (
-        <div className="space-y-4">
-          {[...budgetSummaries].sort((a, b) => b.spent - a.spent).slice(0, 6).map((b) => {
-            const meta     = getCategoryMeta(b.categoryName);
+        <div className="flex-1 flex flex-col justify-center space-y-4">
+          {visible.map((b) => {
+            const icon     = getCategoryIcon({ name: b.categoryName, icon: b.categoryIcon });
             const color    = getCategoryColor(b.categoryName, b.categoryColor);
             const pct      = Math.min(100, b.percentUsed);
             const barColor = b.overBudget ? "#ef4444" : b.percentUsed > 80 ? "#f59e0b" : color;
-            const Icon     = meta.icon;
             return (
               <div key={b.categoryId}>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                      style={{ backgroundColor: color + "20" }}>
-                      <Icon className="w-3.5 h-3.5" style={{ color }} strokeWidth={1.75} />
-                    </div>
+                    <PremiumIcon icon={icon} hex={color} size="xs" />
                     <span className="text-sm font-medium text-foreground truncate">{b.categoryName}</span>
                     {b.overBudget && (
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-500 shrink-0">
@@ -66,7 +72,7 @@ export function BudgetSection({ budgetSummaries, year, month, isLoading }: Budge
                   </div>
                   <div className="flex items-center gap-3 shrink-0 ml-2">
                     <span className="text-xs text-muted-foreground/70 tabular-nums">
-                      {formatCurrencyCompact(b.spent)} / {formatCurrencyCompact(b.budgeted)}
+                      {fmtC(b.spent)} / {fmtC(b.budgeted)}
                     </span>
                     <span className={cn(
                       "text-xs font-bold w-9 text-right tabular-nums",
@@ -87,13 +93,13 @@ export function BudgetSection({ budgetSummaries, year, month, isLoading }: Budge
           })}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-12 text-center gap-2">
-          <Target className="w-10 h-10 text-muted-foreground/25 mb-1" />
-          <p className="text-sm font-medium text-foreground">No budgets set for this month</p>
-          <Link href="/budgets" className="text-xs text-primary hover:underline font-medium">
-            Set up budgets →
-          </Link>
-        </div>
+        <EmptyState
+          icon={Target}
+          title="No budgets set for this month"
+          description="Set spending limits by category to keep your budget on track."
+          action={<Link href="/budgets" className="text-xs font-semibold text-primary hover:underline">Set up budgets →</Link>}
+          className="flex-1"
+        />
       )}
     </div>
   );

@@ -11,6 +11,7 @@ import com.wealthynest.domain.investment.dto.response.InvestmentResponse;
 import com.wealthynest.domain.investment.dto.response.InvestmentSearchResult;
 import com.wealthynest.domain.investment.dto.response.SipTransactionResponse;
 import com.wealthynest.domain.investment.dto.response.StockTransactionResponse;
+import com.wealthynest.domain.investment.entity.InvestmentType;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -35,6 +36,8 @@ public interface InvestmentService {
     List<SipTransactionResponse> getSipTransactions(UUID investmentId, UUID userId);
     void deleteSipTransaction(Long sipId, UUID userId);
     Double computeXirr(UUID investmentId, UUID userId);
+    Double computePortfolioXirr(UUID userId);
+    Double computeTypeXirr(UUID userId, InvestmentType type);
     IncomeHistoryResponse getIncomeHistory(UUID userId, int year);
 
     // Manual income logging

@@ -4,6 +4,7 @@ import { ArrowLeft, Bell } from "lucide-react";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { PageWrapper } from "@/components/layout/PageWrapper";
+import { PremiumIcon } from "@/components/icons/PremiumIcon";
 import { useNotificationStore, type NotifPrefs } from "@/store/notification.store";
 
 const NOTIF_ITEMS: { key: keyof NotifPrefs; label: string; description: string; emoji: string }[] = [
@@ -39,9 +40,9 @@ export default function NotificationsPage() {
 
   return (
     <div className="flex flex-col flex-1">
-      <Header title="Notifications" />
+      <Header title="Notifications" subtitle="Choose what you get notified about" />
       <PageWrapper>
-        <div className="max-w-lg mx-auto space-y-6">
+        <div className="max-w-lg md:max-w-3xl mx-auto space-y-6">
 
           <Link href="/settings" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="w-3.5 h-3.5" />
@@ -50,9 +51,7 @@ export default function NotificationsPage() {
 
           {/* Icon header */}
           <div className="flex flex-col items-center gap-3 py-2">
-            <div className="w-16 h-16 rounded-2xl bg-rose-500/10 flex items-center justify-center">
-              <Bell className="w-8 h-8 text-rose-500" />
-            </div>
+            <PremiumIcon icon={Bell} tone="pink" size="xl" />
             <div className="text-center">
               <p className="text-base font-semibold text-foreground">Notification Preferences</p>
               <p className="text-xs text-muted-foreground mt-1">Choose which alerts you want to receive in the app.</p>

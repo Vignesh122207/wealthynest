@@ -51,4 +51,8 @@ public class InvestmentResponse {
     private BigDecimal week52High;
     private BigDecimal week52Low;
     private Instant    priceLastUpdated;
+    /** STOCK only — number of buy/sell transactions on record. Once &gt;1, units/avgBuyPrice are
+     * derived from the transaction ledger (weighted average cost), so the frontend disables
+     * direct editing of those fields and points to Buy More/Sell instead. */
+    private int        transactionCount;
 }

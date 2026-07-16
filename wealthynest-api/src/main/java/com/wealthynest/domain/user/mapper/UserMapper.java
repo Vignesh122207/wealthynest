@@ -9,5 +9,6 @@ import org.mapstruct.Mapping;
 public interface UserMapper {
     @Mapping(target = "role", expression = "java(user.getRole().name())")
     @Mapping(target = "active", source = "active")
+    @Mapping(target = "pinEnabled", expression = "java(user.getPinHash() != null)")
     UserResponse toResponse(User user);
 }

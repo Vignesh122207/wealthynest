@@ -1,0 +1,87 @@
+# WealthyNest — Coding Standards
+
+Monorepo: `wealthynest-api` (Spring Boot 3, Java 21) + `wealthynest-web` (Next.js 15, React 19, TypeScript). These rules apply to all code written or edited in this repo.
+
+## Common commands
+
+Backend (run from `wealthynest-api/`):
+- `mvn spring-boot:run` — run API locally against `postgres`/`redis` (needs `docker compose up postgres redis -d` first)
+- `mvn compile` — fast compile check
+- `mvn test` — full test suite
+- `mvn test -Dtest=ClassName#methodName` — single test
+
+Frontend (run from `wealthynest-web/`):
+- `npm run dev` — dev server
+- `npm run build` — production build
+- `npm run lint` — ESLint
+- `npm run type-check` — `tsc --noEmit`
+- No `npm test` script exists yet — don't assume a test runner is wired up.
+
+Full stack: `docker compose up -d` (all services); `docker compose up -d --build <service>` to rebuild one.
+
+## Domain glossary
+
+- **Family**: a group of users sharing finances via invite codes; most data (accounts, assets, budgets) is scoped to a family, not just a user.
+- **WalletAccount**: a bank/cash/wallet holding (`AccountType`), distinct from an `Asset`. `AccountTransfer` moves money between wallet accounts.
+- **Asset**: a tracked holding — stocks, gold, real estate, etc. (`AssetType`) — separate from `WalletAccount` and from `Investment` (portfolio-tracked securities).
+- **Liability / Debt**: money owed (`LiabilityType`), tracked separately from `Investment`/`Asset`; has its own due-date and repayment fields.
+- **NetWorthSnapshot**: a point-in-time rollup of assets minus liabilities, used for net-worth trend charts.
+- **Income domains**: `income` (general), `dividend`, `recurringincome` are separate modules — don't conflate one-off income with recurring or dividend income when adding features.
+- **ExpenseSplit**: tracks who owes whom within a shared expense, separate from the base `expense` module.
+- **StatementImport**: bank/CSV statement ingestion (`commons-csv`) that creates draft expenses/transactions for review — distinct from manual expense entry.
+- Full domain module list lives under `wealthynest-api/src/main/java/com/wealthynest/domain/` (account, admin, analytics, asset, auth, budget, category, debt, dividend, expense, expensesplit, family, goal, income, investment, liability, networth, notification, recurringincome, report, statementimport, support, user).
+
+## Do-not-touch without explicit instruction
+
+- `SecurityConfig`, `JwtAuthenticationFilter`, `JwtProperties`, `SecurityUtils` — auth/security core; changes here have app-wide blast radius.
+- Database migration files (Flyway/Liquibase) — never edit an already-applied migration; add a new one.
+- `.env`, `.env.example`, `wealthynest-web/.env.local` — may contain or template secrets (`JWT_SECRET`, `MAIL_PASSWORD`, DB creds); don't print their contents into chat or commits.
+- `docker-compose.yml` service definitions for `postgres`/`redis`/`tunnel` — only touch if the task is specifically about infra.
+
+## General principles
+
+- **No subagents/Explore agents in this repo.** Do research directly with Read/Grep/Bash yourself instead of delegating to the Agent tool — the user wants to see the research happen inline, not summarized back from a subagent.
+- **Reuse before you write.** Before adding a helper, DTO, hook, or component, grep the codebase for an existing one that already does it (backend: `common/`, `infra/util/`; frontend: `src/hooks/`, `src/lib/`, `src/components/ui/`, and the target feature's own `api/hooks/schemas/utils`). Extend or generalize it instead of duplicating. If you find near-duplicate logic while working nearby, flag it rather than adding a third copy.
+- **No premature abstraction.** Don't introduce an interface, base class, generic hook, or config flag for a single use site. Three real call sites justify an abstraction; one or two don't.
+- **Minimal diffs.** Touch only what the task requires. Don't reformat, rename, or refactor unrelated code in the same change.
+- **No dead code.** Delete unused params, imports, methods, and commented-out blocks rather than leaving them "just in case."
+- **Fail loud at boundaries, trust internals.** Validate/sanitize at API boundaries (controller input, external responses). Don't re-validate data that's already guaranteed by the type system or a prior layer.
+- **Comments explain why, not what.** Skip comments that restate the code. Only comment non-obvious constraints, workarounds, or invariants.
+
+## wealthynest-api (Spring Boot / Java 21)
+
+- **Layering**: Controller → Service (interface + impl) → Repository. Controllers stay thin — no business logic, only request/response mapping and delegation.
+- **DTOs, not entities, cross the API boundary.** Never return JPA entities directly from a controller; map through a response DTO (see existing `AssetMapper`-style mapper pattern).
+- **Reuse mappers.** Use MapStruct/manual mapper classes consistently instead of ad-hoc field copying scattered across services.
+- **Transactions**: `@Transactional` at the service layer, scoped to the smallest boundary that needs atomicity. Don't wrap read-only queries in a write transaction — use `@Transactional(readOnly = true)`.
+- **Validation**: use `jakarta.validation` annotations on request DTOs; don't hand-roll null checks for things Bean Validation already covers.
+- **Security**: never bypass `SecurityUtils`/`JwtAuthenticationFilter` conventions already in place. All family-scoped or user-scoped queries must filter by the authenticated user/family — check existing repository query patterns before adding a new one.
+- **Repositories**: prefer derived query methods or `@Query` with named params over building queries in Java strings. Avoid N+1s — use fetch joins or `@EntityGraph` where a list endpoint touches associations.
+- **Exceptions**: throw the project's existing custom exceptions (`BusinessException`, `ResourceNotFoundException`, `AccessDeniedException` in `common/exception/`) — not generic `RuntimeException` — so `GlobalExceptionHandler` can map them to proper HTTP responses. Add a new exception type only if none of the existing ones fit.
+- **Migrations**: schema changes go through Flyway/Liquibase migration files (whichever this repo uses) — never rely on Hibernate `ddl-auto` for anything beyond local dev.
+
+## wealthynest-web (Next.js 15 / React 19 / TypeScript)
+
+- **Strict typing.** No `any`. Derive types from Zod schemas (`z.infer`) where a schema already exists instead of hand-writing a parallel interface.
+- **Server/client boundary.** Default to Server Components; add `"use client"` only when the component needs state, effects, or browser APIs.
+- **Data fetching**: use TanStack Query for server state — don't roll ad-hoc `useEffect` + `fetch` + `useState` fetch logic. Co-locate query keys and reuse them instead of restringing key arrays.
+- **Forms**: use `react-hook-form` + `zod` resolver, matching the pattern already used elsewhere in the app — don't hand-manage form state with `useState` per field.
+- **Styling**: Tailwind utility classes; use `clsx`/`tailwind-merge` for conditional class composition instead of manual string concatenation. Reuse existing `src/components/ui/` primitives (`Button`, `Card`, `Modal`, `Tooltip`, etc.) rather than styling one-offs.
+- **Cross-feature utils**: formatting/meta helpers (amount formatting, account/category/investment type metadata, chart colors) already live in `src/lib/` and `src/hooks/` — reuse or extend them instead of re-deriving the same formatting logic inside a feature module.
+- **State**: local component state first, Zustand only for state genuinely shared across distant components. Don't add a new store for something one component tree needs.
+- **Components**: keep presentational components free of data-fetching; fetch in a parent/page and pass props, or use a query hook — don't fetch inside deeply nested leaf components.
+- **Error/loading states**: every query/mutation that hits the API must handle loading and error states in the UI — no silent failures.
+
+## Before considering a change done
+
+A task is not complete until the affected app has been rebuilt and restarted via Docker — not just compiled locally. Scope this to whichever side you touched:
+
+- **Backend changes** (`wealthynest-api`): run `mvn compile` (or `mvn -pl wealthynest-api compile`) to catch errors fast, then rebuild and restart only that service:
+  `docker compose up -d --build wealthynest-api`
+- **Frontend changes** (`wealthynest-web`): run `npm run type-check` and `npm run lint` inside `wealthynest-web` first, then rebuild and restart only that service:
+  `docker compose up -d --build wealthynest-web`
+- **Changes touching both**: rebuild and restart both services (`docker compose up -d --build wealthynest-api wealthynest-web`).
+- Don't rebuild/restart services you didn't touch — e.g. don't restart `wealthynest-web` for an API-only change, and don't touch `postgres`/`redis`/`tunnel` unless the task specifically changed them.
+- After restart, confirm the container is healthy (`docker compose ps`) and check logs for startup errors (`docker compose logs -f <service> --tail 50`) before reporting the task as done.
+- No leftover debug logging, commented-out code, or TODO without an owner.
+- If you touched a shared component, hook, service, or util, check other call sites weren't broken.

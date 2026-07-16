@@ -2,6 +2,7 @@ package com.wealthynest.domain.investment.repository;
 
 import com.wealthynest.domain.investment.entity.InvestmentIncomeLog;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -24,8 +25,10 @@ public interface InvestmentIncomeLogRepository extends JpaRepository<InvestmentI
     java.math.BigDecimal sumByUserAndIncomeType(@Param("userId") UUID userId,
                                                 @Param("incomeType") String incomeType);
 
-    List<InvestmentIncomeLog> findByInvestmentIdAndIncomeTypeOrderByEventDateDesc(
-            UUID investmentId, String incomeType);
-
     List<InvestmentIncomeLog> findByInvestmentId(UUID investmentId);
+
+    /** income_entry_id has no ON DELETE policy — must be cleared before the income row it points to is deleted. */
+    @Modifying
+    @Query("UPDATE InvestmentIncomeLog l SET l.incomeEntryId = null WHERE l.incomeEntryId = :incomeEntryId")
+    void clearIncomeEntryId(@Param("incomeEntryId") UUID incomeEntryId);
 }

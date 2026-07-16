@@ -2,6 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { adminApi } from "../api/admin.api";
+import { apiErrorMessage } from "@/lib/utils";
 
 export function useAdminStats() {
   return useQuery({ queryKey: ["admin", "stats"], queryFn: adminApi.getStats });
@@ -91,7 +92,7 @@ export function useTriggerJob() {
         qc.invalidateQueries({ queryKey: ["income-history"] });
       }, delay);
     },
-    onError: (e: any) => toast.error(e?.response?.data?.message ?? "Failed to trigger job"),
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to trigger job")),
   });
 }
 

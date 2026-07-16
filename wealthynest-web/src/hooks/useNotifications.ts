@@ -8,7 +8,7 @@ import { useNotificationStore } from "@/store/notification.store";
 import { formatCurrency } from "@/lib/utils";
 
 export type NotifSeverity = "error" | "warning" | "success" | "info";
-export type NotifType = "budget" | "income" | "goal" | "maturity";
+export type NotifType = "budget" | "income" | "goal" | "maturity" | "lowBalance" | "anomaly" | "debtDue" | "loanEmi";
 
 export interface AppNotification {
   id:       string;

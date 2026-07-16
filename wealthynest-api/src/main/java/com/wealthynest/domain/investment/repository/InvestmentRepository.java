@@ -16,7 +16,6 @@ import java.util.UUID;
 public interface InvestmentRepository extends JpaRepository<Investment, UUID> {
     List<Investment> findByUserIdAndActiveTrue(UUID userId);
     List<Investment> findByUserId(UUID userId);
-    List<Investment> findByAssetId(UUID assetId);
     boolean existsByAssetIdAndActiveTrueAndIdNot(UUID assetId, UUID excludeId);
 
     @Query("SELECT COALESCE(SUM(i.currentValue),0) FROM Investment i WHERE i.userId = :userId AND i.active = true")

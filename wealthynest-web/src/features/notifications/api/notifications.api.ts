@@ -14,9 +14,6 @@ export const notificationsApi = {
   getNotifications: async (): Promise<ServerNotification[]> =>
     (await apiClient.get<ApiResponse<ServerNotification[]>>("/notifications")).data.data,
 
-  getUnreadCount: async (): Promise<number> =>
-    (await apiClient.get<ApiResponse<number>>("/notifications/unread-count")).data.data,
-
   markAllRead: async (): Promise<void> => {
     await apiClient.post("/notifications/mark-all-read");
   },

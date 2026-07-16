@@ -18,6 +18,13 @@ public class TransferResponse {
     private String     toAccountName;
     private BigDecimal amount;
     private String     description;
+    // Not "isAdjustment"/"isDebt" — Lombok keeps the isXxx() getter for either spelling, and
+    // Jackson always strips that "is" prefix when deriving the JSON key, so the field on the
+    // wire is "adjustment"/"debt" either way. Naming the field to match avoids the mismatch.
+    private boolean    adjustment;
+    private boolean    debt;
+    private String     debtContactName;
+    private String     debtLabel;
     private LocalDate  transferDate;
     private Instant    createdAt;
 }

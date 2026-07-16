@@ -1,16 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, Menu, Moon, Settings, Sun, LogOut, TrendingUp, Target, AlertCircle, CheckCircle2, Info, X } from "lucide-react";
+import { Bell, Menu, Moon, Sun, AlertCircle, CheckCircle2, Info, X, Eye, EyeOff, Download } from "lucide-react";
 import { useTheme } from "next-themes";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { cn, getInitials } from "@/lib/utils";
 import { useUIStore } from "@/store/ui.store";
 import { useAuthStore } from "@/features/auth/store/auth.store";
-import { useLogout } from "@/features/auth/hooks/useAuth";
-import { useNotifications, type AppNotification, type NotifSeverity } from "@/hooks/useNotifications";
+import { type AppNotification, type NotifSeverity } from "@/hooks/useNotifications";
 import { useNotificationStore } from "@/store/notification.store";
-import { useServerUnreadCount } from "@/features/notifications/hooks/useServerNotifications";
+import { useMergedNotifications } from "@/features/notifications/hooks/useServerNotifications";
+import { usePrivacyStore } from "@/store/privacy.store";
 
 // ─── Severity helpers ────────────────────────────────────────────────────────
 
@@ -33,13 +34,6 @@ const SEVERITY_BG: Record<NotifSeverity, string> = {
   warning: "bg-amber-500/10",
   success: "bg-emerald-500/10",
   info:    "bg-indigo-500/10",
-};
-
-const TYPE_ICON: Record<AppNotification["type"], React.ElementType> = {
-  budget:   Target,
-  income:   TrendingUp,
-  goal:     Target,
-  maturity: AlertCircle,
 };
 
 // ─── Notification Panel ──────────────────────────────────────────────────────
@@ -114,92 +108,36 @@ function NotificationPanel({
   );
 }
 
-// ─── Avatar Dropdown ─────────────────────────────────────────────────────────
-
-function AvatarDropdown({
-  user,
-  onLogout,
-  onClose,
-}: {
-  user: { fullName: string; email: string; role?: string } | null;
-  onLogout: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <div className="absolute right-0 top-full mt-2 w-60 bg-card border border-border rounded-2xl shadow-xl shadow-black/10 overflow-hidden z-50">
-      {/* User info */}
-      <div className="px-4 py-3 border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-indigo-600/20 flex items-center justify-center text-sm font-bold text-indigo-600 dark:text-indigo-300 shrink-0 select-none">
-            {user ? getInitials(user.fullName) : "?"}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-foreground truncate">{user?.fullName ?? "—"}</p>
-            <p className="text-xs text-muted-foreground truncate">{user?.email ?? "—"}</p>
-          </div>
-        </div>
-        {user?.role && user.role !== "MEMBER" && (
-          <span className="mt-2 inline-block text-[11px] font-medium px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
-            {user.role.toLowerCase().replace("_", " ")}
-          </span>
-        )}
-      </div>
-
-      {/* Actions */}
-      <div className="py-1.5">
-        <Link
-          href="/settings"
-          onClick={onClose}
-          className="flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
-        >
-          <Settings className="w-4 h-4 text-muted-foreground" />
-          Settings
-        </Link>
-      </div>
-
-      <div className="border-t border-border py-1.5">
-        <button
-          onClick={() => { onLogout(); onClose(); }}
-          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-500/5 transition-colors"
-        >
-          <LogOut className="w-4 h-4" />
-          Sign out
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ─── Header ──────────────────────────────────────────────────────────────────
 
 interface HeaderProps {
   title: string;
+  subtitle?: string;
+  onExport?: () => void;
 }
 
-export function Header({ title }: HeaderProps) {
+export function Header({ title, subtitle, onExport }: HeaderProps) {
   const { theme, setTheme }   = useTheme();
   const [mounted, setMounted] = useState(false);
   const { toggleMobileMenu }  = useUIStore();
   const { user }              = useAuthStore();
-  const { mutate: logout }    = useLogout();
+  const pathname               = usePathname();
+  const isHome                 = pathname === "/dashboard";
 
   const [showNotifs, setShowNotifs] = useState(false);
-  const [showAvatar, setShowAvatar] = useState(false);
 
   const notifsRef = useRef<HTMLDivElement>(null);
-  const avatarRef = useRef<HTMLDivElement>(null);
 
-  const { notifications, unreadCount: localUnread } = useNotifications();
-  const { markSeen }                                = useNotificationStore();
-  const { data: serverUnread = 0 }                  = useServerUnreadCount();
-  const unreadCount = localUnread + serverUnread;
+  const { notifications, unreadCount } = useMergedNotifications();
+  const { markSeen }                   = useNotificationStore();
+
+  const { hideAmounts, toggleHideAmounts } = usePrivacyStore();
 
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     function handleOutsideClick(e: MouseEvent) {
       if (notifsRef.current && !notifsRef.current.contains(e.target as Node)) setShowNotifs(false);
-      if (avatarRef.current && !avatarRef.current.contains(e.target as Node)) setShowAvatar(false);
     }
     document.addEventListener("mousedown", handleOutsideClick);
     return () => document.removeEventListener("mousedown", handleOutsideClick);
@@ -208,28 +146,41 @@ export function Header({ title }: HeaderProps) {
   function toggleNotifs() {
     const opening = !showNotifs;
     setShowNotifs(opening);
-    setShowAvatar(false);
     if (opening) markSeen(notifications.map((n) => n.id));
   }
 
-  function toggleAvatar() {
-    setShowAvatar(v => !v);
-    setShowNotifs(false);
-  }
-
   return (
-    <header className="h-16 border-b border-border flex items-center justify-between px-4 lg:px-6 bg-[hsl(var(--sidebar-bg))]/90 backdrop-blur-sm sticky top-0 z-10">
-      <div className="flex items-center gap-3">
+    <header className={cn(
+      "min-h-16 border-b border-border flex items-center justify-between gap-3 px-4 lg:px-6 py-3 bg-[hsl(var(--sidebar-bg))]/90 backdrop-blur-sm sticky top-0 z-10"
+    )}>
+      <div className="flex items-center gap-3 min-w-0">
         <button
           onClick={toggleMobileMenu}
-          className="lg:hidden text-muted-foreground hover:text-foreground transition-colors p-1"
+          className="lg:hidden text-muted-foreground hover:text-foreground transition-colors p-1 shrink-0"
         >
           <Menu className="w-5 h-5" />
         </button>
-        <h1 className="text-base font-semibold text-foreground">{title}</h1>
+        <div className="min-w-0">
+          <h1 className="text-base font-semibold text-foreground truncate">{title}</h1>
+          {subtitle && (
+            <p className="text-xs text-muted-foreground/70 truncate hidden sm:block">{subtitle}</p>
+          )}
+        </div>
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 shrink-0">
+
+        {/* Hide/show amounts — Home only; masks currency figures across every stat on the dashboard */}
+        {isHome && (
+          <button
+            onClick={toggleHideAmounts}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+            aria-label={hideAmounts ? "Show amounts" : "Hide amounts"}
+            aria-pressed={hideAmounts}
+          >
+            {hideAmounts ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
+        )}
 
         {/* Bell */}
         <div ref={notifsRef} className="relative">
@@ -268,24 +219,27 @@ export function Header({ title }: HeaderProps) {
           </button>
         )}
 
-        {/* User avatar */}
-        <div ref={avatarRef} className="relative ml-1">
+        {/* Export — only on pages that hand us something to export */}
+        {onExport && (
           <button
-            onClick={toggleAvatar}
-            className={cn(
-              "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold transition-all",
-              showAvatar
-                ? "bg-indigo-600/20 text-indigo-600 dark:text-indigo-300 ring-2 ring-indigo-500/40"
-                : "bg-indigo-600/10 text-indigo-600 dark:text-indigo-300 hover:ring-2 hover:ring-indigo-500/30"
-            )}
-            aria-label="Account menu"
+            onClick={onExport}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+            aria-label="Export"
+          >
+            <Download className="w-4 h-4" />
+          </button>
+        )}
+
+        {/* User avatar — Home only; every other page links back here via Settings in the sidebar */}
+        {isHome && (
+          <Link
+            href="/settings/profile"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold bg-indigo-600/10 text-indigo-600 dark:text-indigo-300 hover:ring-2 hover:ring-indigo-500/30 transition-all ml-1"
+            aria-label="Edit profile"
           >
             {user ? getInitials(user.fullName) : "?"}
-          </button>
-          {showAvatar && (
-            <AvatarDropdown user={user} onLogout={logout} onClose={() => setShowAvatar(false)} />
-          )}
-        </div>
+          </Link>
+        )}
 
       </div>
     </header>

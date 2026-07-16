@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import {
-  Plus, Target, Trash2, Pencil, X, Check, ChevronDown, ChevronUp,
-  Wallet, Clock, Trophy, Zap, Minus, Pause, Play, Unlink, AlertTriangle,
+  Plus, Target, Check, ChevronDown, ChevronUp,
+  Wallet, Clock, Trophy, Zap, Minus, Pause, Play, Unlink, Flag,
 } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,16 +12,23 @@ import { Header } from "@/components/layout/Header";
 import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { TableRowSkeleton } from "@/components/shared/LoadingSkeleton";
-import { FormInput } from "@/components/forms/FormInput";
 import { FormCurrencyInput } from "@/components/forms/FormCurrencyInput";
 import { FormDatePicker } from "@/components/forms/FormDatePicker";
+import { Button } from "@/components/ui/Button";
+import { FormModalShell } from "@/components/ui/Modal";
+import { PremiumIcon } from "@/components/icons/PremiumIcon";
+import { AccountPicker } from "@/components/transactions/AccountPicker";
+import { FormModalHeader } from "@/components/transactions/FormModalHeader";
+import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
+import { BigAmountInput } from "@/components/transactions/BigAmountInput";
+import { resolveGoalIcon, GOAL_COLORS, GOAL_PRESETS, GOAL_ICON_OPTIONS } from "@/lib/categoryMeta";
 import {
   useGoals, useCreateGoal, useUpdateGoal, useDeleteGoal,
 } from "@/features/goals/hooks/useGoals";
 import { useAccounts } from "@/features/accounts/hooks/useAccounts";
 import type { Goal } from "@/features/goals/types/goal.types";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
+import { useAmountFormatter } from "@/hooks/useAmountFormatter";
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -37,127 +44,9 @@ const goalSchema = z.object({
 });
 type GoalFormValues = z.infer<typeof goalSchema>;
 
-// ─── Color Picker ─────────────────────────────────────────────────────────────
-
-const PRESET_COLORS = [
-  "#ef4444", "#f97316", "#f59e0b", "#eab308",
-  "#10b981", "#14b8a6", "#3b82f6", "#6366f1",
-  "#8b5cf6", "#ec4899",
-];
-
-function ColorPicker({ value, onChange }: { value: string; onChange: (c: string) => void }) {
-  const [custom, setCustom] = useState(
-    value && !PRESET_COLORS.includes(value) ? value : ""
-  );
-
-  const applyCustom = (hex: string) => {
-    if (/^#[0-9a-fA-F]{6}$/.test(hex)) onChange(hex);
-  };
-
-  return (
-    <div>
-      <label className="block text-xs font-medium text-muted-foreground mb-1.5">Colour</label>
-      <div className="flex items-center gap-2 flex-wrap">
-        {PRESET_COLORS.map(c => (
-          <button key={c} type="button" onClick={() => { onChange(c); setCustom(""); }}
-            style={{ background: c }}
-            className={cn(
-              "w-7 h-7 rounded-full transition-all shrink-0",
-              value === c ? "ring-2 ring-offset-2 ring-offset-card ring-white/70 scale-110" : "opacity-80 hover:opacity-100 hover:scale-110",
-            )} />
-        ))}
-        <div className="flex items-center gap-1.5 ml-1">
-          <div className="w-7 h-7 rounded-full border border-border shrink-0"
-            style={{ background: custom && /^#[0-9a-fA-F]{6}$/.test(custom) ? custom : "transparent" }} />
-          <input
-            value={custom}
-            onChange={e => { setCustom(e.target.value); applyCustom(e.target.value); }}
-            placeholder="#hex"
-            maxLength={7}
-            className="w-20 h-7 px-2 rounded-lg text-xs bg-muted/60 border border-border text-foreground placeholder-muted-foreground/50 focus:outline-none focus:border-indigo-500 transition-colors"
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Emoji Picker ─────────────────────────────────────────────────────────────
-
-const EMOJI_GRID = [
-  "🎯","💰","🏠","🚗","✈️","📚","💻","🏥","💍","🌴",
-  "🎓","🛒","💪","🎸","⛵","🐕","📈","🏋️","🌱","❤️",
-];
-
-function extractFirstEmoji(str: string): string {
-  // Use spread to get Unicode-aware characters, find the first non-ASCII one
-  const chars = [...str];
-  return chars.find(c => c.codePointAt(0)! > 127) ?? "";
-}
-
-function EmojiPicker({ value, onChange }: { value: string; onChange: (e: string) => void }) {
-  const [open,   setOpen]   = useState(false);
-  const [custom, setCustom] = useState("");
-
-  const preview = extractFirstEmoji(custom);
-
-  const applyCustom = () => {
-    if (preview) { onChange(preview); setOpen(false); setCustom(""); }
-  };
-
-  return (
-    <div className="space-y-2">
-      <button type="button" onClick={() => setOpen(v => !v)}
-        className={cn(
-          "w-10 h-10 rounded-xl bg-muted/60 border text-xl flex items-center justify-center transition-all shrink-0",
-          open ? "border-indigo-500 bg-indigo-500/10" : "border-border hover:border-indigo-500"
-        )}>
-        {value || "🎯"}
-      </button>
-
-      {open && (
-        <div className="p-3 bg-muted/40 border border-border rounded-2xl space-y-3">
-          <div className="grid grid-cols-10 gap-1">
-            {EMOJI_GRID.map(e => (
-              <button key={e} type="button" onClick={() => { onChange(e); setOpen(false); }}
-                className={cn("w-8 h-8 rounded-lg text-lg flex items-center justify-center hover:bg-card transition-all",
-                  value === e ? "bg-indigo-600/20 ring-1 ring-indigo-500/40" : "")}>
-                {e}
-              </button>
-            ))}
-          </div>
-
-          <div className="border-t border-border pt-2.5 space-y-2">
-            <p className="text-[11px] text-muted-foreground">Or paste an emoji from your keyboard</p>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-card border border-border flex items-center justify-center text-lg shrink-0">
-                {preview || <span className="text-muted-foreground/40 text-xs">?</span>}
-              </div>
-              <input
-                value={custom}
-                onChange={e => setCustom(e.target.value)}
-                placeholder="Paste emoji here…"
-                className="flex-1 h-8 px-2 rounded-lg text-sm bg-card border border-border text-foreground placeholder-muted-foreground focus:outline-none focus:border-indigo-500"
-                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); applyCustom(); } }}
-              />
-              <button type="button" onClick={applyCustom} disabled={!preview}
-                className="h-8 px-2.5 rounded-lg bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-500 transition-all disabled:opacity-40 shrink-0">
-                OK
-              </button>
-            </div>
-            {custom && !preview && (
-              <p className="text-[11px] text-amber-500">That doesn&apos;t look like an emoji — try pasting one directly.</p>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Add / Withdraw Savings Modal ─────────────────────────────────────────────
 
-function AddSavingsModal({ goal, onClose }: { goal: Goal; onClose: () => void }) {
+function AddSavingsModal({ goal, goalColor, onClose }: { goal: Goal; goalColor: string; onClose: () => void }) {
   const { mutate: updateGoal, isPending } = useUpdateGoal();
   const [mode, setMode] = useState<"add" | "withdraw">("add");
   const [error, setError] = useState("");
@@ -180,24 +69,12 @@ function AddSavingsModal({ goal, onClose }: { goal: Goal; onClose: () => void })
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-      onClick={onClose}>
-      <div className="bg-card border border-border rounded-2xl p-5 w-full max-w-sm shadow-2xl"
-        onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xl">{goal.icon || "🎯"}</span>
-              <h3 className="font-semibold text-foreground text-sm">{goal.name}</h3>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {mode === "add" ? `${formatCurrency(remaining)} remaining` : `${formatCurrency(goal.savedAmount)} available to withdraw`}
-            </p>
-          </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+    <TransactionModalOverlay onDismiss={onClose}>
+      <div className="bg-card border border-border rounded-2xl p-5 w-full max-w-sm shadow-2xl">
+        <FormModalHeader icon={resolveGoalIcon(goal)} hex={goalColor} title={goal.name} onClose={onClose} />
+        <p className="text-xs text-muted-foreground -mt-3 mb-4">
+          {mode === "add" ? `${formatCurrency(remaining)} remaining` : `${formatCurrency(goal.savedAmount)} available to withdraw`}
+        </p>
 
         {/* Mode toggle */}
         <div className="flex gap-1.5 p-1 bg-muted/60 rounded-xl mb-4">
@@ -242,24 +119,23 @@ function AddSavingsModal({ goal, onClose }: { goal: Goal; onClose: () => void })
           </div>
         </form>
       </div>
-    </div>
+    </TransactionModalOverlay>
   );
 }
 
-// ─── Goal Card ────────────────────────────────────────────────────────────────
+// ─── Goal Card — whole card clickable to edit, "Add to Savings" stays a distinct action ──
 
-function GoalCard({ goal, onEdit, onDelete, onAddSavings, onPause, onResume, onUnlink }: {
+function GoalCard({ goal, goalColor, onEdit, onAddSavings }: {
   goal:         Goal;
+  goalColor:    string;
   onEdit:       () => void;
-  onDelete:     () => void;
   onAddSavings: () => void;
-  onPause:      () => void;
-  onResume:     () => void;
-  onUnlink:     () => void;
 }) {
+  const { fmt } = useAmountFormatter();
   const pct       = goal.targetAmount > 0 ? Math.min(100, (goal.savedAmount / goal.targetAmount) * 100) : 0;
   const remaining = Math.max(0, goal.targetAmount - goal.savedAmount);
   const complete  = goal.savedAmount >= goal.targetAmount;
+  const goalIcon  = resolveGoalIcon(goal);
 
   const daysLeft = useMemo(() => {
     if (!goal.targetDate || complete) return null;
@@ -276,7 +152,6 @@ function GoalCard({ goal, onEdit, onDelete, onAddSavings, onPause, onResume, onU
     : daysLeft != null && daysLeft < 90 ? "warning"
     : "normal";
 
-  const goalColor   = goal.color || PRESET_COLORS[7];
   const barColor    = pct >= 100 ? "bg-emerald-500"
     : pct >= 60 ? "bg-indigo-500"
     : pct >= 30 ? "bg-amber-500"
@@ -286,15 +161,16 @@ function GoalCard({ goal, onEdit, onDelete, onAddSavings, onPause, onResume, onU
     : complete ? "border-emerald-500/30" : "border-border";
 
   return (
-    <div className={cn("bg-card border rounded-2xl p-5 transition-all group shadow-sm",
+    <div className={cn("bg-card border rounded-2xl transition-all shadow-sm overflow-hidden",
       complete ? "border-emerald-500/30 ring-2 ring-emerald-500/20" : borderClass,
       goal.paused && !complete ? "opacity-70 border-slate-600" : "")}>
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <span className="text-2xl shrink-0">{goal.icon || "🎯"}</span>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: goalColor }} />
+      <button type="button" onClick={onEdit}
+        aria-label={`Edit ${goal.name} goal, ${pct.toFixed(0)}% saved`}
+        className="w-full text-left p-5 hover:bg-muted/30 transition-colors">
+        <div className="flex items-start gap-3 mb-3">
+          <PremiumIcon icon={goalIcon} hex={goalColor} size="md" className="shrink-0" />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <p className="text-sm font-semibold text-foreground truncate">{goal.name}</p>
               {complete && <Trophy className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />}
               {goal.paused && !complete && (
@@ -304,7 +180,7 @@ function GoalCard({ goal, onEdit, onDelete, onAddSavings, onPause, onResume, onU
             {goal.accountName && (
               <div className="flex items-center gap-1 mt-0.5">
                 <Wallet className="w-3 h-3 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                <p className="text-xs text-indigo-600 dark:text-indigo-400 truncate max-w-[120px]">{goal.accountName}</p>
+                <p className="text-xs text-indigo-600 dark:text-indigo-400 truncate max-w-[160px]">{goal.accountName}</p>
               </div>
             )}
             {goal.targetDate && (
@@ -323,52 +199,32 @@ function GoalCard({ goal, onEdit, onDelete, onAddSavings, onPause, onResume, onU
             )}
           </div>
         </div>
-        <div className="flex items-center gap-1 shrink-0 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          {!complete && (goal.paused
-            ? <button onClick={onResume} title="Resume goal" className="w-7 h-7 rounded-lg text-foreground/40 hover:text-emerald-400 hover:bg-emerald-500/10 flex items-center justify-center transition-all"><Play className="w-3.5 h-3.5" /></button>
-            : <button onClick={onPause} title="Pause goal" className="w-7 h-7 rounded-lg text-foreground/40 hover:text-amber-400 hover:bg-amber-500/10 flex items-center justify-center transition-all"><Pause className="w-3.5 h-3.5" /></button>
-          )}
-          {goal.accountId && (
-            <button onClick={onUnlink} title="Unlink account" className="w-7 h-7 rounded-lg text-foreground/40 hover:text-indigo-400 hover:bg-indigo-500/10 flex items-center justify-center transition-all">
-              <Unlink className="w-3.5 h-3.5" />
-            </button>
-          )}
-          <button onClick={onEdit}
-            className="w-7 h-7 rounded-lg text-foreground/40 hover:text-indigo-400 hover:bg-indigo-500/10 flex items-center justify-center transition-all">
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-          <button onClick={onDelete}
-            className="w-7 h-7 rounded-lg text-foreground/40 hover:text-red-400 hover:bg-red-500/10 flex items-center justify-center transition-all">
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
 
-      <div className="space-y-2 mb-3">
-        <div className="flex items-center justify-between">
-          <p className="text-lg font-bold tabular-nums text-foreground">{formatCurrency(goal.savedAmount)}</p>
-          <p className="text-sm font-medium text-foreground/60 tabular-nums">of {formatCurrency(goal.targetAmount)}</p>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-lg font-bold tabular-nums text-foreground">{fmt(goal.savedAmount)}</p>
+            <p className="text-sm font-medium text-foreground/60 tabular-nums">of {fmt(goal.targetAmount)}</p>
+          </div>
+          <div className="h-2 bg-foreground/[0.08] rounded-full overflow-hidden">
+            <div className={cn("h-full rounded-full transition-all duration-500", barColor)} style={{ width: `${pct}%` }} />
+          </div>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-foreground/60">{pct.toFixed(0)}% complete</p>
+            {complete
+              ? <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">Completed!</span>
+              : remaining > 0 && <p className="text-xs font-medium text-foreground/50 tabular-nums">{fmt(remaining)} to go</p>
+            }
+          </div>
         </div>
-        <div className="h-2 bg-foreground/[0.08] rounded-full overflow-hidden">
-          <div className={cn("h-full rounded-full transition-all duration-500", barColor ?? "")}
-            style={{ width: `${pct}%`, ...(!barColor ? { background: goalColor } : {}) }} />
-        </div>
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-medium text-foreground/60">{pct.toFixed(0)}% complete</p>
-          {complete
-            ? <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">✓ Completed!</span>
-            : remaining > 0 && <p className="text-xs font-medium text-foreground/50 tabular-nums">{formatCurrency(remaining)} to go</p>
-          }
-        </div>
-      </div>
+      </button>
 
       {!complete && (
-        <>
+        <div className="px-5 pb-5 -mt-1">
           {monthlyNeeded ? (
             <div className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-500/25 rounded-xl px-3 py-2 mb-3">
               <Zap className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
               <p className="text-xs text-indigo-400 dark:text-indigo-300">
-                Save <span className="font-bold">{formatCurrency(monthlyNeeded)}/month</span> to reach goal on time
+                Save <span className="font-bold">{fmt(monthlyNeeded)}/month</span> to reach goal on time
               </p>
             </div>
           ) : !goal.targetDate && remaining > 0 && (
@@ -391,7 +247,7 @@ function GoalCard({ goal, onEdit, onDelete, onAddSavings, onPause, onResume, onU
               <Wallet className="w-3.5 h-3.5" /> Add to Savings
             </button>
           )}
-        </>
+        </div>
       )}
     </div>
   );
@@ -399,120 +255,200 @@ function GoalCard({ goal, onEdit, onDelete, onAddSavings, onPause, onResume, onU
 
 // ─── Goal Form ────────────────────────────────────────────────────────────────
 
-function GoalForm({ title, defaultValues, onSubmit, onCancel, isPending, isCreate }: {
-  title:         string;
-  defaultValues?: Partial<GoalFormValues & { icon?: string; color?: string; accountId?: string }>;
-  onSubmit:      (v: GoalFormValues & { icon?: string; color?: string; accountId?: string }) => void;
-  onCancel:      () => void;
-  isPending:     boolean;
-  isCreate?:     boolean;
+function GoalForm({ goal, goalColor, isCreate, onSubmit, onCancel, onClose, isPending, onDelete, onPause, onResume, onUnlink, pauseResumeDisabled }: {
+  goal?:                Goal;
+  goalColor:            string;
+  isCreate?:            boolean;
+  onSubmit:             (v: GoalFormValues & { accountId?: string; icon?: string }) => void;
+  onCancel:             () => void;
+  onClose:              () => void;
+  isPending:            boolean;
+  onDelete?:            () => void;
+  onPause?:             () => void;
+  onResume?:            () => void;
+  onUnlink?:            () => void;
+  pauseResumeDisabled?: boolean;
 }) {
-  const [icon,      setIcon]      = useState(defaultValues?.icon ?? "🎯");
-  const [color,     setColor]     = useState(defaultValues?.color ?? PRESET_COLORS[7]); // indigo default
-  const [accountId, setAccountId] = useState(defaultValues?.accountId ?? "");
+  const [accountId, setAccountId] = useState(goal?.accountId ?? "");
+  const [customIcon, setCustomIcon] = useState<string | undefined>(goal?.icon ?? undefined);
+  const [showIconPicker, setShowIconPicker] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
   const { data: accounts = [] } = useAccounts();
-  const savingsAccounts = accounts.filter(a => a.accountType !== "CREDIT_CARD");
+  // Credit cards aren't a sensible savings-goal destination; Emergency Fund
+  // accounts very much are (it's one of the goal presets) and were part of the
+  // original "any account except credit card" set, so keep those linkable too.
+  const cashAccounts          = accounts.filter(a => a.accountType === "CASH_WALLET");
+  const bankAccounts          = accounts.filter(a => a.accountType === "BANK_ACCOUNT");
+  const emergencyFundAccounts = accounts.filter(a => a.accountType === "EMERGENCY_FUND");
 
   const form = useForm<GoalFormValues>({
     resolver: zodResolver(goalSchema),
-    defaultValues: { name: "", targetAmount: undefined as any, savedAmount: undefined as any, ...defaultValues },
+    defaultValues: {
+      name: goal?.name ?? "", targetAmount: goal?.targetAmount as any ?? undefined,
+      savedAmount: goal?.savedAmount as any ?? undefined, targetDate: goal?.targetDate ?? "",
+    },
   });
+  const watchedName = form.watch("name");
+  const livePreviewIcon  = resolveGoalIcon({ name: watchedName || "", icon: customIcon });
+  const complete = goal ? goal.savedAmount >= goal.targetAmount : false;
+  const { ref: nameRhfRef, ...nameFieldRest } = form.register("name");
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-foreground text-sm">{title}</h3>
-        <button type="button" onClick={onCancel} className="text-muted-foreground hover:text-foreground transition-colors">
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-      <form onSubmit={form.handleSubmit(v => onSubmit({ ...v, icon, color, accountId: accountId || undefined }))} className="space-y-4">
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1.5">Goal Name</label>
-          <div className="flex items-start gap-2">
-            <EmojiPicker value={icon} onChange={setIcon} />
-            <input
-              placeholder="e.g. Emergency Fund"
-              className="flex-1 h-10 px-3 rounded-xl bg-muted/60 border border-border text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:border-indigo-500 transition-colors"
-              {...form.register("name")}
-            />
-          </div>
-          {form.formState.errors.name && (
-            <p className="text-xs text-red-500 mt-1">{form.formState.errors.name.message}</p>
+    <TransactionModalOverlay onDismiss={onClose}>
+      <FormModalShell accent="from-fuchsia-400 to-purple-500">
+          <FormModalHeader icon={Flag} tone="purple" title={goal ? `Edit — ${goal.name}` : "New Goal"} onDelete={onDelete} onClose={onClose} />
+
+          {isCreate && (
+            <div className="mb-4">
+              <p className="text-xs font-medium text-muted-foreground mb-2">Quick start</p>
+              <div className="grid grid-cols-5 gap-2">
+                {GOAL_PRESETS.map((p, i) => {
+                  const isCustom = p.name === "Custom Goal";
+                  const isActive = isCustom
+                    ? !GOAL_PRESETS.some(x => x.name !== "Custom Goal" && x.name === watchedName)
+                    : watchedName === p.name;
+                  return (
+                    <button key={p.name} type="button"
+                      onClick={() => {
+                        if (isCustom) {
+                          form.setValue("name", "", { shouldValidate: false });
+                          nameInputRef.current?.focus();
+                        } else {
+                          form.setValue("name", p.name, { shouldValidate: true });
+                        }
+                      }}
+                      className={cn("flex flex-col items-center gap-1 p-1.5 rounded-xl transition-all",
+                        isActive ? "bg-fuchsia-500/15 ring-1 ring-fuchsia-500/40" : "hover:bg-muted/60")}>
+                      <PremiumIcon icon={p.icon} hex={GOAL_COLORS[i % GOAL_COLORS.length]} size="sm" />
+                      <span className="text-[9px] text-muted-foreground text-center leading-tight">{isCustom ? "Custom" : p.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           )}
-        </div>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <FormCurrencyInput label="Target Amount" placeholder="0"
-            error={form.formState.errors.targetAmount?.message} {...form.register("targetAmount")} />
-          <div>
-            <FormCurrencyInput
-              label={isCreate ? "Amount Already Saved" : "Saved Amount"}
-              placeholder="0"
-              disabled={!!accountId}
-              error={form.formState.errors.savedAmount?.message} {...form.register("savedAmount")} />
-            {accountId
-              ? <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-1">Auto-synced from linked account</p>
-              : isCreate && (
-                <p className="text-xs text-muted-foreground/80 mt-1">Or link an account below to auto-sync</p>
+
+          <form onSubmit={form.handleSubmit(v => onSubmit({ ...v, accountId: accountId || undefined, icon: customIcon }))} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Goal Name</label>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setShowIconPicker(v => !v)} title="Change icon"
+                  className="shrink-0 rounded-2xl transition-all hover:ring-2 hover:ring-fuchsia-500/40">
+                  <PremiumIcon icon={livePreviewIcon} hex={goalColor} size="sm" />
+                </button>
+                <input
+                  ref={(el) => { nameInputRef.current = el; nameRhfRef(el); }}
+                  placeholder="e.g. Emergency Fund"
+                  className="flex-1 h-10 px-3 rounded-xl bg-muted/60 border border-border text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:border-fuchsia-500 transition-colors"
+                  {...nameFieldRest}
+                />
+              </div>
+              {form.formState.errors.name && (
+                <p className="text-xs text-red-500 mt-1">{form.formState.errors.name.message}</p>
               )}
-          </div>
-        </div>
-        <Controller control={form.control} name="targetDate" render={({ field, fieldState }) => (
-          <FormDatePicker label="Target Date (optional)" value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} error={fieldState.error?.message} placeholder="No deadline" />
-        )} />
+              {showIconPicker && (
+                <div className="mt-2 p-3 bg-muted/40 border border-border rounded-2xl">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Choose an icon</p>
+                    {customIcon && (
+                      <button type="button" onClick={() => setCustomIcon(undefined)}
+                        className="text-[11px] text-fuchsia-600 dark:text-fuchsia-400 hover:underline">
+                        Use automatic
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {GOAL_ICON_OPTIONS.map(({ key, icon }) => (
+                      <button key={key} type="button" onClick={() => setCustomIcon(key)}
+                        className={cn("rounded-lg transition-all", customIcon === key ? "ring-2 ring-fuchsia-500 ring-offset-2 ring-offset-card" : "opacity-70 hover:opacity-100")}>
+                        <PremiumIcon icon={icon} hex={goalColor} size="xs" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
-        <ColorPicker value={color} onChange={setColor} />
+            <BigAmountInput label="Target Amount" colorClass="text-fuchsia-500 dark:text-fuchsia-400"
+              error={form.formState.errors.targetAmount?.message} inputProps={form.register("targetAmount")} />
 
-        {/* Account Link */}
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-            Link to Account <span className="text-muted-foreground/50">(optional — auto-syncs progress)</span>
-          </label>
-          <select
-            value={accountId}
-            onChange={e => {
-              const id = e.target.value;
-              setAccountId(id);
-              if (id) {
-                const acc = savingsAccounts.find(a => a.id === id);
-                if (acc) form.setValue("savedAmount", acc.currentBalance, { shouldValidate: true });
-              } else {
-                form.setValue("savedAmount", undefined as any, { shouldValidate: false });
-              }
-            }}
-            className="w-full h-10 px-3 rounded-xl bg-slate-800 border border-slate-700/60 text-sm text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors">
-            <option value="" style={{ backgroundColor: "#1e293b", color: "#f1f5f9" }}>No linked account</option>
-            {savingsAccounts.map(a => (
-              <option key={a.id} value={a.id} style={{ backgroundColor: "#1e293b", color: "#f1f5f9" }}>
-                {a.name} — {formatCurrency(a.currentBalance)}
-              </option>
-            ))}
-          </select>
-          {accountId && (form.getValues("savedAmount") ?? 0) > 0 && !defaultValues?.accountId && (
-            <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
-              ⚠ Linking this account will replace your manually entered saved amount with the account&apos;s current balance.
-            </p>
-          )}
-        </div>
+            <div>
+              <FormCurrencyInput
+                label={isCreate ? "Amount Already Saved" : "Saved Amount"}
+                placeholder="0"
+                disabled={!!accountId}
+                error={form.formState.errors.savedAmount?.message} {...form.register("savedAmount")} />
+              {accountId
+                ? <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-1">Auto-synced from linked account</p>
+                : isCreate && (
+                  <p className="text-xs text-muted-foreground/80 mt-1">Or link an account below to auto-sync</p>
+                )}
+            </div>
 
-        <div className="flex gap-2 pt-1">
-          <button type="submit" disabled={isPending}
-            className="flex-1 h-10 rounded-xl text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-all disabled:opacity-60 flex items-center justify-center gap-2">
-            <Check className="w-4 h-4" /> {isPending ? "Saving…" : "Save Goal"}
-          </button>
-          <button type="button" onClick={onCancel}
-            className="h-10 px-4 rounded-xl text-sm text-muted-foreground bg-muted/60 hover:bg-muted transition-all">
-            Cancel
-          </button>
-        </div>
-      </form>
-    </div>
+            <Controller control={form.control} name="targetDate" render={({ field, fieldState }) => (
+              <FormDatePicker label="Target Date (optional)" value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} error={fieldState.error?.message} placeholder="No deadline" />
+            )} />
+
+            {/* Account Link */}
+            <div>
+              <AccountPicker label="Link to Account (optional — auto-syncs progress)"
+                cashAccounts={cashAccounts} bankAccounts={bankAccounts} creditAccounts={[]}
+                emergencyFundAccounts={emergencyFundAccounts}
+                value={accountId}
+                onChange={id => {
+                  setAccountId(id);
+                  const acc = [...cashAccounts, ...bankAccounts, ...emergencyFundAccounts].find(a => a.id === id);
+                  if (acc) form.setValue("savedAmount", acc.currentBalance, { shouldValidate: true });
+                }} />
+              {accountId && accountId !== goal?.accountId && (
+                <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1.5">
+                  Linking this account will replace your manually entered saved amount with the account&apos;s current balance.
+                </p>
+              )}
+            </div>
+
+            {/* Pause / Unlink — only meaningful once a goal exists */}
+            {goal && !complete && (onPause || onResume || onUnlink) && (
+              <div className="flex gap-2 flex-wrap pt-1">
+                {goal.paused
+                  ? onResume && (
+                    <button type="button" onClick={onResume} disabled={pauseResumeDisabled}
+                      className="flex items-center gap-1.5 h-9 px-3 rounded-xl text-xs font-medium bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 transition-all disabled:opacity-50">
+                      <Play className="w-3.5 h-3.5" /> Resume Goal
+                    </button>
+                  )
+                  : onPause && (
+                    <button type="button" onClick={onPause} disabled={pauseResumeDisabled}
+                      className="flex items-center gap-1.5 h-9 px-3 rounded-xl text-xs font-medium bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-400 border border-amber-500/30 transition-all disabled:opacity-50">
+                      <Pause className="w-3.5 h-3.5" /> Pause Goal
+                    </button>
+                  )}
+                {goal.accountId && onUnlink && (
+                  <button type="button" onClick={onUnlink}
+                    className="flex items-center gap-1.5 h-9 px-3 rounded-xl text-xs font-medium bg-muted hover:bg-muted/80 text-muted-foreground transition-all">
+                    <Unlink className="w-3.5 h-3.5" /> Unlink Account
+                  </button>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              <Button type="submit" variant="gradient" loading={isPending}
+                className="flex-1 bg-gradient-to-r from-fuchsia-500 to-purple-600 hover:from-fuchsia-400 hover:to-purple-500 shadow-fuchsia-500/25 disabled:shadow-none">
+                <Check className="w-4 h-4" /> {isPending ? "Saving…" : "Save Goal"}
+              </Button>
+              <Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button>
+            </div>
+          </form>
+      </FormModalShell>
+    </TransactionModalOverlay>
   );
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function GoalsPage() {
+  const { fmt } = useAmountFormatter();
   const [showCreate,   setShowCreate]   = useState(false);
   const [editGoal,     setEditGoal]     = useState<Goal | null>(null);
   const [confirmId,    setConfirmId]    = useState<string | null>(null);
@@ -521,14 +457,9 @@ export default function GoalsPage() {
   const [showDone,     setShowDone]     = useState(false);
 
   const { data: goals = [], isLoading } = useGoals();
-  const { data: accounts = [] }         = useAccounts();
   const { mutate: createGoal, isPending: creating } = useCreateGoal();
   const { mutate: updateGoal, isPending: updating } = useUpdateGoal();
   const { mutate: deleteGoal }                      = useDeleteGoal();
-
-  const efAccount = accounts.find(a => a.accountType === "EMERGENCY_FUND");
-  const efGoal    = goals.find(g => g.name.toLowerCase().includes("emergency"));
-  const showEfWarning = !!(efAccount && efGoal && efGoal.accountId !== efAccount.id);
 
   const sorted = useMemo(() => [...goals].sort((a, b) => {
     const aC = a.savedAmount >= a.targetAmount;
@@ -544,6 +475,15 @@ export default function GoalsPage() {
     return aPct - bPct;
   }), [goals]);
 
+  // Index used to derive each goal's color deterministically (GOAL_COLORS cycled
+  // by position in the full unsorted list, matching GoalsSummary's approach),
+  // so a goal's color stays stable even as sort order shifts with progress.
+  const colorIndex = new Map(goals.map((g, i) => [g.id, i]));
+  const colorFor = (g: Goal) => {
+    const complete = g.savedAmount >= g.targetAmount;
+    return complete ? "#34C759" : GOAL_COLORS[(colorIndex.get(g.id) ?? 0) % GOAL_COLORS.length];
+  };
+
   const activeGoals    = sorted.filter(g => g.savedAmount < g.targetAmount);
   const completedGoals = sorted.filter(g => g.savedAmount >= g.targetAmount);
 
@@ -552,13 +492,13 @@ export default function GoalsPage() {
   const totalRemaining = Math.max(0, totalTarget - totalSaved);
   const overallPct     = totalTarget > 0 ? (totalSaved / totalTarget) * 100 : 0;
 
-  const onCreateSubmit = (v: GoalFormValues & { icon?: string; color?: string; accountId?: string }) =>
+  const onCreateSubmit = (v: GoalFormValues & { accountId?: string; icon?: string }) =>
     createGoal(
-      { name: v.name, icon: v.icon, color: v.color, targetAmount: Number(v.targetAmount), savedAmount: Number(v.savedAmount ?? 0), targetDate: v.targetDate || undefined, accountId: v.accountId },
+      { name: v.name, icon: v.icon, targetAmount: Number(v.targetAmount), savedAmount: Number(v.savedAmount ?? 0), targetDate: v.targetDate || undefined, accountId: v.accountId },
       { onSuccess: () => setShowCreate(false) }
     );
 
-  const onUpdateSubmit = (v: GoalFormValues & { icon?: string; color?: string; accountId?: string }) => {
+  const onUpdateSubmit = (v: GoalFormValues & { accountId?: string; icon?: string }) => {
     if (!editGoal) return;
     const wasLinked   = !!editGoal.accountId;
     const isUnlinking = wasLinked && !v.accountId;
@@ -566,7 +506,7 @@ export default function GoalsPage() {
       {
         id: editGoal.id,
         payload: {
-          name: v.name, icon: v.icon, color: v.color, targetAmount: Number(v.targetAmount),
+          name: v.name, icon: v.icon, targetAmount: Number(v.targetAmount),
           savedAmount: Number(v.savedAmount ?? 0), targetDate: v.targetDate || undefined,
           accountId:     v.accountId  || undefined,
           unlinkAccount: isUnlinking  || undefined,
@@ -578,7 +518,7 @@ export default function GoalsPage() {
 
   return (
     <div className="flex flex-col flex-1">
-      <Header title="Goals" />
+      <Header title="Goals" subtitle="Save toward what matters, one milestone at a time" />
 
       {confirmId && (
         <ConfirmDialog open title="Delete Goal"
@@ -596,28 +536,21 @@ export default function GoalsPage() {
           onCancel={() => setUnlinkGoalId(null)} />
       )}
 
-      {savingsGoal && <AddSavingsModal goal={savingsGoal} onClose={() => setSavingsGoal(null)} />}
+      {savingsGoal && <AddSavingsModal goal={savingsGoal} goalColor={colorFor(savingsGoal)} onClose={() => setSavingsGoal(null)} />}
 
-      {(showCreate || editGoal) && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={() => { setShowCreate(false); setEditGoal(null); }}>
-          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto"
-            onClick={e => e.stopPropagation()}>
-            {showCreate && (
-              <GoalForm title="New Goal" isCreate
-                onSubmit={onCreateSubmit} onCancel={() => setShowCreate(false)} isPending={creating} />
-            )}
-            {editGoal && (
-              <GoalForm title={`Edit — ${editGoal.name}`}
-                defaultValues={{
-                  name: editGoal.name, targetAmount: editGoal.targetAmount,
-                  savedAmount: editGoal.savedAmount, targetDate: editGoal.targetDate ?? "",
-                  icon: editGoal.icon, color: editGoal.color, accountId: editGoal.accountId,
-                }}
-                onSubmit={onUpdateSubmit} onCancel={() => setEditGoal(null)} isPending={updating} />
-            )}
-          </div>
-        </div>
+      {showCreate && (
+        <GoalForm isCreate goalColor={GOAL_COLORS[goals.length % GOAL_COLORS.length]}
+          onSubmit={onCreateSubmit} onCancel={() => setShowCreate(false)} onClose={() => setShowCreate(false)} isPending={creating} />
+      )}
+
+      {editGoal && (
+        <GoalForm goal={editGoal} goalColor={colorFor(editGoal)}
+          onSubmit={onUpdateSubmit} onCancel={() => setEditGoal(null)} onClose={() => setEditGoal(null)} isPending={updating}
+          onDelete={() => { setConfirmId(editGoal.id); setEditGoal(null); }}
+          onPause={() => updateGoal({ id: editGoal.id, payload: { paused: true } }, { onSuccess: () => setEditGoal(null) })}
+          onResume={() => updateGoal({ id: editGoal.id, payload: { paused: false } }, { onSuccess: () => setEditGoal(null) })}
+          onUnlink={() => { setUnlinkGoalId(editGoal.id); setEditGoal(null); }}
+          pauseResumeDisabled={updating} />
       )}
 
       <main className="flex-1 p-4 md:p-5 lg:p-6 pb-36 lg:pb-24 overflow-auto">
@@ -625,19 +558,19 @@ export default function GoalsPage() {
 
         {/* Summary banner */}
         {goals.length > 0 && (
-          <div className="bg-gradient-to-br from-indigo-600/15 to-violet-600/10 border border-indigo-500/20 rounded-2xl p-5">
+          <div className="bg-gradient-to-br from-fuchsia-500/15 to-purple-500/10 border border-fuchsia-500/20 rounded-2xl p-5">
             <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Total Saved</p>
-                <p className="text-2xl font-bold text-foreground tabular-nums">{formatCurrency(totalSaved)}</p>
+                <p className="text-2xl font-bold text-foreground tabular-nums">{fmt(totalSaved)}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  of {formatCurrency(totalTarget)} across {goals.length} {goals.length === 1 ? "goal" : "goals"}
+                  of {fmt(totalTarget)} across {goals.length} {goals.length === 1 ? "goal" : "goals"}
                 </p>
               </div>
               {totalRemaining > 0 && (
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Still Needed</p>
-                  <p className="text-2xl font-bold text-amber-600 dark:text-amber-400 tabular-nums">{formatCurrency(totalRemaining)}</p>
+                  <p className="text-2xl font-bold text-fuchsia-600 dark:text-fuchsia-400 tabular-nums">{fmt(totalRemaining)}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     across {activeGoals.length} active {activeGoals.length === 1 ? "goal" : "goals"}
                   </p>
@@ -645,37 +578,16 @@ export default function GoalsPage() {
               )}
               <div className="text-right shrink-0">
                 <p className="text-xs text-muted-foreground mb-1">Progress</p>
-                <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 tabular-nums">{overallPct.toFixed(0)}%</p>
+                <p className="text-2xl font-bold text-fuchsia-600 dark:text-fuchsia-400 tabular-nums">{overallPct.toFixed(0)}%</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{completedGoals.length} of {goals.length} complete</p>
               </div>
             </div>
             <div className="h-2 bg-muted/60 rounded-full overflow-hidden">
-              <div className="h-full bg-indigo-500 rounded-full transition-all duration-500"
+              <div className="h-full bg-fuchsia-500 rounded-full transition-all duration-500"
                 style={{ width: `${overallPct}%` }} />
             </div>
           </div>
         )}
-
-        {/* Emergency fund double-count warning */}
-        {showEfWarning && (
-          <div className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 text-sm">
-            <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-medium text-amber-600 dark:text-amber-400">Possible double count</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                You have an <span className="font-medium">Emergency Fund account</span> and an <span className="font-medium">{efGoal!.name}</span> goal linked to a different account. Both may be counting the same money toward your net worth. Consider deleting the Emergency Fund account and linking your goal to your actual savings account instead.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Header row */}
-        <div className="flex items-center justify-end">
-          <button onClick={() => { setShowCreate(v => !v); setEditGoal(null); }}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 h-10 rounded-xl text-sm font-medium transition-all">
-            <Plus className="w-4 h-4" /> New Goal
-          </button>
-        </div>
 
         {isLoading ? (
           <div className="grid sm:grid-cols-2 gap-4">
@@ -688,7 +600,7 @@ export default function GoalsPage() {
             description="Set a financial goal — buying a house, emergency fund, or a dream vacation — and track your progress."
             action={
               <button onClick={() => setShowCreate(true)}
-                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-5 h-10 rounded-xl text-sm font-medium transition-all">
+                className="flex items-center gap-2 bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-5 h-10 rounded-xl text-sm font-semibold transition-all">
                 <Plus className="w-4 h-4" /> Create First Goal
               </button>
             } />
@@ -707,19 +619,15 @@ export default function GoalsPage() {
             {activeGoals.length > 0 && (
               <section>
                 <div className="flex items-center gap-2 mb-3">
-                  <Target className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                  <PremiumIcon icon={Target} tone="purple" size="xs" />
                   <h2 className="text-sm font-semibold text-foreground">Active Goals</h2>
                   <span className="text-xs text-muted-foreground">{activeGoals.length}</span>
                 </div>
                 <div className="grid sm:grid-cols-2 gap-4">
                   {activeGoals.map(g => (
-                    <GoalCard key={g.id} goal={g}
+                    <GoalCard key={g.id} goal={g} goalColor={colorFor(g)}
                       onEdit={() => { setShowCreate(false); setEditGoal(g); }}
-                      onDelete={() => setConfirmId(g.id)}
-                      onAddSavings={() => setSavingsGoal(g)}
-                      onPause={() => updateGoal({ id: g.id, payload: { paused: true } })}
-                      onResume={() => updateGoal({ id: g.id, payload: { paused: false } })}
-                      onUnlink={() => setUnlinkGoalId(g.id)} />
+                      onAddSavings={() => setSavingsGoal(g)} />
                   ))}
                 </div>
               </section>
@@ -743,13 +651,9 @@ export default function GoalsPage() {
                 {showDone && (
                   <div className="grid sm:grid-cols-2 gap-4">
                     {completedGoals.map(g => (
-                      <GoalCard key={g.id} goal={g}
+                      <GoalCard key={g.id} goal={g} goalColor={colorFor(g)}
                         onEdit={() => { setShowCreate(false); setEditGoal(g); }}
-                        onDelete={() => setConfirmId(g.id)}
-                        onAddSavings={() => setSavingsGoal(g)}
-                        onPause={() => {}}
-                        onResume={() => {}}
-                        onUnlink={() => setUnlinkGoalId(g.id)} />
+                        onAddSavings={() => setSavingsGoal(g)} />
                     ))}
                   </div>
                 )}
@@ -762,7 +666,7 @@ export default function GoalsPage() {
 
       {/* ── Floating Action Button ── */}
       <FloatingActionButton actions={[
-        { icon: Target, label: "Add Goal", color: "indigo", onClick: () => { setShowCreate(true); setEditGoal(null); } },
+        { icon: Target, label: "Add Goal", color: "fuchsia", onClick: () => { setShowCreate(true); setEditGoal(null); } },
       ]} />
     </div>
   );

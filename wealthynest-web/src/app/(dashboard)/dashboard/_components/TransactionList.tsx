@@ -3,11 +3,13 @@
 import Link from "next/link";
 import {
   Receipt, ArrowDownLeft, ArrowUpRight, CreditCard, HandCoins, RefreshCw,
-  Briefcase, Laptop, Building2, Home, Gift, Percent, TrendingUp, Coins,
   type LucideIcon,
 } from "lucide-react";
-import { cn, formatCurrency, formatDate } from "@/lib/utils";
-import { getCategoryMeta } from "@/lib/categoryMeta";
+import { cn, formatDate } from "@/lib/utils";
+import { useAmountFormatter } from "@/hooks/useAmountFormatter";
+import { getCategoryIcon, getCategoryColor, INCOME_ICON_MAP } from "@/lib/categoryMeta";
+import { PremiumIcon } from "@/components/icons/PremiumIcon";
+import { EmptyState } from "@/components/shared/EmptyState";
 import type { AccountTransactionItem } from "@/features/accounts/types/account.types";
 import { INCOME_SOURCES } from "@/lib/constants";
 
@@ -19,18 +21,6 @@ interface TransactionListProps {
   transactions: TransactionWithAccount[];
   isLoading:    boolean;
 }
-
-// Income source → Lucide icon + color
-const INCOME_ICON_MAP: Record<string, { icon: LucideIcon; color: string }> = {
-  SALARY:    { icon: Briefcase,  color: "#34C759" },
-  FREELANCE: { icon: Laptop,     color: "#007AFF" },
-  BUSINESS:  { icon: Building2,  color: "#BF5AF2" },
-  RENTAL:    { icon: Home,       color: "#30B0C7" },
-  BONUS:     { icon: Gift,       color: "#FF9500" },
-  INTEREST:  { icon: Percent,    color: "#5AC8FA" },
-  DIVIDEND:  { icon: TrendingUp, color: "#32D74B" },
-  OTHER:     { icon: Coins,      color: "#8E8E93" },
-};
 
 const TXN_COLORS: Record<string, string> = {
   INCOME:       "text-emerald-500 dark:text-emerald-400",
@@ -46,12 +36,12 @@ const TXN_SIGNS: Record<string, string> = {
   DEBT_OUT: "−", DEBT_IN: "+", ADJUSTMENT: "±",
 };
 
-const TXN_TRANSFER: Record<string, { icon: LucideIcon; bg: string; color: string }> = {
-  TRANSFER_IN:  { icon: ArrowDownLeft, bg: "#818cf820", color: "#818cf8" },
-  TRANSFER_OUT: { icon: ArrowUpRight,  bg: "#f59e0b20", color: "#f59e0b" },
-  DEBT_OUT:     { icon: CreditCard,    bg: "#f43f5e20", color: "#f43f5e" },
-  DEBT_IN:      { icon: HandCoins,     bg: "#14b8a620", color: "#14b8a6" },
-  ADJUSTMENT:   { icon: RefreshCw,     bg: "#94a3b820", color: "#94a3b8" },
+const TXN_TRANSFER: Record<string, { icon: LucideIcon; color: string }> = {
+  TRANSFER_IN:  { icon: ArrowDownLeft, color: "#818cf8" },
+  TRANSFER_OUT: { icon: ArrowUpRight,  color: "#f59e0b" },
+  DEBT_OUT:     { icon: CreditCard,    color: "#f43f5e" },
+  DEBT_IN:      { icon: HandCoins,     color: "#14b8a6" },
+  ADJUSTMENT:   { icon: RefreshCw,     color: "#94a3b8" },
 };
 
 function txnLabel(type: string, label: string, description?: string): string {
@@ -76,47 +66,33 @@ function TxnSkeleton() {
   );
 }
 
-function TxnIcon({ type, label }: { type: string; label: string }) {
+function TxnIcon({ type, label, categoryIcon, categoryColor }: {
+  type: string; label: string; categoryIcon?: string | null; categoryColor?: string | null;
+}) {
   // INCOME — mapped Lucide icon per source
   if (type === "INCOME") {
-    const src   = INCOME_ICON_MAP[label] ?? INCOME_ICON_MAP.OTHER;
-    const Icon  = src.icon;
-    return (
-      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-        style={{ backgroundColor: src.color + "20" }}>
-        <Icon className="w-[18px] h-[18px]" style={{ color: src.color }} strokeWidth={1.75} />
-      </div>
-    );
+    const src = INCOME_ICON_MAP[label] ?? INCOME_ICON_MAP.OTHER;
+    return <PremiumIcon icon={src.icon} hex={src.color} size="sm" className="w-9 h-9" />;
   }
 
-  // EXPENSE — category-matched Lucide icon + color
+  // EXPENSE — the category's own icon/color first, name-keyword match as fallback
   if (type === "EXPENSE") {
-    const meta = getCategoryMeta(label);
-    const Icon = meta.icon;
-    return (
-      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-        style={{ backgroundColor: meta.color + "20" }}>
-        <Icon className="w-[18px] h-[18px]" style={{ color: meta.color }} strokeWidth={1.75} />
-      </div>
-    );
+    const icon  = getCategoryIcon({ name: label, icon: categoryIcon });
+    const color = getCategoryColor(label, categoryColor ?? undefined);
+    return <PremiumIcon icon={icon} hex={color} size="sm" className="w-9 h-9" />;
   }
 
   // TRANSFER / DEBT / ADJUSTMENT
   const t    = TXN_TRANSFER[type];
   const Icon = t ? t.icon : RefreshCw;
-  const bg   = t ? t.bg   : "#94a3b820";
   const clr  = t ? t.color : "#94a3b8";
-  return (
-    <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-      style={{ backgroundColor: bg }}>
-      <Icon className="w-[18px] h-[18px]" style={{ color: clr }} strokeWidth={1.75} />
-    </div>
-  );
+  return <PremiumIcon icon={Icon} hex={clr} size="sm" className="w-9 h-9" />;
 }
 
 export function TransactionList({ transactions, isLoading }: TransactionListProps) {
+  const { fmt } = useAmountFormatter();
   return (
-    <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm animate-fade-in-up delay-300 flex flex-col h-full">
+    <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm animate-fade-in-up delay-300 flex flex-col h-full card-hover">
       <div className="flex items-center justify-between px-5 py-4 border-b border-border/40 shrink-0">
         <h3 className="font-bold text-foreground">Recent Transactions</h3>
         <Link href="/expenses" className="text-xs font-semibold text-primary hover:underline transition-colors">
@@ -129,17 +105,18 @@ export function TransactionList({ transactions, isLoading }: TransactionListProp
           {Array.from({ length: 5 }).map((_, i) => <TxnSkeleton key={i} />)}
         </div>
       ) : transactions.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 gap-2 text-center flex-1">
-          <Receipt className="w-10 h-10 text-muted-foreground/25 mb-1" />
-          <p className="text-sm font-medium text-foreground">No transactions yet</p>
-          <p className="text-xs text-muted-foreground">Add your first income or expense</p>
-        </div>
+        <EmptyState
+          icon={Receipt}
+          title="No transactions yet"
+          description="Add your first income or expense to see it here."
+          className="flex-1"
+        />
       ) : (
         <div className="divide-y divide-border/40">
           {transactions.map((t) => (
             <div key={t.id}
               className="flex items-center gap-3 px-5 py-3.5 hover:bg-muted/30 transition-colors">
-              <TxnIcon type={t.type} label={t.label} />
+              <TxnIcon type={t.type} label={t.label} categoryIcon={t.categoryIcon} categoryColor={t.categoryColor} />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate">
                   {txnLabel(t.type, t.label, t.description)}
@@ -154,7 +131,7 @@ export function TransactionList({ transactions, isLoading }: TransactionListProp
                 "text-sm font-bold tabular-nums shrink-0",
                 TXN_COLORS[t.type] ?? "text-muted-foreground"
               )}>
-                {TXN_SIGNS[t.type] ?? ""}{formatCurrency(t.amount)}
+                {TXN_SIGNS[t.type] ?? ""}{fmt(t.amount)}
               </p>
             </div>
           ))}

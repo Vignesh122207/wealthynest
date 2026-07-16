@@ -425,7 +425,7 @@ export default function AdminTicketsPage() {
 
   return (
     <div className="flex flex-col flex-1">
-      <Header title="Support Tickets" />
+      <Header title="Support Tickets" subtitle="Review and respond to user support requests" />
       <PageWrapper>
         <div className="max-w-4xl space-y-5">
 

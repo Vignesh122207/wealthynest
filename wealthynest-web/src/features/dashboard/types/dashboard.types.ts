@@ -33,6 +33,7 @@ export interface BudgetSummary {
   categoryId:    string;
   categoryName:  string;
   categoryColor?: string;
+  categoryIcon?:  string;
   budgeted:      number;
   spent:         number;
   percentUsed:   number;

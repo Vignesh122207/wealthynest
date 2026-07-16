@@ -41,7 +41,10 @@ public class NetWorthServiceImpl implements NetWorthService {
         BigDecimal liquidBalance  = BigDecimal.ZERO;
         BigDecimal emergencyFund  = BigDecimal.ZERO;
         BigDecimal creditCardDebt = BigDecimal.ZERO;
+        BigDecimal loanDebt       = BigDecimal.ZERO;
         List<LiabilityBreakdown> creditCardBreakdown = new ArrayList<>();
+        Map<String, BigDecimal> loanOutstandingByType = new LinkedHashMap<>();
+        Map<String, Integer>    loanCountByType       = new LinkedHashMap<>();
         for (AccountResponse a : accounts) {
             BigDecimal bal = a.getCurrentBalance() != null ? a.getCurrentBalance() : BigDecimal.ZERO;
             if ("EMERGENCY_FUND".equals(a.getAccountType())) {
@@ -57,7 +60,16 @@ public class NetWorthServiceImpl implements NetWorthService {
                             .totalOutstanding(outstanding)
                             .build());
                 }
+            } else if ("LOAN".equals(a.getAccountType())) {
+                BigDecimal outstanding = bal.max(BigDecimal.ZERO);
+                loanDebt = loanDebt.add(outstanding);
+                if (outstanding.compareTo(BigDecimal.ZERO) > 0) {
+                    String type = a.getLoanType() != null ? a.getLoanType() : "OTHER";
+                    loanOutstandingByType.merge(type, outstanding, BigDecimal::add);
+                    loanCountByType.merge(type, 1, Integer::sum);
+                }
             } else {
+                // Cash, bank, and investment-account (broker cash) balances are all liquid assets
                 liquidBalance = liquidBalance.add(bal);
             }
         }
@@ -144,10 +156,15 @@ public class NetWorthServiceImpl implements NetWorthService {
                 .map(Liability::getOutstandingAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal totalLiabilities = manualLiabilities.add(creditCardDebt);
+        BigDecimal totalLiabilities = manualLiabilities.add(creditCardDebt).add(loanDebt);
 
-        // Merge credit card breakdown into liability breakdown list
+        // Merge credit card + loan-account breakdowns into the liability breakdown list
         List<LiabilityBreakdown> allLiabilityBreakdown = new ArrayList<>(liabilityBreakdown);
+        loanOutstandingByType.forEach((type, outstanding) -> allLiabilityBreakdown.add(LiabilityBreakdown.builder()
+                .liabilityType(type)
+                .count(loanCountByType.getOrDefault(type, 1))
+                .totalOutstanding(outstanding)
+                .build()));
         if (!creditCardBreakdown.isEmpty()) {
             BigDecimal totalCC = creditCardBreakdown.stream()
                     .map(LiabilityBreakdown::getTotalOutstanding)
@@ -186,12 +203,12 @@ public class NetWorthServiceImpl implements NetWorthService {
         BigDecimal total = BigDecimal.ZERO;
         for (var member : members) {
             UUID uid = member.getId();
-            // Wallet accounts — split into liquid and credit card debt
+            // Wallet accounts — split into liquid balances and debt (credit cards + loans)
             BigDecimal walletBalance = BigDecimal.ZERO;
             BigDecimal ccDebt = BigDecimal.ZERO;
             for (AccountResponse a : walletAccountService.getAccounts(uid)) {
                 BigDecimal bal = a.getCurrentBalance() != null ? a.getCurrentBalance() : BigDecimal.ZERO;
-                if ("CREDIT_CARD".equals(a.getAccountType())) {
+                if ("CREDIT_CARD".equals(a.getAccountType()) || "LOAN".equals(a.getAccountType())) {
                     ccDebt = ccDebt.add(bal.max(BigDecimal.ZERO));
                 } else {
                     walletBalance = walletBalance.add(bal);

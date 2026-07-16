@@ -4,12 +4,17 @@ import com.wealthynest.domain.investment.entity.StockTransaction;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
 @Repository
 public interface StockTransactionRepository extends JpaRepository<StockTransaction, Long> {
     List<StockTransaction> findByInvestmentIdOrderByTransactionDateAsc(UUID investmentId);
+
+    /** Batch-load variant for portfolio-wide aggregation (e.g. computePortfolioXirr) — avoids
+     * one query per investment. */
+    List<StockTransaction> findByInvestmentIdInOrderByTransactionDateAsc(Collection<UUID> investmentIds);
 
     @Query("SELECT COALESCE(SUM(CASE WHEN t.transactionType = 'BUY' THEN t.quantity ELSE -t.quantity END), 0) FROM StockTransaction t WHERE t.investmentId = :investmentId")
     java.math.BigDecimal sumNetQuantityByInvestmentId(UUID investmentId);

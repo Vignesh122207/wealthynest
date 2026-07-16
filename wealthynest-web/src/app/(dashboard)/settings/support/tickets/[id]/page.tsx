@@ -14,11 +14,11 @@ const STATUS_CONFIG: Record<TicketStatus, { label: string; color: string }> = {
   OPEN:        { label: "Open",        color: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20" },
   IN_PROGRESS: { label: "In Progress", color: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" },
   RESOLVED:    { label: "Resolved",    color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" },
-  CLOSED:      { label: "Closed",      color: "bg-slate-500/10 text-slate-500 border border-slate-500/20" },
+  CLOSED:      { label: "Closed",      color: "bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20" },
 };
 
 const PRIORITY_CONFIG: Record<TicketPriority, { label: string; color: string; bar: string }> = {
-  LOW:    { label: "Low",    color: "text-slate-500",                            bar: "bg-slate-400" },
+  LOW:    { label: "Low",    color: "text-slate-600 dark:text-slate-400",        bar: "bg-slate-400" },
   MEDIUM: { label: "Medium", color: "text-amber-600 dark:text-amber-400",        bar: "bg-amber-400" },
   HIGH:   { label: "High",   color: "text-orange-600 dark:text-orange-400",      bar: "bg-orange-500" },
   URGENT: { label: "Urgent", color: "text-red-600 dark:text-red-400",            bar: "bg-red-500" },
@@ -45,9 +45,9 @@ export default function TicketPage({ params }: { params: Promise<{ id: string }>
   if (isLoading) {
     return (
       <div className="flex flex-col flex-1">
-        <Header title="Ticket" />
+        <Header title="Ticket" subtitle="Support ticket details and conversation" />
         <PageWrapper>
-          <div className="max-w-lg mx-auto space-y-3">
+          <div className="max-w-lg md:max-w-2xl mx-auto space-y-3">
             {[1,2,3].map(i => <div key={i} className="h-24 bg-muted/50 rounded-2xl animate-pulse" />)}
           </div>
         </PageWrapper>
@@ -63,9 +63,9 @@ export default function TicketPage({ params }: { params: Promise<{ id: string }>
 
   return (
     <div className="flex flex-col flex-1">
-      <Header title="Ticket" />
+      <Header title="Ticket" subtitle="Support ticket details and conversation" />
       <PageWrapper>
-        <div className="max-w-lg mx-auto space-y-5">
+        <div className="max-w-lg md:max-w-2xl mx-auto space-y-5">
 
           <Link href="/settings/support/tickets"
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -110,7 +110,7 @@ export default function TicketPage({ params }: { params: Promise<{ id: string }>
                   )}>
                   <div className="flex items-center gap-2">
                     {r.adminReply
-                      ? <ShieldCheck className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                      ? <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
                       : <div className="w-3.5 h-3.5 rounded-full bg-muted shrink-0" />
                     }
                     <p className={cn("text-xs font-semibold", r.adminReply ? "text-indigo-600 dark:text-indigo-400" : "text-foreground")}>
@@ -130,7 +130,7 @@ export default function TicketPage({ params }: { params: Promise<{ id: string }>
           {isClosed ? (
             <div className="text-center text-sm text-muted-foreground bg-muted/50 rounded-2xl py-5 border border-border">
               This ticket is {ticket.status.toLowerCase()}.{" "}
-              <Link href="/settings/support/tickets/new" className="text-indigo-500 hover:underline">
+              <Link href="/settings/support/tickets/new" className="text-indigo-600 dark:text-indigo-400 hover:underline">
                 Open a new ticket
               </Link>{" "}
               if you need further help.

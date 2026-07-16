@@ -5,6 +5,7 @@ import { ArrowLeft, HelpCircle, ChevronRight, X } from "lucide-react";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { PageWrapper } from "@/components/layout/PageWrapper";
+import { PremiumIcon } from "@/components/icons/PremiumIcon";
 import { cn } from "@/lib/utils";
 
 const FAQS = [
@@ -46,7 +47,22 @@ const FAQS = [
   {
     emoji: "🗑️",
     q: "How do I delete my account?",
-    a: "Go to Settings → scroll to the bottom → Close account. This deactivates your account. Your data is retained and only an admin can reactivate it.",
+    a: "Go to Settings → scroll to the bottom → Close account. This deactivates your account. Your data is retained and only an admin can reactivate it. Email support@wealthynest.in if you need your data permanently erased instead.",
+  },
+  {
+    emoji: "📥",
+    q: "Can I import transactions from a bank or UPI statement?",
+    a: "Yes — on the Transactions page, tap Import and upload a CSV export from your bank or UPI app. You'll get an editable preview to review categories and dates before anything is saved.",
+  },
+  {
+    emoji: "🔑",
+    q: "What sign-in options does WealthyNest support?",
+    a: "Email and password, Google sign-in, and passkeys (fingerprint, face, or screen lock) all work from the sign-in page. On a device you've already signed into, you can also set up a quick PIN unlock from Settings → Security.",
+  },
+  {
+    emoji: "💱",
+    q: "Can I change the currency symbol shown in the app?",
+    a: "Yes — Settings → Appearance lets you pick INR, USD, EUR or GBP for how amounts are displayed. This only changes the symbol and formatting; it does not convert amounts between currencies.",
   },
 ];
 
@@ -77,9 +93,9 @@ function FaqItem({ emoji, q, a }: { emoji: string; q: string; a: string }) {
 export default function FaqPage() {
   return (
     <div className="flex flex-col flex-1">
-      <Header title="FAQ" />
+      <Header title="FAQ" subtitle="Answers to common questions" />
       <PageWrapper>
-        <div className="max-w-lg mx-auto space-y-5">
+        <div className="max-w-lg md:max-w-4xl mx-auto space-y-5">
 
           <Link href="/settings" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="w-3.5 h-3.5" />
@@ -88,22 +104,20 @@ export default function FaqPage() {
 
           {/* Header */}
           <div className="flex items-center gap-3 pb-1">
-            <div className="w-11 h-11 rounded-2xl bg-cyan-500/10 flex items-center justify-center shrink-0">
-              <HelpCircle className="w-5 h-5 text-cyan-500" />
-            </div>
+            <PremiumIcon icon={HelpCircle} tone="cyan" size="md" />
             <div>
               <p className="text-base font-semibold text-foreground">Frequently Asked Questions</p>
               <p className="text-xs text-muted-foreground mt-0.5">Tap a question to see the answer</p>
             </div>
           </div>
 
-          {/* FAQ list */}
-          <div className="space-y-2">
+          {/* FAQ list — 2 columns on desktop; items-start so one card expanding doesn't
+              stretch its row-mate's height to match. */}
+          <div className="grid md:grid-cols-2 gap-2 md:gap-3 items-start">
             {FAQS.map(faq => (
               <FaqItem key={faq.q} emoji={faq.emoji} q={faq.q} a={faq.a} />
             ))}
           </div>
-
 
         </div>
       </PageWrapper>

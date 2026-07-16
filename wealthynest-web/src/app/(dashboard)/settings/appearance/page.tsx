@@ -6,6 +6,7 @@ import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { Header } from "@/components/layout/Header";
 import { PageWrapper } from "@/components/layout/PageWrapper";
+import { PremiumIcon } from "@/components/icons/PremiumIcon";
 import { usePrefsStore, CURRENCIES } from "@/store/preferences.store";
 import { cn } from "@/lib/utils";
 
@@ -23,9 +24,9 @@ export default function AppearancePage() {
 
   return (
     <div className="flex flex-col flex-1">
-      <Header title="Appearance" />
+      <Header title="Appearance" subtitle="Customize theme and how WealthyNest looks" />
       <PageWrapper>
-        <div className="max-w-lg mx-auto space-y-6">
+        <div className="max-w-lg md:max-w-3xl mx-auto space-y-6">
 
           <Link href="/settings" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="w-3.5 h-3.5" />
@@ -34,9 +35,7 @@ export default function AppearancePage() {
 
           {/* Icon header */}
           <div className="flex flex-col items-center gap-3 py-2">
-            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 flex items-center justify-center">
-              <Sun className="w-8 h-8 text-amber-500" />
-            </div>
+            <PremiumIcon icon={Sun} tone="orange" size="xl" />
             <p className="text-base font-semibold text-foreground">Appearance</p>
           </div>
 
@@ -56,13 +55,13 @@ export default function AppearancePage() {
                         : "bg-card border-border text-muted-foreground hover:text-foreground hover:border-border/80 hover:bg-muted/40"
                     )}
                   >
-                    <Icon className="w-5 h-5" />
-                    <div className="text-center">
+                    <Icon className="w-5 h-5 shrink-0" />
+                    <div className="text-center flex-1">
                       <p className="text-xs font-semibold">{label}</p>
                       <p className="text-[10px] leading-tight mt-0.5 opacity-70">{desc}</p>
                     </div>
                     {theme === id && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
                     )}
                   </button>
                 ))}

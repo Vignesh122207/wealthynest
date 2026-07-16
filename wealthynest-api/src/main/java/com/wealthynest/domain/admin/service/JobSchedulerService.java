@@ -4,9 +4,18 @@ import com.wealthynest.domain.admin.entity.JobScheduleConfig;
 import com.wealthynest.domain.admin.repository.JobScheduleConfigRepository;
 import com.wealthynest.infra.external.StockDataService;
 import com.wealthynest.infra.scheduler.AutoIncomeScheduler;
+import com.wealthynest.infra.scheduler.DebtReminderScheduler;
+import com.wealthynest.infra.scheduler.EmiReminderScheduler;
+import com.wealthynest.infra.scheduler.LoanEmiScheduler;
+import com.wealthynest.infra.scheduler.LowBalanceScheduler;
+import com.wealthynest.infra.scheduler.NetWorthSnapshotScheduler;
 import com.wealthynest.infra.scheduler.PriceRefreshScheduler;
 import com.wealthynest.infra.scheduler.RecurringExpenseScheduler;
+import com.wealthynest.infra.scheduler.RecurringGoalContributionScheduler;
 import com.wealthynest.infra.scheduler.RecurringIncomeScheduler;
+import com.wealthynest.infra.scheduler.RecurringTransferScheduler;
+import com.wealthynest.infra.scheduler.SpendAnomalyScheduler;
+import com.wealthynest.infra.scheduler.StockDataScheduler;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +46,15 @@ public class JobSchedulerService {
     private final StockDataService            stockDataService;
     private final RecurringExpenseScheduler   recurringExpenseScheduler;
     private final RecurringIncomeScheduler    recurringIncomeScheduler;
+    private final NetWorthSnapshotScheduler   netWorthSnapshotScheduler;
+    private final StockDataScheduler          stockDataScheduler;
+    private final LoanEmiScheduler            loanEmiScheduler;
+    private final LowBalanceScheduler         lowBalanceScheduler;
+    private final SpendAnomalyScheduler       spendAnomalyScheduler;
+    private final DebtReminderScheduler       debtReminderScheduler;
+    private final EmiReminderScheduler        emiReminderScheduler;
+    private final RecurringTransferScheduler  recurringTransferScheduler;
+    private final RecurringGoalContributionScheduler recurringGoalContributionScheduler;
 
     private final ThreadPoolTaskScheduler taskScheduler = new ThreadPoolTaskScheduler();
     private final Map<String, ScheduledFuture<?>> futures = new ConcurrentHashMap<>();
@@ -121,6 +139,15 @@ public class JobSchedulerService {
             case "MF_NAV"               -> priceRefreshScheduler.refreshMFNav();
             case "RECURRING_EXPENSES"   -> recurringExpenseScheduler.processRecurringExpenses();
             case "RECURRING_INCOME"     -> recurringIncomeScheduler.processRecurringIncome();
+            case "NET_WORTH_SNAPSHOT"   -> netWorthSnapshotScheduler.takeMonthlySnapshots();
+            case "STOCK_WEEKLY_REFRESH" -> stockDataScheduler.weeklyMasterRefresh();
+            case "LOAN_EMI"             -> loanEmiScheduler.processDueEmis();
+            case "LOW_BALANCE_CHECK"    -> lowBalanceScheduler.checkAllAccounts();
+            case "SPEND_ANOMALY_CHECK"  -> spendAnomalyScheduler.checkRecentExpenses();
+            case "DEBT_DUE_REMINDER"    -> debtReminderScheduler.checkUpcomingDueDates();
+            case "LOAN_EMI_REMINDER"    -> emiReminderScheduler.checkUpcomingEmis();
+            case "RECURRING_TRANSFER"   -> recurringTransferScheduler.processRecurringTransfers();
+            case "RECURRING_GOAL_CONTRIBUTION" -> recurringGoalContributionScheduler.processRecurringGoalContributions();
             default -> throw new IllegalArgumentException("Unknown job: " + jobName);
         }
     }

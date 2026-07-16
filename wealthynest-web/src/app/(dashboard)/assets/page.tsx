@@ -2,15 +2,13 @@
 
 import { useState, useMemo } from "react";
 import {
-  Plus, Pencil, Trash2, X, Check, ChevronDown, ChevronUp,
+  Plus, ChevronDown, ChevronUp,
   TrendingUp, TrendingDown, Banknote, PieChart,
-  Building2, AlertTriangle, Wallet, Layers, Coins, Percent, BarChart3,
+  Building2, AlertTriangle, Wallet, Layers, Coins, Percent, BarChart3, ShieldCheck,
+  type LucideIcon,
 } from "lucide-react";
-import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import {
-  PieChart as RechartsPie, Pie, Cell, Tooltip, ResponsiveContainer, Legend, Sector,
+  PieChart as RechartsPie, Pie, Cell, Tooltip, ResponsiveContainer, Sector,
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, ReferenceLine,
 } from "recharts";
 import Link from "next/link";
@@ -19,58 +17,31 @@ import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
 import { useChartTheme } from "@/hooks/useChartTheme";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { FormInput } from "@/components/forms/FormInput";
-import { FormSelect } from "@/components/forms/FormSelect";
-import { FormCurrencyInput } from "@/components/forms/FormCurrencyInput";
-import { FormDatePicker } from "@/components/forms/FormDatePicker";
+import { PremiumIcon } from "@/components/icons/PremiumIcon";
 import {
   useAssets, useCreateAsset, useUpdateAsset, useDeleteAsset,
 } from "@/features/assets/hooks/useAssets";
+import { AssetForm } from "@/features/assets/components/AssetForm";
+import { AssetRow } from "@/features/assets/components/AssetRow";
+import type { AssetFormValues } from "@/features/assets/schemas/asset.schema";
 import {
   useLiabilities, useCreateLiability, useUpdateLiability, useDeleteLiability,
 } from "@/features/liability/hooks/useLiabilities";
+import { LiabilityForm } from "@/features/liability/components/LiabilityForm";
+import { LiabilityRow } from "@/features/liability/components/LiabilityRow";
+import type { LiabilityFormValues } from "@/features/liability/schemas/liability.schema";
 import { useNetWorthSummary, useNetWorthHistory } from "@/features/networth/hooks/useNetWorth";
 import type { Asset } from "@/features/assets/types/asset.types";
 import type { Liability, CreateLiabilityPayload } from "@/features/liability/types/liability.types";
-import {
-  ASSET_TYPES, ASSET_ICONS, ASSET_COLORS,
-  LIABILITY_TYPES, LIABILITY_ICONS, LIABILITY_COLORS,
-} from "@/lib/constants";
-import { formatCurrency, formatCurrencyCompact, formatDate, cn } from "@/lib/utils";
-
-// ─── Schemas ─────────────────────────────────────────────────────────────────
-
-const assetSchema = z.object({
-  name:         z.string().min(1, "Name is required").max(100),
-  assetType:    z.string().min(1, "Type is required"),
-  currentValue: z.coerce.number().min(0, "Value must be 0 or more"),
-  institution:  z.string().max(100).optional(),
-  notes:        z.string().optional(),
-  asOfDate:     z.string().optional(),
-});
-
-const liabilitySchema = z.object({
-  name:              z.string().min(1, "Name is required").max(100),
-  liabilityType:     z.string().min(1, "Type is required"),
-  principalAmount:   z.coerce.number().min(0, "Must be 0 or more"),
-  outstandingAmount: z.coerce.number().min(0, "Must be 0 or more"),
-  interestRate:      z.coerce.number().min(0).max(100).optional(),
-  lenderName:        z.string().max(100).optional(),
-  emiAmount:         z.coerce.number().min(0).optional(),
-  startDate:         z.string().optional(),
-  endDate:           z.string().optional(),
-  notes:             z.string().optional(),
-}).refine(
-  d => Number(d.outstandingAmount) <= Number(d.principalAmount),
-  { message: "Cannot exceed original loan amount", path: ["outstandingAmount"] },
-);
-
-type AssetFormValues     = z.infer<typeof assetSchema>;
-type LiabilityFormValues = z.infer<typeof liabilitySchema>;
+import { ASSET_TYPES } from "@/lib/constants";
+import { typeLabel } from "@/lib/netWorthTypeMeta";
+import { withCategoricalColors } from "@/lib/chartColors";
+import { formatChartTickINR, cn } from "@/lib/utils";
+import { useAmountFormatter } from "@/hooks/useAmountFormatter";
 
 // ─── Investment type meta (for net worth breakdown) ──────────────────────────
 
-const INV_TYPE_META: Record<string, { label: string; color: string; icon: React.ElementType; tab: string }> = {
+const INV_TYPE_META: Record<string, { label: string; color: string; icon: LucideIcon; tab: string }> = {
   STOCK:       { label: "Stocks",         color: "#6366f1", icon: TrendingUp,  tab: "stocks"   },
   MUTUAL_FUND: { label: "Mutual Funds",   color: "#22c55e", icon: Layers,      tab: "mf"       },
   GOLD:        { label: "Gold",           color: "#f59e0b", icon: Coins,       tab: "gold"     },
@@ -87,259 +58,10 @@ const INVESTMENT_TYPE_KEYS = new Set([
   "STOCK", "MUTUAL_FUND", "GOLD", "GOLD_ETF", "FD", "BOND", "PPF", "NPS", "REIT",
 ]);
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function paidPct(outstanding: number, principal: number) {
-  if (!principal || principal <= 0) return 0;
-  return Math.min(100, ((principal - outstanding) / principal) * 100);
-}
-
-function typeLabel(types: { value: string; label: string }[], val: string) {
-  return types.find(t => t.value === val)?.label ?? val;
-}
-
-// ─── Asset Form ───────────────────────────────────────────────────────────────
-
-function AssetForm({ title, defaultValues, onSubmit, onCancel, isPending }: {
-  title:          string;
-  defaultValues?: Partial<AssetFormValues>;
-  onSubmit:       (v: AssetFormValues) => void;
-  onCancel:       () => void;
-  isPending:      boolean;
-}) {
-  const form = useForm<AssetFormValues>({
-    resolver: zodResolver(assetSchema),
-    defaultValues: { asOfDate: new Date().toISOString().split("T")[0], ...defaultValues },
-  });
-
-  return (
-    <div className="bg-card border border-border rounded-2xl p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-foreground text-sm">{title}</h3>
-        <button type="button" onClick={onCancel} className="text-muted-foreground/80 hover:text-foreground transition-colors">
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <FormInput label="Name" placeholder="e.g. My Apartment"
-            error={form.formState.errors.name?.message} {...form.register("name")} />
-          <FormSelect label="Asset Type" options={ASSET_TYPES} placeholder="Select type"
-            error={form.formState.errors.assetType?.message} {...form.register("assetType")} />
-          <FormCurrencyInput label="Current Value" placeholder="0"
-            error={form.formState.errors.currentValue?.message} {...form.register("currentValue")} />
-          <FormInput label="Institution / Source" placeholder="e.g. SBI, Employer"
-            {...form.register("institution")} />
-          <Controller control={form.control} name="asOfDate" render={({ field }) => (
-            <FormDatePicker label="As of Date" value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} />
-          )} />
-          <FormInput label="Notes (optional)" placeholder="Add a note…" {...form.register("notes")} />
-        </div>
-        <div className="flex gap-2 pt-1">
-          <button type="submit" disabled={isPending}
-            className="flex items-center justify-center gap-2 flex-1 h-10 rounded-xl text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-all disabled:opacity-60">
-            <Check className="w-4 h-4" /> {isPending ? "Saving…" : "Save Asset"}
-          </button>
-          <button type="button" onClick={onCancel}
-            className="h-10 px-4 rounded-xl text-sm text-muted-foreground bg-muted/60 hover:bg-muted transition-all">
-            Cancel
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-// ─── Liability Form ───────────────────────────────────────────────────────────
-
-function LiabilityForm({ title, defaultValues, onSubmit, onCancel, isPending }: {
-  title:          string;
-  defaultValues?: Partial<LiabilityFormValues>;
-  onSubmit:       (v: LiabilityFormValues) => void;
-  onCancel:       () => void;
-  isPending:      boolean;
-}) {
-  const form = useForm<LiabilityFormValues>({
-    resolver: zodResolver(liabilitySchema),
-    defaultValues,
-  });
-
-  return (
-    <div className="bg-card border border-border rounded-2xl p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-foreground text-sm">{title}</h3>
-        <button type="button" onClick={onCancel} className="text-muted-foreground/80 hover:text-foreground transition-colors">
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <FormInput label="Name" placeholder="e.g. HDFC Home Loan"
-            error={form.formState.errors.name?.message} {...form.register("name")} />
-          <FormSelect label="Type" options={LIABILITY_TYPES} placeholder="Select type"
-            error={form.formState.errors.liabilityType?.message} {...form.register("liabilityType")} />
-          <FormCurrencyInput label="Original Loan Amount" placeholder="0"
-            error={form.formState.errors.principalAmount?.message} {...form.register("principalAmount")} />
-          <FormCurrencyInput label="Outstanding Balance" placeholder="0"
-            error={form.formState.errors.outstandingAmount?.message} {...form.register("outstandingAmount")} />
-          <FormInput label="Interest Rate (% p.a.)" type="number" placeholder="8.5"
-            {...form.register("interestRate")} />
-          <FormCurrencyInput label="Monthly EMI" placeholder="0"
-            {...form.register("emiAmount")} />
-          <FormInput label="Lender / Bank" placeholder="e.g. HDFC Bank" {...form.register("lenderName")} />
-          <Controller control={form.control} name="startDate" render={({ field }) => (
-            <FormDatePicker label="Start Date" value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} />
-          )} />
-          <Controller control={form.control} name="endDate" render={({ field }) => (
-            <FormDatePicker label="Expected Payoff Date" value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} />
-          )} />
-          <div className="sm:col-span-2 lg:col-span-3">
-            <FormInput label="Notes (optional)" placeholder="Add a note…" {...form.register("notes")} />
-          </div>
-        </div>
-        <div className="flex gap-2 pt-1">
-          <button type="submit" disabled={isPending}
-            className="flex items-center justify-center gap-2 flex-1 h-10 rounded-xl text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-all disabled:opacity-60">
-            <Check className="w-4 h-4" /> {isPending ? "Saving…" : "Save Liability"}
-          </button>
-          <button type="button" onClick={onCancel}
-            className="h-10 px-4 rounded-xl text-sm text-muted-foreground bg-muted/60 hover:bg-muted transition-all">
-            Cancel
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-// ─── Asset Row ────────────────────────────────────────────────────────────────
-
-function AssetRow({ asset, onEdit, onDelete }: {
-  asset:    Asset;
-  onEdit:   () => void;
-  onDelete: () => void;
-}) {
-  const icon  = ASSET_ICONS[asset.assetType]  ?? "💰";
-  const color = ASSET_COLORS[asset.assetType] ?? "#6366f1";
-  return (
-    <div className="group flex items-center gap-4 px-5 py-4 hover:bg-muted/20 transition-colors">
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0"
-        style={{ backgroundColor: color + "20" }}>
-        {icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-foreground truncate">{asset.name}</p>
-        <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-xs px-1.5 py-0.5 rounded font-medium"
-            style={{ backgroundColor: color + "18", color }}>
-            {typeLabel(ASSET_TYPES, asset.assetType)}
-          </span>
-          {asset.institution && <span className="text-xs text-muted-foreground/60">· {asset.institution}</span>}
-          <span className="text-xs text-muted-foreground/60">· as of {formatDate(asset.asOfDate)}</span>
-        </div>
-        {asset.notes && <p className="text-xs text-muted-foreground/60 mt-0.5 truncate">{asset.notes}</p>}
-      </div>
-      <p className="text-sm font-bold text-emerald-300 tabular-nums shrink-0 min-w-[7rem] text-right">{formatCurrency(asset.currentValue)}</p>
-      <div className="flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0">
-        <button onClick={onEdit}
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/80 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-500/10 transition-all">
-          <Pencil className="w-3.5 h-3.5" />
-        </button>
-        <button onClick={onDelete}
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/80 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 transition-all">
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Liability Row ────────────────────────────────────────────────────────────
-
-function LiabilityRow({ liability, onEdit, onDelete }: {
-  liability: Liability;
-  onEdit:    () => void;
-  onDelete:  () => void;
-}) {
-  const icon  = LIABILITY_ICONS[liability.liabilityType]  ?? "📋";
-  const color = LIABILITY_COLORS[liability.liabilityType] ?? "#ef4444";
-  const pct   = paidPct(liability.outstandingAmount, liability.principalAmount);
-  // Compare date strings directly to avoid timezone-midnight false-positives
-  const todayStr  = new Date().toISOString().split("T")[0];
-  const isOverdue = !!(liability.endDate && liability.endDate < todayStr);
-
-  return (
-    <div className={cn("group px-5 py-4 hover:bg-muted/20 transition-colors", isOverdue && "border-l-2 border-amber-500/60 bg-amber-500/4")}>
-      <div className="flex items-start gap-4">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0"
-          style={{ backgroundColor: color + "20" }}>
-          {icon}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-semibold text-foreground truncate">{liability.name}</p>
-                {isOverdue && (
-                  <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 text-xs font-semibold shrink-0">
-                    <AlertTriangle className="w-3 h-3" /> Overdue
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                <span className="text-xs px-1.5 py-0.5 rounded font-medium"
-                  style={{ backgroundColor: color + "18", color }}>
-                  {typeLabel(LIABILITY_TYPES, liability.liabilityType)}
-                </span>
-                {liability.lenderName && <span className="text-xs text-muted-foreground/60">· {liability.lenderName}</span>}
-                {liability.interestRate != null && <span className="text-xs text-muted-foreground/60">· {liability.interestRate}% p.a.</span>}
-                {liability.endDate && <span className="text-xs text-muted-foreground/60">· Payoff {formatDate(liability.endDate)}</span>}
-              </div>
-            </div>
-            <div className="text-right shrink-0">
-              <p className="text-sm font-bold text-red-600 dark:text-red-400 tabular-nums">{formatCurrency(liability.outstandingAmount)}</p>
-              <p className="text-xs text-muted-foreground/60">outstanding</p>
-            </div>
-          </div>
-          {/* Repayment progress */}
-          {liability.principalAmount > 0 && (
-            <div className="mt-2.5">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-muted-foreground/60">Repaid</span>
-                <span className="text-xs text-muted-foreground/80 tabular-nums">
-                  {formatCurrency(liability.principalAmount - liability.outstandingAmount)} / {formatCurrency(liability.principalAmount)}
-                </span>
-              </div>
-              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500/70 rounded-full transition-all" style={{ width: `${pct}%` }} />
-              </div>
-              <div className="flex items-center justify-between mt-1">
-                <span className="text-xs text-muted-foreground/60">{pct.toFixed(0)}% paid off</span>
-                {liability.emiAmount && (
-                  <span className="text-xs text-muted-foreground/80">EMI {formatCurrency(liability.emiAmount)}/mo</span>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0 ml-2 mt-1">
-          <button onClick={onEdit}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/80 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-500/10 transition-all">
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-          <button onClick={onDelete}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/80 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 transition-all">
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function NetWorthPage() {
+  const { fmt, fmtC } = useAmountFormatter();
   const chart = useChartTheme();
   const [showAssetForm,  setShowAssetForm]  = useState(false);
   const [showLiabForm,   setShowLiabForm]   = useState(false);
@@ -385,41 +107,48 @@ export default function NetWorthPage() {
     return { invBreakdown: inv, manualBreakdown: manual };
   }, [summary]);
 
-  // Pie chart: liquid + emergency + per-investment-type slices + manual asset types
+  // Pie chart: cash & bank + emergency fund + per-investment-type slices + manual asset types.
+  // Colors are assigned positionally (largest slice first) by withCategoricalColors, not per
+  // category — fixed per-category colors collided whenever two categories landed in the same
+  // chart (e.g. Real Estate and Stocks were both indigo).
   const pieData = useMemo(() => {
-    const slices: { name: string; value: number; color: string }[] = [];
-    if ((summary?.liquidBalance ?? 0) > 0)  slices.push({ name: "Cash & Bank",    value: summary!.liquidBalance,  color: "#22c55e" });
+    const slices: { name: string; value: number }[] = [];
+    const emergencyFund = summary?.emergencyFund ?? 0;
+    const cashAndBank   = (summary?.liquidBalance ?? 0) - emergencyFund;
+    if (cashAndBank > 0)   slices.push({ name: "Cash & Bank",    value: cashAndBank });
+    if (emergencyFund > 0) slices.push({ name: "Emergency Fund", value: emergencyFund });
     // Investment type breakdown (from assetBreakdown where available, else single total)
     if (invBreakdown.length > 0) {
       invBreakdown.forEach(b => {
         const meta = INV_TYPE_META[b.assetType];
-        slices.push({ name: meta?.label ?? b.assetType, value: b.totalValue, color: meta?.color ?? "#6366f1" });
+        slices.push({ name: meta?.label ?? b.assetType, value: b.totalValue });
       });
     } else if ((summary?.investmentValue ?? 0) > 0) {
-      slices.push({ name: "Investments", value: summary!.investmentValue, color: "#6366f1" });
+      slices.push({ name: "Investments", value: summary!.investmentValue });
     }
     manualBreakdown.forEach(b => {
-      slices.push({ name: typeLabel(ASSET_TYPES, b.assetType), value: b.totalValue, color: ASSET_COLORS[b.assetType] ?? "#64748b" });
+      slices.push({ name: typeLabel(ASSET_TYPES, b.assetType), value: b.totalValue });
     });
-    return slices.filter(s => s.value > 0).sort((a, b) => b.value - a.value);
-  }, [summary, invBreakdown, manualBreakdown]);
+    const sorted = slices.filter(s => s.value > 0).sort((a, b) => b.value - a.value);
+    return withCategoricalColors(sorted, chart.isDark);
+  }, [summary, invBreakdown, manualBreakdown, chart.isDark]);
 
   const debtRatio = summary && summary.totalAssets > 0
     ? Math.min(100, (summary.totalLiabilities / summary.totalAssets) * 100) : 0;
 
   const handleCreateAsset = (v: AssetFormValues) =>
-    createAsset({ ...v, currentValue: Number(v.currentValue) } as any,
+    createAsset({ ...v, currentValue: Number(v.currentValue) },
       { onSuccess: () => setShowAssetForm(false) });
 
   const handleUpdateAsset = (v: AssetFormValues) => {
     if (!editAsset) return;
-    updateAsset({ id: editAsset.id, payload: { ...v, currentValue: Number(v.currentValue) } as any },
+    updateAsset({ id: editAsset.id, payload: { ...v, currentValue: Number(v.currentValue) } },
       { onSuccess: () => setEditAsset(null) });
   };
 
   const handleCreateLiab = (v: LiabilityFormValues) => {
     const p: CreateLiabilityPayload = {
-      ...v, liabilityType: v.liabilityType as any,
+      ...v,
       principalAmount: Number(v.principalAmount), outstandingAmount: Number(v.outstandingAmount),
       interestRate: v.interestRate ? Number(v.interestRate) : undefined,
       emiAmount:    v.emiAmount    ? Number(v.emiAmount)    : undefined,
@@ -434,7 +163,7 @@ export default function NetWorthPage() {
   const handleUpdateLiab = (v: LiabilityFormValues) => {
     if (!editLiability) return;
     const p: CreateLiabilityPayload = {
-      ...v, liabilityType: v.liabilityType as any,
+      ...v,
       principalAmount: Number(v.principalAmount), outstandingAmount: Number(v.outstandingAmount),
       interestRate: v.interestRate ? Number(v.interestRate) : undefined,
       emiAmount:    v.emiAmount    ? Number(v.emiAmount)    : undefined,
@@ -456,7 +185,7 @@ export default function NetWorthPage() {
 
   return (
     <div className="flex flex-col flex-1">
-      <Header title="Net Worth" />
+      <Header title="Net Worth" subtitle="Everything you own versus everything you owe" />
 
       {confirmAsset && (
         <ConfirmDialog open title="Delete Asset"
@@ -474,43 +203,31 @@ export default function NetWorthPage() {
       )}
 
       {/* Asset / Liability modals */}
-      {(showAssetForm || editAsset) && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={() => { setShowAssetForm(false); setEditAsset(null); }}>
-          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            {(showAssetForm && !editAsset) && (
-              <AssetForm title="New Asset"
-                onSubmit={handleCreateAsset} onCancel={() => setShowAssetForm(false)} isPending={creatingAsset} />
-            )}
-            {editAsset && (
-              <AssetForm title={`Edit — ${editAsset.name}`}
-                defaultValues={{ name: editAsset.name, assetType: editAsset.assetType, currentValue: editAsset.currentValue, institution: editAsset.institution, notes: editAsset.notes, asOfDate: editAsset.asOfDate }}
-                onSubmit={handleUpdateAsset} onCancel={() => setEditAsset(null)} isPending={updatingAsset} />
-            )}
-          </div>
-        </div>
+      {showAssetForm && !editAsset && (
+        <AssetForm title="New Asset"
+          onSubmit={handleCreateAsset} onCancel={() => setShowAssetForm(false)} isPending={creatingAsset} />
       )}
-      {(showLiabForm || editLiability) && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={() => { setShowLiabForm(false); setEditLiability(null); }}>
-          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            {(showLiabForm && !editLiability) && (
-              <LiabilityForm title="New Liability"
-                onSubmit={handleCreateLiab} onCancel={() => setShowLiabForm(false)} isPending={creatingLiab} />
-            )}
-            {editLiability && (
-              <LiabilityForm title={`Edit — ${editLiability.name}`}
-                defaultValues={{
-                  name: editLiability.name, liabilityType: editLiability.liabilityType,
-                  principalAmount: editLiability.principalAmount, outstandingAmount: editLiability.outstandingAmount,
-                  interestRate: editLiability.interestRate, lenderName: editLiability.lenderName,
-                  emiAmount: editLiability.emiAmount, startDate: editLiability.startDate,
-                  endDate: editLiability.endDate, notes: editLiability.notes,
-                }}
-                onSubmit={handleUpdateLiab} onCancel={() => setEditLiability(null)} isPending={updatingLiab} />
-            )}
-          </div>
-        </div>
+      {editAsset && (
+        <AssetForm title={`Edit — ${editAsset.name}`}
+          defaultValues={{ name: editAsset.name, assetType: editAsset.assetType, currentValue: editAsset.currentValue, institution: editAsset.institution, notes: editAsset.notes, asOfDate: editAsset.asOfDate }}
+          onSubmit={handleUpdateAsset} onCancel={() => setEditAsset(null)} isPending={updatingAsset}
+          onDelete={() => { setConfirmAsset(editAsset.id); setEditAsset(null); }} />
+      )}
+      {showLiabForm && !editLiability && (
+        <LiabilityForm title="New Liability"
+          onSubmit={handleCreateLiab} onCancel={() => setShowLiabForm(false)} isPending={creatingLiab} />
+      )}
+      {editLiability && (
+        <LiabilityForm title={`Edit — ${editLiability.name}`}
+          defaultValues={{
+            name: editLiability.name, liabilityType: editLiability.liabilityType,
+            principalAmount: editLiability.principalAmount, outstandingAmount: editLiability.outstandingAmount,
+            interestRate: editLiability.interestRate, lenderName: editLiability.lenderName,
+            emiAmount: editLiability.emiAmount, startDate: editLiability.startDate,
+            endDate: editLiability.endDate, notes: editLiability.notes,
+          }}
+          onSubmit={handleUpdateLiab} onCancel={() => setEditLiability(null)} isPending={updatingLiab}
+          onDelete={() => { setConfirmLiab(editLiability.id); setEditLiability(null); }} />
       )}
 
       <main className="flex-1 p-4 md:p-5 lg:p-6 pb-36 lg:pb-24 overflow-auto">
@@ -527,12 +244,12 @@ export default function NetWorthPage() {
           ) : (
             <div className="flex items-end gap-3 mb-1">
               <p className={cn("text-4xl font-bold tabular-nums", nw >= 0 ? "text-foreground" : "text-red-600 dark:text-red-400")}>
-                {formatCurrency(nw)}
+                {fmt(nw)}
               </p>
               {nwDelta != null && nwDeltaPct != null && (
                 <span className={cn("mb-1 text-sm font-semibold tabular-nums",
                   nwDelta >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
-                  {nwDelta >= 0 ? "+" : ""}{formatCurrencyCompact(nwDelta)} ({nwDeltaPct >= 0 ? "+" : ""}{nwDeltaPct.toFixed(1)}%) vs last month
+                  {nwDelta >= 0 ? "+" : ""}{fmtC(nwDelta)} ({nwDeltaPct >= 0 ? "+" : ""}{nwDeltaPct.toFixed(1)}%) vs last month
                 </span>
               )}
             </div>
@@ -542,20 +259,19 @@ export default function NetWorthPage() {
             <p className="text-xs text-red-600/80 dark:text-red-400/80 mb-4">Your liabilities exceed your assets. Focus on paying down debt to build positive net worth.</p>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[
-              { label: "Total Assets",      value: summary?.totalAssets,      color: "text-emerald-600 dark:text-emerald-400", icon: TrendingUp },
-              { label: "Total Liabilities", value: summary?.totalLiabilities, color: "text-red-600 dark:text-red-400",     icon: TrendingDown },
-              { label: "Cash & Bank",       value: summary?.liquidBalance,    color: "text-indigo-600 dark:text-indigo-400",  icon: Banknote },
-            ].map(({ label, value, color, icon: Icon }) => (
+              { label: "Total Assets",      value: summary?.totalAssets,      color: "text-emerald-600 dark:text-emerald-400", icon: TrendingUp,   tone: "emerald" as const },
+              { label: "Total Liabilities", value: summary?.totalLiabilities, color: "text-red-600 dark:text-red-400",     icon: TrendingDown, tone: "red" as const },
+            ].map(({ label, value, color, icon: Icon, tone }) => (
               <div key={label} className="bg-muted/40 rounded-xl p-3">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <Icon className={cn("w-3.5 h-3.5", color)} />
+                <div className="flex items-center gap-1.5 mb-2">
+                  <PremiumIcon icon={Icon} tone={tone} size="xs" />
                   <p className="text-xs text-muted-foreground/80 uppercase tracking-wide">{label}</p>
                 </div>
                 {loadingSum
                   ? <div className="h-5 w-24 bg-muted/60 rounded animate-pulse" />
-                  : <p className={cn("text-sm font-bold tabular-nums", color)}>{formatCurrency(value ?? 0)}</p>}
+                  : <p className={cn("text-sm font-bold tabular-nums", color)}>{fmt(value ?? 0)}</p>}
               </div>
             ))}
           </div>
@@ -590,30 +306,39 @@ export default function NetWorthPage() {
             <h3 className="font-semibold text-foreground text-sm mb-1">Auto-Linked Assets</h3>
             <p className="text-xs text-muted-foreground/80 mb-4">Pulled live from your Accounts &amp; Investments — no manual entry needed.</p>
             <div className="space-y-2">
-              {/* Cash & Bank */}
+              {/* Cash & Bank — excludes Emergency Fund, which gets its own row below even
+                  though the backend's liquidBalance folds both together (EF is liquid money,
+                  just earmarked) — differently-colored concepts everywhere else in the app. */}
               <Link href="/accounts"
                 className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-all">
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-emerald-500/15">
-                  <Banknote className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                </div>
+                <PremiumIcon icon={Banknote} tone="emerald" size="sm" className="shrink-0" />
                 <p className="text-xs font-semibold text-foreground flex-1">Cash &amp; Bank Accounts</p>
                 {loadingSum
                   ? <div className="h-4 w-20 bg-muted rounded animate-pulse" />
-                  : <p className="text-sm font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{formatCurrency(summary?.liquidBalance ?? 0)}</p>}
+                  : <p className="text-sm font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{fmt((summary?.liquidBalance ?? 0) - (summary?.emergencyFund ?? 0))}</p>}
               </Link>
 
+              {/* Emergency Fund */}
+              {(summary?.emergencyFund ?? 0) > 0 && (
+                <Link href="/accounts"
+                  className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-all">
+                  <PremiumIcon icon={ShieldCheck} tone="orange" size="sm" className="shrink-0" />
+                  <p className="text-xs font-semibold text-foreground flex-1">Emergency Fund</p>
+                  {loadingSum
+                    ? <div className="h-4 w-20 bg-muted rounded animate-pulse" />
+                    : <p className="text-sm font-bold tabular-nums text-amber-600 dark:text-amber-400">{fmt(summary!.emergencyFund)}</p>}
+                </Link>
+              )}
 
               {/* Investment Portfolio — single total, breakdown is in Assets section */}
               {(summary?.investmentValue ?? 0) > 0 && (
                 <Link href="/investments"
                   className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-all">
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-indigo-500/15">
-                    <TrendingUp className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                  </div>
+                  <PremiumIcon icon={TrendingUp} tone="indigo" size="sm" className="shrink-0" />
                   <p className="text-xs font-semibold text-foreground flex-1">Investment Portfolio</p>
                   {loadingSum
                     ? <div className="h-4 w-20 bg-muted rounded animate-pulse" />
-                    : <p className="text-sm font-bold tabular-nums text-indigo-600 dark:text-indigo-400">{formatCurrency(summary!.investmentValue)}</p>}
+                    : <p className="text-sm font-bold tabular-nums text-indigo-600 dark:text-indigo-400">{fmt(summary!.investmentValue)}</p>}
                 </Link>
               )}
             </div>
@@ -623,7 +348,7 @@ export default function NetWorthPage() {
           <div className="lg:col-span-3 bg-card border border-border rounded-2xl p-5">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <PieChart className="w-4 h-4 text-muted-foreground" />
+                <PremiumIcon icon={PieChart} tone="violet" size="xs" />
                 <h3 className="font-semibold text-foreground text-sm">Asset Allocation</h3>
               </div>
               {summary && <span className="text-xs text-muted-foreground/80">{pieData.length} categories</span>}
@@ -640,10 +365,13 @@ export default function NetWorthPage() {
                     <RechartsPie>
                       <Pie data={pieData} cx="50%" cy="50%" innerRadius={52} outerRadius={82}
                         paddingAngle={2} dataKey="value" stroke="none"
-                        activeShape={(props: any) => (
+                        activeShape={(props: {
+                          cx?: number; cy?: number; innerRadius?: number; outerRadius?: number;
+                          startAngle?: number; endAngle?: number; fill?: string;
+                        }) => (
                           <Sector
                             cx={props.cx} cy={props.cy}
-                            innerRadius={props.innerRadius} outerRadius={props.outerRadius + 5}
+                            innerRadius={props.innerRadius} outerRadius={(props.outerRadius ?? 0) + 5}
                             startAngle={props.startAngle} endAngle={props.endAngle}
                             fill={props.fill} stroke="none"
                           />
@@ -655,16 +383,16 @@ export default function NetWorthPage() {
                         labelStyle={chart.labelStyle}
                         itemStyle={chart.itemStyle}
                         wrapperStyle={{ zIndex: 20 }}
-                        formatter={(v: number, _: string, props: any) => [
-                          formatCurrency(v),
-                          props?.payload?.name ?? "Amount",
+                        formatter={(v: number, _: string, props: { payload?: { name?: string } }) => [
+                          fmt(v),
+                          props.payload?.name ?? "Amount",
                         ]} />
                     </RechartsPie>
                   </ResponsiveContainer>
                   {/* Center label — z-0 keeps it below the Recharts tooltip layer (z-20) */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-0">
                     <p className="text-xs text-muted-foreground/80 uppercase tracking-wide">Total</p>
-                    <p className="text-sm font-bold text-foreground tabular-nums">{formatCurrency(summary?.totalAssets ?? 0)}</p>
+                    <p className="text-sm font-bold text-foreground tabular-nums">{fmt(summary?.totalAssets ?? 0)}</p>
                   </div>
                 </div>
 
@@ -681,7 +409,7 @@ export default function NetWorthPage() {
                           </div>
                           <div className="text-right shrink-0 ml-2">
                             <span className="text-xs font-semibold text-foreground tabular-nums">{pct.toFixed(1)}%</span>
-                            <span className="text-xs text-muted-foreground ml-1.5 tabular-nums">{formatCurrency(s.value)}</span>
+                            <span className="text-xs text-muted-foreground ml-1.5 tabular-nums">{fmt(s.value)}</span>
                           </div>
                         </div>
                         <div className="h-1.5 bg-muted/60 rounded-full overflow-hidden">
@@ -699,16 +427,11 @@ export default function NetWorthPage() {
 
         {/* ── Assets ───────────────────────────────────────────────────────── */}
         <section>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              <h2 className="text-sm font-semibold text-foreground">Assets</h2>
-              {summary && <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">{formatCurrency(summary.totalAssets)}</span>}
-            </div>
-            <button onClick={() => { setShowAssetForm(v => !v); setEditAsset(null); }}
-              className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-medium bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-all">
-              <Plus className="w-3.5 h-3.5" /> Add Asset
-            </button>
+          {/* Add Asset lived here too, redundant with the FAB's own "Add Asset" action. */}
+          <div className="flex items-center gap-2 mb-3">
+            <PremiumIcon icon={Building2} tone="emerald" size="xs" />
+            <h2 className="text-sm font-semibold text-foreground">Assets</h2>
+            {summary && <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">{fmt(summary.totalAssets)}</span>}
           </div>
 
           <div className="bg-card border border-border rounded-2xl overflow-hidden">
@@ -716,17 +439,14 @@ export default function NetWorthPage() {
             {invBreakdown.length === 0 && (summary?.investmentValue ?? 0) > 0 && (
               <Link href="/investments"
                 className="flex items-center gap-4 px-5 py-4 hover:bg-muted/20 transition-colors border-b border-border/40">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-indigo-500/15">
-                  <TrendingUp className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                </div>
+                <PremiumIcon icon={TrendingUp} tone="indigo" size="sm" className="w-10 h-10 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-foreground">Investment Portfolio</p>
                   <p className="text-xs text-muted-foreground/80 mt-0.5">View in Investments</p>
                 </div>
                 <p className="text-sm font-bold tabular-nums text-indigo-600 dark:text-indigo-400 min-w-[7rem] text-right">
-                  {formatCurrency(summary!.investmentValue)}
+                  {fmt(summary!.investmentValue)}
                 </p>
-                <div className="w-[68px] shrink-0" />
               </Link>
             )}
 
@@ -734,14 +454,10 @@ export default function NetWorthPage() {
             {invBreakdown.map(b => {
               const meta = INV_TYPE_META[b.assetType];
               if (!meta) return null;
-              const Icon = meta.icon;
               return (
                 <Link key={b.assetType} href={`/investments?tab=${meta.tab}`}
                   className="flex items-center gap-4 px-5 py-4 hover:bg-muted/20 transition-colors border-b border-border/40 group">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: meta.color + "20" }}>
-                    <Icon className="w-5 h-5" style={{ color: meta.color }} />
-                  </div>
+                  <PremiumIcon icon={meta.icon} hex={meta.color} size="sm" className="w-10 h-10 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground">{meta.label}</p>
                     <p className="text-xs text-muted-foreground/80 mt-0.5">
@@ -750,10 +466,8 @@ export default function NetWorthPage() {
                     </p>
                   </div>
                   <p className="text-sm font-bold tabular-nums shrink-0 min-w-[7rem] text-right" style={{ color: meta.color }}>
-                    {formatCurrency(b.totalValue)}
+                    {fmt(b.totalValue)}
                   </p>
-                  {/* Spacer matching the hidden edit/delete button area in AssetRow */}
-                  <div className="w-[68px] shrink-0" />
                 </Link>
               );
             })}
@@ -782,8 +496,7 @@ export default function NetWorthPage() {
                 <div className="divide-y divide-border/40">
                   {(showAllAssets ? assets : assets.slice(0, PREVIEW_COUNT)).map(a => (
                     <AssetRow key={a.id} asset={a}
-                      onEdit={() => { setShowAssetForm(false); setEditAsset(a); }}
-                      onDelete={() => setConfirmAsset(a.id)} />
+                      onEdit={() => { setShowAssetForm(false); setEditAsset(a); }} />
                   ))}
                 </div>
                 {assets.length > PREVIEW_COUNT && (
@@ -801,17 +514,12 @@ export default function NetWorthPage() {
 
         {/* ── Liabilities ──────────────────────────────────────────────────── */}
         <section>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
-              <h2 className="text-sm font-semibold text-foreground">Liabilities</h2>
-              <span className="text-xs text-muted-foreground/80">{liabilities.length}</span>
-              {summary && <span className="text-xs font-semibold text-red-600 dark:text-red-400 tabular-nums">{formatCurrency(summary.totalLiabilities)}</span>}
-            </div>
-            <button onClick={() => { setShowLiabForm(v => !v); setEditLiability(null); }}
-              className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-medium bg-red-600/20 hover:bg-red-600/30 text-red-600 dark:text-red-400 border border-red-500/20 transition-all">
-              <Plus className="w-3.5 h-3.5" /> Add Liability
-            </button>
+          {/* Add Liability lived here too, redundant with the FAB's own "Add Liability" action. */}
+          <div className="flex items-center gap-2 mb-3">
+            <PremiumIcon icon={AlertTriangle} tone="red" size="xs" />
+            <h2 className="text-sm font-semibold text-foreground">Liabilities</h2>
+            <span className="text-xs text-muted-foreground/80">{liabilities.length}</span>
+            {summary && <span className="text-xs font-semibold text-red-600 dark:text-red-400 tabular-nums">{fmt(summary.totalLiabilities)}</span>}
           </div>
 
           <div className="bg-card border border-border rounded-2xl overflow-hidden">
@@ -832,8 +540,7 @@ export default function NetWorthPage() {
               <div className="divide-y divide-border/40">
                 {(showAllLiabs ? liabilities : liabilities.slice(0, PREVIEW_COUNT)).map(l => (
                   <LiabilityRow key={l.id} liability={l}
-                    onEdit={() => { setShowLiabForm(false); setEditLiability(l); }}
-                    onDelete={() => setConfirmLiab(l.id)} />
+                    onEdit={() => { setShowLiabForm(false); setEditLiability(l); }} />
                 ))}
               </div>
             )}
@@ -878,11 +585,11 @@ export default function NetWorthPage() {
                       <CartesianGrid strokeDasharray="3 3" stroke={chart.gridColor} vertical={false} />
                       <XAxis dataKey="label" tick={{ fill: chart.axisColor, fontSize: 10 }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fill: chart.axisColor, fontSize: 10 }} axisLine={false} tickLine={false}
-                        tickFormatter={(v) => `₹${Math.abs(v) >= 100000 ? `${(v / 100000).toFixed(1)}L` : `${(v / 1000).toFixed(0)}K`}`} />
+                        tickFormatter={formatChartTickINR} />
                       <Tooltip
                         contentStyle={chart.tooltipStyle} labelStyle={chart.labelStyle} itemStyle={chart.itemStyle}
                         cursor={chart.cursorStyle}
-                        formatter={(v: number) => [formatCurrency(v), "Net Worth"]}
+                        formatter={(v: number) => [fmt(v), "Net Worth"]}
                       />
                       <ReferenceLine y={0} stroke={chart.gridColor} strokeWidth={1.5} />
                       <Line
@@ -901,11 +608,11 @@ export default function NetWorthPage() {
                       <CartesianGrid strokeDasharray="3 3" stroke={chart.gridColor} vertical={false} />
                       <XAxis dataKey="year" tick={{ fill: chart.axisColor, fontSize: 10 }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fill: chart.axisColor, fontSize: 10 }} axisLine={false} tickLine={false}
-                        tickFormatter={(v) => `₹${Math.abs(v) >= 100000 ? `${(v / 100000).toFixed(1)}L` : `${(v / 1000).toFixed(0)}K`}`} />
+                        tickFormatter={formatChartTickINR} />
                       <Tooltip
                         contentStyle={chart.tooltipStyle} labelStyle={chart.labelStyle} itemStyle={chart.itemStyle}
                         cursor={{ fill: "rgba(99,102,241,0.06)" }}
-                        formatter={(v: number) => [formatCurrency(v), "Net Worth"]}
+                        formatter={(v: number) => [fmt(v), "Net Worth"]}
                       />
                       <ReferenceLine y={0} stroke={chart.gridColor} strokeWidth={1.5} />
                       <Bar dataKey="netWorth" fill="#6366f1" radius={[6, 6, 0, 0]} />

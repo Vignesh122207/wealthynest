@@ -1,293 +1,50 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import {
-  Wallet, Receipt, Banknote, Sparkles, ArrowUpRight, ArrowDownRight,
-  X, ArrowLeftRight, Building2, CreditCard,
-} from "lucide-react";
+import { Receipt, Banknote, Sparkles, ArrowLeftRight } from "lucide-react";
 import Link from "next/link";
-import { useForm, Controller } from "react-hook-form";
+import { type ExpenseFormValues } from "@/features/expenses/schemas/expense.schema";
 import { Header }                from "@/components/layout/Header";
+import { PremiumIcon }           from "@/components/icons/PremiumIcon";
 import { FloatingActionButton }  from "@/components/shared/FloatingActionButton";
-import { FormCurrencyInput }     from "@/components/forms/FormCurrencyInput";
-import { FormSelect }            from "@/components/forms/FormSelect";
-import { FormDatePicker }        from "@/components/forms/FormDatePicker";
-import { FormInput }             from "@/components/forms/FormInput";
+import { ExpenseForm }           from "@/components/transactions/ExpenseForm";
+import { IncomeForm, type IncomeFormValues, type IncomeSourceValue } from "@/components/transactions/IncomeForm";
+import { TransferFormModal, type TransferFormValues } from "@/components/transactions/TransferFormModal";
+import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
 import { useDashboard }          from "@/features/dashboard/hooks/useDashboard";
 import { useAccounts }           from "@/features/accounts/hooks/useAccounts";
 import { useGoals }              from "@/features/goals/hooks/useGoals";
 import { useCategories }         from "@/features/categories/hooks/useCategories";
 import { useCreateExpense, useExpenses } from "@/features/expenses/hooks/useExpenses";
-import { useCreateIncome }       from "@/features/income/hooks/useIncome";
+import { useCreateIncome, useIncome } from "@/features/income/hooks/useIncome";
 import { useTransfer }           from "@/features/accounts/hooks/useAccounts";
+import { useInvestments }        from "@/features/investments/hooks/useInvestments";
+import { useNetWorthHistory }    from "@/features/networth/hooks/useNetWorth";
+import { useDebts }              from "@/features/debts/hooks/useDebts";
 import { useAuthStore }          from "@/features/auth/store/auth.store";
 import { useChartTheme }         from "@/hooks/useChartTheme";
-import { formatCurrencyCompact, formatCurrency, cn } from "@/lib/utils";
-import { INCOME_SOURCES }        from "@/lib/constants";
+import { pctChange } from "@/lib/utils";
+import { buildUsageCounts, sortByUsage } from "@/lib/mostUsed";
 import { toast }                 from "sonner";
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 import { GreetingBanner }   from "./_components/GreetingBanner";
-import { InsightRow }       from "./_components/InsightRow";
-import { SummaryCards }     from "./_components/SummaryCards";
+import { StatOverview }     from "./_components/StatOverview";
 import { SmartAlerts }      from "./_components/SmartAlerts";
+import { NetWorthTrend }    from "./_components/NetWorthTrend";
 import { WalletOverview }   from "./_components/WalletOverview";
+import { SpendingDonut }    from "./_components/SpendingDonut";
 import { BudgetSection }    from "./_components/BudgetSection";
-import { ChartsGrid }       from "./_components/ChartsGrid";
+import { SixMonthTrend }    from "./_components/SixMonthTrend";
 import { TransactionList }  from "./_components/TransactionList";
 import { GoalsSummary }     from "./_components/GoalsSummary";
 import { InvestmentPanel }  from "./_components/InvestmentPanel";
+import { DebtPulse }        from "./_components/DebtPulse";
+import { TwoColRow }        from "./_components/TwoColRow";
 
 // ── Quick-add modals ──────────────────────────────────────────────────────────
 
 type QuickModal = "none" | "expense" | "income" | "transfer";
-
-function QuickModalShell({ title, onClose, children }: {
-  title: string; onClose: () => void; children: React.ReactNode;
-}) {
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-      onClick={onClose}>
-      <div className="bg-card border border-border rounded-2xl p-5 w-full max-w-sm shadow-2xl animate-scale-in"
-        onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-foreground text-sm">{title}</h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function QuickExpenseModal({ accounts, categories, onClose }: {
-  accounts:   { id: string; name: string; accountType: string; currentBalance: number }[];
-  categories: { id: string; name: string }[];
-  onClose:    () => void;
-}) {
-  const now = new Date();
-  const { mutate: createExpense, isPending } = useCreateExpense();
-  const [payChannel, setPayChannel] = useState<"" | "CASH" | "ACCOUNT" | "CREDIT">("");
-
-  const cashAccounts   = accounts.filter(a => a.accountType === "CASH_WALLET");
-  const bankAccounts   = accounts.filter(a => a.accountType === "BANK_ACCOUNT");
-  const creditAccounts = accounts.filter(a => a.accountType === "CREDIT_CARD");
-
-  const form = useForm({ defaultValues: {
-    accountId: "", categoryId: "", amount: 0, description: "",
-    expenseDate: now.toISOString().split("T")[0],
-  }});
-
-  const channelList    = payChannel === "CASH" ? cashAccounts : payChannel === "ACCOUNT" ? bankAccounts : payChannel === "CREDIT" ? creditAccounts : [];
-  const accountOptions = channelList.map(a => ({ value: a.id, label: `${a.name} — ${formatCurrencyCompact(a.currentBalance)}` }));
-  const categoryOptions = categories.map(c => ({ value: c.id, label: c.name }));
-
-  const handleChannel = (ch: "CASH" | "ACCOUNT" | "CREDIT") => {
-    setPayChannel(ch);
-    form.setValue("accountId", "");
-    const list = ch === "CASH" ? cashAccounts : ch === "ACCOUNT" ? bankAccounts : creditAccounts;
-    if (list.length === 1) form.setValue("accountId", list[0].id);
-  };
-
-  const onSubmit = (v: any) => {
-    const account = accounts.find(a => a.id === v.accountId);
-    const paymentMethod = account?.accountType === "CASH_WALLET" ? "CASH"
-      : account?.accountType === "CREDIT_CARD" ? "CREDIT_CARD" : "BANK_ACCOUNT";
-    createExpense({ accountId: v.accountId, categoryId: v.categoryId,
-      amount: Number(v.amount), description: v.description || undefined,
-      expenseDate: v.expenseDate, paymentMethod },
-      { onSuccess: () => { toast.success("Expense added"); onClose(); } });
-  };
-
-  return (
-    <QuickModalShell title="Quick Add Expense" onClose={onClose}>
-      {accounts.length === 0 ? (
-        <div className="py-6 flex flex-col items-center gap-3 text-center">
-          <p className="text-sm text-muted-foreground">You need at least one account to add expenses.</p>
-          <a href="/accounts" onClick={onClose}
-            className="inline-flex items-center gap-1.5 text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl transition-colors">
-            Set up an account →
-          </a>
-        </div>
-      ) : (
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-          <FormSelect label="Category" options={categoryOptions} placeholder="Select category"
-            error={form.formState.errors.categoryId?.message}
-            {...form.register("categoryId", { required: "Select a category" })} />
-          <FormCurrencyInput label="Amount" placeholder="0"
-            error={form.formState.errors.amount?.message}
-            {...form.register("amount", { required: true, min: 0.01 })} />
-          <Controller control={form.control} name="expenseDate" render={({ field }) => (
-            <FormDatePicker label="Date" value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} />
-          )} />
-          <FormInput label="Description (optional)" placeholder="e.g. Grocery shopping" {...form.register("description")} />
-          <div className="space-y-2">
-            <div className="flex items-center gap-1">
-              <p className="text-xs font-medium text-muted-foreground">Paid Via</p>
-              <span className="text-red-500 text-xs">*</span>
-            </div>
-            <div className="flex gap-1.5 flex-wrap">
-              {cashAccounts.length > 0 && (
-                <button type="button" onClick={() => handleChannel("CASH")}
-                  className={cn("flex items-center gap-1 px-2.5 h-7 rounded-lg text-xs font-medium transition-all border",
-                    payChannel === "CASH" ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400" : "bg-muted border-border text-muted-foreground")}>
-                  <Banknote className="w-3 h-3" /> Cash
-                </button>
-              )}
-              {bankAccounts.length > 0 && (
-                <button type="button" onClick={() => handleChannel("ACCOUNT")}
-                  className={cn("flex items-center gap-1 px-2.5 h-7 rounded-lg text-xs font-medium transition-all border",
-                    payChannel === "ACCOUNT" ? "bg-indigo-500/15 border-indigo-500/40 text-indigo-600 dark:text-indigo-400" : "bg-muted border-border text-muted-foreground")}>
-                  <Building2 className="w-3 h-3" /> Bank
-                </button>
-              )}
-              {creditAccounts.length > 0 && (
-                <button type="button" onClick={() => handleChannel("CREDIT")}
-                  className={cn("flex items-center gap-1 px-2.5 h-7 rounded-lg text-xs font-medium transition-all border",
-                    payChannel === "CREDIT" ? "bg-rose-500/15 border-rose-500/40 text-rose-600 dark:text-rose-400" : "bg-muted border-border text-muted-foreground")}>
-                  <CreditCard className="w-3 h-3" /> Credit
-                </button>
-              )}
-            </div>
-            {payChannel !== "" && accountOptions.length > 1 && (
-              <FormSelect label="" options={accountOptions} placeholder="Select account"
-                error={form.formState.errors.accountId?.message}
-                {...form.register("accountId", { required: "Select an account" })} />
-            )}
-            {form.formState.isSubmitted && !form.watch("accountId") && payChannel === "" && (
-              <p className="text-xs text-red-500">Please select how this expense was paid</p>
-            )}
-          </div>
-          <div className="flex gap-2 pt-1">
-            <button type="submit" disabled={isPending}
-              className="flex-1 h-10 rounded-xl text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-all disabled:opacity-60">
-              {isPending ? "Saving…" : "Add Expense"}
-            </button>
-            <button type="button" onClick={onClose}
-              className="h-10 px-4 rounded-xl text-sm text-muted-foreground bg-muted hover:bg-muted/80 transition-all">
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
-    </QuickModalShell>
-  );
-}
-
-function QuickIncomeModal({ accounts, onClose }: {
-  accounts: { id: string; name: string; accountType: string; currentBalance: number }[];
-  onClose:  () => void;
-}) {
-  const now = new Date();
-  const { mutate: createIncome, isPending } = useCreateIncome();
-  const form = useForm({ defaultValues: {
-    accountId: "", source: "SALARY", amount: 0, description: "",
-    incomeDate: now.toISOString().split("T")[0],
-  }});
-
-  const nonCreditAccounts = accounts.filter(a => a.accountType !== "CREDIT_CARD");
-  const accountOptions    = nonCreditAccounts.map(a => ({ value: a.id, label: `${a.name} — ${formatCurrencyCompact(a.currentBalance)}` }));
-
-  const onSubmit = (v: any) => {
-    const account = accounts.find(a => a.id === v.accountId);
-    const d = new Date(v.incomeDate);
-    createIncome({
-      accountId: v.accountId || undefined, source: v.source as any,
-      paymentMode: account?.accountType === "CASH_WALLET" ? "CASH" : "BANK_ACCOUNT",
-      amount: Number(v.amount), description: v.description || undefined,
-      incomeDate: v.incomeDate, periodMonth: d.getMonth() + 1, periodYear: d.getFullYear(),
-    }, { onSuccess: () => { toast.success("Income recorded"); onClose(); } });
-  };
-
-  return (
-    <QuickModalShell title="Quick Add Income" onClose={onClose}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-        <FormSelect label="Credit To" options={accountOptions} placeholder="Select account"
-          error={form.formState.errors.accountId?.message}
-          {...form.register("accountId", { required: "Select an account" })} />
-        <FormSelect label="Source" options={INCOME_SOURCES} placeholder="Select source"
-          error={form.formState.errors.source?.message}
-          {...form.register("source", { required: "Select a source" })} />
-        <FormCurrencyInput label="Amount" placeholder="0"
-          error={form.formState.errors.amount?.message}
-          {...form.register("amount", { required: true, min: 0.01 })} />
-        <Controller control={form.control} name="incomeDate" render={({ field }) => (
-          <FormDatePicker label="Date" value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} />
-        )} />
-        <FormInput label="Description (optional)" placeholder="e.g. June salary" {...form.register("description")} />
-        <div className="flex gap-2 pt-1">
-          <button type="submit" disabled={isPending}
-            className="flex-1 h-10 rounded-xl text-sm font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-all disabled:opacity-60">
-            {isPending ? "Saving…" : "Add Income"}
-          </button>
-          <button type="button" onClick={onClose}
-            className="h-10 px-4 rounded-xl text-sm text-muted-foreground bg-muted hover:bg-muted/80 transition-all">
-            Cancel
-          </button>
-        </div>
-      </form>
-    </QuickModalShell>
-  );
-}
-
-function QuickTransferModal({ accounts, onClose }: {
-  accounts: { id: string; name: string; accountType: string; currentBalance: number }[];
-  onClose:  () => void;
-}) {
-  const now = new Date();
-  const { mutate: doTransfer, isPending } = useTransfer();
-  const form = useForm({ defaultValues: {
-    fromAccountId: "", toAccountId: "", amount: 0, description: "",
-    transferDate: now.toISOString().split("T")[0],
-  }});
-
-  const allOptions    = accounts.map(a => ({ value: a.id, label: `${a.name} — ${formatCurrencyCompact(a.currentBalance)}` }));
-  const creditOptions = accounts.filter(a => a.accountType === "CREDIT_CARD").map(a => ({ value: a.id, label: `${a.name} — ${formatCurrencyCompact(a.currentBalance)} due` }));
-  const fromOptions   = accounts.filter(a => a.accountType !== "CREDIT_CARD").map(a => ({ value: a.id, label: `${a.name} — ${formatCurrencyCompact(a.currentBalance)}` }));
-  const toOptions     = [...allOptions.filter(o => accounts.find(a => a.id === o.value)?.accountType !== "CREDIT_CARD"), ...creditOptions];
-
-  const onSubmit = (v: any) => {
-    if (v.fromAccountId === v.toAccountId) {
-      form.setError("toAccountId", { message: "Cannot transfer to same account" });
-      return;
-    }
-    doTransfer({ fromAccountId: v.fromAccountId, toAccountId: v.toAccountId,
-      amount: Number(v.amount), description: v.description || undefined, transferDate: v.transferDate },
-      { onSuccess: () => { toast.success("Transfer complete"); onClose(); } });
-  };
-
-  return (
-    <QuickModalShell title="Quick Transfer" onClose={onClose}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-        <FormSelect label="From" options={fromOptions} placeholder="Source account"
-          error={form.formState.errors.fromAccountId?.message}
-          {...form.register("fromAccountId", { required: "Select source" })} />
-        <FormSelect label="To" options={toOptions} placeholder="Destination account"
-          error={(form.formState.errors.toAccountId as any)?.message}
-          {...form.register("toAccountId", { required: "Select destination" })} />
-        <FormCurrencyInput label="Amount" placeholder="0"
-          error={form.formState.errors.amount?.message}
-          {...form.register("amount", { required: true, min: 0.01 })} />
-        <Controller control={form.control} name="transferDate" render={({ field }) => (
-          <FormDatePicker label="Date" value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} />
-        )} />
-        <FormInput label="Note (optional)" placeholder="e.g. Bill payment" {...form.register("description")} />
-        <div className="flex gap-2 pt-1">
-          <button type="submit" disabled={isPending}
-            className="flex-1 h-10 rounded-xl text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-all disabled:opacity-60">
-            {isPending ? "Processing…" : "Transfer"}
-          </button>
-          <button type="button" onClick={onClose}
-            className="h-10 px-4 rounded-xl text-sm text-muted-foreground bg-muted hover:bg-muted/80 transition-all">
-            Cancel
-          </button>
-        </div>
-      </form>
-    </QuickModalShell>
-  );
-}
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -311,10 +68,100 @@ export default function DashboardPage() {
 
   const { data, isLoading }           = useDashboard(year, month);
   const { data: prevData }            = useDashboard(prevYearNum, prevMonthNum);
-  const { data: walletAccounts = [] } = useAccounts();
+  const { data: walletAccounts = [], isLoading: accountsLoading } = useAccounts();
   const { data: goals = [] }          = useGoals();
-  const { data: categories = [] }     = useCategories("EXPENSE");
+  const { data: categories = [] }       = useCategories("EXPENSE");
+  const { data: incomeCategories = [] } = useCategories("INCOME");
+  const { data: investments = [] }    = useInvestments();
+  const { data: netWorthHistory = [] } = useNetWorthHistory();
+  const { data: debts = [] }          = useDebts();
   const chart                         = useChartTheme();
+
+  // Quick-add form data/handlers — same forms as the Transactions page, so behavior
+  // (validation, payment-method derivation, Paid Via/category pickers) stays identical
+  // no matter where a transaction is added from.
+  const cashAccounts   = walletAccounts.filter(a => a.accountType === "CASH_WALLET");
+  const bankAccounts   = walletAccounts.filter(a => a.accountType === "BANK_ACCOUNT");
+  const creditAccounts = walletAccounts.filter(a => a.accountType === "CREDIT_CARD");
+
+  // Same all-time history the Transactions page fetches, used to seed the "last used / most
+  // frequent" category and income-source defaults below, and to sort each picker most-used
+  // first — without this, Home's quick-add forms always start with nothing selected and list
+  // categories in whatever order the API returns them instead of Groceries/Salary-first.
+  const { data: allTimeExpensesData }   = useExpenses({ size: 2000, sortDir: "asc", includeDebt: true });
+  const allTimeExpenses = useMemo(() => allTimeExpensesData?.data ?? [], [allTimeExpensesData]);
+  const { data: allTimeIncome = [] }    = useIncome(undefined, undefined, true);
+
+  const expenseCategoryUsage = useMemo(() => buildUsageCounts(allTimeExpenses, e => e.categoryId), [allTimeExpenses]);
+  const incomeSourceUsage    = useMemo(() => buildUsageCounts(allTimeIncome, i => i.source), [allTimeIncome]);
+  const categoryOptions = useMemo(() =>
+    sortByUsage(categories.map(c => ({ value: c.id, label: c.name, icon: c.icon, color: c.color })), o => o.value, expenseCategoryUsage),
+    [categories, expenseCategoryUsage]);
+
+  const defaultExpenseCategoryId = useMemo(() => {
+    if (allTimeExpenses.length === 0) return undefined;
+    const mostRecent = [...allTimeExpenses].sort((a, b) =>
+      b.expenseDate.localeCompare(a.expenseDate) || b.createdAt.localeCompare(a.createdAt))[0];
+    if (mostRecent?.categoryId) return mostRecent.categoryId;
+    const counts = new Map<string, number>();
+    allTimeExpenses.forEach(e => { if (e.categoryId) counts.set(e.categoryId, (counts.get(e.categoryId) ?? 0) + 1); });
+    let best: string | undefined, bestCount = 0;
+    counts.forEach((count, id) => { if (count > bestCount) { best = id; bestCount = count; } });
+    return best;
+  }, [allTimeExpenses]);
+
+  const defaultIncomeSource = useMemo((): IncomeSourceValue => {
+    if (allTimeIncome.length === 0) return "SALARY";
+    const mostRecent = [...allTimeIncome].sort((a, b) =>
+      b.incomeDate.localeCompare(a.incomeDate) || b.createdAt.localeCompare(a.createdAt))[0];
+    if (mostRecent?.source) return mostRecent.source as IncomeSourceValue;
+    const counts = new Map<string, number>();
+    allTimeIncome.forEach(i => counts.set(i.source, (counts.get(i.source) ?? 0) + 1));
+    let best: string | undefined, bestCount = 0;
+    counts.forEach((count, source) => { if (count > bestCount) { best = source; bestCount = count; } });
+    return (best as IncomeSourceValue) ?? "SALARY";
+  }, [allTimeIncome]);
+
+  const { mutate: createExpense, isPending: creatingExpense } = useCreateExpense();
+  const { mutate: createIncome,  isPending: creatingIncome }  = useCreateIncome();
+  const { mutate: createTransfer, isPending: creatingTransfer } = useTransfer();
+
+  const handleCreateExpense = (values: ExpenseFormValues) => {
+    const accountId = values.accountId || undefined;
+    const accountType = walletAccounts.find(a => a.id === accountId)?.accountType;
+    const paymentMethod = accountType === "CASH_WALLET" ? "CASH"
+      : accountType === "CREDIT_CARD" ? "CREDIT_CARD" : accountType ? "BANK_ACCOUNT" : undefined;
+    createExpense(
+      { ...values, amount: Number(values.amount), accountId, paymentMethod },
+      { onSuccess: () => { toast.success("Expense added"); setQuickModal("none"); } }
+    );
+  };
+
+  const handleAddIncome = (values: IncomeFormValues) => {
+    const d = new Date(values.incomeDate);
+    createIncome(
+      {
+        source: values.source, amount: values.amount, incomeDate: values.incomeDate,
+        periodMonth: d.getMonth() + 1, periodYear: d.getFullYear(),
+        accountId: values.accountId || undefined, description: values.description || undefined,
+        paymentMode: (() => {
+          if (!values.accountId) return "CASH";
+          const acc = walletAccounts.find(a => a.id === values.accountId);
+          return acc?.accountType === "CASH_WALLET" ? "CASH" : "BANK_ACCOUNT";
+        })(),
+      },
+      { onSuccess: () => { toast.success("Income recorded"); setQuickModal("none"); } }
+    );
+  };
+
+  const handleAddTransfer = (values: TransferFormValues) => {
+    createTransfer(
+      { fromAccountId: values.fromAccountId, toAccountId: values.toAccountId,
+        amount: Number(values.amount), transferDate: values.transferDate,
+        description: values.description || undefined },
+      { onSuccess: () => { toast.success("Transfer complete"); setQuickModal("none"); } }
+    );
+  };
 
   const todayStr = now.toISOString().split("T")[0];
   const next7    = new Date(now); next7.setDate(now.getDate() + 7);
@@ -322,10 +169,6 @@ export default function DashboardPage() {
   const { data: recurringPage } = useExpenses({ recurring: true, startDate: todayStr, endDate: next7Str, size: 10 });
   const upcomingBills = recurringPage?.data ?? [];
 
-  const cashBalance         = walletAccounts.filter(a => a.accountType === "CASH_WALLET")  .reduce((s, a) => s + a.currentBalance, 0);
-  const bankBalance         = walletAccounts.filter(a => a.accountType === "BANK_ACCOUNT") .reduce((s, a) => s + a.currentBalance, 0);
-  const creditCardDebt      = walletAccounts.filter(a => a.accountType === "CREDIT_CARD")  .reduce((s, a) => s + Math.max(0, a.currentBalance), 0);
-  const totalAccountBalance = cashBalance + bankBalance;
 
   const recentTransactions = useMemo(() => {
     const seen = new Set<string>();
@@ -335,18 +178,6 @@ export default function DashboardPage() {
       .sort((a, b) => b.date.localeCompare(a.date))
       .slice(0, 8);
   }, [walletAccounts]);
-
-  const todaySpending = useMemo(() => {
-    const seen = new Set<string>();
-    return walletAccounts
-      .flatMap(a => a.recentTransactions)
-      .filter(t => {
-        if (seen.has(t.id)) return false;
-        seen.add(t.id);
-        return t.type === "EXPENSE" && t.date.startsWith(todayStr);
-      })
-      .reduce((s, t) => s + t.amount, 0);
-  }, [walletAccounts, todayStr]);
 
   const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
 
@@ -359,19 +190,29 @@ export default function DashboardPage() {
   };
 
   const trend          = data?.monthlyTrend ?? [];
-  const hasInvestments = data && (data.totalInvested > 0 || data.totalInvestmentValue > 0);
-  const netCashFlow    = data ? data.monthlyIncome - data.monthlyExpenses : 0;
-  const incomeTrend    = prevData && prevData.monthlyIncome  > 0 ? ((data?.monthlyIncome  ?? 0) - prevData.monthlyIncome)  / prevData.monthlyIncome  * 100 : undefined;
-  const expenseTrend   = prevData && prevData.monthlyExpenses > 0 ? ((data?.monthlyExpenses ?? 0) - prevData.monthlyExpenses) / prevData.monthlyExpenses * 100 : undefined;
+  const hasInvestments = investments.some(i => i.active);
+  const incomeTrend    = pctChange(data?.monthlyIncome, prevData?.monthlyIncome);
+  const expenseTrend   = pctChange(data?.monthlyExpenses, prevData?.monthlyExpenses);
+  // Not derived from the dashboard endpoint's totalNetWorth: that field ignores
+  // year/month entirely and always returns today's live net worth, so comparing
+  // "this month" vs "last month" via that field just compares the same number to
+  // itself. Real monthly snapshots (same data backing the trend chart) give an
+  // actual month-over-month comparison instead.
+  const latestSnapshot = netWorthHistory[netWorthHistory.length - 1];
+  const prevSnapshot   = netWorthHistory[netWorthHistory.length - 2];
+  const netWorthTrend  = pctChange(latestSnapshot?.netWorth, prevSnapshot?.netWorth);
   const firstName      = user?.fullName?.split(" ")[0] ?? "there";
+
+  const budgetSummaries = data?.budgetSummaries ?? [];
+  const overBudgetCount = budgetSummaries.filter(b => b.overBudget).length;
 
   const smartInsights = useMemo(() => {
     if (!data?.categoryBreakdown?.length || !prevData?.categoryBreakdown?.length) return [];
-    const prevMap = new Map((prevData.categoryBreakdown as any[]).map((c: any) => [c.categoryId, c.amount ?? 0]));
+    const prevMap = new Map(prevData.categoryBreakdown.map((c) => [c.categoryId, c.amount ?? 0]));
     const avgMonthlySpend = data.monthlyExpenses > 0 ? data.monthlyExpenses : 5000;
     const threshold = Math.max(100, avgMonthlySpend * 0.05);
     const deltas: { category: string; delta: number }[] = [];
-    for (const c of data.categoryBreakdown as any[]) {
+    for (const c of data.categoryBreakdown) {
       const prev = prevMap.get(c.categoryId) ?? 0;
       const delta = (c.amount ?? 0) - prev;
       if (Math.abs(delta) >= threshold) deltas.push({ category: c.categoryName, delta });
@@ -382,29 +223,40 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col flex-1 bg-background">
-      <Header title="Dashboard" />
+      <Header title="Home" subtitle="Your complete financial picture at a glance" />
 
-      {/* Quick-add modals */}
+      {/* Quick-add modals — same ExpenseForm/IncomeForm/TransferFormModal used on the
+          Transactions page, so Home's "Add Expense/Income/Transfer" behaves identically. */}
       {quickModal === "expense" && (
-        <QuickExpenseModal accounts={walletAccounts} categories={categories} onClose={() => setQuickModal("none")} />
+        <TransactionModalOverlay onDismiss={() => setQuickModal("none")}>
+          <ExpenseForm title="New Expense" defaultCategoryId={defaultExpenseCategoryId} categoryOptions={categoryOptions}
+            cashAccounts={cashAccounts} bankAccounts={bankAccounts} creditAccounts={creditAccounts}
+            onSubmit={handleCreateExpense} onCancel={() => setQuickModal("none")}
+            isPending={creatingExpense} submitLabel="Add Expense" />
+        </TransactionModalOverlay>
       )}
       {quickModal === "income" && (
-        <QuickIncomeModal accounts={walletAccounts} onClose={() => setQuickModal("none")} />
+        <TransactionModalOverlay onDismiss={() => setQuickModal("none")}>
+          <IncomeForm onSubmit={handleAddIncome} onCancel={() => setQuickModal("none")}
+            defaultSource={defaultIncomeSource} sourceUsageCounts={incomeSourceUsage}
+            isPending={creatingIncome} accounts={walletAccounts} incomeCategories={incomeCategories} />
+        </TransactionModalOverlay>
       )}
       {quickModal === "transfer" && (
-        <QuickTransferModal accounts={walletAccounts} onClose={() => setQuickModal("none")} />
+        <TransactionModalOverlay onDismiss={() => setQuickModal("none")}>
+          <TransferFormModal onSubmit={handleAddTransfer} onCancel={() => setQuickModal("none")}
+            isPending={creatingTransfer} accounts={walletAccounts} />
+        </TransactionModalOverlay>
       )}
 
       <main className="flex-1 overflow-auto pb-36 lg:pb-24">
         <div className="max-w-7xl mx-auto p-4 md:p-5 lg:p-6 space-y-4 lg:space-y-5">
 
           {/* ── Onboarding: new user ── */}
-          {!isLoading && walletAccounts.length === 0 && (
+          {!isLoading && !accountsLoading && walletAccounts.length === 0 && (
             <div className="rounded-2xl border border-primary/25 bg-primary/5 p-6 space-y-4 animate-fade-in-up">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-primary/15 flex items-center justify-center shrink-0">
-                  <Sparkles className="w-5 h-5 text-primary" />
-                </div>
+                <PremiumIcon icon={Sparkles} tone="purple" size="md" className="w-10 h-10" />
                 <div>
                   <p className="font-bold text-foreground">Welcome to WealthyNest!</p>
                   <p className="text-sm text-muted-foreground mt-0.5">Get started in 3 simple steps to track your finances.</p>
@@ -438,36 +290,23 @@ export default function DashboardPage() {
             month={month}
             isCurrentMonth={isCurrentMonth}
             onNavigate={navigate}
+            savingsRate={data?.savingsRate}
+          />
+
+          {/* ── Stat Overview: Net Worth, Investments, Income, Expenses, Savings Rate, Budget Progress ── */}
+          <StatOverview
             netWorth={data?.totalNetWorth}
             prevNetWorth={prevData?.totalNetWorth}
-            savingsRate={data?.savingsRate}
-            netCashFlow={netCashFlow}
-            isLoading={isLoading}
-          />
-
-          {/* ── Insight Row ── */}
-          <InsightRow
-            savingsRate={data?.savingsRate}
-            netCashFlow={netCashFlow}
-            totalAccountBalance={totalAccountBalance}
-            budgetSummaries={data?.budgetSummaries ?? []}
-            monthlyIncome={data?.monthlyIncome}
-            year={year}
-            month={month}
-            isLoading={isLoading}
-          />
-
-          {/* ── Summary Cards ── */}
-          <SummaryCards
-            year={year}
-            month={month}
+            netWorthHistory={netWorthHistory}
+            investments={investments}
             income={data?.monthlyIncome}
             expenses={data?.monthlyExpenses}
             savingsRate={data?.savingsRate}
-            todaySpending={todaySpending}
+            prevSavingsRate={prevData?.savingsRate}
             incomeTrend={incomeTrend}
             expenseTrend={expenseTrend}
-            trend={trend}
+            budgetSummaries={budgetSummaries}
+            alertBannerVisible={!overBudgetDismissed && overBudgetCount > 0}
             isLoading={isLoading}
           />
 
@@ -475,60 +314,63 @@ export default function DashboardPage() {
           <SmartAlerts
             smartInsights={smartInsights}
             upcomingBills={upcomingBills}
-            overBudgetCount={data?.budgetSummaries?.filter(b => b.overBudget).length ?? 0}
+            overBudgetCount={overBudgetCount}
             overBudgetDismissed={overBudgetDismissed}
             onDismissOverBudget={() => {
               setOverBudgetDismissed(true);
               localStorage.setItem(`overBudgetDismissed_${year}_${month}`, "true");
             }}
-            year={year}
-            month={month}
           />
 
-          {/* ── Wallet Overview ── */}
+          {/* ── Debts: lending/borrowing pulse — only renders when there's an active debt ── */}
+          <DebtPulse debts={debts} />
+
+          {/* ── Phase 1: Accounts Overview (left) + Spending chart (right) ── */}
           {walletAccounts.length > 0 && (
-            <WalletOverview
-              totalAccountBalance={totalAccountBalance}
-              bankBalance={bankBalance}
-              cashBalance={cashBalance}
-              creditCardDebt={creditCardDebt}
-            />
+            <TwoColRow>
+              <WalletOverview accounts={walletAccounts} />
+              <SpendingDonut
+                categoryBreakdown={data?.categoryBreakdown ?? []}
+                year={year}
+                month={month}
+                chart={chart}
+                onAddExpense={() => setQuickModal("expense")}
+                isLoading={isLoading}
+              />
+            </TwoColRow>
           )}
 
-          {/* ── Charts: 6-month trend + spending donut ── */}
-          <ChartsGrid
-            trend={trend}
-            categoryBreakdown={data?.categoryBreakdown ?? []}
-            year={year}
-            month={month}
-            chart={chart}
-            onAddExpense={() => setQuickModal("expense")}
-            isLoading={isLoading}
-          />
-
-          {/* ── Budget Section ── */}
-          <div className="grid lg:grid-cols-2 gap-4 items-stretch">
+          {/* ── Phase 2: Budget Progress (left) + Recent Transactions (right) ── */}
+          <TwoColRow>
             <BudgetSection
               budgetSummaries={data?.budgetSummaries ?? []}
               year={year}
               month={month}
               isLoading={isLoading}
             />
-
-            {/* ── Recent Transactions ── */}
             <TransactionList transactions={recentTransactions} isLoading={isLoading} />
-          </div>
+          </TwoColRow>
 
-          {/* ── Goals Summary ── */}
-          <GoalsSummary goals={goals} isLoading={isLoading} />
-
-          {/* ── Investment Overview ── */}
-          {hasInvestments && data && (
-            <InvestmentPanel
-              totalInvested={data.totalInvested}
-              totalInvestmentValue={data.totalInvestmentValue}
-              totalDividendIncome={data.totalDividendIncome}
+          {/* ── Phase 3: Net Worth Trend (left) + 6-Month Income/Expense/Savings Trend (right) ── */}
+          <TwoColRow>
+            <NetWorthTrend
+              history={netWorthHistory}
+              netWorth={data?.totalNetWorth}
+              changePct={netWorthTrend}
+              chart={chart}
+              isLoading={isLoading}
             />
+            <SixMonthTrend trend={trend} chart={chart} isLoading={isLoading} />
+          </TwoColRow>
+
+          {/* ── Investment Overview (left) + Goals (right) ── */}
+          {hasInvestments ? (
+            <TwoColRow>
+              <InvestmentPanel investments={investments} chart={chart} />
+              <GoalsSummary goals={goals} isLoading={isLoading} />
+            </TwoColRow>
+          ) : (
+            <GoalsSummary goals={goals} isLoading={isLoading} />
           )}
 
         </div>

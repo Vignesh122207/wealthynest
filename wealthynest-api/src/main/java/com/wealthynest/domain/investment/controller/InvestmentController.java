@@ -8,6 +8,7 @@ import com.wealthynest.domain.investment.dto.request.CreateStockTransactionReque
 import com.wealthynest.domain.investment.dto.request.DismissDividendRequest;
 import com.wealthynest.domain.investment.dto.request.LogIncomeRequest;
 import com.wealthynest.domain.investment.dto.response.*;
+import com.wealthynest.domain.investment.entity.InvestmentType;
 import com.wealthynest.domain.investment.service.InvestmentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -127,6 +128,20 @@ public class InvestmentController {
     public ResponseEntity<ApiResponse<Double>> getXirr(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success(
             investmentService.computeXirr(id, SecurityUtils.requireCurrentUserId())));
+    }
+
+    @GetMapping("/portfolio-xirr")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Double>> getPortfolioXirr() {
+        return ResponseEntity.ok(ApiResponse.success(
+            investmentService.computePortfolioXirr(SecurityUtils.requireCurrentUserId())));
+    }
+
+    @GetMapping("/type-xirr")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Double>> getTypeXirr(@RequestParam InvestmentType type) {
+        return ResponseEntity.ok(ApiResponse.success(
+            investmentService.computeTypeXirr(SecurityUtils.requireCurrentUserId(), type)));
     }
 
     @PostMapping("/{id}/log-income")

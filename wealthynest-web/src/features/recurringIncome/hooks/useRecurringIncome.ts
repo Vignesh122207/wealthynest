@@ -47,9 +47,9 @@ export function useToggleRecurringIncome() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => recurringIncomeApi.toggle(id),
-    onSuccess: () => {
+    onSuccess: (rule) => {
       qc.invalidateQueries({ queryKey: KEY });
-      toast.success("Rule updated");
+      toast.success(rule.active ? "Rule activated" : "Rule paused");
     },
     onError: () => toast.error("Failed to toggle rule"),
   });

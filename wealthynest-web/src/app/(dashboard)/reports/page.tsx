@@ -4,11 +4,13 @@ import { useState } from "react";
 import {
   FileText, Download, FileSpreadsheet, Printer,
   BarChart2, CalendarDays, Database, Loader2,
+  Receipt, Wallet, ArrowLeftRight, Landmark, LineChart, Coins,
 } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { PageWrapper } from "@/components/layout/PageWrapper";
+import { PremiumIcon } from "@/components/icons/PremiumIcon";
 import { apiClient } from "@/lib/axios";
-import { cn } from "@/lib/utils";
+import { cn, escapeCsvField, getCurrencySymbol } from "@/lib/utils";
 import { toast } from "sonner";
 import { expensesApi } from "@/features/expenses/api/expenses.api";
 import { accountsApi } from "@/features/accounts/api/accounts.api";
@@ -47,16 +49,16 @@ async function downloadCsv(url: string, filename: string) {
 }
 
 function triggerLocalCsv(filename: string, header: string[], rows: string[][]) {
-  const esc = (v: string) =>
-    v.includes(",") || v.includes('"') || v.includes("\n")
-      ? `"${v.replace(/"/g, '""')}"` : v;
-  const csv  = [header.join(","), ...rows.map(r => r.map(esc).join(","))].join("\n");
+  const csv  = [header.join(","), ...rows.map(r => r.map(escapeCsvField).join(","))].join("\n");
   const href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
   const a    = document.createElement("a");
   a.href = href; a.download = filename; a.click();
   setTimeout(() => URL.revokeObjectURL(href), 5000);
 }
 
+// Branded letterhead + print stylesheet shared by every report — matches the in-app indigo→violet
+// identity (see .hero-gradient in globals.css) instead of a generic black-on-white print view,
+// since a downloaded/printed report is the one artifact a user hands to someone outside the app.
 async function openPrintWindow(title: string, htmlBody: string) {
   const win = window.open("", "_blank", "width=900,height=700");
   if (!win) { toast.error("Allow pop-ups to save as PDF."); return; }
@@ -67,29 +69,49 @@ async function openPrintWindow(title: string, htmlBody: string) {
   <title>${title}</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:system-ui,sans-serif;font-size:13px;color:#111;padding:32px 40px}
-    h1{font-size:20px;font-weight:700;margin-bottom:4px}
-    .sub{color:#666;font-size:12px;margin-bottom:28px}
-    table{width:100%;border-collapse:collapse;margin-bottom:24px}
-    th{background:#f5f5f5;text-align:left;padding:8px 10px;font-size:12px;font-weight:600;border-bottom:2px solid #e0e0e0}
-    td{padding:7px 10px;border-bottom:1px solid #f0f0f0;font-size:12px}
+    :root{--brand-1:#4f46e5;--brand-2:#7c3aed}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;font-size:13px;color:#18181b;padding:0 40px 40px}
+    .letterhead{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:28px 0 18px;border-bottom:2px solid var(--brand-1);margin-bottom:26px}
+    .brand{display:flex;align-items:center;gap:10px}
+    .brand-mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--brand-1),var(--brand-2));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:15px;flex-shrink:0}
+    .brand-name{font-size:16px;font-weight:800;letter-spacing:-.01em;color:#111}
+    .brand-tag{font-size:10px;color:#8a8a95;letter-spacing:.05em;text-transform:uppercase;margin-top:1px}
+    .letterhead-meta{text-align:right;font-size:11px;color:#8a8a95;line-height:1.5}
+    h1{font-size:19px;font-weight:700;margin-bottom:3px;color:#111}
+    .sub{color:#8a8a95;font-size:12px;margin-bottom:26px}
+    table{width:100%;border-collapse:collapse;margin-bottom:26px}
+    th{background:#eef2ff;color:var(--brand-1);text-align:left;padding:9px 10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid #e0e0fa}
+    td{padding:8px 10px;border-bottom:1px solid #f1f1f4;font-size:12.5px}
     tr:last-child td{border-bottom:none}
-    .section-title{font-size:13px;font-weight:700;margin:20px 0 8px;color:#444;text-transform:uppercase;letter-spacing:.05em}
-    .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
-    .card{background:#f9f9f9;border:1px solid #eee;border-radius:8px;padding:12px 16px}
-    .card-label{font-size:11px;color:#888;margin-bottom:4px}
-    .card-value{font-size:16px;font-weight:700}
-    .positive{color:#16a34a} .negative{color:#dc2626}
-    tfoot td{padding:9px 10px;font-size:13px}
-    @media print{body{padding:16px 20px}button{display:none}}
+    .section-title{font-size:12px;font-weight:700;margin:24px 0 10px;color:var(--brand-1);text-transform:uppercase;letter-spacing:.06em;padding-left:9px;border-left:3px solid var(--brand-1)}
+    .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:10px}
+    .card{background:#fafaff;border:1px solid #e6e6f5;border-top:3px solid var(--brand-1);border-radius:10px;padding:14px 16px}
+    .card-label{font-size:10.5px;color:#8a8a95;margin-bottom:5px;text-transform:uppercase;letter-spacing:.03em}
+    .card-value{font-size:17px;font-weight:800}
+    .positive{color:#0f7a3d} .negative{color:#b3261e}
+    tfoot td{padding:10px;font-size:13px}
+    .print-footer{margin-top:30px;padding-top:14px;border-top:1px solid #eee;font-size:10.5px;color:#aaa;display:flex;justify-content:space-between}
+    .save-btn{margin-top:28px;padding:11px 26px;background:linear-gradient(135deg,var(--brand-1),var(--brand-2));color:#fff;border:none;border-radius:10px;font-size:13px;cursor:pointer;font-weight:700}
+    @media print{body{padding:0 20px 20px}.letterhead{padding-top:0}.save-btn{display:none}}
   </style>
 </head>
 <body>
+  <div class="letterhead">
+    <div class="brand">
+      <div class="brand-mark">W</div>
+      <div>
+        <div class="brand-name">WealthyNest</div>
+        <div class="brand-tag">Personal Finance</div>
+      </div>
+    </div>
+    <div class="letterhead-meta">Generated ${new Date().toLocaleDateString("en-IN", { dateStyle: "long" })}</div>
+  </div>
   ${htmlBody}
-  <br/><br/>
-  <button onclick="window.print()" style="padding:10px 24px;background:#4f46e5;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600">
-    Save as PDF
-  </button>
+  <div class="print-footer">
+    <span>WealthyNest · Free forever · No ads</span>
+    <span>Built for Indian families</span>
+  </div>
+  <button class="save-btn" onclick="window.print()">Save as PDF</button>
 </body>
 </html>`);
   win.document.close();
@@ -134,7 +156,8 @@ function MonthlyTab() {
       const totalExp = expenses.reduce((s: number, e: { amount: number }) => s + Number(e.amount), 0);
       const totalInc = incomeEntries.reduce((s, e) => s + Number(e.amount), 0);
       const savings  = totalInc - totalExp;
-      const fmt = (v: number) => `₹${Math.abs(v).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+      const currSymbol = getCurrencySymbol();
+      const fmt = (v: number) => `${currSymbol}${Math.abs(v).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 
       // Category breakdown
       const catMap: Record<string, number> = {};
@@ -158,8 +181,8 @@ function MonthlyTab() {
         .join("") || `<tr><td colspan="2" style="color:#999;text-align:center;padding:12px">No income recorded</td></tr>`;
 
       const html = `
-        <h1>WealthyNest — ${label}</h1>
-        <p class="sub">Monthly Report · Generated ${new Date().toLocaleDateString("en-IN", { dateStyle: "long" })}</p>
+        <h1>${label}</h1>
+        <p class="sub">Monthly Report</p>
         <div class="summary">
           <div class="card"><div class="card-label">Total Income</div><div class="card-value positive">${fmt(totalInc)}</div></div>
           <div class="card"><div class="card-label">Total Expenses</div><div class="card-value negative">${fmt(totalExp)}</div></div>
@@ -188,58 +211,63 @@ function MonthlyTab() {
 
   return (
     <div className="space-y-6">
-      {/* Selectors */}
-      <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
-        <p className="text-xs text-muted-foreground">Select a year and month to download your monthly financial report.</p>
-        <div className="flex items-center gap-3 flex-wrap">
-          <select
-            value={year}
-            onChange={e => setYear(Number(e.target.value))}
-            className="bg-muted border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-indigo-500/50 min-w-[100px]"
-          >
-            {years.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-          <select
-            value={month}
-            onChange={e => setMonth(Number(e.target.value))}
-            className="bg-muted border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-indigo-500/50 min-w-[140px]"
-          >
-            {MONTH_NAMES.map((name, i) => <option key={i + 1} value={i + 1}>{name}</option>)}
-          </select>
+      <div className="bg-card border border-border rounded-2xl p-5 space-y-5">
+        <div className="space-y-2.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Period</p>
+          <div className="flex items-center gap-3 flex-wrap">
+            <select
+              value={year}
+              onChange={e => setYear(Number(e.target.value))}
+              className="bg-muted border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/40 min-w-[100px]"
+            >
+              {years.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <select
+              value={month}
+              onChange={e => setMonth(Number(e.target.value))}
+              className="bg-muted border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/40 min-w-[140px]"
+            >
+              {MONTH_NAMES.map((name, i) => <option key={i + 1} value={i + 1}>{name}</option>)}
+            </select>
+          </div>
+          {isFuture && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/8 border border-amber-500/20 rounded-xl px-3 py-2">
+              This month is in the future — the report will be empty.
+            </p>
+          )}
         </div>
 
-        {isFuture && (
-          <p className="text-xs text-amber-500 bg-amber-500/8 border border-amber-500/20 rounded-xl px-3 py-2">
-            This month is in the future — the report will be empty.
-          </p>
-        )}
-
-        <div className="pt-1 flex items-start gap-3 flex-wrap">
-          <button
-            onClick={handleCsv}
-            disabled={!!busy}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-all disabled:opacity-60 border border-emerald-500/20"
-          >
-            {busy === "csv" ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />}
-            Download CSV
-          </button>
-          <div>
+        <div className="space-y-2.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Format</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              onClick={handleCsv}
+              disabled={!!busy}
+              className="group flex items-center gap-3 p-4 rounded-2xl border border-border bg-muted/30 hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all text-left disabled:opacity-60"
+            >
+              <PremiumIcon icon={FileSpreadsheet} tone="emerald" size="sm" className={busy === "csv" ? "animate-pulse" : undefined} />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                  CSV {busy === "csv" && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">Income, expenses & category breakdown — opens in Excel or Sheets</p>
+              </div>
+            </button>
             <button
               onClick={handlePdf}
               disabled={!!busy}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/20 transition-all disabled:opacity-60 border border-indigo-500/20"
+              className="group flex items-center gap-3 p-4 rounded-2xl border border-border bg-muted/30 hover:border-red-500/40 hover:bg-red-500/5 transition-all text-left disabled:opacity-60"
             >
-              {busy === "pdf" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
-              Save as PDF
+              <PremiumIcon icon={Printer} tone="red" size="sm" className={busy === "pdf" ? "animate-pulse" : undefined} />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                  PDF {busy === "pdf" && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">Print-ready summary — save from your browser&apos;s print dialog</p>
+              </div>
             </button>
-            <p className="text-xs text-muted-foreground/70 mt-1.5">
-              Opens a print preview — use your browser&apos;s &ldquo;Save as PDF&rdquo; option to download.
-            </p>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">
-          CSV includes income + expenses with category breakdown. PDF opens a print-ready summary — use your browser&apos;s Print dialog to save.
-        </p>
       </div>
     </div>
   );
@@ -278,7 +306,8 @@ function AnnualTab() {
       const totalExp = expenses.reduce((s: number, e: { amount: number }) => s + Number(e.amount), 0);
       const totalInc = incomeEntries.reduce((s, e) => s + Number(e.amount), 0);
       const savings  = totalInc - totalExp;
-      const fmt = (v: number) => `₹${Math.abs(v).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+      const currSymbol = getCurrencySymbol();
+      const fmt = (v: number) => `${currSymbol}${Math.abs(v).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 
       const expByMonth: Record<number, number> = {};
       expenses.forEach((e: { expenseDate: string; amount: number }) => {
@@ -303,8 +332,8 @@ function AnnualTab() {
       }).join("");
 
       const html = `
-        <h1>WealthyNest — ${year} Annual Report</h1>
-        <p class="sub">Generated ${new Date().toLocaleDateString("en-IN", { dateStyle: "long" })}</p>
+        <h1>${year} Annual Report</h1>
+        <p class="sub">Full-year summary</p>
         <div class="summary">
           <div class="card"><div class="card-label">Total Income</div><div class="card-value positive">${fmt(totalInc)}</div></div>
           <div class="card"><div class="card-label">Total Expenses</div><div class="card-value negative">${fmt(totalExp)}</div></div>
@@ -312,7 +341,7 @@ function AnnualTab() {
         </div>
         <div class="section-title">Month-by-Month Summary</div>
         <table>
-          <thead><tr><th>Month</th><th style="text-align:right">Income (₹)</th><th style="text-align:right">Expenses (₹)</th><th style="text-align:right">Net Savings (₹)</th></tr></thead>
+          <thead><tr><th>Month</th><th style="text-align:right">Income (${currSymbol})</th><th style="text-align:right">Expenses (${currSymbol})</th><th style="text-align:right">Net Savings (${currSymbol})</th></tr></thead>
           <tbody>${rows}</tbody>
           <tfoot><tr style="font-weight:700;border-top:2px solid #e0e0e0">
             <td>Total</td>
@@ -332,46 +361,53 @@ function AnnualTab() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
-        <p className="text-xs text-muted-foreground">Select a year to download your annual financial summary.</p>
-        <select
-          value={year}
-          onChange={e => setYear(Number(e.target.value))}
-          className="bg-muted border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-indigo-500/50 min-w-[100px]"
-        >
-          {years.map(y => (
-            <option key={y} value={y}>
-              {y}{y === currentYear ? " (current year)" : ""}
-            </option>
-          ))}
-        </select>
-
-        <div className="pt-1 flex items-start gap-3 flex-wrap">
-          <button
-            onClick={handleCsv}
-            disabled={!!busy}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-all disabled:opacity-60 border border-emerald-500/20"
+      <div className="bg-card border border-border rounded-2xl p-5 space-y-5">
+        <div className="space-y-2.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Year</p>
+          <select
+            value={year}
+            onChange={e => setYear(Number(e.target.value))}
+            className="bg-muted border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/40 min-w-[100px]"
           >
-            {busy === "csv" ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />}
-            Download CSV
-          </button>
-          <div>
+            {years.map(y => (
+              <option key={y} value={y}>
+                {y}{y === currentYear ? " (current year)" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-2.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Format</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              onClick={handleCsv}
+              disabled={!!busy}
+              className="group flex items-center gap-3 p-4 rounded-2xl border border-border bg-muted/30 hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all text-left disabled:opacity-60"
+            >
+              <PremiumIcon icon={FileSpreadsheet} tone="emerald" size="sm" className={busy === "csv" ? "animate-pulse" : undefined} />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                  CSV {busy === "csv" && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">Month-by-month summary + full transaction list</p>
+              </div>
+            </button>
             <button
               onClick={handlePdf}
               disabled={!!busy}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/20 transition-all disabled:opacity-60 border border-indigo-500/20"
+              className="group flex items-center gap-3 p-4 rounded-2xl border border-border bg-muted/30 hover:border-red-500/40 hover:bg-red-500/5 transition-all text-left disabled:opacity-60"
             >
-              {busy === "pdf" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
-              Save as PDF
+              <PremiumIcon icon={Printer} tone="red" size="sm" className={busy === "pdf" ? "animate-pulse" : undefined} />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                  PDF {busy === "pdf" && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">Print-ready summary — save from your browser&apos;s print dialog</p>
+              </div>
             </button>
-            <p className="text-xs text-muted-foreground/70 mt-1.5">
-              Opens a print preview — use your browser&apos;s &ldquo;Save as PDF&rdquo; option to download.
-            </p>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Annual CSV includes month-by-month summary + full transaction list. PDF opens in a print-ready tab.
-        </p>
       </div>
     </div>
   );
@@ -476,38 +512,41 @@ function ExportTab() {
   }
 
   const EXPORTS = [
-    { key: "expenses",          label: "Expenses",          desc: `All expense transactions for ${year} — date, category, amount, payment method` },
-    { key: "income",            label: "Income",            desc: `Salary, freelance, rental and other income for ${year}` },
-    { key: "transfers",         label: "Transfers",         desc: `Account-to-account transfers for ${year} — from, to, amount` },
-    { key: "accounts",          label: "Accounts",          desc: "All accounts — type, bank, balances, total in/out" },
-    { key: "investments",       label: "Investments",       desc: "Portfolio snapshot — type, name, invested amount, current value, gain/loss" },
-    { key: "investment-income", label: "Investment Income", desc: "Dividends, coupons, and FD maturity payouts — date, amount, source" },
+    { key: "expenses",          label: "Expenses",          icon: Receipt,        desc: `All expense transactions for ${year} — date, category, amount, payment method` },
+    { key: "income",            label: "Income",            icon: Wallet,         desc: `Salary, freelance, rental and other income for ${year}` },
+    { key: "transfers",         label: "Transfers",         icon: ArrowLeftRight, desc: `Account-to-account transfers for ${year} — from, to, amount` },
+    { key: "accounts",          label: "Accounts",          icon: Landmark,       desc: "All accounts — type, bank, balances, total in/out" },
+    { key: "investments",       label: "Investments",       icon: LineChart,      desc: "Portfolio snapshot — type, name, invested amount, current value, gain/loss" },
+    { key: "investment-income", label: "Investment Income", icon: Coins,          desc: "Dividends, coupons, and FD maturity payouts — date, amount, source" },
   ] as const;
 
   return (
     <div className="space-y-4">
       <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
-        <div className="flex items-center justify-between pb-2 border-b border-border">
-          <div className="flex items-center gap-2">
-            <Database className="w-4 h-4 text-muted-foreground" />
+        <div className="flex items-center justify-between pb-3 border-b border-border">
+          <div className="flex items-center gap-2.5">
+            <PremiumIcon icon={Database} tone="indigo" size="sm" />
             <h2 className="text-sm font-semibold text-foreground">Raw Data Export</h2>
           </div>
           <select
             value={year}
             onChange={e => setYear(Number(e.target.value))}
-            className="bg-muted border border-border rounded-xl px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
+            className="bg-muted border border-border rounded-xl px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
           >
             {years.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
         <p className="text-xs text-muted-foreground">Download your raw data as CSV files for use in spreadsheets or external tools.</p>
 
-        <div className="space-y-3">
-          {EXPORTS.map(({ key, label, desc }) => (
-            <div key={key} className="flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground">{label}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
+        <div className="space-y-2">
+          {EXPORTS.map(({ key, label, icon, desc }) => (
+            <div key={key} className="flex items-center justify-between gap-4 p-2 rounded-xl hover:bg-muted/40 transition-colors">
+              <div className="flex items-center gap-3 min-w-0">
+                <PremiumIcon icon={icon} tone="gray" size="xs" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">{label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
+                </div>
               </div>
               <button
                 onClick={() => handleExport(key)}
@@ -532,15 +571,13 @@ export default function ReportsPage() {
 
   return (
     <>
-      <Header title="Reports" />
+      <Header title="Reports" subtitle="Generate and export detailed financial reports" />
       <PageWrapper>
         <div className="max-w-5xl space-y-6">
 
           {/* Intro */}
           <div className="bg-card border border-border rounded-2xl p-5 flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center shrink-0">
-              <FileText className="w-5 h-5 text-indigo-500" />
-            </div>
+            <PremiumIcon icon={FileText} tone="indigo" size="md" />
             <div>
               <p className="text-sm font-semibold text-foreground">Financial Reports & Exports</p>
               <p className="text-xs text-muted-foreground mt-1 leading-relaxed">

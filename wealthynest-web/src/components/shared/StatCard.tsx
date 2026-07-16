@@ -1,18 +1,23 @@
 import { type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PremiumIcon, type IconTone } from "@/components/icons/PremiumIcon";
 
 interface StatCardProps {
   title:      string;
   value:      string;
   subtitle?:  string;
   icon:       LucideIcon;
-  iconColor?: string;
-  iconBg?:    string;
+  /** Apple system-color tone for the glossy icon tile — same palette every other stat/category tile in the app uses. */
+  tone?:      IconTone;
   trend?:     number;
   className?: string;
 }
 
-export function StatCard({ title, value, subtitle, icon: Icon, iconColor, iconBg, trend, className }: StatCardProps) {
+// Glossy PremiumIcon tile, matching the Home dashboard's StatOverview tiles —
+// this component used to render a flat tinted-box icon (iconBg/iconColor
+// props), which is why Admin's Overview and any other StatCard user looked
+// visually flatter than Home's stat row despite serving the same role.
+export function StatCard({ title, value, subtitle, icon, tone = "indigo", trend, className }: StatCardProps) {
   const trendPositive = trend != null && trend >= 0;
   const trendLarge    = trend != null && Math.abs(trend) > 500;
 
@@ -23,12 +28,7 @@ export function StatCard({ title, value, subtitle, icon: Icon, iconColor, iconBg
       className
     )}>
       <div className="flex items-center justify-between mb-3">
-        <div className={cn(
-          "w-9 h-9 rounded-xl flex items-center justify-center shrink-0",
-          iconBg ?? "bg-primary/10"
-        )}>
-          <Icon className={cn("w-4.5 h-4.5", iconColor ?? "text-primary")} strokeWidth={1.75} />
-        </div>
+        <PremiumIcon icon={icon} tone={tone} size="sm" />
 
         {trend !== undefined && !trendLarge && (
           <span className={cn(

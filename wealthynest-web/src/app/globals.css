@@ -5,6 +5,10 @@
 @layer base {
   /* ── Light theme ─────────────────────────────────────────── */
   :root {
+    /* Tells the browser to theme its OWN native UI (select popups, scrollbars, date
+       pickers) to match — without this, those stay light even inside .dark, since
+       they don't read our --background/--card variables at all. */
+    color-scheme: light;
     --background:  220 25% 97%;
     --foreground:  222 47% 9%;
     --card:        0 0% 100%;
@@ -15,7 +19,7 @@
     --secondary:   220 20% 92%;
     --secondary-foreground: 222 47% 20%;
     --muted:       220 20% 94%;
-    --muted-foreground: 215 16% 47%;
+    --muted-foreground: 215 16% 42%;
     --accent:      220 20% 92%;
     --accent-foreground: 222 47% 9%;
     --destructive: 0 84% 55%;
@@ -24,7 +28,7 @@
     --border-subtle: 220 20% 93%;
     --input:       0 0% 100%;
     --ring:        239 84% 62%;
-    --radius:      0.875rem;
+    --radius:      1rem;
     --sidebar-bg:  0 0% 100%;
     --sidebar-border: 220 20% 90%;
     --chart-grid:  220 20% 92%;
@@ -33,6 +37,7 @@
 
   /* ── Dark theme — premium deep navy ──────────────────────── */
   .dark {
+    color-scheme: dark;
     --background:  213 72% 7%;
     --foreground:  213 25% 92%;
     --card:        213 52% 11%;
@@ -43,7 +48,7 @@
     --secondary:   217 38% 16%;
     --secondary-foreground: 213 25% 92%;
     --muted:       217 38% 14%;
-    --muted-foreground: 215 18% 52%;
+    --muted-foreground: 215 18% 58%;
     --accent:      217 38% 17%;
     --accent-foreground: 213 25% 92%;
     --destructive: 0 72% 71%;
@@ -66,17 +71,7 @@
   ::-webkit-scrollbar-thumb { @apply bg-slate-300 dark:bg-slate-700 rounded-full; }
   ::-webkit-scrollbar-thumb:hover { @apply bg-slate-400 dark:bg-slate-600; }
 
-  /* ── Auth autofill ── */
-  .auth-input:-webkit-autofill,
-  .auth-input:-webkit-autofill:hover,
-  .auth-input:-webkit-autofill:focus {
-    -webkit-box-shadow: 0 0 0 1000px #131320 inset !important;
-    -webkit-text-fill-color: #f1f5f9 !important;
-    caret-color: #f1f5f9;
-    transition: background-color 5000s ease-in-out 0s;
-  }
-
-  /* ── Dashboard autofill — light ── */
+  /* ── Autofill — light (also covers auth forms, which now share the dashboard's bg-background inputs) ── */
   input:-webkit-autofill,
   input:-webkit-autofill:hover,
   input:-webkit-autofill:focus {

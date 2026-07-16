@@ -23,7 +23,9 @@ import com.wealthynest.domain.expense.repository.ExpenseRepository;
 import com.wealthynest.domain.goal.repository.GoalRepository;
 import com.wealthynest.domain.income.repository.IncomeRepository;
 import com.wealthynest.domain.investment.repository.InvestmentRepository;
+import com.wealthynest.domain.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -36,9 +38,13 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class WalletAccountServiceImpl implements WalletAccountService {
+
+    /** Only one active account of these types may exist per user. */
+    private static final Set<AccountType> SINGLETON_TYPES = Set.of(AccountType.CASH_WALLET, AccountType.EMERGENCY_FUND);
 
     private final WalletAccountRepository   accountRepository;
     private final AccountTransferRepository transferRepository;
@@ -47,28 +53,29 @@ public class WalletAccountServiceImpl implements WalletAccountService {
     private final CategoryRepository        categoryRepository;
     private final InvestmentRepository      investmentRepository;
     private final GoalRepository            goalRepository;
+    private final AccountBalanceGuard       accountBalanceGuard;
+    private final NotificationService       notificationService;
 
     @Override
     @Transactional(readOnly = true)
     public List<AccountResponse> getAccounts(UUID userId) {
-        return accountRepository.findByUserIdOrderByCreatedAtAsc(userId)
-                .stream().filter(a -> !a.isArchived()).map(this::enrich).toList();
+        List<WalletAccount> accounts = accountRepository.findByUserIdOrderByCreatedAtAsc(userId)
+                .stream().filter(a -> !a.isArchived()).toList();
+        return enrichBatch(accounts);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<AccountResponse> getArchivedAccounts(UUID userId) {
-        return accountRepository.findByUserIdAndArchivedTrueOrderByCreatedAtAsc(userId)
-                .stream().map(this::enrich).toList();
+        List<WalletAccount> accounts = accountRepository.findByUserIdAndArchivedTrueOrderByCreatedAtAsc(userId);
+        return enrichBatch(accounts);
     }
 
     @Override
     @Transactional
     @CacheEvict(value = "dashboard", allEntries = true)
     public AccountResponse archiveAccount(UUID id, UUID userId) {
-        WalletAccount acct = accountRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Account", "id", id));
-        if (!acct.getUserId().equals(userId)) throw new AccessDeniedException();
+        WalletAccount acct = findAndValidate(id, userId);
         acct.setArchived(true);
         return enrich(accountRepository.save(acct));
     }
@@ -77,14 +84,11 @@ public class WalletAccountServiceImpl implements WalletAccountService {
     @Transactional
     @CacheEvict(value = "dashboard", allEntries = true)
     public AccountResponse unarchiveAccount(UUID id, UUID userId) {
-        WalletAccount acct = accountRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Account", "id", id));
-        if (!acct.getUserId().equals(userId)) throw new AccessDeniedException();
+        WalletAccount acct = findAndValidate(id, userId);
 
         // Singleton types (CASH_WALLET, EMERGENCY_FUND) can only have one active account at a time.
         // Block the restore if there is already an active account of the same type.
-        boolean singleton = acct.getAccountType() != AccountType.BANK_ACCOUNT
-                         && acct.getAccountType() != AccountType.CREDIT_CARD;
+        boolean singleton = SINGLETON_TYPES.contains(acct.getAccountType());
         if (singleton && accountRepository.existsByUserIdAndAccountTypeAndArchivedFalse(userId, acct.getAccountType())) {
             String typeName = acct.getAccountType().name().replace('_', ' ').toLowerCase();
             throw new BusinessException(
@@ -101,9 +105,7 @@ public class WalletAccountServiceImpl implements WalletAccountService {
     @Transactional
     @CacheEvict(value = "dashboard", allEntries = true)
     public AccountResponse createAccount(UUID userId, CreateAccountRequest req) {
-        // BANK_ACCOUNT and CREDIT_CARD can be created multiple times; others are singletons
-        boolean singleton = req.getAccountType() != AccountType.BANK_ACCOUNT
-                         && req.getAccountType() != AccountType.CREDIT_CARD;
+        boolean singleton = SINGLETON_TYPES.contains(req.getAccountType());
         if (singleton) {
             String typeName = req.getAccountType().name().replace('_', ' ').toLowerCase();
             // Block if an active account of this type already exists
@@ -119,6 +121,11 @@ public class WalletAccountServiceImpl implements WalletAccountService {
                 );
             }
         }
+        // Credit-limit/billing-cycle fields only mean anything for a card, and apr is shared between
+        // card and loan — apply each only where it's relevant, regardless of what the request carries,
+        // so a stale value left over from a different type picked earlier in the same form can't ride along.
+        boolean isCC = req.getAccountType() == AccountType.CREDIT_CARD;
+        boolean isLoan = req.getAccountType() == AccountType.LOAN;
         WalletAccount account = WalletAccount.builder()
                 .userId(userId)
                 .accountType(req.getAccountType())
@@ -126,11 +133,22 @@ public class WalletAccountServiceImpl implements WalletAccountService {
                 .bankName(req.getBankName())
                 .accountNumber(req.getAccountNumber())
                 .openingBalance(req.getOpeningBalance() != null ? req.getOpeningBalance() : BigDecimal.ZERO)
-                .creditLimit(req.getCreditLimit())
-                .statementDay(req.getStatementDay())
-                .paymentDueDay(req.getPaymentDueDay())
-                .apr(req.getApr())
+                .lowBalanceThreshold(req.getLowBalanceThreshold())
+                .creditLimit(isCC ? req.getCreditLimit() : null)
+                .statementDay(isCC ? req.getStatementDay() : null)
+                .paymentDueDay(isCC ? req.getPaymentDueDay() : null)
+                .apr((isCC || isLoan) ? req.getApr() : null)
                 .build();
+        if (req.getAccountType() == AccountType.LOAN) {
+            applyLoanFields(account, req, userId);
+            // Original principal defaults to the outstanding at creation when not given
+            if (account.getPrincipalAmount() == null) account.setPrincipalAmount(account.getOpeningBalance());
+        }
+        // First-ever bank account becomes primary automatically; later ones need an explicit "Set as Primary".
+        if (req.getAccountType() == AccountType.BANK_ACCOUNT
+                && !accountRepository.existsByUserIdAndAccountTypeAndArchivedFalse(userId, AccountType.BANK_ACCOUNT)) {
+            account.setPrimary(true);
+        }
         return enrich(accountRepository.save(account));
     }
 
@@ -139,25 +157,52 @@ public class WalletAccountServiceImpl implements WalletAccountService {
     @CacheEvict(value = "dashboard", allEntries = true)
     public AccountResponse updateAccount(UUID id, UUID userId, CreateAccountRequest req) {
         WalletAccount account = findAndValidate(id, userId);
+        boolean isCC = account.getAccountType() == AccountType.CREDIT_CARD;
+        boolean isLoan = account.getAccountType() == AccountType.LOAN;
         account.setName(req.getName());
         if (req.getBankName()      != null) account.setBankName(req.getBankName());
         if (req.getAccountNumber() != null) account.setAccountNumber(req.getAccountNumber());
         if (req.getOpeningBalance() != null) account.setOpeningBalance(req.getOpeningBalance());
-        if (req.getCreditLimit()   != null) account.setCreditLimit(req.getCreditLimit());
-        if (req.getStatementDay()  != null) account.setStatementDay(req.getStatementDay());
-        if (req.getPaymentDueDay() != null) account.setPaymentDueDay(req.getPaymentDueDay());
-        if (req.getApr()           != null) account.setApr(req.getApr());
+        if (req.getLowBalanceThreshold() != null) account.setLowBalanceThreshold(req.getLowBalanceThreshold());
+        if (isCC && req.getCreditLimit()   != null) account.setCreditLimit(req.getCreditLimit());
+        if (isCC && req.getStatementDay()  != null) account.setStatementDay(req.getStatementDay());
+        if (isCC && req.getPaymentDueDay() != null) account.setPaymentDueDay(req.getPaymentDueDay());
+        if ((isCC || isLoan) && req.getApr() != null) account.setApr(req.getApr());
+        if (isLoan) applyLoanFields(account, req, userId);
         return enrich(accountRepository.save(account));
+    }
+
+    private void applyLoanFields(WalletAccount account, CreateAccountRequest req, UUID userId) {
+        if (req.getLoanType()        != null) account.setLoanType(req.getLoanType());
+        if (req.getPrincipalAmount() != null) account.setPrincipalAmount(req.getPrincipalAmount());
+        if (req.getEmiAmount()       != null) account.setEmiAmount(req.getEmiAmount());
+        if (req.getEmiDay()          != null) account.setEmiDay(req.getEmiDay());
+        if (req.getLoanEndDate()     != null) account.setLoanEndDate(req.getLoanEndDate());
+        if (req.getAutopayAccountId() != null) {
+            WalletAccount source = accountRepository.findByIdAndUserId(req.getAutopayAccountId(), userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("WalletAccount", "id", req.getAutopayAccountId()));
+            if (source.getAccountType().isLiability() || source.getAccountType() == AccountType.INVESTMENT) {
+                throw new BusinessException("EMIs can only be auto-debited from a cash or bank account.", HttpStatus.BAD_REQUEST);
+            }
+            account.setAutopayAccountId(source.getId());
+        }
     }
 
     @Override
     @Transactional
     @CacheEvict(value = "dashboard", allEntries = true)
-    public void deleteAccount(UUID id, UUID userId) {
+    public void deleteAccount(UUID id, UUID userId, boolean alsoDeleteTransactions) {
         WalletAccount account = findAndValidate(id, userId);
+        // Default: detach so reports/charts that sum by month or category keep reflecting money
+        // that already moved. Opt-in: the user explicitly asked to purge this account's history too.
+        if (alsoDeleteTransactions) {
+            expenseRepository.deleteByAccountId(id);
+            incomeRepository.deleteByAccountId(id);
+        } else {
+            expenseRepository.clearAccountId(id);
+            incomeRepository.clearAccountId(id);
+        }
         // Clear nullable FK references so deletion doesn't hit constraint violations
-        expenseRepository.clearAccountId(id);
-        incomeRepository.clearAccountId(id);
         investmentRepository.clearLinkedAccountId(id);
         investmentRepository.clearDebitAccountId(id);
         goalRepository.clearAccountId(id);
@@ -176,6 +221,7 @@ public class WalletAccountServiceImpl implements WalletAccountService {
             throw new BusinessException("Cannot transfer to the same account.", HttpStatus.BAD_REQUEST);
         WalletAccount from = findAndValidate(req.getFromAccountId(), userId);
         WalletAccount to   = findAndValidate(req.getToAccountId(),   userId);
+        accountBalanceGuard.validateSufficientBalance(from.getId(), userId, req.getAmount(), BigDecimal.ZERO);
         AccountTransfer transfer = AccountTransfer.builder()
                 .userId(userId)
                 .fromAccountId(from.getId())
@@ -184,19 +230,23 @@ public class WalletAccountServiceImpl implements WalletAccountService {
                 .description(req.getDescription())
                 .transferDate(req.getTransferDate())
                 .build();
-        return toTransferResponse(transferRepository.save(transfer), from.getName(), to.getName());
+        TransferResponse response = toTransferResponse(transferRepository.save(transfer), from.getName(), to.getName());
+        checkLowBalance(from.getId(), userId);
+        return response;
     }
 
     @Override
     @Transactional
     @CacheEvict(value = "dashboard", allEntries = true)
     public TransferResponse updateTransfer(UUID transferId, UUID userId, UpdateTransferRequest req) {
-        AccountTransfer t = transferRepository.findById(transferId)
-                .orElseThrow(() -> new ResourceNotFoundException("Transfer", "id", transferId));
-        if (!t.getUserId().equals(userId)) throw new AccessDeniedException();
+        AccountTransfer t = findTransferAndValidate(transferId, userId);
+        BigDecimal previousAmount = t.getAmount();
         if (req.getAmount()       != null) t.setAmount(req.getAmount());
         if (req.getTransferDate() != null) t.setTransferDate(req.getTransferDate());
         if (req.getDescription()  != null) t.setDescription(req.getDescription());
+        if (req.getAmount() != null) {
+            accountBalanceGuard.validateSufficientBalance(t.getFromAccountId(), userId, t.getAmount(), previousAmount);
+        }
         AccountTransfer saved = transferRepository.save(t);
         List<WalletAccount> accounts = accountRepository.findByUserIdOrderByCreatedAtAsc(userId);
         Map<UUID, String> nameMap = accounts.stream()
@@ -210,10 +260,7 @@ public class WalletAccountServiceImpl implements WalletAccountService {
     @Transactional
     @CacheEvict(value = "dashboard", allEntries = true)
     public void deleteTransfer(UUID transferId, UUID userId) {
-        AccountTransfer t = transferRepository.findById(transferId)
-                .orElseThrow(() -> new ResourceNotFoundException("Transfer", "id", transferId));
-        if (!t.getUserId().equals(userId)) throw new AccessDeniedException();
-        transferRepository.delete(t);
+        transferRepository.delete(findTransferAndValidate(transferId, userId));
     }
 
     @Override
@@ -230,6 +277,28 @@ public class WalletAccountServiceImpl implements WalletAccountService {
         return PagedResponse.of(page);
     }
 
+    /**
+     * Fires a low-balance notification if the account has an alert threshold configured and its
+     * live balance has dropped to/below it. Called right after any operation that can reduce a
+     * spendable balance (expense debit, transfer out) — best-effort, never blocks the caller.
+     */
+    @Override
+    public void checkLowBalance(UUID accountId, UUID userId) {
+        if (accountId == null) return;
+        try {
+            WalletAccount account = accountRepository.findById(accountId).orElse(null);
+            if (account == null || !account.getUserId().equals(userId)) return;
+            if (account.getLowBalanceThreshold() == null || account.getAccountType().isLiability()) return;
+            BigDecimal balance = enrich(account).getCurrentBalance();
+            if (balance.compareTo(account.getLowBalanceThreshold()) <= 0) {
+                notificationService.createLowBalanceNotification(
+                        userId, account.getName(), balance, account.getLowBalanceThreshold());
+            }
+        } catch (Exception e) {
+            log.warn("Low balance check failed for account={}: {}", accountId, e.getMessage());
+        }
+    }
+
     // ─── private helpers ───────────────────────────────────────────────────────
 
     private WalletAccount findAndValidate(UUID id, UUID userId) {
@@ -237,6 +306,13 @@ public class WalletAccountServiceImpl implements WalletAccountService {
                 .orElseThrow(() -> new ResourceNotFoundException("WalletAccount", "id", id));
         if (!a.getUserId().equals(userId)) throw new AccessDeniedException();
         return a;
+    }
+
+    private AccountTransfer findTransferAndValidate(UUID transferId, UUID userId) {
+        AccountTransfer t = transferRepository.findById(transferId)
+                .orElseThrow(() -> new ResourceNotFoundException("Transfer", "id", transferId));
+        if (!t.getUserId().equals(userId)) throw new AccessDeniedException();
+        return t;
     }
 
     private AccountResponse enrich(WalletAccount account) {
@@ -253,8 +329,54 @@ public class WalletAccountServiceImpl implements WalletAccountService {
         BigDecimal displayIn  = incomeRepository.sumRegularByAccountId(id).add(displayTransfersIn);
         BigDecimal displayOut = expenseRepository.sumRegularByAccountId(id).add(displayTransfersOut);
 
+        return enrich(account, incomeIn, expenseOut, transfersIn, transfersOut, displayIn, displayOut);
+    }
+
+    /**
+     * Enriches a whole account list with a fixed number of grouped queries instead of
+     * running enrich()'s ~8 balance-aggregate queries once per account (N+1 on every
+     * accounts-list / dashboard load).
+     */
+    private List<AccountResponse> enrichBatch(List<WalletAccount> accounts) {
+        if (accounts.isEmpty()) return List.of();
+        List<UUID> ids = accounts.stream().map(WalletAccount::getId).toList();
+
+        Map<UUID, BigDecimal> incomeIn            = toSumMap(incomeRepository.sumByAccountIdsGrouped(ids));
+        Map<UUID, BigDecimal> expenseOut          = toSumMap(expenseRepository.sumByAccountIdsGrouped(ids));
+        Map<UUID, BigDecimal> transfersIn         = toSumMap(transferRepository.sumTransfersInGrouped(ids));
+        Map<UUID, BigDecimal> transfersOut        = toSumMap(transferRepository.sumTransfersOutGrouped(ids));
+        Map<UUID, BigDecimal> regularTransfersIn  = toSumMap(transferRepository.sumRegularTransfersInGrouped(ids));
+        Map<UUID, BigDecimal> regularTransfersOut = toSumMap(transferRepository.sumRegularTransfersOutGrouped(ids));
+        Map<UUID, BigDecimal> regularIncomeIn     = toSumMap(incomeRepository.sumRegularByAccountIdsGrouped(ids));
+        Map<UUID, BigDecimal> regularExpenseOut   = toSumMap(expenseRepository.sumRegularByAccountIdsGrouped(ids));
+
+        return accounts.stream().map(a -> {
+            UUID id = a.getId();
+            BigDecimal displayIn  = regularIncomeIn.getOrDefault(id, BigDecimal.ZERO)
+                    .add(regularTransfersIn.getOrDefault(id, BigDecimal.ZERO));
+            BigDecimal displayOut = regularExpenseOut.getOrDefault(id, BigDecimal.ZERO)
+                    .add(regularTransfersOut.getOrDefault(id, BigDecimal.ZERO));
+            return enrich(a,
+                    incomeIn.getOrDefault(id, BigDecimal.ZERO),
+                    expenseOut.getOrDefault(id, BigDecimal.ZERO),
+                    transfersIn.getOrDefault(id, BigDecimal.ZERO),
+                    transfersOut.getOrDefault(id, BigDecimal.ZERO),
+                    displayIn, displayOut);
+        }).toList();
+    }
+
+    private Map<UUID, BigDecimal> toSumMap(List<Object[]> rows) {
+        Map<UUID, BigDecimal> map = new HashMap<>();
+        for (Object[] row : rows) map.put((UUID) row[0], (BigDecimal) row[1]);
+        return map;
+    }
+
+    private AccountResponse enrich(WalletAccount account, BigDecimal incomeIn, BigDecimal expenseOut,
+                                    BigDecimal transfersIn, BigDecimal transfersOut,
+                                    BigDecimal displayIn, BigDecimal displayOut) {
         boolean isCreditCard = account.getAccountType() == AccountType.CREDIT_CARD;
-        BigDecimal balance = isCreditCard
+        // Liability accounts (credit card, loan): balance = outstanding — payments in reduce it
+        BigDecimal balance = account.getAccountType().isLiability()
                 ? account.getOpeningBalance().add(expenseOut).add(transfersOut).subtract(incomeIn).subtract(transfersIn)
                 : account.getOpeningBalance()
                         .add(incomeIn).add(transfersIn)
@@ -270,11 +392,16 @@ public class WalletAccountServiceImpl implements WalletAccountService {
                 .accountNumber(account.getAccountNumber())
                 .openingBalance(account.getOpeningBalance())
                 .currentBalance(balance)
+                .lowBalanceThreshold(account.getLowBalanceThreshold())
+                .belowLowBalanceThreshold(account.getLowBalanceThreshold() != null
+                        && !isCreditCard && account.getAccountType() != AccountType.LOAN
+                        && balance.compareTo(account.getLowBalanceThreshold()) <= 0)
                 .totalMoneyIn(displayIn)
                 .totalMoneyOut(displayOut)
                 .recentTransactions(recent)
                 .createdAt(account.getCreatedAt())
-                .archived(account.isArchived());
+                .archived(account.isArchived())
+                .primary(account.isPrimary());
 
         if (isCreditCard) {
             BigDecimal limit = account.getCreditLimit();
@@ -300,6 +427,30 @@ public class WalletAccountServiceImpl implements WalletAccountService {
                    .apr(account.getApr())
                    .nextStatementDate(nextStatement)
                    .nextDueDate(nextDue);
+        }
+
+        if (account.getAccountType() == AccountType.LOAN) {
+            LocalDate nextEmi = null;
+            if (account.getEmiDay() != null && balance.compareTo(BigDecimal.ZERO) > 0) {
+                LocalDate today = LocalDate.now();
+                int ed = account.getEmiDay();
+                nextEmi = today.getDayOfMonth() < ed
+                        ? today.withDayOfMonth(ed)
+                        : today.plusMonths(1).withDayOfMonth(ed);
+            }
+            String autopayName = account.getAutopayAccountId() != null
+                    ? accountRepository.findById(account.getAutopayAccountId())
+                            .map(WalletAccount::getName).orElse(null)
+                    : null;
+            builder.loanType(account.getLoanType() != null ? account.getLoanType().name() : null)
+                   .principalAmount(account.getPrincipalAmount())
+                   .emiAmount(account.getEmiAmount())
+                   .emiDay(account.getEmiDay())
+                   .autopayAccountId(account.getAutopayAccountId())
+                   .autopayAccountName(autopayName)
+                   .loanEndDate(account.getLoanEndDate())
+                   .nextEmiDate(nextEmi)
+                   .apr(account.getApr());
         }
 
         return builder.build();
@@ -328,26 +479,33 @@ public class WalletAccountServiceImpl implements WalletAccountService {
         // Expense debits — batch-load categories to avoid N+1
         List<Expense> top5Expenses = expenseRepository.findTop5ByAccountIdAndDebtFalseOrderByExpenseDateDesc(id);
         Set<UUID> catIds = top5Expenses.stream().map(Expense::getCategoryId).collect(Collectors.toSet());
-        Map<UUID, String> catNames = categoryRepository.findAllById(catIds).stream()
-                .collect(Collectors.toMap(Category::getId, Category::getName));
+        Map<UUID, Category> catById = categoryRepository.findAllById(catIds).stream()
+                .collect(Collectors.toMap(Category::getId, c -> c));
         top5Expenses.forEach(e -> {
-            String categoryName = catNames.getOrDefault(e.getCategoryId(), "Expense");
+            Category cat = catById.get(e.getCategoryId());
             items.add(AccountTransactionItem.builder()
                 .id(e.getId().toString())
                 .type("EXPENSE")
-                .label(categoryName)
+                .label(cat != null ? cat.getName() : "Expense")
+                .categoryIcon(cat != null ? cat.getIcon() : null)
+                .categoryColor(cat != null ? cat.getColor() : null)
                 .amount(e.getAmount())
                 .date(e.getExpenseDate())
                 .description(e.getDescription())
                 .build());
         });
 
-        // Transfers — limited query; no longer loads all rows
+        // Transfers — limited query; no longer loads all rows. Debt transfers (one-sided, tagged
+        // isDebt) and balance adjustments ride the same query, distinguished into their own types.
         transferRepository.findTop5ByAccountId(id).forEach(t -> {
             boolean isIn       = id.equals(t.getToAccountId());
             boolean isAdjust   = "Balance Adjustment".equals(t.getDescription());
-            String  txnType    = isAdjust ? "ADJUSTMENT" : (isIn ? "TRANSFER_IN" : "TRANSFER_OUT");
-            String  txnLabel   = isAdjust ? "Adjustment" : (isIn ? "Transfer In" : "Transfer Out");
+            String  txnType    = t.isDebt() ? (isIn ? "DEBT_IN" : "DEBT_OUT")
+                                : isAdjust  ? "ADJUSTMENT"
+                                : isIn      ? "TRANSFER_IN" : "TRANSFER_OUT";
+            String  txnLabel   = t.isDebt() ? (t.getDebtContactName() != null ? t.getDebtContactName() : "Debt")
+                                : isAdjust  ? "Adjustment"
+                                : isIn      ? "Transfer In" : "Transfer Out";
             items.add(AccountTransactionItem.builder()
                 .id(t.getId().toString())
                 .type(txnType)
@@ -358,28 +516,6 @@ public class WalletAccountServiceImpl implements WalletAccountService {
                 .build());
         });
 
-        // Debt-tagged expenses (lent out, borrowed repayments) — shown as DEBT_OUT
-        expenseRepository.findTop5ByAccountIdAndDebtTrueOrderByExpenseDateDesc(id).forEach(e ->
-            items.add(AccountTransactionItem.builder()
-                .id(e.getId().toString())
-                .type("DEBT_OUT")
-                .label("Debt")
-                .amount(e.getAmount())
-                .date(e.getExpenseDate())
-                .description(e.getDescription())
-                .build()));
-
-        // Debt-tagged incomes (borrowed in, lent repayments received) — shown as DEBT_IN
-        incomeRepository.findTop5ByAccountIdAndDebtTrueOrderByIncomeDateDesc(id).forEach(e ->
-            items.add(AccountTransactionItem.builder()
-                .id(e.getId().toString())
-                .type("DEBT_IN")
-                .label("Debt")
-                .amount(e.getAmount())
-                .date(e.getIncomeDate())
-                .description(e.getDescription())
-                .build()));
-
         return items.stream()
                 .sorted(Comparator.comparing(AccountTransactionItem::getDate).reversed())
                 .limit(10)
@@ -389,9 +525,7 @@ public class WalletAccountServiceImpl implements WalletAccountService {
     @Override
     @Transactional(readOnly = true)
     public byte[] generateStatementCsv(UUID accountId, UUID userId) {
-        WalletAccount account = accountRepository.findById(accountId)
-                .orElseThrow(() -> new com.wealthynest.common.exception.ResourceNotFoundException("Account", "id", accountId));
-        if (!account.getUserId().equals(userId)) throw new com.wealthynest.common.exception.AccessDeniedException();
+        findAndValidate(accountId, userId);
 
         // Load all transactions
         List<AccountTransactionItem> items = new ArrayList<>();
@@ -445,25 +579,35 @@ public class WalletAccountServiceImpl implements WalletAccountService {
     }
 
     @Override @Transactional
+    @CacheEvict(value = "dashboard", allEntries = true)
     public AccountResponse adjustBalance(UUID id, UUID userId, BigDecimal targetBalance) {
         WalletAccount account = findAndValidate(id, userId);
+        if (!account.getAccountType().isLiability() && targetBalance.compareTo(BigDecimal.ZERO) < 0) {
+            throw new BusinessException("Balance cannot be negative for " + account.getName() + ".", HttpStatus.BAD_REQUEST);
+        }
         AccountResponse current = enrich(account);
         BigDecimal diff = targetBalance.subtract(current.getCurrentBalance());
         if (diff.compareTo(BigDecimal.ZERO) == 0) return current;
 
+        // Asset balance = opening + incomeIn + transfersIn − expenseOut − transfersOut, so a transfer
+        // INTO the account raises it. Liability balance (outstanding) is the mirror image
+        // (opening + expenseOut + transfersOut − incomeIn − transfersIn), so raising the outstanding
+        // needs a transfer OUT, and lowering it (an unlogged payment) needs a transfer IN — routing
+        // both account types the same way silently moved liability balances in the wrong direction.
+        boolean wantsIncrease = diff.compareTo(BigDecimal.ZERO) > 0;
+        boolean routeAsIncomingTransfer = account.getAccountType().isLiability() != wantsIncrease;
+
         LocalDate today = LocalDate.now();
-        if (diff.compareTo(BigDecimal.ZERO) > 0) {
-            // Money comes in from nowhere → toAccountId=account, fromAccountId=null
+        if (routeAsIncomingTransfer) {
             transferRepository.save(AccountTransfer.builder()
                     .userId(userId)
                     .fromAccountId(null)
                     .toAccountId(id)
-                    .amount(diff)
+                    .amount(diff.abs())
                     .description("Balance Adjustment")
                     .transferDate(today)
                     .build());
         } else {
-            // Money goes out to nowhere → fromAccountId=account, toAccountId=null
             transferRepository.save(AccountTransfer.builder()
                     .userId(userId)
                     .fromAccountId(id)
@@ -476,14 +620,32 @@ public class WalletAccountServiceImpl implements WalletAccountService {
         return enrich(account);
     }
 
+    @Override
+    @Transactional
+    @CacheEvict(value = "dashboard", allEntries = true)
+    public AccountResponse setPrimary(UUID id, UUID userId) {
+        WalletAccount account = findAndValidate(id, userId);
+        if (account.getAccountType() != AccountType.BANK_ACCOUNT) {
+            throw new BusinessException("Only bank accounts can be set as primary.", HttpStatus.BAD_REQUEST);
+        }
+        accountRepository.clearPrimaryForType(userId, AccountType.BANK_ACCOUNT);
+        account.setPrimary(true);
+        return enrich(accountRepository.save(account));
+    }
+
     private TransferResponse toTransferResponse(AccountTransfer t, String fromName, String toName) {
         boolean isAdjustment = "Balance Adjustment".equals(t.getDescription());
-        String resolvedFromName = t.getFromAccountId() == null ? (isAdjustment ? "Adjustment" : "External") : fromName;
-        String resolvedToName   = t.getToAccountId()   == null ? (isAdjustment ? "Adjustment" : "Investment") : toName;
+        boolean isDebt       = t.isDebt();
+        String externalLabel = isDebt ? t.getDebtContactName() : isAdjustment ? "Adjustment" : "External";
+        String investmentLabel = isDebt ? t.getDebtContactName() : isAdjustment ? "Adjustment" : "Investment";
+        String resolvedFromName = t.getFromAccountId() == null ? externalLabel   : fromName;
+        String resolvedToName   = t.getToAccountId()   == null ? investmentLabel : toName;
         return TransferResponse.builder()
                 .id(t.getId()).fromAccountId(t.getFromAccountId()).fromAccountName(resolvedFromName)
                 .toAccountId(t.getToAccountId()).toAccountName(resolvedToName)
                 .amount(t.getAmount()).description(t.getDescription())
+                .adjustment(isAdjustment)
+                .debt(isDebt).debtContactName(t.getDebtContactName()).debtLabel(t.getDebtLabel())
                 .transferDate(t.getTransferDate()).createdAt(t.getCreatedAt())
                 .build();
     }

@@ -33,6 +33,10 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: false
     validate-on-migrate: true
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -87,6 +91,11 @@ wealthynest:
     from: "WealthyNest <noreply@wealthynest.in>"
     frontend-url: ${FRONTEND_URL:http://localhost:3000}
     reset-token-expiry-minutes: 15
+  webauthn:
+    rp-id: ${WEBAUTHN_RP_ID:}
+    rp-name: WealthyNest
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:}
 
 management:
   endpoints:

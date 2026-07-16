@@ -1,7 +1,9 @@
 package com.wealthynest.domain.user.service;
 
+import com.wealthynest.common.audit.AuditService;
 import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
+import com.wealthynest.common.security.TokenRevocationService;
 import com.wealthynest.common.security.UserPrincipal;
 import com.wealthynest.domain.user.dto.request.ChangePasswordRequest;
 import com.wealthynest.domain.user.dto.request.UpdateProfileRequest;
@@ -29,6 +31,8 @@ public class UserServiceImpl implements UserService {
     private final UserMapper             userMapper;
     private final PasswordEncoder        passwordEncoder;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final AuditService           auditService;
+    private final TokenRevocationService tokenRevocationService;
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
@@ -72,25 +76,26 @@ public class UserServiceImpl implements UserService {
         if (request.getFullName() != null && !request.getFullName().isBlank()) {
             user.setFullName(request.getFullName().trim());
         }
-        if (request.getEmail() != null && !request.getEmail().isBlank()) {
-            String newEmail = request.getEmail().toLowerCase().trim();
-            if (!newEmail.equals(user.getEmail()) && userRepository.existsByEmail(newEmail)) {
-                throw new BusinessException("Email already in use", HttpStatus.CONFLICT, "EMAIL_EXISTS");
-            }
-            user.setEmail(newEmail);
-        }
         return userMapper.toResponse(userRepository.save(user));
     }
 
     @Override
     @Transactional
-    public void changePassword(UUID userId, ChangePasswordRequest request) {
+    public void changePassword(UUID userId, ChangePasswordRequest request, String ipAddress, String userAgent) {
         User user = findById(userId);
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
             throw new BusinessException("Current password is incorrect", HttpStatus.BAD_REQUEST, "WRONG_PASSWORD");
         }
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
+        // Match forgot-password's behavior: a password change should invalidate every
+        // other session, not just leave old refresh tokens usable until they expire.
+        refreshTokenRepository.revokeAllByUserId(userId);
+        // Also invalidate any access token already issued — otherwise a leaked token
+        // stays valid for up to its full lifetime even after the password changes.
+        tokenRevocationService.revokeAllTokensFor(userId);
+        log.info("Password changed by user {}", userId);
+        auditService.log(userId, "PASSWORD_CHANGED", "USER", userId, null, null, ipAddress, userAgent);
     }
 
     @Override

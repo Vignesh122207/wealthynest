@@ -42,6 +42,9 @@ export interface Investment {
   week52High?:    number;
   week52Low?:     number;
   priceLastUpdated?: string;
+  /** STOCK only — number of buy/sell transactions on record. Once >1, units/avgBuyPrice come
+   * from the transaction ledger (weighted average cost) — edit them via Buy More/Sell instead. */
+  transactionCount?: number;
 }
 
 export interface CreateInvestmentPayload {

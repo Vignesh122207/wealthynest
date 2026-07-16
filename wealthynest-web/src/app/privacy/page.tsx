@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Shield } from "lucide-react";
-import { PublicNav, PublicFooter } from "@/components/layout/PublicNav";
+import { LegalPageChrome } from "@/components/layout/LegalPageChrome";
 
 export const metadata: Metadata = { title: "Privacy Policy" };
 
@@ -15,9 +15,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
-      <PublicNav />
-
+    <LegalPageChrome>
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-16">
 
         {/* Header */}
@@ -33,7 +31,7 @@ export default function PrivacyPage() {
 
           <Section title="1. Who we are">
             <p>
-              WealthyNest ("we", "our", "us") is a personal finance application built for Indian families.
+              WealthyNest (&quot;we&quot;, &quot;our&quot;, &quot;us&quot;) is a personal finance application built for Indian families.
               We are operated as an independent product. For questions, contact us at{" "}
               <a href="mailto:support@wealthynest.in" className="text-indigo-500 hover:underline">
                 support@wealthynest.in
@@ -88,7 +86,7 @@ export default function PrivacyPage() {
             <ul className="list-disc list-inside space-y-1 pl-2">
               <li>Export all your data — available in Settings → Download Data</li>
               <li>Correct your name or email — available in Settings → Profile</li>
-              <li>Delete your account and all associated data — available in Settings → Close Account</li>
+              <li>Deactivate your account — available in Settings → Close Account. Your data is retained and only an admin can reactivate it; email us at support@wealthynest.in if you need it permanently erased instead</li>
               <li>Opt out of notifications — available in Settings → Notification Preferences</li>
             </ul>
             <p>For requests that cannot be completed within the app, email us at support@wealthynest.in and we will respond within 7 business days.</p>
@@ -109,7 +107,7 @@ export default function PrivacyPage() {
 
           <Section title="9. Changes to this policy">
             <p>
-              We may update this Privacy Policy occasionally. When we do, we will update the "Last updated" date at the top.
+              We may update this Privacy Policy occasionally. When we do, we will update the &quot;Last updated&quot; date at the top.
               For significant changes, we will notify you via email or an in-app notice.
             </p>
           </Section>
@@ -132,8 +130,6 @@ export default function PrivacyPage() {
 
         </div>
       </main>
-
-      <PublicFooter />
-    </div>
+    </LegalPageChrome>
   );
 }

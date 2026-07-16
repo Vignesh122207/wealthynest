@@ -22,13 +22,3 @@ export interface PageMeta {
   first:         boolean;
   last:          boolean;
 }
-
-export interface ErrorResponse {
-  success:     false;
-  status:      number;
-  error:       string;
-  message:     string;
-  path:        string;
-  fieldErrors?: Record<string, string>;
-  timestamp:   string;
-}

@@ -25,6 +25,7 @@ export const categoriesApi = {
   updateCategory: async (id: string, payload: UpdateCategoryPayload): Promise<Category> =>
     (await apiClient.put<ApiResponse<Category>>(`/categories/${id}`, payload)).data.data,
 
+  /** Removes the category and its budgets; expenses are kept and retain this category's label. */
   deleteCategory: async (id: string): Promise<void> => {
     await apiClient.delete(`/categories/${id}`);
   },

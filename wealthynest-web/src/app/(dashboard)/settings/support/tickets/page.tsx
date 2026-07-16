@@ -4,6 +4,7 @@ import { ArrowLeft, Plus, Ticket, ChevronRight, MessageSquare, Clock } from "luc
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { PageWrapper } from "@/components/layout/PageWrapper";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { useMyTickets } from "@/features/support/hooks/useSupport";
 import type { TicketStatus, TicketPriority } from "@/features/support/types/support.types";
 import { cn } from "@/lib/utils";
@@ -12,7 +13,7 @@ const STATUS_CONFIG: Record<TicketStatus, { label: string; color: string }> = {
   OPEN:        { label: "Open",        color: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20" },
   IN_PROGRESS: { label: "In Progress", color: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" },
   RESOLVED:    { label: "Resolved",    color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" },
-  CLOSED:      { label: "Closed",      color: "bg-slate-500/10 text-slate-500 border border-slate-500/20" },
+  CLOSED:      { label: "Closed",      color: "bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20" },
 };
 
 const PRIORITY_BAR: Record<TicketPriority, string> = {
@@ -30,15 +31,15 @@ export default function MyTicketsPage() {
 
   return (
     <div className="flex flex-col flex-1">
-      <Header title="My Tickets" />
+      <Header title="My Tickets" subtitle="Track the status of your support requests" />
       <PageWrapper>
-        <div className="max-w-lg mx-auto space-y-5">
+        <div className="max-w-lg md:max-w-4xl mx-auto space-y-5">
 
           <div className="flex items-center justify-between">
             <Link href="/settings"
               className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
               <ArrowLeft className="w-3.5 h-3.5" />
-              Support
+              Settings
             </Link>
             <Link href="/settings/support/tickets/new"
               className="inline-flex items-center gap-1.5 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-xl transition-colors">
@@ -54,19 +55,21 @@ export default function MyTicketsPage() {
               ))}
             </div>
           ) : tickets.length === 0 ? (
-            <div className="bg-card border border-border rounded-2xl p-10 flex flex-col items-center gap-3 text-center">
-              <Ticket className="w-10 h-10 text-muted-foreground/30" />
-              <div>
-                <p className="text-sm font-semibold text-foreground">No tickets yet</p>
-                <p className="text-xs text-muted-foreground mt-1">Open a ticket whenever you hit an issue or have a question.</p>
-              </div>
-              <Link href="/settings/support/tickets/new"
-                className="inline-flex items-center gap-1.5 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl transition-colors mt-1">
-                <Plus className="w-3.5 h-3.5" /> Create your first ticket
-              </Link>
+            <div className="bg-card border border-border rounded-2xl">
+              <EmptyState
+                icon={Ticket}
+                title="No tickets yet"
+                description="Open a ticket whenever you hit an issue or have a question."
+                action={
+                  <Link href="/settings/support/tickets/new"
+                    className="inline-flex items-center gap-1.5 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl transition-colors">
+                    <Plus className="w-3.5 h-3.5" /> Create your first ticket
+                  </Link>
+                }
+              />
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="grid md:grid-cols-2 gap-2">
               {tickets.map(t => {
                 const cfg = STATUS_CONFIG[t.status];
                 return (

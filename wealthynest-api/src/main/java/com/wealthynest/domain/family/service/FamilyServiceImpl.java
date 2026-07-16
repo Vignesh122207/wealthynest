@@ -1,5 +1,6 @@
 package com.wealthynest.domain.family.service;
 
+import com.wealthynest.common.audit.AuditService;
 import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.domain.asset.repository.AssetRepository;
@@ -21,12 +22,14 @@ import com.wealthynest.domain.user.repository.UserRepository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -42,10 +45,12 @@ public class FamilyServiceImpl implements FamilyService {
     private final BudgetRepository    budgetRepository;
     private final CategoryRepository  categoryRepository;
     private final EntityManager       entityManager;
+    private final AuditService        auditService;
 
     @Override
     @Transactional
-    public FamilyResponse createFamily(UUID userId, CreateFamilyRequest request) {
+    @CacheEvict(value = "categories", allEntries = true) // migrateExistingData changes category scoping
+    public FamilyResponse createFamily(UUID userId, CreateFamilyRequest request, String ipAddress, String userAgent) {
         User user = requireUser(userId);
         if (user.getFamilyId() != null) {
             throw new BusinessException("User already belongs to a family", HttpStatus.CONFLICT);
@@ -62,11 +67,14 @@ public class FamilyServiceImpl implements FamilyService {
         entityManager.flush(); // ensure family INSERT reaches DB before FK-referencing UPDATE queries
         migrateExistingData(userId, family.getId());
         log.info("Family created: {} by user: {}", family.getId(), userId);
+        auditService.log(userId, "FAMILY_CREATED", "FAMILY", family.getId(),
+                null, Map.of("name", family.getName()), ipAddress, userAgent);
         return familyMapper.toResponse(family);
     }
 
     @Override
     @Transactional
+    @CacheEvict(value = "categories", allEntries = true) // migrateExistingData changes category scoping
     public FamilyResponse joinFamily(UUID userId, JoinFamilyRequest request) {
         User user = requireUser(userId);
         if (user.getFamilyId() != null) {
@@ -112,13 +120,16 @@ public class FamilyServiceImpl implements FamilyService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "categories", allEntries = true) // detachExistingData changes category scoping
     public void leaveFamily(UUID userId) {
         User user = requireUser(userId);
         if (user.getFamilyId() == null) {
             throw new BusinessException("User is not in a family", HttpStatus.BAD_REQUEST);
         }
+        UUID familyId = user.getFamilyId();
+        boolean lastMember = false;
         if (user.getRole() == UserRole.FAMILY_ADMIN || user.getRole() == UserRole.ADMIN) {
-            List<User> others = userRepository.findByFamilyId(user.getFamilyId())
+            List<User> others = userRepository.findByFamilyId(familyId)
                     .stream().filter(u -> !u.getId().equals(userId)).toList();
             if (!others.isEmpty()) {
                 boolean anotherAdminExists = others.stream()
@@ -127,9 +138,14 @@ public class FamilyServiceImpl implements FamilyService {
                     throw new BusinessException("Promote another member to admin before leaving.", HttpStatus.CONFLICT);
                 }
             } else {
-                // Last member — delete the family entirely
-                familyRepository.deleteById(user.getFamilyId());
+                lastMember = true;
             }
+        }
+        // Revert this member's data to personal so it leaves the family's shared views.
+        // For the last member this must happen before the family row is deleted — see detachExistingData.
+        detachExistingData(userId, familyId);
+        if (lastMember) {
+            familyRepository.deleteById(familyId);
         }
         user.setFamilyId(null);
         if (user.getRole() != UserRole.ADMIN) {
@@ -140,12 +156,14 @@ public class FamilyServiceImpl implements FamilyService {
 
     @Override
     @Transactional
-    public void deleteFamily(UUID familyId, UUID userId) {
+    @CacheEvict(value = "categories", allEntries = true) // clearFamilyId changes category scoping
+    public void deleteFamily(UUID familyId, UUID userId, String ipAddress, String userAgent) {
         User user = requireUser(userId);
         if (!familyId.equals(user.getFamilyId()) ||
                 (user.getRole() != UserRole.FAMILY_ADMIN && user.getRole() != UserRole.ADMIN)) {
             throw new BusinessException("Only the family admin can delete the group", HttpStatus.FORBIDDEN);
         }
+        Family family = requireFamily(familyId);
         // Clear FK references on all data tables first
         assetRepository.clearFamilyId(familyId);
         liabilityRepository.clearFamilyId(familyId);
@@ -163,6 +181,8 @@ public class FamilyServiceImpl implements FamilyService {
         });
         familyRepository.deleteById(familyId);
         log.info("Family {} deleted by admin {}", familyId, userId);
+        auditService.log(userId, "FAMILY_DELETED", "FAMILY", familyId,
+                Map.of("name", family.getName()), null, ipAddress, userAgent);
     }
 
     @Override
@@ -184,6 +204,7 @@ public class FamilyServiceImpl implements FamilyService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "categories", allEntries = true) // detachExistingData changes category scoping
     public void removeMember(UUID familyId, UUID adminId, UUID memberId) {
         User admin = requireUser(adminId);
         if (!familyId.equals(admin.getFamilyId()) ||
@@ -197,6 +218,8 @@ public class FamilyServiceImpl implements FamilyService {
         if (!familyId.equals(member.getFamilyId())) {
             throw new BusinessException("User is not a member of this family", HttpStatus.BAD_REQUEST);
         }
+        // Revert the removed member's data to personal so it leaves the family's shared views
+        detachExistingData(memberId, familyId);
         member.setFamilyId(null);
         member.setRole(UserRole.MEMBER);
         userRepository.save(member);
@@ -205,7 +228,7 @@ public class FamilyServiceImpl implements FamilyService {
 
     @Override
     @Transactional
-    public void transferAdmin(UUID familyId, UUID adminId, UUID newAdminId) {
+    public void transferAdmin(UUID familyId, UUID adminId, UUID newAdminId, String ipAddress, String userAgent) {
         User admin = requireUser(adminId);
         if (!familyId.equals(admin.getFamilyId()) ||
                 (admin.getRole() != UserRole.FAMILY_ADMIN && admin.getRole() != UserRole.ADMIN)) {
@@ -224,11 +247,14 @@ public class FamilyServiceImpl implements FamilyService {
         }
         userRepository.save(newAdmin);
         log.info("Admin promoted in family {}: {} granted admin to {}", familyId, adminId, newAdminId);
+        auditService.log(adminId, "FAMILY_ADMIN_TRANSFERRED", "FAMILY", familyId,
+                Map.of("previousAdmin", adminId.toString()),
+                Map.of("newAdmin", newAdminId.toString()), ipAddress, userAgent);
     }
 
     @Override
     @Transactional
-    public void revokeAdmin(UUID familyId, UUID adminId, UUID targetId) {
+    public void revokeAdmin(UUID familyId, UUID adminId, UUID targetId, String ipAddress, String userAgent) {
         User admin = requireUser(adminId);
         if (!familyId.equals(admin.getFamilyId()) ||
                 (admin.getRole() != UserRole.FAMILY_ADMIN && admin.getRole() != UserRole.ADMIN)) {
@@ -247,6 +273,9 @@ public class FamilyServiceImpl implements FamilyService {
         target.setRole(UserRole.MEMBER);
         userRepository.save(target);
         log.info("Admin revoked in family {}: {} revoked admin from {}", familyId, adminId, targetId);
+        auditService.log(adminId, "FAMILY_ADMIN_REVOKED", "FAMILY", familyId,
+                Map.of("targetUserId", targetId.toString(), "role", "FAMILY_ADMIN"),
+                Map.of("targetUserId", targetId.toString(), "role", "MEMBER"), ipAddress, userAgent);
     }
 
     private void migrateExistingData(UUID userId, UUID familyId) {
@@ -256,6 +285,21 @@ public class FamilyServiceImpl implements FamilyService {
         budgetRepository.migrateUserBudgetsToFamily(familyId, userId);
         categoryRepository.migrateUserCategoriesToFamily(familyId, userId);
         log.info("Migrated existing data for user {} to family {}", userId, familyId);
+    }
+
+    /**
+     * Reverse of migrateExistingData — reverts a departing member's own data to personal so it
+     * stops appearing in the family's shared views (categories, expenses, budgets, assets,
+     * liabilities). Must run BEFORE any family-row deletion: categories/budgets carry
+     * ON DELETE CASCADE on family_id, so deleting the family first would destroy the data.
+     */
+    private void detachExistingData(UUID userId, UUID familyId) {
+        assetRepository.clearFamilyIdForUser(userId, familyId);
+        liabilityRepository.clearFamilyIdForUser(userId, familyId);
+        expenseRepository.clearFamilyIdForUser(userId, familyId);
+        budgetRepository.clearFamilyIdForUser(userId, familyId);
+        categoryRepository.clearFamilyIdForUser(userId, familyId);
+        log.info("Detached data of user {} from family {}", userId, familyId);
     }
 
     private User requireUser(UUID userId) {

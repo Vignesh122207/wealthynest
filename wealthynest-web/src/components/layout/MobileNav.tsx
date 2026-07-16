@@ -2,15 +2,25 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Wallet, Receipt, TrendingUp, Scale } from "lucide-react";
+import { Home, Wallet, ArrowLeftRight, TrendingUp, PieChart } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PremiumIcon } from "@/components/icons/PremiumIcon";
+import { NAV_GRADIENTS } from "@/components/layout/Sidebar";
 
+// Net Worth only moves on a monthly snapshot — the least frequently-checked
+// number in the app — while Budgets is one of the most-opened destinations
+// (checked mid-month against a limit), so it holds the fifth tab instead.
+// Budgets uses PieChart (not Target) to match the desktop Sidebar, which now
+// uses Target for Goals — same glyph would otherwise mean two different
+// things depending on whether you're on mobile or desktop.
+// Gradients come from NAV_GRADIENTS (Sidebar.tsx) so each icon is the exact
+// same color on mobile as it is on desktop, instead of its own named tone.
 const NAV_ITEMS = [
   { href: "/dashboard",   label: "Home",         icon: Home },
   { href: "/accounts",    label: "Accounts",     icon: Wallet },
-  { href: "/expenses",    label: "Transactions", icon: Receipt },
+  { href: "/expenses",    label: "Transactions", icon: ArrowLeftRight },
   { href: "/investments", label: "Investments",  icon: TrendingUp },
-  { href: "/assets",      label: "Net Worth",    icon: Scale },
+  { href: "/budgets",     label: "Budgets",      icon: PieChart },
 ];
 
 export function MobileNav() {
@@ -22,7 +32,7 @@ export function MobileNav() {
         className="flex items-center justify-around w-full"
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+        {NAV_ITEMS.map(({ href, label, icon }) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link
@@ -40,7 +50,7 @@ export function MobileNav() {
                 "w-9 h-7 rounded-xl flex items-center justify-center transition-all",
                 active ? "bg-primary/10" : "bg-transparent"
               )}>
-                <Icon className={cn("w-[18px] h-[18px] transition-transform", active && "scale-110")} strokeWidth={active ? 2.25 : 1.75} />
+                <PremiumIcon icon={icon} gradient={NAV_GRADIENTS[href]} size="xs" className={cn("transition-transform", active && "scale-110")} />
               </div>
               <span className={cn(
                 "text-[9px] font-semibold tracking-tight text-center leading-tight",

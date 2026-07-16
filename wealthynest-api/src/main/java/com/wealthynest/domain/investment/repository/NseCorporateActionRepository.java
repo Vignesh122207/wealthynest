@@ -13,10 +13,7 @@ import java.util.UUID;
 @Repository
 public interface NseCorporateActionRepository extends JpaRepository<NseCorporateAction, UUID> {
     List<NseCorporateAction> findBySymbolAndExDateAfterOrderByExDateDesc(String symbol, LocalDate after);
-    List<NseCorporateAction> findBySymbolAndActionTypeAndExDateBetweenOrderByExDateAsc(
-        String symbol, String actionType, LocalDate from, LocalDate to);
     boolean existsBySymbolAndActionTypeAndExDate(String symbol, String actionType, LocalDate exDate);
-    long countBySymbol(String symbol);
 
     @Query("SELECT ca FROM NseCorporateAction ca WHERE ca.symbol IN :symbols AND ca.actionType = 'DIVIDEND' " +
            "AND YEAR(ca.exDate) = :year ORDER BY ca.exDate DESC")

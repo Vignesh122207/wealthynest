@@ -14,13 +14,9 @@ import java.util.UUID;
 public interface LiabilityRepository extends JpaRepository<Liability, UUID> {
 
     List<Liability> findByUserIdAndActiveTrueOrderByCreatedAtDesc(UUID userId);
-    List<Liability> findByFamilyIdAndActiveTrueOrderByCreatedAtDesc(UUID familyId);
 
     @Query("SELECT COALESCE(SUM(l.outstandingAmount),0) FROM Liability l WHERE l.userId = :userId AND l.active = true")
     BigDecimal sumOutstandingByUser(UUID userId);
-
-    @Query("SELECT COALESCE(SUM(l.outstandingAmount),0) FROM Liability l WHERE l.familyId = :familyId AND l.active = true")
-    BigDecimal sumOutstandingByFamily(UUID familyId);
 
     @Modifying
     @Query("UPDATE Liability l SET l.familyId = :familyId WHERE l.userId = :userId AND l.familyId IS NULL")
@@ -29,4 +25,9 @@ public interface LiabilityRepository extends JpaRepository<Liability, UUID> {
     @Modifying
     @Query("UPDATE Liability l SET l.familyId = null WHERE l.familyId = :familyId")
     void clearFamilyId(@Param("familyId") UUID familyId);
+
+    /** Detaches one departing member's own liabilities from the family. */
+    @Modifying
+    @Query("UPDATE Liability l SET l.familyId = null WHERE l.userId = :userId AND l.familyId = :familyId")
+    void clearFamilyIdForUser(@Param("userId") UUID userId, @Param("familyId") UUID familyId);
 }

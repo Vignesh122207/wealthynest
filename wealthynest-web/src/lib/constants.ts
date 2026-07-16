@@ -41,13 +41,24 @@ export const INDIAN_BANKS = [
   "UCO Bank",
 ];
 
-export const PAYMENT_METHODS = [
-  { value: "UPI",         label: "UPI" },
-  { value: "CASH",        label: "Cash" },
-  { value: "CREDIT_CARD", label: "Credit Card" },
-  { value: "DEBIT_CARD",  label: "Debit Card" },
-  { value: "NET_BANKING", label: "Net Banking" },
-  { value: "OTHER",       label: "Other" },
+// Ordered by approximate active-user market share, so the most-used brokers surface first
+// in the Investment-account "Broker / Platform" picker.
+export const STOCK_BROKERS = [
+  "Zerodha",
+  "Groww",
+  "Angel One",
+  "Upstox",
+  "ICICI Direct",
+  "HDFC Securities",
+  "Kotak Securities",
+  "Motilal Oswal",
+  "5paisa",
+  "Paytm Money",
+  "Sharekhan",
+  "IIFL Securities",
+  "SBI Securities",
+  "Axis Direct",
+  "Dhan",
 ];
 
 // Physical / non-investment asset types — distinct from the Investments tab
@@ -67,20 +78,9 @@ export const LIABILITY_TYPES = [
   { value: "PERSONAL_LOAN",  label: "Personal Loan" },
   { value: "CREDIT_CARD",    label: "Credit Card" },
   { value: "EDUCATION_LOAN", label: "Education Loan" },
+  { value: "GOLD_LOAN",      label: "Gold Loan" },
   { value: "BUSINESS_LOAN",  label: "Business Loan" },
   { value: "OTHER",          label: "Other" },
-];
-
-export const INVESTMENT_TYPES = [
-  { value: "STOCK",       label: "Stock" },
-  { value: "MUTUAL_FUND", label: "Mutual Fund" },
-  { value: "BOND",        label: "Bond" },
-  { value: "FD",          label: "Fixed Deposit" },
-  { value: "PPF",         label: "PPF" },
-  { value: "NPS",         label: "NPS" },
-  { value: "GOLD_ETF",    label: "Gold ETF" },
-  { value: "REIT",        label: "REIT" },
-  { value: "OTHER",       label: "Other" },
 ];
 
 export const INCOME_SOURCES = [
@@ -103,26 +103,6 @@ export const INCOME_SOURCE_ICONS: Record<string, string> = {
   INTEREST:  "🏦",
   DIVIDEND:  "📈",
   OTHER:     "💰",
-};
-
-export const INCOME_PAYMENT_MODES = [
-  { value: "BANK_ACCOUNT", label: "Bank Account" },
-  { value: "CASH",         label: "Cash" },
-];
-
-export const INCOME_PAYMENT_MODE_ICONS: Record<string, string> = {
-  BANK_ACCOUNT: "🏦",
-  CASH:         "💵",
-};
-
-export const INCOME_PAYMENT_MODE_COLORS: Record<string, string> = {
-  BANK_ACCOUNT: "#6366f1",
-  CASH:         "#22c55e",
-};
-
-export const INCOME_PAYMENT_MODE_LABELS: Record<string, string> = {
-  BANK_ACCOUNT: "Bank Account",
-  CASH:         "Cash",
 };
 
 export const INCOME_SOURCE_COLORS: Record<string, string> = {
@@ -165,6 +145,7 @@ export const LIABILITY_ICONS: Record<string, string> = {
   PERSONAL_LOAN:  "💳",
   CREDIT_CARD:    "💳",
   EDUCATION_LOAN: "🎓",
+  GOLD_LOAN:      "🪙",
   BUSINESS_LOAN:  "🏢",
   OTHER:          "📋",
 };
@@ -175,6 +156,7 @@ export const LIABILITY_COLORS: Record<string, string> = {
   PERSONAL_LOAN:  "#ec4899",
   CREDIT_CARD:    "#dc2626",
   EDUCATION_LOAN: "#a855f7",
+  GOLD_LOAN:      "#eab308",
   BUSINESS_LOAN:  "#0ea5e9",
   OTHER:          "#64748b",
 };

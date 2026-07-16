@@ -2,25 +2,23 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
-  Plus, Receipt, Trash2, Search, ChevronLeft, ChevronRight,
-  Banknote, Building2, CreditCard, Pencil, X, Check, Download, ChevronDown, RefreshCw,
-  ArrowUpRight, ArrowDownLeft, ArrowLeftRight,
-  Briefcase, Laptop, Home, Gift, Percent, Coins, TrendingUp, type LucideIcon,
+  Plus, Receipt, ChevronLeft, ChevronRight,
+  Banknote, CreditCard, RefreshCw, Wallet,
+  ArrowUpRight, ArrowDownLeft, ArrowLeftRight, HandCoins,
 } from "lucide-react";
-import { getCategoryMeta } from "@/lib/categoryMeta";
-import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { getCategoryIcon, getCategoryColor, INCOME_ICON_MAP } from "@/lib/categoryMeta";
+import { PremiumIcon } from "@/components/icons/PremiumIcon";
 import { Header } from "@/components/layout/Header";
 import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { TableRowSkeleton } from "@/components/shared/LoadingSkeleton";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { FormInput } from "@/components/forms/FormInput";
-import { FormSelect } from "@/components/forms/FormSelect";
-import { FormCurrencyInput } from "@/components/forms/FormCurrencyInput";
-import { FormDatePicker } from "@/components/forms/FormDatePicker";
+import { ExpenseForm } from "@/components/transactions/ExpenseForm";
+import { IncomeForm, type IncomeFormValues, type IncomeSourceValue } from "@/components/transactions/IncomeForm";
+import { TransferFormModal, type TransferFormValues } from "@/components/transactions/TransferFormModal";
+import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
 import {
   useExpenses, useCreateExpense, useUpdateExpense, useDeleteExpense,
 } from "@/features/expenses/hooks/useExpenses";
@@ -31,763 +29,37 @@ import {
 import {
   useIncome, useCreateIncome, useUpdateIncome, useDeleteIncome,
 } from "@/features/income/hooks/useIncome";
-import { expenseSchema, type ExpenseFormValues } from "@/features/expenses/schemas/expense.schema";
-import { formatCurrency, formatCurrencyCompact, formatDate, cn } from "@/lib/utils";
+import { useDashboard } from "@/features/dashboard/hooks/useDashboard";
+import { useAuthStore } from "@/features/auth/store/auth.store";
+import { useFamilyMembers } from "@/features/family/hooks/useFamily";
+import { type ExpenseFormValues } from "@/features/expenses/schemas/expense.schema";
+import type { SplitParticipant } from "@/features/expenses/types/expense.types";
+import { exportCsv, exportIncomeCsv, exportTransfersCsv, exportAllCsv } from "@/features/expenses/utils/csvExport";
+import { pad } from "@/features/expenses/utils/filterHelpers";
+import { ExpenseRow, IncomeRow, TransferRow, DebtBadge } from "@/features/expenses/components/TransactionRows";
+import { Chip } from "@/features/expenses/components/Chip";
+import { TypeTabs } from "@/features/expenses/components/TypeTabs";
+import { DateControls } from "@/features/expenses/components/DateControls";
+import { StatCards } from "@/features/expenses/components/StatCards";
+import { Toolbar } from "@/features/expenses/components/Toolbar";
+import { ImportStatementModal } from "@/features/statementimport/components/ImportStatementModal";
+import { FilterPanel } from "@/features/expenses/components/FilterPanel";
+import type { TxType, DateMode, SortKey, Channel } from "@/features/expenses/types/filters.types";
+import { formatDate, cn, pctChange } from "@/lib/utils";
+import { buildUsageCounts, sortByUsage, pickSmartDefault } from "@/lib/mostUsed";
+import { useAmountFormatter } from "@/hooks/useAmountFormatter";
 import { usePrefsStore, CURRENCIES } from "@/store/preferences.store";
 import { useDebounce } from "@/hooks/useDebounce";
-import { INCOME_SOURCES, INCOME_SOURCE_ICONS } from "@/lib/constants";
+import { INCOME_SOURCES } from "@/lib/constants";
 import type { Category } from "@/features/categories/types/category.types";
 import type { Expense } from "@/features/expenses/types/expense.types";
 import type { IncomeEntry } from "@/features/income/types/income.types";
 import type { AccountTransfer } from "@/features/accounts/types/account.types";
 
-type TxType  = "expenses" | "income" | "transfers" | "all";
-type DateMode = "month" | "year" | "custom" | "all";
-type SortKey  = "date-desc" | "date-asc" | "amount-desc" | "amount-asc";
-type Channel  = "" | "CASH" | "ACCOUNT" | "CREDIT";
-
-function pad(n: number) { return String(n).padStart(2, "0"); }
-function monthLabel(year: number, month: number) {
-  return new Date(year, month - 1).toLocaleString("en-IN", { month: "long", year: "numeric" });
-}
-
-const INCOME_ICON_MAP: Record<string, { icon: LucideIcon; color: string }> = {
-  SALARY:    { icon: Briefcase,   color: "#34C759" },
-  FREELANCE: { icon: Laptop,      color: "#007AFF" },
-  BUSINESS:  { icon: Building2,   color: "#BF5AF2" },
-  RENTAL:    { icon: Home,        color: "#30B0C7" },
-  BONUS:     { icon: Gift,        color: "#FF9500" },
-  INTEREST:  { icon: Percent,     color: "#5AC8FA" },
-  DIVIDEND:  { icon: TrendingUp,  color: "#32D74B" },
-  OTHER:     { icon: Coins,       color: "#8E8E93" },
-};
-
-// ─── CSV Export ───────────────────────────────────────────────────────────────
-
-function exportCsv(
-  expenses: Expense[],
-  label: string,
-  accountNameMap: Record<string, string>,
-  accountTypeMap: Record<string, string>,
-) {
-  const storedCurr = (() => { try { return JSON.parse(localStorage.getItem("wn-preferences") ?? "{}")?.state?.currency ?? "INR"; } catch { return "INR"; } })();
-  const headerSymbol = ({ INR: "₹", USD: "$", EUR: "€", GBP: "£" } as Record<string,string>)[storedCurr] ?? storedCurr;
-  const header = ["Date", "Description", "Category", `Amount (${headerSymbol})`, "Account", "Payment Method"];
-  const rows = expenses.map(e => {
-    let paymentMethod = e.paymentMethod ?? "";
-    if (!paymentMethod && e.accountId) {
-      const type = accountTypeMap[e.accountId];
-      if      (type === "CASH_WALLET")   paymentMethod = "Cash";
-      else if (type === "CREDIT_CARD")   paymentMethod = "Credit Card";
-      else if (type === "BANK_ACCOUNT")  paymentMethod = "Bank Account";
-    }
-    return [
-      e.expenseDate,
-      `"${(e.description ?? "").replace(/"/g, '""')}"`,
-      `"${(e.categoryName ?? "").replace(/"/g, '""')}"`,
-      e.amount.toFixed(2),
-      `"${accountNameMap[e.accountId ?? ""] ?? ""}"`,
-      paymentMethod,
-    ];
-  });
-  const csv  = [header, ...rows].map(r => r.join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url  = URL.createObjectURL(blob);
-  const a    = Object.assign(document.createElement("a"), { href: url, download: `expenses-${label}.csv` });
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
-}
-
-function exportIncomeCsv(entries: import("@/features/income/types/income.types").IncomeEntry[], label: string, accountNames: Record<string, string>) {
-  const INCOME_SOURCE_LABELS: Record<string, string> = {
-    SALARY: "Salary", FREELANCE: "Freelance", BUSINESS: "Business",
-    RENTAL: "Rental Income", INTEREST: "Interest", DIVIDEND: "Dividend",
-    GIFT: "Gift", BONUS: "Bonus", OTHER: "Other",
-  };
-  const header = ["Date", "Source", "Amount (₹)", "Description", "Account"];
-  const rows = entries.map(e => [
-    e.incomeDate,
-    INCOME_SOURCE_LABELS[e.source] ?? e.source.replace(/_/g, " "),
-    e.amount.toFixed(2),
-    `"${(e.description ?? "").replace(/"/g, '""')}"`,
-    `"${accountNames[e.accountId ?? ""] ?? ""}"`,
-  ]);
-  const csv  = [header, ...rows].map(r => r.join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url  = URL.createObjectURL(blob);
-  const a    = Object.assign(document.createElement("a"), { href: url, download: `income-${label}.csv` });
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
-}
-
-function exportTransfersCsv(transfers: import("@/features/accounts/types/account.types").AccountTransfer[], label: string) {
-  const header = ["Date", "From Account", "To Account", "Amount (₹)", "Description"];
-  const rows = transfers.map(t => [
-    t.transferDate, t.fromAccountName, t.toAccountName,
-    t.amount.toFixed(2),
-    `"${(t.description ?? "").replace(/"/g, '""')}"`,
-  ]);
-  const csv  = [header, ...rows].map(r => r.join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url  = URL.createObjectURL(blob);
-  const a    = Object.assign(document.createElement("a"), { href: url, download: `transfers-${label}.csv` });
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
-}
-
-// ─── Expense Form ─────────────────────────────────────────────────────────────
-
-interface ExpenseFormProps {
-  title:           string;
-  defaultValues?:  Partial<ExpenseFormValues>;
-  categoryOptions: { value: string; label: string }[];
-  cashAccounts:    { id: string; name: string; currentBalance: number }[];
-  bankAccounts:    { id: string; name: string; bankName?: string; currentBalance: number }[];
-  creditAccounts:  { id: string; name: string; bankName?: string; currentBalance: number }[];
-  onSubmit:        (v: ExpenseFormValues) => void;
-  onCancel:        () => void;
-  isPending:       boolean;
-  submitLabel:     string;
-}
-
-function ExpenseForm({ title, defaultValues, categoryOptions, cashAccounts, bankAccounts, creditAccounts, onSubmit, onCancel, isPending, submitLabel }: ExpenseFormProps) {
-  const hasAccounts = cashAccounts.length > 0 || bankAccounts.length > 0 || creditAccounts.length > 0;
-
-  const detectChannel = (): "" | "CASH" | "ACCOUNT" | "CREDIT" => {
-    if (defaultValues?.accountId) {
-      if (cashAccounts.some(a => a.id === defaultValues.accountId))   return "CASH";
-      if (creditAccounts.some(a => a.id === defaultValues.accountId)) return "CREDIT";
-      return "ACCOUNT";
-    }
-    const types = [cashAccounts.length > 0, bankAccounts.length > 0, creditAccounts.length > 0].filter(Boolean);
-    if (types.length === 1) {
-      if (cashAccounts.length > 0)   return "CASH";
-      if (creditAccounts.length > 0) return "CREDIT";
-      return "ACCOUNT";
-    }
-    return "";
-  };
-  const [payChannel, setPayChannel] = useState<"" | "CASH" | "ACCOUNT" | "CREDIT">(detectChannel);
-
-  const form = useForm<ExpenseFormValues>({
-    resolver: zodResolver(expenseSchema),
-    defaultValues: { expenseDate: new Date().toISOString().split("T")[0], ...defaultValues },
-  });
-
-  useEffect(() => {
-    if (!defaultValues?.accountId) {
-      const ch = detectChannel();
-      if (ch !== "") {
-        const list = ch === "CASH" ? cashAccounts : ch === "CREDIT" ? creditAccounts : bankAccounts;
-        if (list.length === 1) form.setValue("accountId", list[0].id);
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const accountOptions =
-    payChannel === "CASH"    ? cashAccounts.map(a => ({ value: a.id, label: `${a.name} — ${formatCurrencyCompact(a.currentBalance)}` }))
-    : payChannel === "CREDIT" ? creditAccounts.map(a => ({ value: a.id, label: `${a.name}${a.bankName ? ` (${a.bankName})` : ""} — ${formatCurrencyCompact(a.currentBalance)} due` }))
-    : bankAccounts.map(a => ({ value: a.id, label: `${a.name}${a.bankName ? ` (${a.bankName})` : ""} — ${formatCurrencyCompact(a.currentBalance)}` }));
-
-  const handleChannelChange = (ch: "CASH" | "ACCOUNT" | "CREDIT") => {
-    setPayChannel(ch);
-    const list = ch === "CASH" ? cashAccounts : ch === "CREDIT" ? creditAccounts : bankAccounts;
-    form.setValue("accountId", list.length === 1 ? list[0].id : "");
-    form.clearErrors("accountId");
-  };
-
-  return (
-    <div className="bg-card border border-border rounded-2xl p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-foreground text-sm">{title}</h3>
-        <button type="button" onClick={onCancel} className="text-muted-foreground hover:text-foreground transition-colors">
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <FormCurrencyInput label="Amount" placeholder="0"
-            error={form.formState.errors.amount?.message} {...form.register("amount")} />
-          <Controller control={form.control} name="expenseDate" render={({ field, fieldState }) => (
-            <FormDatePicker label="Date" value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} error={fieldState.error?.message} />
-          )} />
-          <FormSelect label="Category" options={categoryOptions} placeholder="Select category"
-            error={form.formState.errors.categoryId?.message} {...form.register("categoryId")} />
-          <FormInput label="Description (optional)" placeholder="e.g. Lunch at Saravana Bhavan"
-            className="sm:col-span-2 lg:col-span-3" {...form.register("description")} />
-        </div>
-
-        {!hasAccounts ? (
-          <div className="flex items-start gap-2 bg-amber-500/12 border border-amber-500/20 rounded-xl px-3 py-3">
-            <span className="mt-0.5 shrink-0 text-amber-500">⚠</span>
-            <div>
-              <p className="text-xs font-medium text-amber-600 dark:text-amber-400">No accounts found</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                You need at least one account to add expenses.{" "}
-                <a href="/accounts" className="underline text-indigo-500">Add an account →</a>
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <div className="flex items-center gap-1">
-              <p className="text-xs font-medium text-muted-foreground">Paid Via</p>
-              <span className="text-red-500 text-xs ml-0.5">*</span>
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              {cashAccounts.length > 0 && (
-                <button type="button" onClick={() => handleChannelChange("CASH")}
-                  className={cn("flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-medium transition-all border",
-                    payChannel === "CASH"
-                      ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
-                      : "bg-muted/60 border-border text-muted-foreground hover:text-foreground")}>
-                  <Banknote className="w-3.5 h-3.5" /> Cash
-                </button>
-              )}
-              {bankAccounts.length > 0 && (
-                <button type="button" onClick={() => handleChannelChange("ACCOUNT")}
-                  className={cn("flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-medium transition-all border",
-                    payChannel === "ACCOUNT"
-                      ? "bg-indigo-500/15 border-indigo-500/40 text-indigo-600 dark:text-indigo-400"
-                      : "bg-muted/60 border-border text-muted-foreground hover:text-foreground")}>
-                  <Building2 className="w-3.5 h-3.5" /> Bank Account
-                </button>
-              )}
-              {creditAccounts.length > 0 && (
-                <button type="button" onClick={() => handleChannelChange("CREDIT")}
-                  className={cn("flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-medium transition-all border",
-                    payChannel === "CREDIT"
-                      ? "bg-rose-500/15 border-rose-500/40 text-rose-600 dark:text-rose-400"
-                      : "bg-muted/60 border-border text-muted-foreground hover:text-foreground")}>
-                  <CreditCard className="w-3.5 h-3.5" /> Credit Card
-                </button>
-              )}
-            </div>
-            {payChannel !== "" && accountOptions.length > 1 && (
-              <FormSelect
-                label={payChannel === "CASH" ? "Cash Wallet" : payChannel === "CREDIT" ? "Credit Card" : "Bank Account"}
-                options={accountOptions} placeholder="Select account"
-                error={form.formState.errors.accountId?.message} {...form.register("accountId")} />
-            )}
-            {form.formState.errors.accountId && payChannel === "" && (
-              <p className="text-xs text-red-500">Please select how this expense was paid</p>
-            )}
-          </div>
-        )}
-
-        <div className="flex gap-2 pt-1">
-          <button type="submit" disabled={isPending || !hasAccounts}
-            className="flex items-center justify-center gap-2 flex-1 h-10 rounded-xl text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-all disabled:opacity-60">
-            <Check className="w-4 h-4" /> {isPending ? "Saving…" : submitLabel}
-          </button>
-          <button type="button" onClick={onCancel}
-            className="h-10 px-4 rounded-xl text-sm text-muted-foreground bg-muted hover:bg-muted/80 transition-all">
-            Cancel
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-// ─── Income Form ──────────────────────────────────────────────────────────────
-
-const incomeFormSchema = z.object({
-  source:      z.string().min(1, "Select a source"),
-  amount:      z.string().min(1, "Amount is required"),
-  incomeDate:  z.string().min(1, "Date is required"),
-  accountId:   z.string().min(1, "Select a deposit account"),
-  description: z.string().optional(),
-});
-type IncomeFormValues = z.infer<typeof incomeFormSchema>;
-
-/** Maps income category name → IncomeSource enum value stored in DB */
-const CATEGORY_NAME_TO_SOURCE: Record<string, string> = {
-  "salary":          "SALARY",
-  "freelance":       "FREELANCE",
-  "business":        "BUSINESS",
-  "business income": "BUSINESS",
-  "rental":          "RENTAL",
-  "rental income":   "RENTAL",
-  "bonus":           "BONUS",
-  "interest":        "INTEREST",
-  "interest income": "INTEREST",
-  "dividend":        "DIVIDEND",
-  "dividend income": "DIVIDEND",
-  "other":           "OTHER",
-  "other income":    "OTHER",
-};
-
-function categoryToSource(name: string): string {
-  return CATEGORY_NAME_TO_SOURCE[name.toLowerCase().trim()] ?? "OTHER";
-}
-
-/** Maps stored IncomeSource back to the income category name for pre-selection */
-const SOURCE_TO_CATEGORY_NAME: Record<string, string> = {
-  SALARY:    "Salary",
-  FREELANCE: "Freelance",
-  BUSINESS:  "Business Income",
-  RENTAL:    "Rental Income",
-  BONUS:     "Bonus",
-  INTEREST:  "Interest",
-  DIVIDEND:  "Dividend",
-  OTHER:     "Other",
-};
-
-function IncomeForm({ onSubmit, onCancel, isPending, accounts, incomeCategories, defaultValues, isEdit }: {
-  onSubmit:          (v: IncomeFormValues) => void;
-  onCancel:          () => void;
-  isPending:         boolean;
-  accounts:          { id: string; name: string; accountType: string }[];
-  incomeCategories?: Category[];
-  defaultValues?:    Partial<IncomeFormValues>;
-  isEdit?:           boolean;
-}) {
-  const form = useForm<IncomeFormValues>({
-    resolver: zodResolver(incomeFormSchema),
-    defaultValues: { incomeDate: new Date().toISOString().split("T")[0], ...defaultValues },
-  });
-  const depositAccounts = accounts.filter(a => a.accountType !== "CREDIT_CARD");
-  const accountOptions  = depositAccounts.map(a => ({ value: a.id, label: a.name }));
-  const selectedSource  = form.watch("source");
-
-  const hasCategoryOptions = incomeCategories && incomeCategories.length > 0;
-
-  return (
-    <div className="bg-card border border-border rounded-2xl p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-foreground text-sm">{isEdit ? "Edit Income" : "Add Income"}</h3>
-        <button type="button" onClick={onCancel} className="text-muted-foreground hover:text-foreground transition-colors">
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <div className="grid sm:grid-cols-2 gap-4">
-          <FormCurrencyInput label="Amount" placeholder="0"
-            error={form.formState.errors.amount?.message} {...form.register("amount")} />
-          <Controller control={form.control} name="incomeDate" render={({ field, fieldState }) => (
-            <FormDatePicker label="Date" value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} error={fieldState.error?.message} />
-          )} />
-        </div>
-
-        {/* Income category / source selection */}
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-            {hasCategoryOptions ? "Category" : "Source"}
-          </label>
-          {hasCategoryOptions ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {incomeCategories!.map(cat => {
-                const src = categoryToSource(cat.name);
-                const isActive = selectedSource === src ||
-                  (isEdit && SOURCE_TO_CATEGORY_NAME[selectedSource ?? ""] === cat.name);
-                return (
-                  <button key={cat.id} type="button"
-                    onClick={() => form.setValue("source", src, { shouldValidate: true })}
-                    className={cn(
-                      "flex items-center gap-2 h-9 px-3 rounded-xl text-xs font-medium border transition-all text-left",
-                      isActive
-                        ? "border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
-                        : "bg-muted/60 border-border text-muted-foreground hover:text-foreground"
-                    )}
-                    style={isActive ? { backgroundColor: (cat.color ?? "#22c55e") + "20" } : undefined}>
-                    {cat.icon && cat.icon.length <= 4 && (
-                      <span className="shrink-0">{cat.icon}</span>
-                    )}
-                    <span className="truncate">{cat.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {INCOME_SOURCES.map(s => (
-                <button key={s.value} type="button"
-                  onClick={() => form.setValue("source", s.value, { shouldValidate: true })}
-                  className={cn("flex items-center gap-1.5 h-9 px-3 rounded-xl text-xs font-medium border transition-all",
-                    selectedSource === s.value
-                      ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
-                      : "bg-muted/60 border-border text-muted-foreground hover:text-foreground")}>
-                  <span>{INCOME_SOURCE_ICONS[s.value]}</span> {s.label}
-                </button>
-              ))}
-            </div>
-          )}
-          {form.formState.errors.source && (
-            <p className="text-xs text-red-500 mt-1">{form.formState.errors.source.message}</p>
-          )}
-        </div>
-
-        {accountOptions.length === 0 ? (
-          <div className="text-xs text-amber-500/80 bg-amber-500/12 border border-amber-500/20 rounded-xl px-3 py-2.5">
-            No deposit accounts found. Add a Bank Account or Cash Wallet first.
-          </div>
-        ) : (
-          <FormSelect label="Deposit to Account" options={accountOptions}
-            placeholder="Select account"
-            error={form.formState.errors.accountId?.message}
-            {...form.register("accountId")} />
-        )}
-        <FormInput label="Description (optional)" placeholder="e.g. June salary" {...form.register("description")} />
-        <div className="flex gap-2 pt-1">
-          <button type="submit" disabled={isPending}
-            className="flex items-center justify-center gap-2 flex-1 h-10 rounded-xl text-sm font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-all disabled:opacity-60">
-            <Check className="w-4 h-4" /> {isPending ? "Saving…" : isEdit ? "Save Changes" : "Add Income"}
-          </button>
-          <button type="button" onClick={onCancel}
-            className="h-10 px-4 rounded-xl text-sm text-muted-foreground bg-muted hover:bg-muted/80 transition-all">
-            Cancel
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-// ─── Transfer Form ────────────────────────────────────────────────────────────
-
-const transferFormSchema = z.object({
-  fromAccountId: z.string().min(1, "Select source account"),
-  toAccountId:   z.string().min(1, "Select destination account"),
-  amount:        z.string().min(1, "Amount is required"),
-  transferDate:  z.string().min(1, "Date is required"),
-  description:   z.string().optional(),
-});
-type TransferFormValues = z.infer<typeof transferFormSchema>;
-
-function TransferFormModal({ onSubmit, onCancel, isPending, accounts, editTransferRef, isEdit }: {
-  onSubmit:         (v: TransferFormValues) => void;
-  onCancel:         () => void;
-  isPending:        boolean;
-  accounts:         { id: string; name: string }[];
-  editTransferRef?: AccountTransfer;
-  isEdit?:          boolean;
-}) {
-  const today = new Date().toISOString().split("T")[0];
-  const form = useForm<TransferFormValues>({
-    resolver: zodResolver(transferFormSchema),
-    defaultValues: {
-      fromAccountId: editTransferRef?.fromAccountId ?? "",
-      toAccountId:   editTransferRef?.toAccountId   ?? "",
-      amount:        editTransferRef ? String(editTransferRef.amount) : "",
-      transferDate:  editTransferRef?.transferDate   ?? today,
-      description:   editTransferRef?.description   ?? "",
-    },
-  });
-  const fromId   = form.watch("fromAccountId");
-  const toOpts   = accounts.filter(a => a.id !== fromId).map(a => ({ value: a.id, label: a.name }));
-  const fromOpts = accounts.map(a => ({ value: a.id, label: a.name }));
-
-  return (
-    <div className="bg-card border border-border rounded-2xl p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-foreground text-sm">{isEdit ? "Edit Transfer" : "New Transfer"}</h3>
-        <button type="button" onClick={onCancel} className="text-muted-foreground hover:text-foreground transition-colors">
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        {isEdit && editTransferRef ? (
-          <div className="flex items-center gap-2 bg-muted/50 rounded-xl px-3 py-2.5 text-sm">
-            <span className="font-medium text-foreground">{editTransferRef.fromAccountName}</span>
-            <ArrowLeftRight className="w-3.5 h-3.5 text-muted-foreground/80 shrink-0" />
-            <span className="font-medium text-foreground">{editTransferRef.toAccountName}</span>
-            <span className="ml-auto text-xs text-muted-foreground/50">accounts can't be changed</span>
-          </div>
-        ) : (
-          <div className="grid sm:grid-cols-2 gap-4">
-            <FormSelect label="From Account" options={fromOpts} placeholder="Select account"
-              error={form.formState.errors.fromAccountId?.message} {...form.register("fromAccountId")} />
-            <FormSelect label="To Account" options={toOpts} placeholder="Select account"
-              error={form.formState.errors.toAccountId?.message} {...form.register("toAccountId")} />
-          </div>
-        )}
-        <div className="grid sm:grid-cols-2 gap-4">
-          <FormCurrencyInput label="Amount" placeholder="0"
-            error={form.formState.errors.amount?.message} {...form.register("amount")} />
-          <Controller control={form.control} name="transferDate" render={({ field, fieldState }) => (
-            <FormDatePicker label="Date" value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} error={fieldState.error?.message} />
-          )} />
-        </div>
-        <FormInput label="Description (optional)" placeholder="e.g. Monthly savings" {...form.register("description")} />
-        <div className="flex gap-2 pt-1">
-          <button type="submit" disabled={isPending}
-            className="flex items-center justify-center gap-2 flex-1 h-10 rounded-xl text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white transition-all disabled:opacity-60">
-            <Check className="w-4 h-4" /> {isPending ? "Saving…" : isEdit ? "Save Changes" : "Transfer"}
-          </button>
-          <button type="button" onClick={onCancel}
-            className="h-10 px-4 rounded-xl text-sm text-muted-foreground bg-muted hover:bg-muted/80 transition-all">
-            Cancel
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-// ─── Row Components ───────────────────────────────────────────────────────────
-
-function ExpenseRow({ expense, accountName, onEdit, onDelete }: {
-  expense:     Expense;
-  accountName: string | undefined;
-  onEdit:      () => void;
-  onDelete:    () => void;
-}) {
-  const catMeta  = getCategoryMeta(expense.categoryName ?? "");
-  const catColor = expense.categoryColor ?? catMeta.color;
-  const CatIcon  = catMeta.icon;
-  return (
-    <div className="group flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors">
-      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-        style={{ backgroundColor: catColor + "20" }}>
-        <CatIcon className="w-[18px] h-[18px]" style={{ color: catColor }} strokeWidth={1.75} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground truncate leading-5">
-          {expense.description || expense.categoryName || "Expense"}
-        </p>
-        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-          {expense.categoryName && (
-            <span className="text-xs px-1.5 py-0.5 rounded-md font-medium"
-              style={{ backgroundColor: catColor + "18", color: catColor }}>{expense.categoryName}</span>
-          )}
-          {accountName && (
-            <span className="text-xs text-muted-foreground/50">{accountName}</span>
-          )}
-          {expense.paymentMethod === "CREDIT_CARD" && (
-            <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-500/15 text-rose-500 dark:text-rose-400 font-medium">Card</span>
-          )}
-        </div>
-      </div>
-      <p className="text-sm font-bold text-red-500 dark:text-red-400 tabular-nums shrink-0">−{formatCurrency(expense.amount)}</p>
-      <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
-        <button onClick={onEdit}
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:text-indigo-500 hover:bg-indigo-500/15 transition-all">
-          <Pencil className="w-3.5 h-3.5" />
-        </button>
-        <button onClick={onDelete}
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/15 transition-all">
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function IncomeRow({ entry, accountName, onEdit, onDelete }: {
-  entry:       IncomeEntry;
-  accountName: string | undefined;
-  onEdit:      () => void;
-  onDelete:    () => void;
-}) {
-  const src     = INCOME_ICON_MAP[entry.source] ?? INCOME_ICON_MAP.OTHER;
-  const IncIcon = src.icon;
-  return (
-    <div className="group flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors">
-      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-        style={{ backgroundColor: src.color + "20" }}>
-        <IncIcon className="w-[18px] h-[18px]" style={{ color: src.color }} strokeWidth={1.75} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground truncate leading-5">
-          {entry.description || INCOME_SOURCES.find(s => s.value === entry.source)?.label || entry.source}
-        </p>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          <span className="text-xs px-1.5 py-0.5 rounded-md font-medium"
-            style={{ backgroundColor: src.color + "20", color: src.color }}>
-            {INCOME_SOURCES.find(s => s.value === entry.source)?.label ?? entry.source}
-          </span>
-          {accountName && <span className="text-xs text-muted-foreground/50">{accountName}</span>}
-        </div>
-      </div>
-      <p className="text-sm font-bold text-emerald-500 dark:text-emerald-400 tabular-nums shrink-0">+{formatCurrency(entry.amount)}</p>
-      <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
-        <button onClick={onEdit}
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:text-indigo-500 hover:bg-indigo-500/15 transition-all">
-          <Pencil className="w-3.5 h-3.5" />
-        </button>
-        <button onClick={onDelete}
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/15 transition-all">
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function TransferRow({ transfer, onEdit, onDelete }: {
-  transfer: AccountTransfer;
-  onEdit:   () => void;
-  onDelete: () => void;
-}) {
-  return (
-    <div className="group flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors">
-      <div className="w-9 h-9 rounded-xl bg-violet-500/10 flex items-center justify-center shrink-0">
-        <ArrowLeftRight className="w-[18px] h-[18px] text-violet-500 dark:text-violet-400" strokeWidth={1.75} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground truncate leading-5">
-          {transfer.description || `${transfer.fromAccountName} → ${transfer.toAccountName}`}
-        </p>
-        <p className="text-xs text-muted-foreground/60 mt-0.5">
-          {transfer.fromAccountName} → {transfer.toAccountName}
-        </p>
-      </div>
-      <p className="text-sm font-bold text-violet-500 dark:text-violet-400 tabular-nums shrink-0">{formatCurrency(transfer.amount)}</p>
-      <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
-        <button onClick={onEdit}
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:text-indigo-500 hover:bg-indigo-500/15 transition-all">
-          <Pencil className="w-3.5 h-3.5" />
-        </button>
-        <button onClick={onDelete}
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/15 transition-all">
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
-  return (
-    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/25 shrink-0">
-      {label}
-      <button onClick={onRemove} className="ml-0.5 text-indigo-500/60 hover:text-indigo-500 transition-colors">
-        <X className="w-3 h-3" />
-      </button>
-    </span>
-  );
-}
-
-// ─── Sort Pills ───────────────────────────────────────────────────────────────
-
-function SortPills<T extends string>({
-  value, onChange, options,
-}: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[] }) {
-  return (
-    <div className="flex items-center gap-0.5 p-0.5 bg-muted/60 rounded-xl border border-border/50">
-      {options.map(o => (
-        <button key={o.value} type="button" onClick={() => onChange(o.value)}
-          className={cn(
-            "px-2.5 h-8 rounded-lg text-xs font-medium transition-all whitespace-nowrap",
-            value === o.value
-              ? "bg-card text-foreground shadow-sm border border-border/40"
-              : "text-muted-foreground hover:text-foreground",
-          )}>
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ─── Type Tab Bar ─────────────────────────────────────────────────────────────
-
-function TypeTabs({ value, onChange, counts }: { value: TxType; onChange: (t: TxType) => void; counts: Record<TxType, number> }) {
-  const tabs: { key: TxType; label: string; icon: React.ReactNode; color: string }[] = [
-    { key: "all",       label: "All",       icon: <Receipt className="w-3.5 h-3.5" />,          color: "text-foreground" },
-    { key: "expenses",  label: "Expenses",  icon: <ArrowDownLeft className="w-3.5 h-3.5" />,   color: "text-red-500" },
-    { key: "income",    label: "Income",    icon: <ArrowUpRight className="w-3.5 h-3.5" />,    color: "text-emerald-500" },
-    { key: "transfers", label: "Transfers", icon: <ArrowLeftRight className="w-3.5 h-3.5" />,  color: "text-blue-500" },
-  ];
-  return (
-    <div className="flex items-center gap-1 bg-muted/60 border border-border rounded-2xl p-1 self-start overflow-x-auto max-w-full" style={{ scrollbarWidth: "none" }}>
-      {tabs.map(t => (
-        <button key={t.key} onClick={() => onChange(t.key)}
-          className={cn(
-            "flex items-center gap-1.5 px-4 h-9 rounded-xl text-sm font-medium transition-all whitespace-nowrap",
-            value === t.key
-              ? cn("bg-card shadow-sm", t.color)
-              : "text-muted-foreground hover:text-foreground"
-          )}>
-          {t.icon} {t.label}
-          <span className="ml-1 text-xs bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground tabular-nums">{counts[t.key]}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ─── Shared Date Controls ─────────────────────────────────────────────────────
-
-function DateControls({ dateMode, setDateMode, year, setYear, month, setMonth,
-  customStart, setCustomStart, customEnd, setCustomEnd }: {
-  dateMode: DateMode; setDateMode: (m: DateMode) => void;
-  year: number; setYear: (y: number) => void;
-  month: number; setMonth: (m: number) => void;
-  customStart: string; setCustomStart: (s: string) => void;
-  customEnd: string; setCustomEnd: (s: string) => void;
-}) {
-  const now = new Date();
-  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
-  const navigateMonth = (dir: -1 | 1) => {
-    if (dir === 1 && isCurrentMonth) return;
-    let m = month + dir, y = year;
-    if (m < 1)  { m = 12; y--; }
-    if (m > 12) { m = 1;  y++; }
-    setMonth(m); setYear(y);
-  };
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex items-center h-9 bg-muted/60 border border-border rounded-xl p-0.5">
-          {(["month", "year", "all", "custom"] as DateMode[]).map(m => (
-            <button key={m} onClick={() => setDateMode(m)}
-              className={cn("px-2.5 h-7 rounded-lg text-[11px] font-medium transition-all",
-                dateMode === m ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
-              {m === "month" ? "Month" : m === "year" ? "Year" : m === "custom" ? "Custom" : "All"}
-            </button>
-          ))}
-        </div>
-        {dateMode === "month" && (
-          <>
-            <button onClick={() => navigateMonth(-1)}
-              className="w-7 h-7 rounded-lg bg-muted/60 border border-border hover:bg-muted flex items-center justify-center transition-all">
-              <ChevronLeft className="w-3.5 h-3.5 text-muted-foreground" />
-            </button>
-            <span className="text-sm font-semibold text-foreground min-w-[130px] text-center">{monthLabel(year, month)}</span>
-            <button onClick={() => navigateMonth(1)} disabled={isCurrentMonth}
-              className="w-7 h-7 rounded-lg bg-muted/60 border border-border hover:bg-muted flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed">
-              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
-            </button>
-          </>
-        )}
-        {dateMode === "year" && (
-          <>
-            <button onClick={() => setYear(year - 1)}
-              className="w-7 h-7 rounded-lg bg-muted/60 border border-border hover:bg-muted flex items-center justify-center transition-all">
-              <ChevronLeft className="w-3.5 h-3.5 text-muted-foreground" />
-            </button>
-            <span className="text-sm font-semibold text-foreground min-w-[48px] text-center">{year}</span>
-            <button onClick={() => setYear(year + 1)} disabled={year >= now.getFullYear()}
-              className="w-7 h-7 rounded-lg bg-muted/60 border border-border hover:bg-muted flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed">
-              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
-            </button>
-          </>
-        )}
-      </div>
-      {dateMode === "custom" && (
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="w-44">
-            <FormDatePicker label="From" value={customStart} onChange={setCustomStart} placeholder="Start date" />
-          </div>
-          <div className="w-44">
-            <FormDatePicker label="To" value={customEnd} onChange={setCustomEnd} placeholder="End date" />
-          </div>
-          {customStart && customEnd && customEnd < customStart && (
-            <p className="text-xs text-red-500 w-full">"To" date must be on or after "From" date.</p>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function TransactionsPage() {
+  const { fmt } = useAmountFormatter();
   const now = new Date();
   const searchParams = useSearchParams();
 
@@ -808,33 +80,32 @@ export default function TransactionsPage() {
   const [maxAmount,        setMaxAmount]        = useState<number | "">("");
   const [sortKey,          setSortKey]          = useState<SortKey>("date-desc");
   const [recurringOnly,    setRecurringOnly]    = useState(false);
-  const [search,           setSearch]           = useState("");
   const [showCreate,       setShowCreate]       = useState(false);
   const [editExpense,      setEditExpense]      = useState<Expense | null>(null);
   const [confirmId,        setConfirmId]        = useState<string | null>(null);
-  const [showCatDropdown,  setShowCatDropdown]  = useState(false);
-  const [showAmtPopover,   setShowAmtPopover]   = useState(false);
   const [listPage,         setListPage]         = useState(0);
+
+  // Shared toolbar — search, filters drawer
+  const [search,           setSearch]           = useState("");
+  const [showFilterPanel,  setShowFilterPanel]  = useState(false);
 
   // Income state
   const [showAddIncome,   setShowAddIncome]   = useState(false);
   const [editIncome,      setEditIncome]      = useState<IncomeEntry | null>(null);
   const [confirmIncomeId, setConfirmIncomeId] = useState<string | null>(null);
-  const [incomeSearch,    setIncomeSearch]    = useState("");
   const [incomeSort,      setIncomeSort]      = useState<"newest"|"oldest"|"high"|"low">("newest");
 
   // Transfer state
   const [showAddTransfer,   setShowAddTransfer]   = useState(false);
   const [editTransfer,      setEditTransfer]      = useState<AccountTransfer | null>(null);
   const [confirmTransferId, setConfirmTransferId] = useState<string | null>(null);
-  const [transferSearch,    setTransferSearch]    = useState("");
+  const [showImportStatement, setShowImportStatement] = useState(false);
   const [transferSort,      setTransferSort]      = useState<"newest"|"oldest"|"high"|"low">("newest");
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
 
   // All-tab pagination
   const [allPage, setAllPage] = useState(0);
   const ALL_PAGE_SIZE = 20;
-  const [allSearch, setAllSearch] = useState("");
 
   const debouncedSearch = useDebounce(search, 400);
   const { currency: currCode } = usePrefsStore();
@@ -875,12 +146,16 @@ export default function TransactionsPage() {
   const [sortBy, sortDir] = sortKey.split("-") as ["expenseDate" | "amount", "asc" | "desc"];
   const PAGE_SIZE = 25;
 
+  // An explicit account selection (from the "view transactions for this account" entry point,
+  // or the filter panel's account picker) takes priority over the payment-channel-derived list.
+  const effectiveAccountIds = selectedAccountIds.length > 0 ? selectedAccountIds : accountIds;
+
   const expenseFilters = {
     startDate:  recurringOnly ? undefined : startDate as string | undefined,
     endDate:    recurringOnly ? undefined : endDate as string | undefined,
     search:     debouncedSearch || undefined,
     categoryId: categoryId || undefined,
-    accountIds: accountIds.length ? accountIds : undefined,
+    accountIds: effectiveAccountIds.length ? effectiveAccountIds : undefined,
     minAmount:  minAmount !== "" ? Number(minAmount) : undefined,
     maxAmount:  maxAmount !== "" ? Number(maxAmount) : undefined,
     recurring:  recurringOnly ? true : undefined,
@@ -891,15 +166,9 @@ export default function TransactionsPage() {
 
   const { data: expenseData, isLoading: expensesLoading } = useExpenses(expenseFilters);
 
-  // For prev-month comparison
+  // Previous month, used by the stat-card deltas below (dashboardSummary vs prevDashboardSummary)
   const prevMonthNum = month === 1 ? 12 : month - 1;
   const prevYearNum  = month === 1 ? year - 1 : year;
-  const { data: prevMonthData } = useExpenses({
-    startDate: `${prevYearNum}-${pad(prevMonthNum)}-01`,
-    endDate:   new Date(prevYearNum, prevMonthNum, 0).toISOString().split("T")[0],
-    size: 500, sortDir: "desc",
-  });
-  const prevMonthTotal = (prevMonthData?.data ?? []).reduce((s, e) => s + e.amount, 0);
 
   // ─── Income data ───────────────────────────────────────────────────────────
   const incomeYear  = dateMode === "all" ? undefined : year;
@@ -909,7 +178,18 @@ export default function TransactionsPage() {
 
   // ─── Transfer data ─────────────────────────────────────────────────────────
   const { data: transfersPage, isLoading: transfersLoading } = useTransfers(0, 500);
-  const allTransfers = transfersPage?.data ?? [];
+  const allTransfers = useMemo(() => transfersPage?.data ?? [], [transfersPage]);
+
+  // ─── All-time data, unscoped by the selected date range ────────────────────
+  // Powers two things that a date-scoped fetch can't answer correctly: the running
+  // balance column (needs full history per account, anchored at opening balance) and,
+  // outside "month" mode, the stat-card totals (the month-mode dashboard aggregate below
+  // is server-summed with no size cap; this is the fallback for year/custom/all ranges).
+  const { data: allTimeExpensesData } = useExpenses({ size: 2000, sortDir: "asc", includeDebt: true });
+  const allTimeExpenses = useMemo(() => allTimeExpensesData?.data ?? [], [allTimeExpensesData]);
+  const { data: allTimeIncome = [] } = useIncome(undefined, undefined, true);
+  const { data: dashboardSummary }     = useDashboard(year, month);
+  const { data: prevDashboardSummary } = useDashboard(prevYearNum, prevMonthNum);
 
   // Filter transfers by date range client-side
   const filteredTransfers = useMemo(() => {
@@ -935,19 +215,17 @@ export default function TransactionsPage() {
     return incomeData;
   }, [incomeData, dateMode, startDate, endDate]);
 
-  // Income search
-  const debouncedIncomeSearch = useDebounce(incomeSearch, 300);
+  // Income search — shared search box drives every tab
   const searchedIncome = useMemo(() => {
-    if (!debouncedIncomeSearch) return filteredIncome;
-    const q = debouncedIncomeSearch.toLowerCase();
+    if (!debouncedSearch) return filteredIncome;
+    const q = debouncedSearch.toLowerCase();
     return filteredIncome.filter(i =>
       (i.description ?? "").toLowerCase().includes(q) ||
       (INCOME_SOURCES.find(s => s.value === i.source)?.label ?? "").toLowerCase().includes(q)
     );
-  }, [filteredIncome, debouncedIncomeSearch]);
+  }, [filteredIncome, debouncedSearch]);
 
-  // Transfer search
-  const debouncedTransferSearch = useDebounce(transferSearch, 300);
+  // Transfer search — shared search box drives every tab
   const searchedTransfers = useMemo(() => {
     let base = filteredTransfers;
     if (selectedAccountIds.length > 0) {
@@ -956,14 +234,14 @@ export default function TransactionsPage() {
         selectedAccountIds.includes(t.toAccountId)
       );
     }
-    if (!debouncedTransferSearch) return base;
-    const q = debouncedTransferSearch.toLowerCase();
+    if (!debouncedSearch) return base;
+    const q = debouncedSearch.toLowerCase();
     return base.filter(t =>
       (t.description ?? "").toLowerCase().includes(q) ||
       t.fromAccountName.toLowerCase().includes(q) ||
       t.toAccountName.toLowerCase().includes(q)
     );
-  }, [filteredTransfers, debouncedTransferSearch, selectedAccountIds]);
+  }, [filteredTransfers, debouncedSearch, selectedAccountIds]);
 
   // ─── "All" merged rows ─────────────────────────────────────────────────────
   type TxRow =
@@ -984,20 +262,60 @@ export default function TransactionsPage() {
     return allIncomeRaw;
   }, [allIncomeRaw, dateMode, startDate, endDate]);
 
+  // Computed regardless of active tab — the stat cards need these totals everywhere, not just on "All".
   const mergedRows = useMemo<TxRow[]>(() => {
-    if (txType !== "all") return [];
     const rows: TxRow[] = [
       ...(allExpensesRaw?.data ?? []).map(e => ({ kind: "expense" as const, date: e.expenseDate, data: e })),
       ...filteredAllIncome.map(i => ({ kind: "income" as const, date: i.incomeDate, data: i })),
       ...filteredTransfers.map(t => ({ kind: "transfer" as const, date: t.transferDate, data: t })),
     ];
     return rows.sort((a, b) => b.date.localeCompare(a.date) || b.data.createdAt.localeCompare(a.data.createdAt));
-  }, [txType, allExpensesRaw, filteredAllIncome, filteredTransfers]);
+  }, [allExpensesRaw, filteredAllIncome, filteredTransfers]);
+
+  const txTypeCounts = useMemo<Record<TxType, number>>(() => ({
+    all:       mergedRows.length,
+    expenses:  mergedRows.filter(r => r.kind === "expense").length,
+    income:    mergedRows.filter(r => r.kind === "income").length,
+    transfers: mergedRows.filter(r => r.kind === "transfer").length,
+  }), [mergedRows]);
 
   const filteredMergedRows = useMemo(() => {
-    if (!allSearch.trim()) return mergedRows;
-    const q = allSearch.toLowerCase();
     return mergedRows.filter(row => {
+      // Account filter applies uniformly across all three kinds — e.g. the "view transactions
+      // for this account" entry point from an AccountCard, which lands here via ?accountId=.
+      if (selectedAccountIds.length > 0) {
+        if (row.kind === "expense") {
+          const e = row.data as Expense;
+          if (!e.accountId || !selectedAccountIds.includes(e.accountId)) return false;
+        } else if (row.kind === "income") {
+          const inc = row.data as IncomeEntry;
+          if (!inc.accountId || !selectedAccountIds.includes(inc.accountId)) return false;
+        } else {
+          const t = row.data as AccountTransfer;
+          if (!selectedAccountIds.includes(t.fromAccountId) && !selectedAccountIds.includes(t.toAccountId)) return false;
+        }
+      }
+      // Category / channel / amount / recurring filters only apply to the expense side —
+      // income and transfers don't carry those dimensions in our data model.
+      if (row.kind === "expense") {
+        const e = row.data as Expense;
+        if (categoryId && e.categoryId !== categoryId) return false;
+        if (recurringOnly && !e.recurring) return false;
+        if (minAmount !== "" && e.amount < Number(minAmount)) return false;
+        if (maxAmount !== "" && e.amount > Number(maxAmount)) return false;
+        if (payChannel) {
+          const type = e.accountId ? accountTypeMap[e.accountId] : undefined;
+          const matches = payChannel === "CASH" ? type === "CASH_WALLET"
+            : payChannel === "CREDIT" ? type === "CREDIT_CARD"
+            : type === "BANK_ACCOUNT";
+          if (!matches) return false;
+        }
+      } else if (categoryId || recurringOnly) {
+        // A category or recurring-only filter is active and this row isn't an expense — exclude it.
+        return false;
+      }
+      if (!debouncedSearch.trim()) return true;
+      const q = debouncedSearch.toLowerCase();
       if (row.kind === "expense") {
         const e = row.data as Expense;
         return (e.description ?? "").toLowerCase().includes(q) ||
@@ -1016,12 +334,110 @@ export default function TransactionsPage() {
              t.toAccountName.toLowerCase().includes(q) ||
              String(t.amount).includes(q);
     });
-  }, [mergedRows, allSearch]);
+  }, [mergedRows, debouncedSearch, categoryId, recurringOnly, minAmount, maxAmount, payChannel, accountTypeMap, selectedAccountIds]);
 
   const allTotalPages = Math.max(1, Math.ceil(filteredMergedRows.length / ALL_PAGE_SIZE));
   const pagedMergedRows = filteredMergedRows.slice(allPage * ALL_PAGE_SIZE, (allPage + 1) * ALL_PAGE_SIZE);
 
+  // Net of whatever's currently matched (income − expenses; transfers don't move net worth,
+  // they just move money between your own accounts, so they're excluded from this total).
+  const allTabNet = useMemo(() => filteredMergedRows.reduce((s, r) => {
+    if (r.kind === "income")  return s + (r.data as IncomeEntry).amount;
+    if (r.kind === "expense") return s - (r.data as Expense).amount;
+    return s;
+  }, 0), [filteredMergedRows]);
+
+  // ─── Stat cards — Total Income / Total Expenses for the selected period ────
+  // "Month" mode uses the analytics dashboard's server-side aggregate (no size cap, always
+  // correct). Other modes fall back to summing the all-time fetch above, filtered to the
+  // selected range — bounded by that fetch's 2000-row cap rather than the old 300-row one.
+  const statTotals = useMemo(() => {
+    // Deltas only make sense month-over-month, so they're only ever populated in "month" mode.
+    // Uses the same pctChange() every other stat tile in the app uses (lib/utils) — it treats a
+    // zero/missing previous value as a full +100% move rather than silently hiding the delta,
+    // which is what caused Expenses/Net Savings to go quiet while Income kept showing one.
+    if (dateMode === "month" && dashboardSummary) {
+      const prevNet = prevDashboardSummary ? prevDashboardSummary.monthlyIncome - prevDashboardSummary.monthlyExpenses : undefined;
+      const net = dashboardSummary.monthlyIncome - dashboardSummary.monthlyExpenses;
+      return {
+        income: dashboardSummary.monthlyIncome, expenses: dashboardSummary.monthlyExpenses,
+        incomeDelta:      pctChange(dashboardSummary.monthlyIncome,   prevDashboardSummary?.monthlyIncome),
+        expensesDelta:    pctChange(dashboardSummary.monthlyExpenses, prevDashboardSummary?.monthlyExpenses),
+        netSavingsDelta:  pctChange(net, prevNet),
+      };
+    }
+    const inRange = (d: string) => (!startDate || d >= startDate) && (!endDate || d <= endDate);
+    return {
+      income:   allTimeIncome.filter(i => inRange(i.incomeDate)).reduce((s, i) => s + i.amount, 0),
+      expenses: allTimeExpenses.filter(e => inRange(e.expenseDate)).reduce((s, e) => s + e.amount, 0),
+      incomeDelta: undefined, expensesDelta: undefined, netSavingsDelta: undefined,
+    };
+  }, [dateMode, dashboardSummary, prevDashboardSummary, allTimeIncome, allTimeExpenses, startDate, endDate]);
+
+  // ─── Running balance ledger ──────────────────────────────────────────────────
+  // A per-row "balance after this transaction" only means something as a chronological
+  // replay anchored at the account's true opening balance — anchoring at currentBalance and
+  // walking backward breaks the moment the viewed period isn't the most recent one. So this
+  // replays every expense/income/transfer for each account, oldest to newest, from
+  // account.openingBalance, independent of whatever date range is currently selected.
+  //
+  // Sign convention matches the backend's enrich() exactly: for liability accounts (credit
+  // card, loan) an expense INCREASES what's owed and income/transfers-in pay it DOWN — the
+  // opposite of an asset account. Getting this backwards would show a credit card's balance
+  // shrinking every time you spend on it.
+  const balanceMap = useMemo(() => {
+    const isLiability = (accId: string) => {
+      const type = accountTypeMap[accId];
+      return type === "CREDIT_CARD" || type === "LOAN";
+    };
+    type LedgerEvent = { key: string; accountId: string; date: string; createdAt: string; delta: number };
+    const events: LedgerEvent[] = [];
+    allTimeExpenses.forEach(e => {
+      if (!e.accountId) return;
+      const base = -e.amount;
+      events.push({ key: `expense-${e.id}`, accountId: e.accountId, date: e.expenseDate, createdAt: e.createdAt, delta: isLiability(e.accountId) ? -base : base });
+    });
+    allTimeIncome.forEach(i => {
+      if (!i.accountId) return;
+      const base = i.amount;
+      events.push({ key: `income-${i.id}`, accountId: i.accountId, date: i.incomeDate, createdAt: i.createdAt, delta: isLiability(i.accountId) ? -base : base });
+    });
+    allTransfers.forEach(t => {
+      if (t.fromAccountId) {
+        const base = -t.amount;
+        events.push({ key: `transfer-${t.id}-from`, accountId: t.fromAccountId, date: t.transferDate, createdAt: t.createdAt, delta: isLiability(t.fromAccountId) ? -base : base });
+      }
+      if (t.toAccountId) {
+        const base = t.amount;
+        events.push({ key: `transfer-${t.id}-to`, accountId: t.toAccountId, date: t.transferDate, createdAt: t.createdAt, delta: isLiability(t.toAccountId) ? -base : base });
+      }
+    });
+
+    const byAccount = new Map<string, LedgerEvent[]>();
+    events.forEach(ev => {
+      if (!byAccount.has(ev.accountId)) byAccount.set(ev.accountId, []);
+      byAccount.get(ev.accountId)!.push(ev);
+    });
+
+    const balances = new Map<string, number>();
+    byAccount.forEach((accountEvents, accountId) => {
+      const account = allAccounts.find(a => a.id === accountId);
+      if (!account) return;
+      accountEvents.sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
+      let running = account.openingBalance;
+      accountEvents.forEach(ev => {
+        running += ev.delta;
+        balances.set(ev.key, running);
+      });
+    });
+    return balances;
+  }, [allTimeExpenses, allTimeIncome, allTransfers, allAccounts, accountTypeMap]);
+
   // ─── Mutations ─────────────────────────────────────────────────────────────
+  const { user } = useAuthStore();
+  const { data: familyMembersRaw = [] } = useFamilyMembers(user?.familyId);
+  const familyMembers = familyMembersRaw.filter(m => m.id !== user?.id).map(m => ({ id: m.id, fullName: m.fullName }));
+
   const { mutate: createExpense, isPending: creating } = useCreateExpense();
   const { mutate: updateExpense, isPending: updating } = useUpdateExpense();
   const { mutate: deleteExpense }                      = useDeleteExpense();
@@ -1032,7 +448,13 @@ export default function TransactionsPage() {
   const { mutate: updateTransfer, isPending: updatingTransfer } = useUpdateTransfer();
   const { mutate: deleteTransfer }                            = useDeleteTransfer();
 
-  const categoryOptions = categories.map(c => ({ value: c.id, label: c.name }));
+  // Most-used-first picker order (e.g. Groceries/Salary at the top) — separate from
+  // defaultExpenseCategoryId/defaultIncomeSource below, which pick the recency-based default.
+  const expenseCategoryUsage = useMemo(() => buildUsageCounts(allTimeExpenses, e => e.categoryId), [allTimeExpenses]);
+  const incomeSourceUsage    = useMemo(() => buildUsageCounts(allTimeIncome, i => i.source), [allTimeIncome]);
+  const categoryOptions = useMemo(() =>
+    sortByUsage(categories.map(c => ({ value: c.id, label: c.name, icon: c.icon, color: c.color })), o => o.value, expenseCategoryUsage),
+    [categories, expenseCategoryUsage]);
   const categoryName    = categories.find(c => c.id === categoryId)?.name;
 
   function resolvePaymentMethod(accountId: string | undefined) {
@@ -1042,10 +464,10 @@ export default function TransactionsPage() {
     return type === "CASH_WALLET" ? "CASH" : type === "CREDIT_CARD" ? "CREDIT_CARD" : "BANK_ACCOUNT";
   }
 
-  const handleCreate = (values: ExpenseFormValues) => {
+  const handleCreate = (values: ExpenseFormValues, splitWith?: SplitParticipant[]) => {
     const accountId = values.accountId || undefined;
     createExpense(
-      { ...values, amount: Number(values.amount), accountId, paymentMethod: resolvePaymentMethod(accountId) },
+      { ...values, amount: Number(values.amount), accountId, paymentMethod: resolvePaymentMethod(accountId), splitWith },
       { onSuccess: () => setShowCreate(false) }
     );
   };
@@ -1064,7 +486,7 @@ export default function TransactionsPage() {
     createIncome(
       {
         source: values.source,
-        amount: Number(values.amount),
+        amount: values.amount,
         incomeDate: values.incomeDate,
         periodMonth: d.getMonth() + 1,
         periodYear:  d.getFullYear(),
@@ -1094,7 +516,7 @@ export default function TransactionsPage() {
     const d = new Date(values.incomeDate);
     updateIncome(
       { id: editIncome.id, payload: {
-        source: values.source, amount: Number(values.amount),
+        source: values.source, amount: values.amount,
         incomeDate: values.incomeDate,
         periodMonth: d.getMonth() + 1, periodYear: d.getFullYear(),
         accountId: values.accountId || undefined,
@@ -1145,7 +567,9 @@ export default function TransactionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [startDate, endDate, debouncedSearch, categoryId, payChannel, minAmount, maxAmount, sortKey, recurringOnly]);
 
-  useEffect(() => { setAllPage(0); }, [txType, dateMode, year, month, customStart, customEnd, allSearch]);
+  useEffect(() => { setAllPage(0); },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [txType, dateMode, year, month, customStart, customEnd, debouncedSearch, categoryId, payChannel, minAmount, maxAmount, recurringOnly]);
 
   const activeFilterCount = [
     payChannel !== "", categoryId !== "", minAmount !== "" || maxAmount !== "",
@@ -1153,7 +577,6 @@ export default function TransactionsPage() {
   ].filter(Boolean).length;
 
   const expenses      = expenseData?.data ?? [];
-  const totalSpent    = expenses.reduce((s, e) => s + e.amount, 0);
   const serverTotal   = expenseData?.meta?.totalElements ?? 0;
   const totalPages    = expenseData?.meta?.totalPages ?? 1;
 
@@ -1165,38 +588,88 @@ export default function TransactionsPage() {
   const sortedDates = Object.keys(grouped).sort((a, b) =>
     sortDir === "asc" ? a.localeCompare(b) : b.localeCompare(a));
 
-  const topCategory = useMemo(() => {
-    const map: Record<string, { name: string; total: number }> = {};
-    expenses.forEach(e => {
-      if (!e.categoryId) return;
-      if (!map[e.categoryId]) map[e.categoryId] = { name: e.categoryName ?? "Unknown", total: 0 };
-      map[e.categoryId].total += e.amount;
-    });
-    return Object.values(map).sort((a, b) => b.total - a.total)[0];
-  }, [expenses]);
+  // Expenses-tab list header total — from the full filtered period (filteredMergedRows), not
+  // the paginated `expenses` slice, so it doesn't silently only reflect whichever page is on screen.
+  const expenseTabRows  = useMemo(() => filteredMergedRows.filter(r => r.kind === "expense"), [filteredMergedRows]);
+  const expenseTabTotal = useMemo(() => expenseTabRows.reduce((s, r) => s + (r.data as Expense).amount, 0), [expenseTabRows]);
 
   const csvLabel = dateMode === "month" ? `${year}-${pad(month)}`
     : dateMode === "year" ? `${year}`
     : dateMode === "custom" ? `${customStart ?? "start"}-to-${customEnd ?? "end"}`
     : "all";
 
-  const chips: { label: string; clear: () => void }[] = [];
-  if (payChannel === "CASH")    chips.push({ label: "Cash only",    clear: () => setPayChannel("") });
-  if (payChannel === "ACCOUNT") chips.push({ label: "Bank account", clear: () => setPayChannel("") });
-  if (payChannel === "CREDIT")  chips.push({ label: "Credit card",  clear: () => setPayChannel("") });
-  if (categoryId)               chips.push({ label: categoryName ?? "Category", clear: () => setCategoryId("") });
-  if (minAmount !== "")         chips.push({ label: `Min ${currSymbol}${minAmount}`, clear: () => setMinAmount("") });
-  if (maxAmount !== "")         chips.push({ label: `Max ${currSymbol}${maxAmount}`, clear: () => setMaxAmount("") });
-  if (sortKey !== "date-desc")  chips.push({ label: ({"date-asc":"Oldest first","amount-desc":"Highest first","amount-asc":"Lowest first"} as Record<string,string>)[sortKey], clear: () => setSortKey("date-desc") });
-  if (recurringOnly)            chips.push({ label: "Recurring only", clear: () => setRecurringOnly(false) });
-  if (dateMode === "year")      chips.push({ label: `Year ${year}`,   clear: () => setDateMode("month") });
-  if (dateMode === "custom")    chips.push({ label: "Custom range",   clear: () => setDateMode("month") });
-  if (dateMode === "all")       chips.push({ label: "All time",       clear: () => setDateMode("month") });
+  const hasAccounts       = allAccounts.length > 0;
+  const hasIncomeAccounts = allAccounts.some(a => a.accountType !== "CREDIT_CARD");
+
+  // Shared fallback for the Expenses/Income/Transfers empty states — without it, a brand-new
+  // user with zero accounts could still hit "Add Expense" etc. and land on a form whose
+  // AccountPicker has nothing to pick from (the FAB blocks this path, but these buttons didn't).
+  const addAccountCta = (
+    <Link href="/accounts"
+      className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
+      <Wallet className="w-4 h-4" /> Add an Account
+    </Link>
+  );
+
+  function handleExport() {
+    // Uses filteredMergedRows (period + filter scoped, not paginated) rather than the current
+    // page slice, so the export always matches what "this period's data" actually means —
+    // not just the 25 rows currently on screen.
+    if (txType === "income")    { exportIncomeCsv(searchedIncome, csvLabel, accountMap); return; }
+    if (txType === "transfers") { exportTransfersCsv(searchedTransfers, csvLabel); return; }
+    if (txType === "expenses")  {
+      exportCsv(filteredMergedRows.filter(r => r.kind === "expense").map(r => r.data as Expense), csvLabel, accountMap, accountTypeMap);
+      return;
+    }
+    exportAllCsv(filteredMergedRows, csvLabel, accountMap);
+  }
+
+  // Date-range chips apply to every tab; category/amount/channel/recurring only ever filter the
+  // expense side (Expenses tab, and expense rows within All), so they're kept separate and only
+  // shown where they actually do something — otherwise a chip could sit there doing nothing on
+  // the Income/Transfers tabs, which is more confusing than no chip at all.
+  const dateChips: { label: string; clear: () => void }[] = [];
+  if (dateMode === "year")      dateChips.push({ label: `Year ${year}`,   clear: () => setDateMode("month") });
+  if (dateMode === "custom")    dateChips.push({ label: "Custom range",   clear: () => setDateMode("month") });
+  if (dateMode === "all")       dateChips.push({ label: "All time",       clear: () => setDateMode("month") });
+
+  const expenseChips: { label: string; clear: () => void }[] = [];
+  if (payChannel === "CASH")    expenseChips.push({ label: "Cash only",    clear: () => setPayChannel("") });
+  if (payChannel === "ACCOUNT") expenseChips.push({ label: "Bank account", clear: () => setPayChannel("") });
+  if (payChannel === "CREDIT")  expenseChips.push({ label: "Credit card",  clear: () => setPayChannel("") });
+  if (categoryId)               expenseChips.push({ label: categoryName ?? "Category", clear: () => setCategoryId("") });
+  if (minAmount !== "")         expenseChips.push({ label: `Min ${currSymbol}${minAmount}`, clear: () => setMinAmount("") });
+  if (maxAmount !== "")         expenseChips.push({ label: `Max ${currSymbol}${maxAmount}`, clear: () => setMaxAmount("") });
+  if (sortKey !== "date-desc")  expenseChips.push({ label: ({"date-asc":"Oldest first","amount-desc":"Highest first","amount-asc":"Lowest first"} as Record<string,string>)[sortKey], clear: () => setSortKey("date-desc") });
+  if (recurringOnly)            expenseChips.push({ label: "Recurring only", clear: () => setRecurringOnly(false) });
+
+  const transferChips: { label: string; clear: () => void }[] = [];
+  if (selectedAccountIds.length > 0) {
+    transferChips.push({ label: `${selectedAccountIds.length} account${selectedAccountIds.length > 1 ? "s" : ""}`, clear: () => setSelectedAccountIds([]) });
+  }
+
+  const chips           = [...expenseChips, ...dateChips];
+  const incomeTabChips   = dateChips;
+  const transferTabChips = [...transferChips, ...dateChips];
+  const allTabChips      = [...expenseChips, ...dateChips];
+
+  // Smart default for a new expense's category: whichever category you used most recently;
+  // if you've never logged one, fall back to whichever you use most often overall. Only
+  // falls through to "nothing selected" for a genuinely brand-new account with no history.
+  const defaultExpenseCategoryId = useMemo(() =>
+    pickSmartDefault(allTimeExpenses, e => e.expenseDate, e => e.createdAt, e => e.categoryId),
+    [allTimeExpenses]);
+
+  // Same idea for income's source picker — Salary is the one universal fallback here (unlike
+  // expense categories, most people's income really is salary-dominant) when there's no history yet.
+  const defaultIncomeSource = useMemo((): IncomeSourceValue =>
+    (pickSmartDefault(allTimeIncome, i => i.incomeDate, i => i.createdAt, i => i.source) as IncomeSourceValue) ?? "SALARY",
+    [allTimeIncome]);
 
   const sharedFormProps = {
     categoryOptions,
     cashAccounts:   cashAccounts.map(a => ({ id: a.id, name: a.name, currentBalance: a.currentBalance })),
-    bankAccounts:   bankAccounts.map(a => ({ id: a.id, name: a.name, bankName: a.bankName, currentBalance: a.currentBalance })),
+    bankAccounts:   bankAccounts.map(a => ({ id: a.id, name: a.name, bankName: a.bankName, currentBalance: a.currentBalance, primary: a.primary })),
     creditAccounts: creditAccounts.map(a => ({ id: a.id, name: a.name, bankName: a.bankName, currentBalance: a.currentBalance })),
   };
 
@@ -1242,7 +715,7 @@ export default function TransactionsPage() {
 
   return (
     <div className="flex flex-col flex-1">
-      <Header title="Transactions" />
+      <Header title="Transactions" subtitle="Track and manage all your money movements" onExport={handleExport} />
 
       {/* Expense modals */}
       {confirmId && (
@@ -1269,75 +742,78 @@ export default function TransactionsPage() {
 
       {/* Add/edit modals */}
       {(showCreate || editExpense) && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={() => { setShowCreate(false); setEditExpense(null); }}>
-          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            {showCreate && (
-              <ExpenseForm title="New Expense" {...sharedFormProps}
-                onSubmit={handleCreate} onCancel={() => setShowCreate(false)}
-                isPending={creating} submitLabel="Add Expense" />
-            )}
-            {editExpense && (
-              <ExpenseForm
-                title={`Edit — ${editExpense.description || editExpense.categoryName || "Expense"}`}
-                defaultValues={{ categoryId: editExpense.categoryId, accountId: editExpense.accountId ?? "",
-                  amount: editExpense.amount, description: editExpense.description ?? "", expenseDate: editExpense.expenseDate }}
-                {...sharedFormProps}
-                onSubmit={handleUpdate} onCancel={() => setEditExpense(null)}
-                isPending={updating} submitLabel="Save Changes" />
-            )}
-          </div>
-        </div>
+        <TransactionModalOverlay onDismiss={() => { setShowCreate(false); setEditExpense(null); }}>
+          {showCreate && (
+            <ExpenseForm title="New Expense" defaultCategoryId={defaultExpenseCategoryId} {...sharedFormProps}
+              familyMembers={familyMembers}
+              onSubmit={handleCreate} onCancel={() => setShowCreate(false)}
+              isPending={creating} submitLabel="Add Expense" />
+          )}
+          {editExpense && (
+            <ExpenseForm
+              title={`Edit — ${editExpense.description || editExpense.categoryName || "Expense"}`}
+              defaultValues={{ categoryId: editExpense.categoryId, accountId: editExpense.accountId ?? "",
+                amount: editExpense.amount, description: editExpense.description ?? "", expenseDate: editExpense.expenseDate }}
+              {...sharedFormProps}
+              onSubmit={handleUpdate} onCancel={() => setEditExpense(null)}
+              onDelete={() => { const id = editExpense.id; setEditExpense(null); setConfirmId(id); }}
+              isPending={updating} submitLabel="Save Changes" />
+          )}
+        </TransactionModalOverlay>
       )}
 
       {(showAddIncome || editIncome) && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={() => { setShowAddIncome(false); setEditIncome(null); }}>
-          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            {showAddIncome && (
-              <IncomeForm onSubmit={handleAddIncome} onCancel={() => setShowAddIncome(false)}
-                isPending={addingIncome} accounts={allAccounts} incomeCategories={incomeCategories} />
-            )}
-            {editIncome && (
-              <IncomeForm
-                defaultValues={{ source: editIncome.source, amount: String(editIncome.amount),
-                  incomeDate: editIncome.incomeDate, accountId: editIncome.accountId ?? "",
-                  description: editIncome.description ?? "" }}
-                onSubmit={handleUpdateIncome} onCancel={() => setEditIncome(null)}
-                isPending={updatingIncome} accounts={allAccounts} incomeCategories={incomeCategories} isEdit />
-            )}
-          </div>
-        </div>
+        <TransactionModalOverlay onDismiss={() => { setShowAddIncome(false); setEditIncome(null); }}>
+          {showAddIncome && (
+            <IncomeForm onSubmit={handleAddIncome} onCancel={() => setShowAddIncome(false)}
+              defaultSource={defaultIncomeSource} sourceUsageCounts={incomeSourceUsage}
+              isPending={addingIncome} accounts={allAccounts} incomeCategories={incomeCategories} />
+          )}
+          {editIncome && (
+            <IncomeForm
+              defaultValues={{ source: editIncome.source as IncomeSourceValue, amount: editIncome.amount,
+                incomeDate: editIncome.incomeDate, accountId: editIncome.accountId ?? "",
+                description: editIncome.description ?? "" }}
+              onSubmit={handleUpdateIncome} onCancel={() => setEditIncome(null)}
+              onDelete={() => { const id = editIncome.id; setEditIncome(null); setConfirmIncomeId(id); }}
+              sourceUsageCounts={incomeSourceUsage}
+              isPending={updatingIncome} accounts={allAccounts} incomeCategories={incomeCategories} isEdit />
+          )}
+        </TransactionModalOverlay>
       )}
 
       {(showAddTransfer || editTransfer) && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={() => { setShowAddTransfer(false); setEditTransfer(null); }}>
-          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            {showAddTransfer && (
-              <TransferFormModal onSubmit={handleAddTransfer} onCancel={() => setShowAddTransfer(false)}
-                isPending={transferring} accounts={allAccounts} />
-            )}
-            {editTransfer && (
-              <TransferFormModal
-                editTransferRef={editTransfer}
-                onSubmit={handleUpdateTransfer} onCancel={() => setEditTransfer(null)}
-                isPending={updatingTransfer} accounts={allAccounts} isEdit />
-            )}
-          </div>
-        </div>
+        <TransactionModalOverlay onDismiss={() => { setShowAddTransfer(false); setEditTransfer(null); }}>
+          {showAddTransfer && (
+            <TransferFormModal onSubmit={handleAddTransfer} onCancel={() => setShowAddTransfer(false)}
+              isPending={transferring} accounts={allAccounts} />
+          )}
+          {editTransfer && (
+            <TransferFormModal
+              editTransferRef={editTransfer}
+              onSubmit={handleUpdateTransfer} onCancel={() => setEditTransfer(null)}
+              onDelete={() => { const id = editTransfer.id; setEditTransfer(null); setConfirmTransferId(id); }}
+              isPending={updatingTransfer} accounts={allAccounts} isEdit />
+          )}
+        </TransactionModalOverlay>
       )}
 
       <main className="flex-1 p-4 md:p-5 lg:p-6 pb-36 lg:pb-24 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-4">
 
-        {/* Type tabs */}
-        <TypeTabs value={txType} onChange={v => { setTxType(v); }} counts={{
-          expenses: serverTotal,
-          income: searchedIncome.length,
-          transfers: searchedTransfers.length,
-          all: serverTotal + searchedIncome.length + searchedTransfers.length,
-        }} />
+        {/* Toolbar — search, filters, import — shared across every tab */}
+        <Toolbar
+          search={search} setSearch={setSearch}
+          onOpenFilters={() => setShowFilterPanel(true)}
+          activeFilterCount={activeFilterCount}
+          onImportStatement={() => setShowImportStatement(true)}
+          hasAccounts={hasAccounts}
+        />
+
+        {showImportStatement && (
+          <ImportStatementModal onClose={() => setShowImportStatement(false)}
+            bankAccounts={sharedFormProps.bankAccounts} cashAccounts={sharedFormProps.cashAccounts} />
+        )}
 
         {/* Shared date controls */}
         <DateControls
@@ -1348,169 +824,37 @@ export default function TransactionsPage() {
           customEnd={customEnd} setCustomEnd={setCustomEnd}
         />
 
+        {/* Stat cards — always visible, reflect the selected date range regardless of tab */}
+        <StatCards
+          income={statTotals.income} expenses={statTotals.expenses}
+          incomeDelta={statTotals.incomeDelta} expensesDelta={statTotals.expensesDelta}
+          netSavingsDelta={statTotals.netSavingsDelta}
+          transactionCount={mergedRows.length}
+        />
+
+        {/* Type tabs */}
+        <TypeTabs value={txType} onChange={v => { setTxType(v); }} counts={txTypeCounts} />
+
+        <FilterPanel
+          open={showFilterPanel} onClose={() => setShowFilterPanel(false)} txType={txType}
+          categories={categories} categoryId={categoryId} setCategoryId={setCategoryId}
+          payChannel={payChannel} setPayChannel={setPayChannel}
+          minAmount={minAmount} setMinAmount={setMinAmount} maxAmount={maxAmount} setMaxAmount={setMaxAmount}
+          recurringOnly={recurringOnly} setRecurringOnly={setRecurringOnly}
+          currSymbol={currSymbol}
+          sortKey={sortKey} setSortKey={setSortKey}
+          incomeSort={incomeSort} setIncomeSort={setIncomeSort}
+          transferSort={transferSort} setTransferSort={setTransferSort}
+          allAccounts={allAccounts} selectedAccountIds={selectedAccountIds} setSelectedAccountIds={setSelectedAccountIds}
+          onClearAll={clearAllFilters} activeFilterCount={activeFilterCount}
+        />
+
         {/* ── EXPENSES TAB ─────────────────────────────────────────────────── */}
         {txType === "expenses" && (
           <div className="space-y-3">
-            {/* toolbar */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="relative flex-1 min-w-44">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
-                <input placeholder="Search expenses…" value={search} onChange={e => setSearch(e.target.value)}
-                  className="w-full h-10 pl-9 pr-3 rounded-xl text-sm bg-background border border-border text-foreground placeholder-muted-foreground/50 outline-none focus:border-indigo-500 transition-all" />
-              </div>
-              <SortPills
-                value={sortKey}
-                onChange={v => setSortKey(v as SortKey)}
-                options={[
-                  { value: "date-desc",   label: "Newest" },
-                  { value: "date-asc",    label: "Oldest" },
-                  { value: "amount-desc", label: "Highest" },
-                  { value: "amount-asc",  label: "Lowest" },
-                ]}
-              />
-              {expenses.length > 0 && (
-                <button onClick={() => exportCsv(expenses, csvLabel, accountMap, accountTypeMap)}
-                  className="flex items-center gap-2 h-10 px-4 rounded-xl text-sm font-medium bg-muted border border-border text-muted-foreground hover:text-foreground transition-all">
-                  <Download className="w-4 h-4" /> Export
-                </button>
-              )}
-              <button onClick={() => { setShowCreate(v => !v); setEditExpense(null); }}
-                className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white px-4 h-10 rounded-xl text-sm font-medium transition-all">
-                <Plus className="w-4 h-4" /> Add
-              </button>
-            </div>
-
-            {/* filter toolbar */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center h-9 bg-muted/60 border border-border rounded-xl p-0.5">
-                {(["", "CASH", "ACCOUNT", "CREDIT"] as Channel[]).map(ch => (
-                  <button key={ch} onClick={() => setPayChannel(ch)}
-                    className={cn("flex items-center gap-1 px-2.5 h-7 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap",
-                      payChannel === ch ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
-                    {ch === ""       ? "All"
-                    : ch === "CASH"    ? <><Banknote   className="w-3 h-3" /> Cash</>
-                    : ch === "ACCOUNT" ? <><Building2  className="w-3 h-3" /> Bank</>
-                    :                    <><CreditCard className="w-3 h-3" /> Card</>}
-                  </button>
-                ))}
-              </div>
-              <button onClick={() => setRecurringOnly(v => !v)}
-                className={cn("flex items-center gap-1.5 h-9 px-3 rounded-xl text-xs font-medium border transition-all",
-                  recurringOnly
-                    ? "bg-violet-500/15 border-violet-500/40 text-violet-600 dark:text-violet-400"
-                    : "bg-muted/60 border-border text-muted-foreground hover:text-foreground")}>
-                <RefreshCw className="w-3 h-3" /> Recurring
-              </button>
-              {/* Category dropdown */}
-              <div className="relative">
-                <button onClick={() => { setShowCatDropdown(v => !v); setShowAmtPopover(false); }}
-                  className={cn("flex items-center gap-1.5 h-9 px-3 rounded-xl text-xs font-medium border transition-all",
-                    categoryId
-                      ? "bg-indigo-500/15 border-indigo-500/40 text-indigo-600 dark:text-indigo-400"
-                      : "bg-muted/60 border-border text-muted-foreground hover:text-foreground")}>
-                  {categoryId ? (
-                    <>
-                      <span className="w-1.5 h-1.5 rounded-full shrink-0"
-                        style={{ background: categories.find(c => c.id === categoryId)?.color ?? "#6366f1" }} />
-                      <span className="max-w-[80px] truncate">{categoryName}</span>
-                    </>
-                  ) : "Category"}
-                  <ChevronDown className="w-3 h-3 shrink-0" />
-                </button>
-                {showCatDropdown && (
-                  <div className="absolute top-full left-0 mt-1 bg-card border border-border rounded-xl shadow-xl z-50 w-52 max-h-56 overflow-y-auto">
-                    <button onClick={() => { setCategoryId(""); setShowCatDropdown(false); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted/60 transition-colors">
-                      All categories {!categoryId && <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 ml-auto" />}
-                    </button>
-                    {categories.map(c => (
-                      <button key={c.id}
-                        onClick={() => { setCategoryId(c.id === categoryId ? "" : c.id); setShowCatDropdown(false); }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted/60 transition-colors">
-                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: c.color ?? "#6366f1" }} />
-                        <span className="flex-1 text-left">{c.name}</span>
-                        {categoryId === c.id && <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              {/* Amount range */}
-              <div className="relative">
-                <button onClick={() => { setShowAmtPopover(v => !v); setShowCatDropdown(false); }}
-                  className={cn("flex items-center gap-1.5 h-9 px-3 rounded-xl text-xs font-medium border transition-all",
-                    minAmount !== "" || maxAmount !== ""
-                      ? "bg-indigo-500/15 border-indigo-500/40 text-indigo-600 dark:text-indigo-400"
-                      : "bg-muted/60 border-border text-muted-foreground hover:text-foreground")}>
-                  {minAmount !== "" || maxAmount !== ""
-                    ? `${currSymbol}${minAmount || 0} – ${maxAmount || "∞"}`
-                    : "Amount"}
-                  <ChevronDown className="w-3 h-3 shrink-0" />
-                </button>
-                {showAmtPopover && (
-                  <div className="absolute top-full left-0 mt-1 bg-card border border-border rounded-xl shadow-xl z-50 p-4 w-52">
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-xs text-muted-foreground/80 mb-1.5">Min ({currSymbol})</p>
-                        <input type="number" min={0} placeholder="0" value={minAmount} onFocus={e => e.target.select()}
-                          onChange={e => setMinAmount(e.target.value === "" ? "" : Number(e.target.value))}
-                          className="w-full h-8 px-2.5 rounded-lg bg-background border border-border text-sm text-foreground placeholder-muted-foreground/40 focus:outline-none focus:border-indigo-500 transition-colors" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground/80 mb-1.5">Max ({currSymbol})</p>
-                        <input type="number" min={0} placeholder="∞" value={maxAmount} onFocus={e => e.target.select()}
-                          onChange={e => setMaxAmount(e.target.value === "" ? "" : Number(e.target.value))}
-                          className="w-full h-8 px-2.5 rounded-lg bg-background border border-border text-sm text-foreground placeholder-muted-foreground/40 focus:outline-none focus:border-indigo-500 transition-colors" />
-                      </div>
-                      {(minAmount !== "" || maxAmount !== "") && (
-                        <button onClick={() => { setMinAmount(""); setMaxAmount(""); setShowAmtPopover(false); }}
-                          className="text-xs text-red-500 hover:text-red-400 transition-colors">Clear range</button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-              {activeFilterCount > 0 && (
-                <button onClick={clearAllFilters}
-                  className="flex items-center gap-1 text-xs text-red-500 hover:text-red-400 transition-colors h-9 px-1">
-                  <X className="w-3.5 h-3.5" /> Clear all
-                </button>
-              )}
-            </div>
-
             {chips.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {chips.map(c => <Chip key={c.label} label={c.label} onRemove={c.clear} />)}
-              </div>
-            )}
-
-            {/* Summary */}
-            {!expensesLoading && expenses.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <div className="bg-red-500/5 border border-red-500/10 rounded-2xl px-4 py-3">
-                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mb-1">Total Spent</p>
-                  <p className="text-xl font-bold text-red-500 dark:text-red-400 tabular-nums">−{formatCurrency(totalSpent)}</p>
-                  {dateMode === "month" && prevMonthTotal > 0 && (() => {
-                    const diff = totalSpent - prevMonthTotal;
-                    const isMore = diff > 0;
-                    return (
-                      <p className={cn("text-xs mt-1 font-medium", isMore ? "text-red-500/70" : "text-emerald-500")}>
-                        {isMore ? "▲" : "▼"} {formatCurrency(Math.abs(diff))} vs last month
-                      </p>
-                    );
-                  })()}
-                </div>
-                <div className="bg-muted/40 border border-border/50 rounded-2xl px-4 py-3">
-                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mb-1">Transactions</p>
-                  <p className="text-xl font-bold text-foreground tabular-nums">{serverTotal}</p>
-                </div>
-                {topCategory && (
-                  <div className="bg-indigo-500/5 border border-indigo-500/10 rounded-2xl px-4 py-3 col-span-2 sm:col-span-1">
-                    <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mb-1">Top Category</p>
-                    <p className="text-sm font-bold text-foreground truncate">{topCategory.name}</p>
-                    <p className="text-xs text-muted-foreground/70 tabular-nums mt-0.5">{formatCurrency(topCategory.total)}</p>
-                  </div>
-                )}
               </div>
             )}
 
@@ -1519,15 +863,19 @@ export default function TransactionsPage() {
               <div className="px-4 py-3 border-b border-border flex items-center justify-between">
                 <h3 className="font-semibold text-foreground text-sm">Expenses</h3>
                 <div className="flex items-center gap-3">
-                  {totalSpent > 0 && <span className="text-xs font-bold text-red-500 dark:text-red-400 tabular-nums">−{formatCurrency(totalSpent)}</span>}
-                  <span className="text-xs text-muted-foreground/80">{serverTotal} total</span>
+                  {expenseTabTotal > 0 && <span className="text-xs font-bold text-red-500 dark:text-red-400 tabular-nums">−{fmt(expenseTabTotal)}</span>}
+                  <span className="text-xs text-muted-foreground/80">{expenseTabRows.length} total</span>
                 </div>
               </div>
               {expensesLoading ? <TableRowSkeleton rows={6} /> : expenses.length === 0 ? (
-                <EmptyState icon={Receipt} title="No expenses found"
-                  description={activeFilterCount > 0 ? "No expenses match the active filters." : "Track your spending by adding your first expense."}
+                <EmptyState icon={Receipt} title={!hasAccounts ? "No accounts yet" : "No expenses found"}
+                  description={
+                    !hasAccounts ? "Add a bank, cash, or credit account before logging expenses."
+                      : activeFilterCount > 0 ? "No expenses match the active filters." : "Track your spending by adding your first expense."
+                  }
                   action={
-                    activeFilterCount > 0
+                    !hasAccounts ? addAccountCta
+                      : activeFilterCount > 0
                       ? <button onClick={clearAllFilters} className="text-sm text-indigo-500 hover:text-indigo-600 font-medium transition-colors">Clear filters</button>
                       : <button onClick={() => setShowCreate(true)}
                           className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
@@ -1542,14 +890,13 @@ export default function TransactionsPage() {
                       <div key={date}>
                         <div className="flex items-center justify-between px-4 py-2 bg-muted/50 border-b border-border/50">
                           <span className="text-xs font-semibold text-foreground/60 uppercase tracking-widest">{formatDate(date)}</span>
-                          <span className="text-xs font-semibold text-red-500/70 tabular-nums">−{formatCurrency(dayTotal)}</span>
+                          <span className="text-xs font-semibold text-red-500/70 tabular-nums">−{fmt(dayTotal)}</span>
                         </div>
                         <div className="divide-y divide-border/50">
                           {grouped[date].map(expense => (
                             <ExpenseRow key={expense.id} expense={expense}
                               accountName={expense.accountId ? accountMap[expense.accountId] : undefined}
-                              onEdit={() => { setShowCreate(false); setEditExpense(expense); }}
-                              onDelete={() => setConfirmId(expense.id)} />
+                              onEdit={() => { setShowCreate(false); setEditExpense(expense); }} />
                           ))}
                         </div>
                       </div>
@@ -1561,18 +908,18 @@ export default function TransactionsPage() {
                         {listPage * PAGE_SIZE + 1}–{Math.min((listPage + 1) * PAGE_SIZE, serverTotal)} of {serverTotal}
                       </p>
                       <div className="flex items-center gap-1">
-                        <button onClick={() => setListPage(0)} disabled={listPage === 0}
+                        <button onClick={() => setListPage(0)} disabled={listPage === 0} aria-label="First page"
                           className="px-1.5 py-1 rounded-lg hover:bg-muted disabled:opacity-30 text-xs text-muted-foreground font-medium transition-colors">«</button>
-                        <button onClick={() => setListPage(p => Math.max(0, p - 1))} disabled={listPage === 0}
+                        <button onClick={() => setListPage(p => Math.max(0, p - 1))} disabled={listPage === 0} aria-label="Previous page"
                           className="p-1.5 rounded-lg hover:bg-muted disabled:opacity-30 transition-colors">
                           <ChevronLeft className="w-3.5 h-3.5 text-muted-foreground" />
                         </button>
                         <span className="text-xs text-muted-foreground px-2 tabular-nums">{listPage + 1} / {totalPages}</span>
-                        <button onClick={() => setListPage(p => Math.min(totalPages - 1, p + 1))} disabled={listPage >= totalPages - 1}
+                        <button onClick={() => setListPage(p => Math.min(totalPages - 1, p + 1))} disabled={listPage >= totalPages - 1} aria-label="Next page"
                           className="p-1.5 rounded-lg hover:bg-muted disabled:opacity-30 transition-colors">
                           <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
                         </button>
-                        <button onClick={() => setListPage(totalPages - 1)} disabled={listPage >= totalPages - 1}
+                        <button onClick={() => setListPage(totalPages - 1)} disabled={listPage >= totalPages - 1} aria-label="Last page"
                           className="px-1.5 py-1 rounded-lg hover:bg-muted disabled:opacity-30 text-xs text-muted-foreground font-medium transition-colors">»</button>
                       </div>
                     </div>
@@ -1586,56 +933,30 @@ export default function TransactionsPage() {
         {/* ── INCOME TAB ───────────────────────────────────────────────────── */}
         {txType === "income" && (
           <div className="space-y-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="relative flex-1 min-w-44">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
-                <input placeholder="Search income…" value={incomeSearch} onChange={e => setIncomeSearch(e.target.value)}
-                  className="w-full h-10 pl-9 pr-3 rounded-xl text-sm bg-background border border-border text-foreground placeholder-muted-foreground/50 outline-none focus:border-indigo-500 transition-all" />
-              </div>
-              <SortPills
-                value={incomeSort}
-                onChange={v => setIncomeSort(v as "newest"|"oldest"|"high"|"low")}
-                options={[
-                  { value: "newest", label: "Newest" },
-                  { value: "oldest", label: "Oldest" },
-                  { value: "high",   label: "Highest" },
-                  { value: "low",    label: "Lowest" },
-                ]}
-              />
-              {searchedIncome.length > 0 && (
-                <button onClick={() => exportIncomeCsv(searchedIncome, csvLabel, accountMap)}
-                  className="flex items-center gap-2 h-10 px-4 rounded-xl text-sm font-medium bg-muted border border-border text-muted-foreground hover:text-foreground transition-all">
-                  <Download className="w-4 h-4" /> Export
-                </button>
-              )}
-              <button onClick={() => setShowAddIncome(true)}
-                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 h-10 rounded-xl text-sm font-medium transition-all">
-                <Plus className="w-4 h-4" /> Add Income
-              </button>
-            </div>
-
-            {searchedIncome.length > 0 && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl px-4 py-3">
-                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mb-1">Total Income</p>
-                  <p className="text-xl font-bold text-emerald-500 dark:text-emerald-400 tabular-nums">+{formatCurrency(searchedIncome.reduce((s, i) => s + i.amount, 0))}</p>
-                </div>
-                <div className="bg-muted/40 border border-border/50 rounded-2xl px-4 py-3">
-                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mb-1">Entries</p>
-                  <p className="text-xl font-bold text-foreground tabular-nums">{searchedIncome.length}</p>
-                </div>
+            {incomeTabChips.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {incomeTabChips.map(c => <Chip key={c.label} label={c.label} onRemove={c.clear} />)}
               </div>
             )}
 
             <div className="bg-card border border-border rounded-2xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-border">
+              <div className="px-4 py-3 border-b border-border flex items-center justify-between">
                 <h3 className="font-semibold text-foreground text-sm">Income</h3>
+                <div className="flex items-center gap-3">
+                  {searchedIncome.length > 0 && (
+                    <span className="text-xs font-bold text-emerald-500 dark:text-emerald-400 tabular-nums">
+                      +{fmt(searchedIncome.reduce((s, i) => s + i.amount, 0))}
+                    </span>
+                  )}
+                  <span className="text-xs text-muted-foreground/80">{searchedIncome.length} total</span>
+                </div>
               </div>
               {incomeLoading ? <TableRowSkeleton rows={4} /> : searchedIncome.length === 0 ? (
-                <EmptyState icon={ArrowUpRight} title="No income this period"
-                  description="Record income to track what's coming in."
+                <EmptyState icon={ArrowUpRight} title={!hasIncomeAccounts ? "No accounts yet" : "No income this period"}
+                  description={!hasIncomeAccounts ? "Add a bank or cash account before recording income." : "Record income to track what's coming in."}
                   action={
-                    <button onClick={() => setShowAddIncome(true)}
+                    !hasIncomeAccounts ? addAccountCta
+                      : <button onClick={() => setShowAddIncome(true)}
                       className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
                       <Plus className="w-4 h-4" /> Add Income
                     </button>
@@ -1647,15 +968,14 @@ export default function TransactionsPage() {
                       <div className="flex items-center justify-between px-4 py-2 bg-muted/50 border-b border-border/50">
                         <span className="text-xs font-semibold text-foreground/60 uppercase tracking-widest">{formatDate(date)}</span>
                         <span className="text-xs font-semibold text-emerald-500/80 tabular-nums">
-                          +{formatCurrency(incomeGrouped[date].reduce((s, i) => s + i.amount, 0))}
+                          +{fmt(incomeGrouped[date].reduce((s, i) => s + i.amount, 0))}
                         </span>
                       </div>
                       <div className="divide-y divide-border/50">
                         {incomeGrouped[date].map(entry => (
                           <IncomeRow key={entry.id} entry={entry}
                             accountName={entry.accountId ? accountMap[entry.accountId] : undefined}
-                            onEdit={() => { setShowAddIncome(false); setEditIncome(entry); }}
-                            onDelete={() => setConfirmIncomeId(entry.id)} />
+                            onEdit={() => { setShowAddIncome(false); setEditIncome(entry); }} />
                         ))}
                       </div>
                     </div>
@@ -1669,57 +989,31 @@ export default function TransactionsPage() {
         {/* ── TRANSFERS TAB ────────────────────────────────────────────────── */}
         {txType === "transfers" && (
           <div className="space-y-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="relative flex-1 min-w-44">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
-                <input placeholder="Search transfers…" value={transferSearch} onChange={e => setTransferSearch(e.target.value)}
-                  className="w-full h-10 pl-9 pr-3 rounded-xl text-sm bg-background border border-border text-foreground placeholder-muted-foreground/50 outline-none focus:border-indigo-500 transition-all" />
-              </div>
-              <SortPills
-                value={transferSort}
-                onChange={v => setTransferSort(v as "newest"|"oldest"|"high"|"low")}
-                options={[
-                  { value: "newest", label: "Newest" },
-                  { value: "oldest", label: "Oldest" },
-                  { value: "high",   label: "Highest" },
-                  { value: "low",    label: "Lowest" },
-                ]}
-              />
-              {searchedTransfers.length > 0 && (
-                <button onClick={() => exportTransfersCsv(searchedTransfers, csvLabel)}
-                  className="flex items-center gap-2 h-10 px-4 rounded-xl text-sm font-medium bg-muted border border-border text-muted-foreground hover:text-foreground transition-all">
-                  <Download className="w-4 h-4" /> Export
-                </button>
-              )}
-              <button onClick={() => setShowAddTransfer(true)}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 h-10 rounded-xl text-sm font-medium transition-all">
-                <Plus className="w-4 h-4" /> New Transfer
-              </button>
-            </div>
-
-            {searchedTransfers.length > 0 && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-violet-500/5 border border-violet-500/10 rounded-2xl px-4 py-3">
-                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mb-1">Total Transferred</p>
-                  <p className="text-xl font-bold text-violet-500 dark:text-violet-400 tabular-nums">{formatCurrency(searchedTransfers.reduce((s, t) => s + t.amount, 0))}</p>
-                </div>
-                <div className="bg-muted/40 border border-border/50 rounded-2xl px-4 py-3">
-                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mb-1">Transfers</p>
-                  <p className="text-xl font-bold text-foreground tabular-nums">{searchedTransfers.length}</p>
-                </div>
+            {transferTabChips.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {transferTabChips.map(c => <Chip key={c.label} label={c.label} onRemove={c.clear} />)}
               </div>
             )}
 
             <div className="bg-card border border-border rounded-2xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-border">
+              <div className="px-4 py-3 border-b border-border flex items-center justify-between">
                 <h3 className="font-semibold text-foreground text-sm">Transfers</h3>
+                <div className="flex items-center gap-3">
+                  {searchedTransfers.length > 0 && (
+                    <span className="text-xs font-bold text-indigo-500 dark:text-indigo-400 tabular-nums">
+                      {fmt(searchedTransfers.reduce((s, t) => s + t.amount, 0))}
+                    </span>
+                  )}
+                  <span className="text-xs text-muted-foreground/80">{searchedTransfers.length} total</span>
+                </div>
               </div>
               {transfersLoading ? <TableRowSkeleton rows={4} /> : searchedTransfers.length === 0 ? (
-                <EmptyState icon={ArrowLeftRight} title="No transfers this period"
-                  description="Move money between your accounts."
+                <EmptyState icon={ArrowLeftRight} title={allAccounts.length < 2 ? "Need at least 2 accounts" : "No transfers this period"}
+                  description={allAccounts.length < 2 ? "Transfers move money between two of your own accounts — add another account first." : "Move money between your accounts."}
                   action={
-                    <button onClick={() => setShowAddTransfer(true)}
-                      className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
+                    allAccounts.length < 2 ? addAccountCta
+                      : <button onClick={() => setShowAddTransfer(true)}
+                      className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
                       <Plus className="w-4 h-4" /> New Transfer
                     </button>
                   } />
@@ -1729,15 +1023,14 @@ export default function TransactionsPage() {
                     <div key={date}>
                       <div className="flex items-center justify-between px-4 py-2 bg-muted/50 border-b border-border/50">
                         <span className="text-xs font-semibold text-foreground/60 uppercase tracking-widest">{formatDate(date)}</span>
-                        <span className="text-xs font-semibold text-violet-500/70 tabular-nums">
-                          {formatCurrency(transferGrouped[date].reduce((s, t) => s + t.amount, 0))}
+                        <span className="text-xs font-semibold text-indigo-500/70 tabular-nums">
+                          {fmt(transferGrouped[date].reduce((s, t) => s + t.amount, 0))}
                         </span>
                       </div>
                       <div className="divide-y divide-border/50">
                         {transferGrouped[date].map(transfer => (
                           <TransferRow key={transfer.id} transfer={transfer}
-                            onEdit={() => { setShowAddTransfer(false); setEditTransfer(transfer); }}
-                            onDelete={() => setConfirmTransferId(transfer.id)} />
+                            onEdit={() => { setShowAddTransfer(false); setEditTransfer(transfer); }} />
                         ))}
                       </div>
                     </div>
@@ -1751,55 +1044,38 @@ export default function TransactionsPage() {
         {/* ── ALL TAB ──────────────────────────────────────────────────────── */}
         {txType === "all" && (
           <div className="space-y-3">
-            {mergedRows.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-red-500/5 border border-red-500/10 rounded-2xl px-4 py-3">
-                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mb-1">Money Out</p>
-                  <p className="text-lg font-bold text-red-500 dark:text-red-400 tabular-nums">
-                    −{formatCurrency(mergedRows.filter(r => r.kind === "expense").reduce((s, r) => s + (r.data as Expense).amount, 0))}
-                  </p>
-                </div>
-                <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl px-4 py-3">
-                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mb-1">Money In</p>
-                  <p className="text-lg font-bold text-emerald-500 dark:text-emerald-400 tabular-nums">
-                    +{formatCurrency(mergedRows.filter(r => r.kind === "income").reduce((s, r) => s + (r.data as IncomeEntry).amount, 0))}
-                  </p>
-                </div>
-                <div className="bg-violet-500/5 border border-violet-500/10 rounded-2xl px-4 py-3">
-                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mb-1">Transferred</p>
-                  <p className="text-lg font-bold text-violet-500 dark:text-violet-400 tabular-nums">
-                    {formatCurrency(mergedRows.filter(r => r.kind === "transfer").reduce((s, r) => s + (r.data as AccountTransfer).amount, 0))}
-                  </p>
-                </div>
-                <div className="bg-muted/40 border border-border/50 rounded-2xl px-4 py-3">
-                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mb-1">Entries</p>
-                  <p className="text-lg font-bold text-foreground tabular-nums">{mergedRows.length}</p>
-                </div>
+            {allTabChips.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {allTabChips.map(c => <Chip key={c.label} label={c.label} onRemove={c.clear} />)}
               </div>
             )}
 
             <div className="bg-card border border-border rounded-2xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-border flex items-center gap-3">
+              <div className="px-4 py-3 border-b border-border flex items-center justify-between">
                 <h3 className="font-semibold text-foreground text-sm">All Transactions</h3>
-                <div className="ml-auto relative">
-                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 pointer-events-none" />
-                  <input
-                    value={allSearch}
-                    onChange={e => setAllSearch(e.target.value)}
-                    placeholder="Search transactions…"
-                    className="h-8 pl-8 pr-3 w-48 rounded-xl bg-muted/60 border border-border text-xs text-foreground placeholder-muted-foreground/50 focus:outline-none focus:border-indigo-500 transition-colors"
-                  />
-                  {allSearch && (
-                    <button onClick={() => setAllSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/80 hover:text-foreground">
-                      <X className="w-3 h-3" />
-                    </button>
+                <div className="flex items-center gap-3">
+                  {filteredMergedRows.length > 0 && (
+                    <span className={cn("text-xs font-bold tabular-nums", allTabNet >= 0 ? "text-emerald-500 dark:text-emerald-400" : "text-red-500 dark:text-red-400")}>
+                      {allTabNet >= 0 ? "+" : "−"}{fmt(Math.abs(allTabNet))}
+                    </span>
                   )}
+                  <span className="text-xs text-muted-foreground/80">{filteredMergedRows.length} total</span>
                 </div>
               </div>
               {(expensesLoading || incomeLoading || transfersLoading) ? <TableRowSkeleton rows={6} /> :
-               mergedRows.length === 0 ? (
-                <EmptyState icon={Receipt} title="No transactions this period"
-                  description="Switch to Expenses, Income, or Transfers tabs to add entries." />
+               filteredMergedRows.length === 0 ? (
+                <EmptyState icon={Receipt}
+                  title={mergedRows.length === 0 ? "No transactions this period" : "No transactions match your filters"}
+                  description={
+                    mergedRows.length === 0
+                      ? "Add your first transaction using the button above."
+                      : "Try clearing the search or filters to see everything again."
+                  }
+                  action={
+                    mergedRows.length > 0 && (activeFilterCount > 0 || search)
+                      ? <button onClick={() => { clearAllFilters(); setSearch(""); }} className="text-sm text-indigo-500 hover:text-indigo-600 font-medium transition-colors">Clear filters</button>
+                      : undefined
+                  } />
               ) : (
                 <div>
                   {allSortedDates.map(date => (
@@ -1811,108 +1087,112 @@ export default function TransactionsPage() {
                         {allGrouped[date].map((row, i) => {
                           if (row.kind === "expense") {
                             const e = row.data as Expense;
-                            const catMeta2  = getCategoryMeta(e.categoryName ?? "");
-                            const catColor2 = e.categoryColor ?? catMeta2.color;
-                            const CatIcon2  = catMeta2.icon;
+                            const catIcon2  = getCategoryIcon({ name: e.categoryName ?? "", icon: e.categoryIcon });
+                            const catColor2 = getCategoryColor(e.categoryName ?? "", e.categoryColor);
                             return (
-                              <div key={i} className="group flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors">
-                                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                                  style={{ backgroundColor: catColor2 + "20" }}>
-                                  <CatIcon2 className="w-[18px] h-[18px]" style={{ color: catColor2 }} strokeWidth={1.75} />
-                                </div>
+                              <button type="button" key={i} onClick={() => { setShowCreate(false); setEditExpense(e); }}
+                                aria-label={`Edit ${e.description || e.categoryName || "expense"}, ${fmt(e.amount)}`}
+                                className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors text-left">
+                                <PremiumIcon icon={catIcon2} hex={catColor2} size="sm" className="w-9 h-9" />
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm font-medium text-foreground truncate leading-5">
                                     {e.description || e.categoryName || "Expense"}
                                   </p>
-                                  <div className="flex items-center gap-1.5 mt-0.5">
-                                    {e.debt ? (
-                                      <span className="text-xs px-1.5 py-0.5 rounded-md font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400">Debt</span>
-                                    ) : e.categoryName && (
+                                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                    {e.categoryName && (
                                       <span className="text-xs px-1.5 py-0.5 rounded-md font-medium"
                                         style={{ backgroundColor: catColor2 + "18", color: catColor2 }}>{e.categoryName}</span>
                                     )}
                                     {e.accountId && accountMap[e.accountId] && (
                                       <span className="text-xs text-muted-foreground/50">{accountMap[e.accountId]}</span>
                                     )}
+                                    {e.paymentMethod === "CREDIT_CARD" && (
+                                      <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-500/15 text-rose-500 dark:text-rose-400 font-medium">Card</span>
+                                    )}
                                   </div>
                                 </div>
-                                <p className="text-sm font-bold text-red-500 dark:text-red-400 tabular-nums shrink-0">−{formatCurrency(e.amount)}</p>
-                                <div className="flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
-                                  <button onClick={() => { setShowCreate(false); setEditExpense(e); }}
-                                    className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:text-indigo-500 hover:bg-indigo-500/15 transition-all">
-                                    <Pencil className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button onClick={() => setConfirmId(e.id)}
-                                    className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/15 transition-all">
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
+                                <div className="text-right shrink-0">
+                                  <p className="text-sm font-bold text-red-500 dark:text-red-400 tabular-nums">−{fmt(e.amount)}</p>
+                                  {e.accountId && balanceMap.has(`expense-${e.id}`) && (
+                                    <p className="text-[11px] text-muted-foreground/50 tabular-nums mt-0.5">Bal {fmt(balanceMap.get(`expense-${e.id}`)!)}</p>
+                                  )}
                                 </div>
-                              </div>
+                              </button>
                             );
                           }
                           if (row.kind === "income") {
                             const income = row.data as IncomeEntry;
                             const src2 = INCOME_ICON_MAP[income.source] ?? INCOME_ICON_MAP.OTHER;
-                            const IncIcon2 = src2.icon;
                             return (
-                              <div key={i} className="group flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors">
-                                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                                  style={{ backgroundColor: src2.color + "20" }}>
-                                  <IncIcon2 className="w-[18px] h-[18px]" style={{ color: src2.color }} strokeWidth={1.75} />
-                                </div>
+                              <button type="button" key={i} onClick={() => setEditIncome(income)}
+                                aria-label={`Edit ${income.description || "income entry"}, ${fmt(income.amount)}`}
+                                className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors text-left">
+                                <PremiumIcon icon={src2.icon} hex={src2.color} size="sm" className="w-9 h-9" />
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm font-medium text-foreground truncate leading-5">
                                     {income.description || INCOME_SOURCES.find(s => s.value === income.source)?.label || income.source}
                                   </p>
-                                  {income.debt ? (
-                                    <span className="text-xs px-1.5 py-0.5 rounded-md font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400">Debt</span>
-                                  ) : (
+                                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                                     <span className="text-xs px-1.5 py-0.5 rounded-md font-medium"
                                       style={{ backgroundColor: src2.color + "20", color: src2.color }}>
                                       {INCOME_SOURCES.find(s => s.value === income.source)?.label ?? income.source}
                                     </span>
+                                    {income.accountId && accountMap[income.accountId] && (
+                                      <span className="text-xs text-muted-foreground/50">{accountMap[income.accountId]}</span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <p className="text-sm font-bold text-emerald-500 dark:text-emerald-400 tabular-nums">+{fmt(income.amount)}</p>
+                                  {income.accountId && balanceMap.has(`income-${income.id}`) && (
+                                    <p className="text-[11px] text-muted-foreground/50 tabular-nums mt-0.5">Bal {fmt(balanceMap.get(`income-${income.id}`)!)}</p>
                                   )}
                                 </div>
-                                <p className="text-sm font-bold text-emerald-500 dark:text-emerald-400 tabular-nums shrink-0">+{formatCurrency(income.amount)}</p>
-                                <div className="flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
-                                  <button onClick={() => setEditIncome(income)}
-                                    className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:text-indigo-500 hover:bg-indigo-500/15 transition-all">
-                                    <Pencil className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button onClick={() => setConfirmIncomeId(income.id)}
-                                    className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/15 transition-all">
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </div>
+                              </button>
                             );
                           }
                           const transfer = row.data as AccountTransfer;
+                          const isAdj  = transfer.adjustment;
+                          const isDebt = transfer.debt;
+                          const isIn   = !!transfer.toAccountId;
+                          const txnSign = (isAdj || isDebt) ? (isIn ? "+" : "−") : "";
+                          // A one-sided transfer (debt/adjustment) only ever has the "from" or the
+                          // "to" side set, never both — show whichever side actually has a balance
+                          // entry instead of assuming "from" (which left money received back with
+                          // no balance shown at all, since only toAccountId is set on that leg).
+                          const balanceKey = balanceMap.has(`transfer-${transfer.id}-from`)
+                            ? `transfer-${transfer.id}-from`
+                            : `transfer-${transfer.id}-to`;
                           return (
-                            <div key={i} className="group flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors">
-                              <div className="w-9 h-9 rounded-xl bg-violet-500/10 flex items-center justify-center shrink-0">
-                                <ArrowLeftRight className="w-[18px] h-[18px] text-violet-500 dark:text-violet-400" strokeWidth={1.75} />
-                              </div>
+                            <button type="button" key={i} onClick={() => setEditTransfer(transfer)}
+                              aria-label={`Edit transfer, ${fmt(transfer.amount)}`}
+                              className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors text-left">
+                              <PremiumIcon icon={isDebt ? (isIn ? HandCoins : CreditCard) : isAdj ? RefreshCw : ArrowLeftRight}
+                                hex={isDebt ? (isIn ? "#14b8a6" : "#f43f5e") : undefined}
+                                tone={isDebt ? undefined : isAdj ? "gray" : "indigo"} size="sm" className="w-9 h-9" />
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-foreground truncate leading-5">
                                   {transfer.description || `${transfer.fromAccountName} → ${transfer.toAccountName}`}
                                 </p>
-                                <p className="text-xs text-muted-foreground/60 mt-0.5">
-                                  {transfer.fromAccountName} → {transfer.toAccountName}
+                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                  {isDebt ? (
+                                    <DebtBadge debtLabel={transfer.debtLabel} debtContactName={transfer.debtContactName} />
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground/60">{transfer.fromAccountName} → {transfer.toAccountName}</span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <p className={cn("text-sm font-bold tabular-nums",
+                                  isDebt ? (isIn ? "text-teal-500 dark:text-teal-400" : "text-rose-500 dark:text-rose-400")
+                                    : isAdj ? "text-muted-foreground" : "text-indigo-500 dark:text-indigo-400")}>
+                                  {txnSign}{fmt(transfer.amount)}
                                 </p>
+                                {balanceMap.has(balanceKey) && (
+                                  <p className="text-[11px] text-muted-foreground/50 tabular-nums mt-0.5">Bal {fmt(balanceMap.get(balanceKey)!)}</p>
+                                )}
                               </div>
-                              <p className="text-sm font-bold text-violet-500 dark:text-violet-400 tabular-nums shrink-0">{formatCurrency(transfer.amount)}</p>
-                              <div className="flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
-                                <button onClick={() => setEditTransfer(transfer)}
-                                  className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:text-indigo-500 hover:bg-indigo-500/15 transition-all">
-                                  <Pencil className="w-3.5 h-3.5" />
-                                </button>
-                                <button onClick={() => setConfirmTransferId(transfer.id)}
-                                  className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/15 transition-all">
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </div>
+                            </button>
                           );
                         })}
                       </div>
@@ -1926,18 +1206,18 @@ export default function TransactionsPage() {
                         {allPage * ALL_PAGE_SIZE + 1}–{Math.min((allPage + 1) * ALL_PAGE_SIZE, mergedRows.length)} of {mergedRows.length}
                       </p>
                       <div className="flex items-center gap-1">
-                        <button onClick={() => setAllPage(0)} disabled={allPage === 0}
+                        <button onClick={() => setAllPage(0)} disabled={allPage === 0} aria-label="First page"
                           className="px-1.5 py-1 rounded-lg hover:bg-muted disabled:opacity-30 text-xs text-muted-foreground font-medium transition-colors">«</button>
-                        <button onClick={() => setAllPage(p => Math.max(0, p - 1))} disabled={allPage === 0}
+                        <button onClick={() => setAllPage(p => Math.max(0, p - 1))} disabled={allPage === 0} aria-label="Previous page"
                           className="p-1.5 rounded-lg hover:bg-muted disabled:opacity-30 transition-colors">
                           <ChevronLeft className="w-3.5 h-3.5 text-muted-foreground" />
                         </button>
                         <span className="text-xs text-muted-foreground px-2 tabular-nums">{allPage + 1} / {allTotalPages}</span>
-                        <button onClick={() => setAllPage(p => Math.min(allTotalPages - 1, p + 1))} disabled={allPage >= allTotalPages - 1}
+                        <button onClick={() => setAllPage(p => Math.min(allTotalPages - 1, p + 1))} disabled={allPage >= allTotalPages - 1} aria-label="Next page"
                           className="p-1.5 rounded-lg hover:bg-muted disabled:opacity-30 transition-colors">
                           <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
                         </button>
-                        <button onClick={() => setAllPage(allTotalPages - 1)} disabled={allPage >= allTotalPages - 1}
+                        <button onClick={() => setAllPage(allTotalPages - 1)} disabled={allPage >= allTotalPages - 1} aria-label="Last page"
                           className="px-1.5 py-1 rounded-lg hover:bg-muted disabled:opacity-30 text-xs text-muted-foreground font-medium transition-colors">»</button>
                       </div>
                     </div>
@@ -1951,12 +1231,17 @@ export default function TransactionsPage() {
 </div>
       </main>
 
-      {/* ── Floating Action Button ── */}
-      <FloatingActionButton actions={[
-        { icon: Receipt,        label: "Add Expense", color: "rose",    onClick: () => { setShowCreate(true); setEditExpense(null); }, disabled: allAccounts.length === 0 },
-        { icon: Banknote,       label: "Add Income",  color: "emerald", onClick: () => { setShowAddIncome(true); setEditIncome(null); }, disabled: allAccounts.filter(a => a.accountType !== "CREDIT_CARD").length === 0 },
-        { icon: ArrowLeftRight, label: "Transfer",    color: "indigo",  onClick: () => { setShowAddTransfer(true); setEditTransfer(null); }, disabled: allAccounts.length < 2 },
-      ]} />
+      {/* ── Floating Action Button — hidden while the filter sheet covers the screen ── */}
+      {!showFilterPanel && (
+        <FloatingActionButton actions={[
+          { icon: Receipt,        label: "Add Expense", color: "rose",    onClick: () => { setShowCreate(true); setEditExpense(null); }, disabled: allAccounts.length === 0,
+            disabledReason: "Add an account first" },
+          { icon: Banknote,       label: "Add Income",  color: "emerald", onClick: () => { setShowAddIncome(true); setEditIncome(null); }, disabled: allAccounts.filter(a => a.accountType !== "CREDIT_CARD").length === 0,
+            disabledReason: "Add a bank or cash account first" },
+          { icon: ArrowLeftRight, label: "Transfer",    color: "indigo",  onClick: () => { setShowAddTransfer(true); setEditTransfer(null); }, disabled: allAccounts.length < 2,
+            disabledReason: "Add at least 2 accounts first" },
+        ]} />
+      )}
     </div>
   );
 }

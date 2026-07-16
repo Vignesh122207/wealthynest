@@ -10,6 +10,7 @@ import type {
   IncomeHistory,
   StockTransaction,
   CreateStockTransactionPayload,
+  InvestmentType,
 } from "../types/investment.types";
 
 export const investmentsApi = {
@@ -51,6 +52,12 @@ export const investmentsApi = {
 
   getXirr: async (investmentId: string): Promise<number | null> =>
     (await apiClient.get<ApiResponse<number | null>>(`/investments/${investmentId}/xirr`)).data.data,
+
+  getPortfolioXirr: async (): Promise<number | null> =>
+    (await apiClient.get<ApiResponse<number | null>>("/investments/portfolio-xirr")).data.data,
+
+  getTypeXirr: async (type: InvestmentType): Promise<number | null> =>
+    (await apiClient.get<ApiResponse<number | null>>("/investments/type-xirr", { params: { type } })).data.data,
 
   // Phase 2 — Dividend suggestions
   getDividendSuggestions: async (): Promise<DividendSuggestion[]> =>

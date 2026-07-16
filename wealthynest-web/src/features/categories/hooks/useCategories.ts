@@ -6,6 +6,8 @@ import { QUERY_KEYS } from "@/lib/constants";
 import { categoriesApi, type CreateCategoryPayload, type UpdateCategoryPayload } from "../api/categories.api";
 import type { Category } from "../types/category.types";
 
+type ApiError = { response?: { status?: number; data?: { message?: string } } };
+
 export function useCategories(type?: "EXPENSE" | "INCOME" | "TRANSFER") {
   return useQuery({
     queryKey:  [...QUERY_KEYS.CATEGORIES, type],
@@ -23,7 +25,7 @@ export function useCreateCategory() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.CATEGORIES });
       toast.success("Category created");
     },
-    onError: () => toast.error("Failed to create category"),
+    onError: (e: ApiError) => toast.error(e.response?.data?.message ?? "Failed to create category"),
   });
 }
 
@@ -36,7 +38,7 @@ export function useUpdateCategory() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.CATEGORIES });
       toast.success("Category updated");
     },
-    onError: () => toast.error("Failed to update category"),
+    onError: (e: ApiError) => toast.error(e.response?.data?.message ?? "Failed to update category"),
   });
 }
 
@@ -46,8 +48,11 @@ export function useDeleteCategory() {
     mutationFn: (id: string) => categoriesApi.deleteCategory(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.CATEGORIES });
+      // Deleting a category also deletes its budgets on the backend
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.BUDGETS });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
       toast.success("Category deleted");
     },
-    onError: () => toast.error("Failed to delete category"),
+    onError: (e: ApiError) => toast.error(e.response?.data?.message ?? "Failed to delete category"),
   });
 }

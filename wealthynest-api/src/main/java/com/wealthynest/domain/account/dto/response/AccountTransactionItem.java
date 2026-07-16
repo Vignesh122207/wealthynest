@@ -14,4 +14,6 @@ public class AccountTransactionItem {
     private BigDecimal amount;
     private LocalDate  date;
     private String     description;
+    private String     categoryIcon;  // EXPENSE only — the category's chosen icon key
+    private String     categoryColor; // EXPENSE only — the category's chosen color
 }

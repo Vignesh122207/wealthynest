@@ -3,9 +3,10 @@
 import { useState, useMemo } from "react";
 import {
   Users, Plus, LogIn, Copy, Check, Crown,
-  Shield, ShieldOff, Loader2, Pencil, Trash2, LogOut, X, Info,
-  UserMinus, BarChart2, AlertTriangle, ChevronRight, ChevronLeft,
+  Shield, Loader2, Pencil, Trash2, LogOut, X, Info,
+  BarChart2, AlertTriangle, ChevronRight, ChevronLeft,
   TrendingUp, Target, ArrowDownLeft, ArrowUpRight, PiggyBank, Trophy,
+  Sparkles, Receipt,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -17,18 +18,20 @@ import {
   useRenameFamily, useLeaveFamily, useDeleteFamily, useRemoveMember,
   useTransferAdmin, useRevokeAdmin, useFamilyExpenses, useFamilyNetWorth, useFamilyMonthlyStats,
 } from "@/features/family/hooks/useFamily";
+import { SlotBar } from "@/features/family/components/SlotBar";
+import { MemberRow } from "@/features/family/components/MemberRow";
+import { AdminLeaveModal } from "@/features/family/components/AdminLeaveModal";
+import { SplitsCard } from "@/features/expensesplits/components/SplitsCard";
+import { MAX_MEMBERS, MEMBER_COLORS } from "@/features/family/constants";
 import { useBudgets } from "@/features/budgets/hooks/useBudgets";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { useChartTheme } from "@/hooks/useChartTheme";
-import { cn, formatCurrency, formatCurrencyCompact } from "@/lib/utils";
+import { cn, formatCurrencyCompact, getInitials } from "@/lib/utils";
+import { useAmountFormatter } from "@/hooks/useAmountFormatter";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { PremiumIcon, GlossyBadge } from "@/components/icons/PremiumIcon";
 import type { FamilyMember } from "@/features/family/types/family.types";
 
-const MAX_MEMBERS   = 6;
-const MEMBER_COLORS = ["#6366f1","#22c55e","#f59e0b","#06b6d4","#8b5cf6","#ec4899"];
-
-const initials = (name: string) =>
-  name.trim().split(/\s+/).filter(Boolean).map(n => n[0]).join("").slice(0, 2).toUpperCase() || "?";
 const firstName = (name: string) =>
   name.trim().split(/\s+/).filter(Boolean)[0] || name;
 
@@ -37,164 +40,10 @@ type Mode =
   | "makeAdmin" | "revokeAdmin" | "confirmRemove"
   | "confirmLeave" | "adminLeave" | "confirmDelete";
 
-// ─── Slot indicator ───────────────────────────────────────────────────────────
-
-function SlotBar({ count }: { count: number }) {
-  const isFull = count >= MAX_MEMBERS;
-  return (
-    <div className="flex items-center gap-2">
-      <div className="flex gap-1">
-        {Array.from({ length: MAX_MEMBERS }).map((_, i) => (
-          <div key={i} className={cn(
-            "w-3.5 h-3.5 rounded-full border-2 transition-all",
-            i < count
-              ? isFull ? "bg-amber-400 border-amber-400" : "bg-indigo-500 border-indigo-500"
-              : "bg-transparent border-border"
-          )} />
-        ))}
-      </div>
-      <span className={cn("text-xs font-semibold tabular-nums", isFull ? "text-amber-500" : "text-muted-foreground")}>
-        {count} / {MAX_MEMBERS}{isFull && " · Full"}
-      </span>
-    </div>
-  );
-}
-
-// ─── Member row ───────────────────────────────────────────────────────────────
-
-function MemberRow({
-  member, isSelf, isCurrentUserAdmin, color, onMakeAdmin, onRevokeAdmin, onRemove,
-}: {
-  member: FamilyMember; isSelf: boolean; isCurrentUserAdmin: boolean; color: string;
-  onMakeAdmin: (m: FamilyMember) => void; onRevokeAdmin: (m: FamilyMember) => void; onRemove: (m: FamilyMember) => void;
-}) {
-  const memberIsAdmin   = member.role === "FAMILY_ADMIN" || member.role === "ADMIN";
-  const canRevokeAdmin  = memberIsAdmin && member.role !== "ADMIN"; // can't revoke app-level ADMIN
-  return (
-    <div className="flex items-center gap-3 py-3 px-4">
-      <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: color + "26" }}>
-        <span className="text-xs font-bold" style={{ color }}>{initials(member.fullName)}</span>
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <p className="text-sm font-medium text-foreground truncate">{member.fullName}</p>
-          {isSelf && <span className="text-[11px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">You</span>}
-        </div>
-        <p className="text-xs text-muted-foreground truncate">{member.email}</p>
-      </div>
-      {memberIsAdmin ? (
-        <span className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg bg-amber-500/15 text-amber-500 shrink-0">
-          <Crown className="w-3 h-3" /> Admin
-        </span>
-      ) : (
-        <span className="text-[11px] font-medium px-2 py-1 rounded-lg bg-muted text-muted-foreground shrink-0">Member</span>
-      )}
-      {isCurrentUserAdmin && !isSelf && (
-        <div className="flex items-center gap-1 shrink-0">
-          {!memberIsAdmin && (
-            <button onClick={() => onMakeAdmin(member)} title="Make admin"
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 transition-all">
-              <Crown className="w-3.5 h-3.5" />
-            </button>
-          )}
-          {canRevokeAdmin && (
-            <button onClick={() => onRevokeAdmin(member)} title="Revoke admin"
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-orange-500 hover:bg-orange-500/10 transition-all">
-              <ShieldOff className="w-3.5 h-3.5" />
-            </button>
-          )}
-          <button onClick={() => onRemove(member)} title="Remove from family"
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-all">
-            <UserMinus className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Admin-leave modal ────────────────────────────────────────────────────────
-
-function AdminLeaveModal({
-  open, familyName, nonAdminMembers, memberColorMap, targetMember, setTargetMember,
-  onConfirm, onCancel, transferring, leaving,
-}: {
-  open: boolean; familyName: string; nonAdminMembers: FamilyMember[];
-  memberColorMap: Map<string, string>; targetMember: FamilyMember | null;
-  setTargetMember: (m: FamilyMember | null) => void;
-  onConfirm: () => void; onCancel: () => void;
-  transferring: boolean; leaving: boolean;
-}) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-card border border-border rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-5">
-        <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
-            <AlertTriangle className="w-4 h-4 text-amber-500" />
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-foreground">Transfer admin before leaving</p>
-            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-              Select a member to become the new admin, then you will leave{" "}
-              <span className="font-medium text-foreground">{familyName}</span>.
-            </p>
-          </div>
-          <button onClick={onCancel} className="text-muted-foreground hover:text-foreground transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {nonAdminMembers.length === 0 ? (
-          <p className="text-xs text-muted-foreground bg-muted/60 rounded-xl px-3 py-2.5">
-            No other members to transfer to. Remove all members first, or delete the group.
-          </p>
-        ) : (
-          <div className="space-y-1.5 max-h-52 overflow-y-auto pr-0.5">
-            {nonAdminMembers.map((m, i) => (
-              <button key={m.id}
-                onClick={() => setTargetMember(targetMember?.id === m.id ? null : m)}
-                className={cn(
-                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all text-left",
-                  targetMember?.id === m.id
-                    ? "bg-indigo-500/10 border-indigo-500/40"
-                    : "bg-muted/40 border-border hover:border-indigo-500/30"
-                )}>
-                <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
-                  style={{ background: (memberColorMap.get(m.id) ?? MEMBER_COLORS[i]) + "26" }}>
-                  <span className="text-[10px] font-bold" style={{ color: memberColorMap.get(m.id) ?? MEMBER_COLORS[i] }}>
-                    {initials(m.fullName)}
-                  </span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{m.fullName}</p>
-                  <p className="text-xs text-muted-foreground truncate">{m.email}</p>
-                </div>
-                {targetMember?.id === m.id && <Check className="w-4 h-4 text-indigo-500 shrink-0" />}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="flex gap-2 pt-1">
-          <button onClick={onConfirm} disabled={!targetMember || transferring || leaving}
-            className="flex-1 flex items-center justify-center gap-2 h-10 rounded-xl text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-all disabled:opacity-60">
-            {(transferring || leaving) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}
-            Transfer & Leave
-          </button>
-          <button onClick={onCancel}
-            className="h-10 px-4 rounded-xl text-sm text-muted-foreground bg-muted hover:bg-muted/80 transition-all">
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function FamilyPage() {
+  const { fmt, fmtC } = useAmountFormatter();
   const now = new Date();
 
   const { user }                     = useAuthStore();
@@ -247,8 +96,6 @@ export default function FamilyPage() {
       .sort((a, b) => b.amount - a.amount);
   }, [monthExpenses, members]);
 
-  const totalMonthSpend = memberSpending.reduce((s, m) => s + m.amount, 0);
-
   const drillExpenses = useMemo(
     () => drillMemberId ? monthExpenses.filter(e => e.userId === drillMemberId) : [],
     [monthExpenses, drillMemberId]
@@ -272,9 +119,9 @@ export default function FamilyPage() {
   const { mutate: renameFamily,  isPending: renaming   } = useRenameFamily();
   const { mutate: leaveFamily,   isPending: leaving    } = useLeaveFamily();
   const { mutate: deleteFamily,  isPending: deleting   } = useDeleteFamily();
-  const { mutate: removeMember,  isPending: removing   } = useRemoveMember(family?.id);
+  const { mutate: removeMember  }                         = useRemoveMember(family?.id);
   const { mutate: transferAdmin, isPending: transferring} = useTransferAdmin(family?.id);
-  const { mutate: revokeAdmin,   isPending: revoking    } = useRevokeAdmin(family?.id);
+  const { mutate: revokeAdmin   }                         = useRevokeAdmin(family?.id);
 
   const hasFamily = !!user?.familyId;
   const isAdmin   = user?.role === "FAMILY_ADMIN" || user?.role === "ADMIN";
@@ -351,7 +198,7 @@ export default function FamilyPage() {
         <div className="bg-red-500/8 border border-red-500/20 rounded-2xl p-5 space-y-3">
           <p className="text-sm font-medium text-foreground">
             Delete <span className="font-semibold">{family?.name}</span>? All {members.length} members will be removed.
-            Everyone's individual data stays in their own accounts.
+            Everyone&apos;s individual data stays in their own accounts.
           </p>
           <div className="flex gap-2">
             <button onClick={handleDelete} disabled={deleting}
@@ -395,7 +242,7 @@ export default function FamilyPage() {
 
   return (
     <div className="flex flex-col flex-1">
-      <Header title="Family" />
+      <Header title="Family" subtitle="Manage shared accounts and members in your family circle" />
       <PageWrapper>
 
         {isLoading ? (
@@ -405,19 +252,17 @@ export default function FamilyPage() {
 
         ) : hasFamily && family ? (
           /* ── Family Dashboard ─────────────────────────── */
-          <div className="max-w-6xl space-y-4">
+          <div className="space-y-4">
 
             {/* ── Top stats ── */}
             {/* Row 1: Net Worth hero + Invite code */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {/* Net Worth — hero card */}
-              <div className="sm:col-span-2 bg-gradient-to-br from-indigo-600/10 to-violet-600/8 border border-indigo-500/20 rounded-2xl p-5 flex items-center gap-4">
-                <div className="w-11 h-11 rounded-2xl bg-indigo-600/20 flex items-center justify-center shrink-0">
-                  <TrendingUp className="w-5 h-5 text-indigo-400" />
-                </div>
+              <div className="sm:col-span-2 bg-gradient-to-br from-indigo-600/15 to-violet-600/10 border border-indigo-500/20 rounded-2xl p-5 flex items-center gap-4">
+                <PremiumIcon icon={TrendingUp} tone="violet" size="lg" className="shrink-0" />
                 <div>
-                  <p className="text-xs font-semibold text-indigo-400/80 uppercase tracking-wider mb-0.5">Family Net Worth</p>
-                  <p className="text-2xl font-bold text-foreground tabular-nums leading-none">{formatCurrency(familyNetWorth)}</p>
+                  <p className="text-xs font-semibold text-indigo-600/80 dark:text-indigo-400/80 uppercase tracking-wider mb-0.5">Family Net Worth</p>
+                  <p className="text-2xl font-bold text-foreground tabular-nums leading-none">{fmt(familyNetWorth)}</p>
                   <p className="text-[11px] text-muted-foreground/60 mt-1">{members.length} member{members.length !== 1 ? "s" : ""} combined</p>
                 </div>
               </div>
@@ -425,17 +270,17 @@ export default function FamilyPage() {
               {/* Invite code */}
               <div className="bg-card border border-border rounded-2xl p-4 flex flex-col justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <Shield className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <PremiumIcon icon={Shield} tone="emerald" size="xs" className="shrink-0" />
                   <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Invite Code</span>
                   <SlotBar count={members.length} />
                 </div>
                 {isFull ? (
-                  <p className="text-xs text-amber-500">Group full — remove a member to allow new joins</p>
+                  <p className="text-xs text-amber-600 dark:text-amber-400">Group full — remove a member to allow new joins</p>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-base font-bold tracking-widest text-indigo-400">{family.inviteCode}</span>
+                    <span className="font-mono text-base font-bold tracking-widest text-indigo-600 dark:text-indigo-400">{family.inviteCode}</span>
                     <button onClick={copyCode}
-                      className="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-indigo-600/15 hover:bg-indigo-600/25 text-indigo-400 transition-all">
+                      className="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-indigo-600/15 hover:bg-indigo-600/25 text-indigo-600 dark:text-indigo-400 transition-all">
                       {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                       {copied ? "Copied" : "Copy"}
                     </button>
@@ -448,66 +293,48 @@ export default function FamilyPage() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {/* Income */}
               <div className="bg-card border border-border rounded-2xl p-4">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <div className="w-6 h-6 rounded-lg bg-emerald-500/15 flex items-center justify-center">
-                    <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-500" />
-                  </div>
-                  <span className="text-[11px] text-muted-foreground font-medium">Income</span>
-                </div>
+                <PremiumIcon icon={ArrowDownLeft} tone="green" size="xs" className="mb-2" />
+                <p className="text-[11px] text-muted-foreground font-medium mb-1.5">Income</p>
                 <p className="text-lg font-bold text-emerald-500 dark:text-emerald-400 tabular-nums leading-none">
-                  {monthlyStats ? formatCurrency(monthlyStats.totalIncome) : "—"}
+                  {monthlyStats ? fmt(monthlyStats.totalIncome) : "—"}
                 </p>
                 <p className="text-[10px] text-muted-foreground/50 mt-1">This month</p>
               </div>
 
               {/* Expense */}
               <div className="bg-card border border-border rounded-2xl p-4">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <div className="w-6 h-6 rounded-lg bg-red-500/15 flex items-center justify-center">
-                    <ArrowUpRight className="w-3.5 h-3.5 text-red-500" />
-                  </div>
-                  <span className="text-[11px] text-muted-foreground font-medium">Expense</span>
-                </div>
+                <PremiumIcon icon={ArrowUpRight} tone="red" size="xs" className="mb-2" />
+                <p className="text-[11px] text-muted-foreground font-medium mb-1.5">Expense</p>
                 <p className="text-lg font-bold text-red-500 dark:text-red-400 tabular-nums leading-none">
-                  {monthlyStats ? formatCurrency(monthlyStats.totalExpense) : "—"}
+                  {monthlyStats ? fmt(monthlyStats.totalExpense) : "—"}
                 </p>
                 <p className="text-[10px] text-muted-foreground/50 mt-1">This month</p>
               </div>
 
               {/* Savings */}
               <div className="bg-card border border-border rounded-2xl p-4">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <div className={cn("w-6 h-6 rounded-lg flex items-center justify-center",
-                    monthlyStats && monthlyStats.savings < 0 ? "bg-amber-500/15" : "bg-sky-500/15")}>
-                    <PiggyBank className={cn("w-3.5 h-3.5",
-                      monthlyStats && monthlyStats.savings < 0 ? "text-amber-500" : "text-sky-500")} />
-                  </div>
-                  <span className="text-[11px] text-muted-foreground font-medium">Savings</span>
-                </div>
+                <PremiumIcon icon={PiggyBank} tone={monthlyStats && monthlyStats.savings < 0 ? "orange" : "cyan"} size="xs" className="mb-2" />
+                <p className="text-[11px] text-muted-foreground font-medium mb-1.5">Savings</p>
                 <p className={cn("text-lg font-bold tabular-nums leading-none",
                   monthlyStats && monthlyStats.savings < 0
-                    ? "text-amber-500"
+                    ? "text-amber-600 dark:text-amber-400"
                     : "text-sky-500 dark:text-sky-400")}>
-                  {monthlyStats ? formatCurrency(monthlyStats.savings) : "—"}
+                  {monthlyStats ? fmt(monthlyStats.savings) : "—"}
                 </p>
                 <p className="text-[10px] text-muted-foreground/50 mt-1">This month</p>
               </div>
 
               {/* Highest Spender */}
               <div className="bg-card border border-border rounded-2xl p-4">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <div className="w-6 h-6 rounded-lg bg-amber-500/15 flex items-center justify-center">
-                    <Trophy className="w-3.5 h-3.5 text-amber-500" />
-                  </div>
-                  <span className="text-[11px] text-muted-foreground font-medium">Top Spender</span>
-                </div>
+                <PremiumIcon icon={Trophy} tone="lemon" size="xs" className="mb-2" />
+                <p className="text-[11px] text-muted-foreground font-medium mb-1.5">Top Spender</p>
                 {monthlyStats?.highestSpenderName ? (
                   <>
                     <p className="text-sm font-bold text-foreground truncate leading-none">
                       {firstName(monthlyStats.highestSpenderName)}
                     </p>
                     <p className="text-[11px] font-semibold text-red-500 dark:text-red-400 tabular-nums mt-1">
-                      {formatCurrency(monthlyStats.highestSpenderAmount!)}
+                      {fmt(monthlyStats.highestSpenderAmount!)}
                     </p>
                   </>
                 ) : (
@@ -525,15 +352,13 @@ export default function FamilyPage() {
                 {/* Family header card */}
                 <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-2xl bg-indigo-600/15 flex items-center justify-center shrink-0">
-                      <Users className="w-5 h-5 text-indigo-400" />
-                    </div>
+                    <PremiumIcon icon={Users} tone="magenta" size="md" className="shrink-0" />
                     <div className="flex-1 min-w-0">
                       {mode === "rename" ? (
                         <div className="flex items-center gap-2">
                           <input value={renameName} onChange={e => setRenameName(e.target.value)}
                             onKeyDown={e => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") reset(); }}
-                            className="h-8 px-2.5 rounded-lg bg-muted border border-border text-sm text-foreground focus:outline-none focus:border-indigo-500 w-36"
+                            className="h-8 px-2.5 rounded-xl bg-muted border border-border text-sm text-foreground focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/40 w-36"
                             autoFocus />
                           <button onClick={handleRename} disabled={!renameName.trim() || renaming}
                             className="h-8 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium disabled:opacity-60 transition-all flex items-center gap-1.5">
@@ -554,7 +379,7 @@ export default function FamilyPage() {
                           )}
                         </div>
                       )}
-                      <div className={cn("flex items-center gap-1.5 mt-0.5 text-xs font-semibold", isAdmin ? "text-amber-500" : "text-indigo-400")}>
+                      <div className={cn("flex items-center gap-1.5 mt-0.5 text-xs font-semibold", isAdmin ? "text-amber-600 dark:text-amber-400" : "text-indigo-600 dark:text-indigo-400")}>
                         {isAdmin && <Crown className="w-3 h-3" />}
                         {isAdmin ? "You are the admin" : "Member"}
                       </div>
@@ -565,9 +390,13 @@ export default function FamilyPage() {
                 {/* Members list */}
                 <div className="bg-card border border-border rounded-2xl overflow-hidden">
                   <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-foreground">Members</h3>
+                    <div className="flex items-center gap-2">
+                      <PremiumIcon icon={Users} tone="magenta" size="xs" />
+                      <h3 className="text-sm font-semibold text-foreground">Members</h3>
+                      <span className="text-xs text-muted-foreground">{members.length}</span>
+                    </div>
                     {isFull && (
-                      <span className="text-[11px] font-medium text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">Full</span>
+                      <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">Full</span>
                     )}
                   </div>
                   <div className="divide-y divide-border">
@@ -586,7 +415,7 @@ export default function FamilyPage() {
                 {budgets.length > 0 && (
                   <div className="bg-card border border-border rounded-2xl p-5">
                     <div className="flex items-center gap-2 mb-3">
-                      <Target className="w-4 h-4 text-violet-400" />
+                      <PremiumIcon icon={Target} tone="violet" size="xs" />
                       <h3 className="text-sm font-semibold text-foreground">
                         Budget Overview — {now.toLocaleString("en-IN", { month: "long" })}
                       </h3>
@@ -598,8 +427,8 @@ export default function FamilyPage() {
                           <div key={b.id}>
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-xs font-medium text-foreground">{b.categoryName ?? "Budget"}</span>
-                              <span className={cn("text-xs font-semibold tabular-nums", b.overBudget ? "text-red-400" : "text-muted-foreground")}>
-                                {formatCurrencyCompact(b.spent)} / {formatCurrencyCompact(b.amount)}
+                              <span className={cn("text-xs font-semibold tabular-nums", b.overBudget ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}>
+                                {fmtC(b.spent)} / {fmtC(b.amount)}
                               </span>
                             </div>
                             <div className="h-1.5 bg-muted rounded-full overflow-hidden">
@@ -615,7 +444,7 @@ export default function FamilyPage() {
                       {budgets.length > 6 && <p className="text-xs text-muted-foreground text-right">+{budgets.length - 6} more</p>}
                     </div>
                     {budgets.some(b => b.overBudget) && (
-                      <div className="mt-3 flex items-center gap-1.5 text-xs text-red-400 bg-red-500/8 border border-red-500/20 rounded-xl px-3 py-2">
+                      <div className="mt-3 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400 bg-red-500/8 border border-red-500/20 rounded-xl px-3 py-2">
                         <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                         {budgets.filter(b => b.overBudget).length} budget{budgets.filter(b => b.overBudget).length > 1 ? "s" : ""} over limit
                       </div>
@@ -632,7 +461,7 @@ export default function FamilyPage() {
                 <div className="bg-card border border-border rounded-2xl p-5">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
-                      <BarChart2 className="w-4 h-4 text-indigo-400" />
+                      <PremiumIcon icon={BarChart2} tone="indigo" size="xs" />
                       <h3 className="text-sm font-semibold text-foreground">Member Spending</h3>
                     </div>
                     <div className="flex items-center gap-1">
@@ -663,9 +492,9 @@ export default function FamilyPage() {
                             axisLine={false} tickLine={false} width={72} />
                           <Tooltip contentStyle={chart.tooltipStyle} labelStyle={chart.labelStyle} itemStyle={chart.itemStyle}
                             cursor={chart.cursorStyle}
-                            formatter={(v: number, _: string, props: any) => [formatCurrency(v), props.payload?.fullName ?? "Spending"]} />
+                            formatter={(v: number, _: string, props: { payload?: { fullName?: string } }) => [fmt(v), props.payload?.fullName ?? "Spending"]} />
                           <Bar dataKey="amount" radius={[0, 6, 6, 0]} style={{ cursor: "pointer" }}
-                            onClick={(data: any) => setDrillMemberId(prev => prev === data.id ? null : data.id)}>
+                            onClick={(data: { id?: string }) => setDrillMemberId(prev => prev === data.id ? null : (data.id ?? null))}>
                             {memberSpending.map((m, i) => (
                               <Cell key={i} fill={m.color} opacity={drillMemberId && drillMemberId !== m.id ? 0.35 : 1} />
                             ))}
@@ -678,7 +507,7 @@ export default function FamilyPage() {
                             className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
                             <div className="w-2 h-2 rounded-full shrink-0" style={{ background: m.color }} />
                             <span className="text-xs text-muted-foreground">{m.fullName}</span>
-                            <span className="text-xs font-semibold text-foreground tabular-nums">{formatCurrencyCompact(m.amount)}</span>
+                            <span className="text-xs font-semibold text-foreground tabular-nums">{fmtC(m.amount)}</span>
                           </button>
                         ))}
                       </div>
@@ -688,12 +517,9 @@ export default function FamilyPage() {
                         <div className="mt-4 pt-4 border-t border-border">
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
-                                style={{ background: (memberColorMap.get(drillMemberId) ?? "#6366f1") + "26" }}>
-                                <span className="text-[9px] font-bold" style={{ color: memberColorMap.get(drillMemberId) ?? "#6366f1" }}>
-                                  {initials(drillMember.fullName)}
-                                </span>
-                              </div>
+                              <GlossyBadge hex={memberColorMap.get(drillMemberId) ?? "#6366f1"} size="xs" className="shrink-0">
+                                <span className="text-[9px] font-bold text-white">{getInitials(drillMember.fullName)}</span>
+                              </GlossyBadge>
                               <p className="text-xs font-semibold text-foreground">{drillMember.fullName}</p>
                               <span className="text-xs text-muted-foreground">· {drillExpenses.length} expense{drillExpenses.length !== 1 ? "s" : ""}</span>
                             </div>
@@ -713,13 +539,13 @@ export default function FamilyPage() {
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
                                   <span className="text-[10px] text-muted-foreground/60">{((amt / drillTotal) * 100).toFixed(0)}%</span>
-                                  <span className="text-xs font-semibold tabular-nums text-red-400">−{formatCurrencyCompact(amt)}</span>
+                                  <span className="text-xs font-semibold tabular-nums text-red-600 dark:text-red-400">−{fmtC(amt)}</span>
                                 </div>
                               </div>
                             ))}
                             <div className="pt-2 border-t border-border/60 flex items-center justify-between">
                               <span className="text-xs font-semibold text-muted-foreground">Total</span>
-                              <span className="text-xs font-bold tabular-nums text-red-400">−{formatCurrency(drillTotal)}</span>
+                              <span className="text-xs font-bold tabular-nums text-red-600 dark:text-red-400">−{fmt(drillTotal)}</span>
                             </div>
                           </div>
                         </div>
@@ -736,7 +562,10 @@ export default function FamilyPage() {
                 {recentFamilyExpenses.length > 0 && (
                   <div className="bg-card border border-border rounded-2xl p-5">
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-semibold text-foreground">Shared Activity</h3>
+                      <div className="flex items-center gap-2">
+                        <PremiumIcon icon={Receipt} tone="cobalt" size="xs" />
+                        <h3 className="text-sm font-semibold text-foreground">Shared Activity</h3>
+                      </div>
                       <span className="text-xs text-muted-foreground">{chartMonthLabel}</span>
                     </div>
                     <div className="space-y-2.5">
@@ -746,9 +575,9 @@ export default function FamilyPage() {
                         const dayStr = new Date(e.expenseDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
                         return (
                           <div key={e.id} className="flex items-center gap-3">
-                            <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: color + "26" }}>
-                              <span className="text-[9px] font-bold" style={{ color }}>{who ? initials(who) : "?"}</span>
-                            </div>
+                            <GlossyBadge hex={color} size="xs" className="shrink-0">
+                              <span className="text-[9px] font-bold text-white">{who ? getInitials(who) : "?"}</span>
+                            </GlossyBadge>
                             <div className="flex-1 min-w-0">
                               <p className="text-xs font-medium text-foreground truncate">{e.description || e.categoryName || "Expense"}</p>
                               <p className="text-[10px] text-muted-foreground/60">
@@ -756,7 +585,7 @@ export default function FamilyPage() {
                                 {e.categoryName && e.description && <span className="ml-1 text-muted-foreground/40">· {e.categoryName}</span>}
                               </p>
                             </div>
-                            <p className="text-xs font-semibold text-red-500 dark:text-red-400 tabular-nums shrink-0">−{formatCurrency(e.amount)}</p>
+                            <p className="text-xs font-semibold text-red-500 dark:text-red-400 tabular-nums shrink-0">−{fmt(e.amount)}</p>
                           </div>
                         );
                       })}
@@ -769,6 +598,8 @@ export default function FamilyPage() {
                   </div>
                 )}
 
+                <SplitsCard />
+
               </div>{/* end right col */}
             </div>{/* end grid */}
 
@@ -779,55 +610,73 @@ export default function FamilyPage() {
 
         ) : (
           /* ── No Family ─────────────────────────────────── */
-          <div className="max-w-lg space-y-4">
-            <div className="flex gap-2.5 p-3.5 bg-muted/60 border border-border rounded-xl">
-              <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                A family group connects up to 6 members — shared expense tracking, budgets, and net worth.
-                Create a group and share the invite code, or enter a code to join an existing group.
-              </p>
-            </div>
-
+          <div className="max-w-3xl mx-auto">
             {mode === "idle" && (
-              <>
-                <div className="text-center pt-2 pb-1">
-                  <div className="w-14 h-14 rounded-2xl bg-indigo-600/15 flex items-center justify-center mx-auto mb-3">
-                    <Users className="w-7 h-7 text-indigo-400" />
-                  </div>
-                  <h2 className="text-base font-bold text-foreground mb-1">No family group yet</h2>
-                  <p className="text-sm text-muted-foreground">Create a new group or join one with an invite code.</p>
+              <div className="space-y-8">
+                {/* Hero */}
+                <div className="text-center pt-8 pb-1">
+                  <GlossyBadge hex="#5856D6" size="xl" className="mx-auto mb-4">
+                    <Sparkles className="w-8 h-8 text-white" strokeWidth={2.25} />
+                  </GlossyBadge>
+                  <h2 className="text-2xl font-bold text-foreground mb-2">Bring your family&apos;s finances together</h2>
+                  <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
+                    Track shared expenses, budgets, and net worth with up to {MAX_MEMBERS} family
+                    members — everyone sees the same picture, in real time.
+                  </p>
                 </div>
-                <div className="grid sm:grid-cols-2 gap-3">
+
+                {/* Create / Join cards */}
+                <div className="grid sm:grid-cols-2 gap-4">
                   <button onClick={() => setMode("create")}
-                    className="flex flex-col items-center gap-3 p-6 bg-card border border-border hover:border-indigo-500/40 hover:bg-indigo-600/5 rounded-2xl transition-all group">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-600/15 group-hover:bg-indigo-600/25 flex items-center justify-center transition-all">
-                      <Plus className="w-5 h-5 text-indigo-400" />
-                    </div>
+                    className="flex flex-col items-center gap-3 p-7 bg-card border border-border hover:border-indigo-500/40 hover:bg-indigo-600/5 rounded-2xl transition-all group">
+                    <PremiumIcon icon={Plus} tone="indigo" size="lg" className="transition-transform group-hover:scale-105" />
                     <div className="text-center">
                       <p className="text-sm font-semibold text-foreground mb-1">Create a Family</p>
-                      <p className="text-xs text-muted-foreground">Start a new group and invite up to 5 others</p>
+                      <p className="text-xs text-muted-foreground">Start a new group and invite up to {MAX_MEMBERS - 1} others</p>
                     </div>
                   </button>
                   <button onClick={() => setMode("join")}
-                    className="flex flex-col items-center gap-3 p-6 bg-card border border-border hover:border-emerald-500/40 hover:bg-emerald-600/5 rounded-2xl transition-all group">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-600/15 group-hover:bg-emerald-600/25 flex items-center justify-center transition-all">
-                      <LogIn className="w-5 h-5 text-emerald-400" />
-                    </div>
+                    className="flex flex-col items-center gap-3 p-7 bg-card border border-border hover:border-emerald-500/40 hover:bg-emerald-600/5 rounded-2xl transition-all group">
+                    <PremiumIcon icon={LogIn} tone="emerald" size="lg" className="transition-transform group-hover:scale-105" />
                     <div className="text-center">
                       <p className="text-sm font-semibold text-foreground mb-1">Join a Family</p>
                       <p className="text-xs text-muted-foreground">Enter an invite code to join a group</p>
                     </div>
                   </button>
                 </div>
-              </>
+
+                {/* Feature highlights */}
+                <div>
+                  <p className="text-center text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-widest mb-4">What you get</p>
+                  <div className="grid sm:grid-cols-3 gap-4">
+                    {[
+                      { icon: TrendingUp, tone: "violet" as const, title: "Combined Net Worth", desc: "See everyone's assets and debts combined, updated in real time." },
+                      { icon: Target,     tone: "orange" as const, title: "Shared Budgets",     desc: "Set spending limits together and track them as a family." },
+                      { icon: BarChart2,  tone: "indigo" as const, title: "Spending Insights",  desc: "See who's spending what, and where, every month." },
+                    ].map(f => (
+                      <div key={f.title} className="bg-card border border-border rounded-2xl p-5 text-center">
+                        <PremiumIcon icon={f.icon} tone={f.tone} size="md" className="mx-auto mb-3" />
+                        <p className="text-sm font-semibold text-foreground mb-1">{f.title}</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{f.desc}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex gap-2.5 p-3.5 bg-muted/60 border border-border rounded-xl">
+                  <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    A family group connects up to {MAX_MEMBERS} members — shared expense tracking, budgets, and net worth.
+                    Create a group and share the invite code, or enter a code to join an existing group.
+                  </p>
+                </div>
+              </div>
             )}
 
             {mode === "create" && (
-              <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-indigo-600/15 flex items-center justify-center">
-                    <Plus className="w-4 h-4 text-indigo-400" />
-                  </div>
+              <div className="max-w-md mx-auto bg-card border border-border rounded-2xl p-6 space-y-4">
+                <div className="flex items-center gap-2.5">
+                  <PremiumIcon icon={Plus} tone="indigo" size="sm" />
                   <h3 className="text-sm font-semibold text-foreground">Create a Family</h3>
                 </div>
                 <div className="space-y-1.5">
@@ -835,7 +684,7 @@ export default function FamilyPage() {
                   <input value={familyName} onChange={e => setFamilyName(e.target.value)}
                     onKeyDown={e => e.key === "Enter" && handleCreate()}
                     placeholder="e.g. The Kumars, Smith Family"
-                    className="w-full h-10 px-3 rounded-xl bg-muted border border-border text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:border-indigo-500 transition-colors"
+                    className="w-full h-10 px-3 rounded-xl bg-muted border border-border text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/40 transition-colors"
                     autoFocus />
                 </div>
                 <div className="flex gap-2 pt-1">
@@ -852,11 +701,9 @@ export default function FamilyPage() {
             )}
 
             {mode === "join" && (
-              <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-600/15 flex items-center justify-center">
-                    <LogIn className="w-4 h-4 text-emerald-400" />
-                  </div>
+              <div className="max-w-md mx-auto bg-card border border-border rounded-2xl p-6 space-y-4">
+                <div className="flex items-center gap-2.5">
+                  <PremiumIcon icon={LogIn} tone="emerald" size="sm" />
                   <h3 className="text-sm font-semibold text-foreground">Join a Family</h3>
                 </div>
                 <div className="space-y-1.5">
@@ -864,7 +711,7 @@ export default function FamilyPage() {
                   <input value={inviteCode} onChange={e => setInviteCode(e.target.value.toUpperCase())}
                     onKeyDown={e => e.key === "Enter" && handleJoin()}
                     placeholder="e.g. AB12CD34" maxLength={8}
-                    className="w-full h-10 px-3 rounded-xl bg-muted border border-border text-sm font-mono text-foreground placeholder-muted-foreground tracking-widest focus:outline-none focus:border-emerald-500 transition-colors uppercase"
+                    className="w-full h-10 px-3 rounded-xl bg-muted border border-border text-sm font-mono text-foreground placeholder-muted-foreground tracking-widest focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/40 transition-colors uppercase"
                     autoFocus />
                   <p className="text-xs text-muted-foreground">Ask your family admin for the 8-character invite code.</p>
                 </div>

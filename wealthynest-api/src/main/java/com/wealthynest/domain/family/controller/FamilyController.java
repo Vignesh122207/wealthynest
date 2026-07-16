@@ -9,9 +9,9 @@ import com.wealthynest.domain.networth.service.NetWorthService;
 import com.wealthynest.domain.family.dto.request.CreateFamilyRequest;
 import com.wealthynest.domain.family.dto.request.JoinFamilyRequest;
 import com.wealthynest.domain.family.dto.request.RenameFamilyRequest;
+import com.wealthynest.domain.family.dto.request.TransferAdminRequest;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Map;
 import com.wealthynest.domain.family.dto.response.FamilyMemberResponse;
 import com.wealthynest.domain.family.dto.response.FamilyMonthlyStatsResponse;
 import com.wealthynest.domain.expense.repository.ExpenseRepository;
@@ -19,6 +19,7 @@ import com.wealthynest.domain.income.repository.IncomeRepository;
 import com.wealthynest.domain.user.repository.UserRepository;
 import com.wealthynest.domain.family.dto.response.FamilyResponse;
 import com.wealthynest.domain.family.service.FamilyService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -45,9 +46,11 @@ public class FamilyController {
 
     @PostMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<FamilyResponse>> createFamily(@Valid @RequestBody CreateFamilyRequest request) {
+    public ResponseEntity<ApiResponse<FamilyResponse>> createFamily(
+            @Valid @RequestBody CreateFamilyRequest request, HttpServletRequest httpRequest) {
         return ResponseEntity.status(HttpStatus.CREATED).body(
-                ApiResponse.created(familyService.createFamily(SecurityUtils.requireCurrentUserId(), request)));
+                ApiResponse.created(familyService.createFamily(SecurityUtils.requireCurrentUserId(), request,
+                        httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"))));
     }
 
     @PostMapping("/join")
@@ -98,8 +101,9 @@ public class FamilyController {
 
     @DeleteMapping("/{familyId}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<Void>> deleteFamily(@PathVariable UUID familyId) {
-        familyService.deleteFamily(familyId, SecurityUtils.requireCurrentUserId());
+    public ResponseEntity<ApiResponse<Void>> deleteFamily(@PathVariable UUID familyId, HttpServletRequest httpRequest) {
+        familyService.deleteFamily(familyId, SecurityUtils.requireCurrentUserId(),
+                httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"));
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
@@ -107,8 +111,10 @@ public class FamilyController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> revokeAdmin(
             @PathVariable UUID familyId,
-            @PathVariable UUID targetId) {
-        familyService.revokeAdmin(familyId, SecurityUtils.requireCurrentUserId(), targetId);
+            @PathVariable UUID targetId,
+            HttpServletRequest httpRequest) {
+        familyService.revokeAdmin(familyId, SecurityUtils.requireCurrentUserId(), targetId,
+                httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"));
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
@@ -116,9 +122,10 @@ public class FamilyController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> transferAdmin(
             @PathVariable UUID familyId,
-            @RequestBody Map<String, String> body) {
-        UUID newAdminId = UUID.fromString(body.get("newAdminId"));
-        familyService.transferAdmin(familyId, SecurityUtils.requireCurrentUserId(), newAdminId);
+            @Valid @RequestBody TransferAdminRequest request,
+            HttpServletRequest httpRequest) {
+        familyService.transferAdmin(familyId, SecurityUtils.requireCurrentUserId(), request.getNewAdminId(),
+                httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"));
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 

@@ -20,6 +20,11 @@ export interface Expense {
   createdAt:      string;
 }
 
+export interface SplitParticipant {
+  userId:      string;
+  shareAmount: number;
+}
+
 export interface CreateExpensePayload {
   categoryId:      string;
   budgetId?:       string;
@@ -31,6 +36,7 @@ export interface CreateExpensePayload {
   recurring?:      boolean;
   recurrenceRule?: string;
   paymentMethod?:  string;
+  splitWith?:      SplitParticipant[];
 }
 
 export interface ExpenseFilters {

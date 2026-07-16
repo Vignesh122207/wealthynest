@@ -8,7 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.DayOfWeek;
@@ -62,11 +61,10 @@ public class StockDataScheduler {
     }
 
     /**
-     * Weekly — Sunday 2 AM IST: refresh full NSE equity list + full corporate actions list.
-     * Catches any gaps in the daily CA files (holidays, network issues).
+     * Weekly full refresh — entry point called by JobSchedulerService (STOCK_WEEKLY_REFRESH job,
+     * configurable/triggerable from Admin). Refreshes full NSE equity list + full corporate actions
+     * list, catching any gaps in the daily CA files (holidays, network issues).
      */
-    @Async
-    @Scheduled(cron = "0 0 2 * * SUN", zone = "Asia/Kolkata")
     public void weeklyMasterRefresh() {
         log.info("Weekly stock master refresh starting …");
         int nseStocks = stockDataService.refreshNSEMaster();

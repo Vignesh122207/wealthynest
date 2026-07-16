@@ -15,6 +15,7 @@ import com.wealthynest.domain.investment.dto.response.*;
 import com.wealthynest.domain.investment.entity.*;
 import com.wealthynest.domain.investment.repository.*;
 import com.wealthynest.domain.account.repository.WalletAccountRepository;
+import com.wealthynest.domain.account.service.AccountOwnershipGuard;
 import com.wealthynest.domain.income.entity.IncomeEntry;
 import com.wealthynest.domain.income.entity.IncomeSource;
 import com.wealthynest.domain.income.entity.IncomePaymentMode;
@@ -41,6 +42,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class InvestmentServiceImpl implements InvestmentService {
 
+    // Marks a StockTransaction that was backfilled from an investment's pre-ledger units/
+    // avgBuyPrice (added before Buy More/Sell tracking existed) rather than one the user actually
+    // logged via the transaction modal. Reuses the existing `notes` column instead of a new
+    // boolean/migration for a single cosmetic flag — the frontend checks for this exact string to
+    // label the row "Opening position" instead of a plain Buy.
+    private static final String SEED_TXN_NOTE = "Opening position (auto-recorded)";
+
     private final InvestmentRepository          investmentRepository;
     private final AssetRepository               assetRepository;
     private final StockPriceCacheRepository     stockPriceCacheRepository;
@@ -51,6 +59,7 @@ public class InvestmentServiceImpl implements InvestmentService {
     private final NseCorporateActionRepository  corpActionRepository;
     private final InvestmentIncomeLogRepository incomeLogRepository;
     private final WalletAccountRepository       accountRepository;
+    private final AccountOwnershipGuard         accountOwnershipGuard;
     private final AccountTransferRepository     accountTransferRepository;
     private final IncomeRepository              incomeRepository;
     private final ExternalPriceService          externalPriceService;
@@ -81,6 +90,7 @@ public class InvestmentServiceImpl implements InvestmentService {
                         .quantity(inv.getUnits())
                         .pricePerShare(inv.getAvgBuyPrice())
                         .brokerage(inv.getBrokerage() != null ? inv.getBrokerage() : BigDecimal.ZERO)
+                        .notes(SEED_TXN_NOTE)
                         .build());
                 }
                 // Record the new buy lot
@@ -96,6 +106,7 @@ public class InvestmentServiceImpl implements InvestmentService {
                     .build());
                 // Debit source account if specified
                 if (req.getDebitAccountId() != null) {
+                    accountOwnershipGuard.validateAccountOwnership(req.getDebitAccountId(), userId);
                     BigDecimal cost = req.getUnits().multiply(req.getAvgBuyPrice()).add(brokerage);
                     accountTransferRepository.save(AccountTransfer.builder()
                         .userId(userId)
@@ -111,8 +122,18 @@ public class InvestmentServiceImpl implements InvestmentService {
             }
         }
 
+        accountOwnershipGuard.validateAccountOwnership(req.getLinkedAccountId(), userId);
+        accountOwnershipGuard.validateAccountOwnership(req.getDebitAccountId(), userId);
+
         // Auto-create linked asset
         UUID assetId = req.getAssetId();
+        if (assetId != null) {
+            // Otherwise a caller could point a new investment at someone else's asset —
+            // every later update would then overwrite that asset's real value (IDOR write).
+            UUID requestedAssetId = assetId;
+            assetRepository.findByIdAndUserId(requestedAssetId, userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Asset", "id", requestedAssetId));
+        }
         if (assetId == null) {
             String name = nameFor(req);
             Asset asset = Asset.builder()
@@ -178,6 +199,7 @@ public class InvestmentServiceImpl implements InvestmentService {
                 .quantity(saved.getUnits())
                 .pricePerShare(saved.getAvgBuyPrice())
                 .brokerage(saved.getBrokerage() != null ? saved.getBrokerage() : BigDecimal.ZERO)
+                .notes(SEED_TXN_NOTE)
                 .build());
         }
 
@@ -203,6 +225,7 @@ public class InvestmentServiceImpl implements InvestmentService {
     public InvestmentResponse updateInvestment(UUID id, UUID userId, CreateInvestmentRequest req) {
         Investment inv = findAndValidate(id, userId);
         UUID oldLinkedAccountId = inv.getLinkedAccountId();
+        accountOwnershipGuard.validateAccountOwnership(req.getLinkedAccountId(), userId);
 
         boolean isStock = inv.getInvestmentType() == InvestmentType.STOCK;
 
@@ -252,17 +275,17 @@ public class InvestmentServiceImpl implements InvestmentService {
         inv.setNotes(req.getNotes());
 
         if (isStock) {
-            // Allow user to correct the initial buy (units/price). We store the correction
-            // by updating (or creating) the seed transaction, then recalculate WAC from all.
-            inv.setUnits(req.getUnits());
-            inv.setAvgBuyPrice(req.getAvgBuyPrice());
             investmentRepository.save(inv); // save metadata first so ID is available
 
-            if (req.getUnits() != null && req.getUnits().compareTo(BigDecimal.ZERO) > 0
-                    && req.getAvgBuyPrice() != null) {
-                List<StockTransaction> txns =
-                    stockTransactionRepository.findByInvestmentIdOrderByTransactionDateAsc(id);
-                // The first BUY transaction is the seed — update it to reflect the correction
+            List<StockTransaction> txns =
+                stockTransactionRepository.findByInvestmentIdOrderByTransactionDateAsc(id);
+            // Units/avg price are only a free-form "correct my initial buy" field while the seed
+            // transaction is the ONLY transaction on record. Once a Buy More/Sell has happened,
+            // units/avgBuyPrice are derived from the full ledger (see recalculateStockTotals) —
+            // applying the edit form's (already-aggregate) values on top of that would double
+            // count the seed against the other transactions still in the ledger.
+            if (txns.size() <= 1 && req.getUnits() != null
+                    && req.getUnits().compareTo(BigDecimal.ZERO) > 0 && req.getAvgBuyPrice() != null) {
                 StockTransaction seed = txns.stream()
                     .filter(t -> "BUY".equals(t.getTransactionType()))
                     .findFirst().orElse(null);
@@ -279,6 +302,7 @@ public class InvestmentServiceImpl implements InvestmentService {
                         .quantity(req.getUnits())
                         .pricePerShare(req.getAvgBuyPrice())
                         .brokerage(inv.getBrokerage() != null ? inv.getBrokerage() : BigDecimal.ZERO)
+                        .notes(SEED_TXN_NOTE)
                         .build());
                 }
             }
@@ -591,6 +615,8 @@ public class InvestmentServiceImpl implements InvestmentService {
             .dayChange(dayChange).dayChangePct(dayChangePct)
             .week52High(w52h).week52Low(w52l)
             .priceLastUpdated(priceLastUpdated)
+            .transactionCount(inv.getInvestmentType() == InvestmentType.STOCK
+                    ? (int) stockTransactionRepository.countByInvestmentId(inv.getId()) : 0)
             .build();
     }
 
@@ -761,10 +787,48 @@ public class InvestmentServiceImpl implements InvestmentService {
         investmentRepository.save(inv);
     }
 
+    // Appends this investment's dated cashflows to the running lists — shared by computeXirr (one
+    // investment) and computePortfolioXirr (every active investment's cashflows combined on one
+    // timeline). Checks both ledgers an investment can have (a SIP ledger for recurring/mutual-fund
+    // style buys, a stock-transaction ledger for buy-more/sell trades) rather than just SIP, so a
+    // stock bought incrementally over time doesn't collapse to "the whole current invested amount
+    // went in on day one" — which would silently understate or overstate the real annualized return.
+    // Falls back to a single outflow on the purchase date only when neither ledger has any rows.
+    private void appendInvestmentCashflows(Investment inv, List<SipTransaction> sipTxns, List<StockTransaction> stockTxns,
+                                            List<Double> cashflows, List<LocalDate> dates) {
+        boolean any = false;
+        for (SipTransaction t : sipTxns) {
+            // BUY = outflow (negative), REDEEM = inflow (positive)
+            double sign = "REDEEM".equalsIgnoreCase(t.getTransactionType()) ? 1.0 : -1.0;
+            cashflows.add(sign * t.getAmount().doubleValue());
+            dates.add(t.getTransactionDate());
+            any = true;
+        }
+        for (StockTransaction t : stockTxns) {
+            // Same cost/proceeds formula addStockTransaction uses when moving money between
+            // accounts: BUY costs quantity×price plus brokerage, SELL nets quantity×price minus
+            // brokerage.
+            BigDecimal gross = t.getQuantity().multiply(t.getPricePerShare());
+            BigDecimal brokerage = t.getBrokerage() != null ? t.getBrokerage() : BigDecimal.ZERO;
+            boolean isSell = "SELL".equalsIgnoreCase(t.getTransactionType());
+            BigDecimal signed = isSell ? gross.subtract(brokerage) : gross.add(brokerage).negate();
+            cashflows.add(signed.doubleValue());
+            dates.add(t.getTransactionDate());
+            any = true;
+        }
+        if (!any && inv.getPurchaseDate() != null && inv.getInvestedAmount() != null) {
+            // No ledger at all — treat as one outflow on the purchase date
+            cashflows.add(-inv.getInvestedAmount().doubleValue());
+            dates.add(inv.getPurchaseDate());
+        }
+    }
+
     @Override @Transactional(readOnly = true)
     public Double computeXirr(UUID investmentId, UUID userId) {
         Investment inv = findAndValidate(investmentId, userId);
-        List<SipTransaction> txns = sipTransactionRepository
+        List<SipTransaction> sipTxns = sipTransactionRepository
+            .findByInvestmentIdOrderByTransactionDateAsc(investmentId);
+        List<StockTransaction> stockTxns = stockTransactionRepository
             .findByInvestmentIdOrderByTransactionDateAsc(investmentId);
 
         BigDecimal currentVal = inv.getCurrentValue();
@@ -772,21 +836,8 @@ public class InvestmentServiceImpl implements InvestmentService {
 
         List<Double> cashflows = new ArrayList<>();
         List<LocalDate> dates   = new ArrayList<>();
-
-        if (!txns.isEmpty()) {
-            for (SipTransaction t : txns) {
-                // BUY = outflow (negative), REDEEM = inflow (positive)
-                double sign = "REDEEM".equalsIgnoreCase(t.getTransactionType()) ? 1.0 : -1.0;
-                cashflows.add(sign * t.getAmount().doubleValue());
-                dates.add(t.getTransactionDate());
-            }
-        } else if (inv.getPurchaseDate() != null) {
-            // Single purchase — treat as one outflow
-            cashflows.add(-inv.getInvestedAmount().doubleValue());
-            dates.add(inv.getPurchaseDate());
-        } else {
-            return null;
-        }
+        appendInvestmentCashflows(inv, sipTxns, stockTxns, cashflows, dates);
+        if (cashflows.isEmpty()) return null;
 
         // Final cashflow = current value today (positive inflow = liquidation)
         cashflows.add(currentVal.doubleValue());
@@ -802,6 +853,69 @@ public class InvestmentServiceImpl implements InvestmentService {
         return Double.isNaN(xirr) ? null : Math.round(xirr * 100.0) / 100.0;
     }
 
+    // Aggregates every given investment's own cashflow timeline (SIP buys/redeems, stock-ledger
+    // buys/sells, or a single purchase-date outflow where neither ledger exists) into one combined
+    // timeline, plus one final inflow for their total current value today. This is the
+    // money-weighted return across the group — not an average of each investment's individual
+    // XIRR, which would misweight investments held for different durations or amounts. Shared by
+    // computePortfolioXirr (every active investment) and computeTypeXirr (just one type, e.g. every
+    // active stock) — same aggregation, just a different input list.
+    private Double computeXirrForInvestments(List<Investment> investments) {
+        if (investments.isEmpty()) return null;
+
+        List<UUID> investmentIds = investments.stream().map(Investment::getId).toList();
+        Map<UUID, List<SipTransaction>> sipTxnsByInvestment = sipTransactionRepository
+            .findByInvestmentIdInOrderByTransactionDateAsc(investmentIds).stream()
+            .collect(Collectors.groupingBy(SipTransaction::getInvestmentId));
+        Map<UUID, List<StockTransaction>> stockTxnsByInvestment = stockTransactionRepository
+            .findByInvestmentIdInOrderByTransactionDateAsc(investmentIds).stream()
+            .collect(Collectors.groupingBy(StockTransaction::getInvestmentId));
+
+        List<Double> cashflows = new ArrayList<>();
+        List<LocalDate> dates  = new ArrayList<>();
+        BigDecimal totalCurrentValue = BigDecimal.ZERO;
+
+        for (Investment inv : investments) {
+            appendInvestmentCashflows(inv,
+                sipTxnsByInvestment.getOrDefault(inv.getId(), List.of()),
+                stockTxnsByInvestment.getOrDefault(inv.getId(), List.of()),
+                cashflows, dates);
+            if (inv.getCurrentValue() != null) totalCurrentValue = totalCurrentValue.add(inv.getCurrentValue());
+        }
+
+        if (cashflows.isEmpty() || totalCurrentValue.compareTo(BigDecimal.ZERO) <= 0) return null;
+
+        cashflows.add(totalCurrentValue.doubleValue());
+        dates.add(LocalDate.now());
+
+        double xirr = XirrCalculator.calculate(cashflows, dates);
+        if (Double.isNaN(xirr)) {
+            // Fall back to simple annualized return, spanning from the earliest cashflow to today
+            LocalDate earliest = dates.stream().min(LocalDate::compareTo).orElse(null);
+            double totalInvested = investments.stream()
+                .map(Investment::getInvestedAmount).filter(Objects::nonNull)
+                .mapToDouble(BigDecimal::doubleValue).sum();
+            if (earliest != null) {
+                double years = ChronoUnit.DAYS.between(earliest, LocalDate.now()) / 365.0;
+                xirr = XirrCalculator.simpleAnnualized(totalInvested, totalCurrentValue.doubleValue(), years);
+            }
+        }
+        return Double.isNaN(xirr) ? null : Math.round(xirr * 100.0) / 100.0;
+    }
+
+    @Override @Transactional(readOnly = true)
+    public Double computePortfolioXirr(UUID userId) {
+        return computeXirrForInvestments(investmentRepository.findByUserIdAndActiveTrue(userId));
+    }
+
+    @Override @Transactional(readOnly = true)
+    public Double computeTypeXirr(UUID userId, InvestmentType type) {
+        List<Investment> investments = investmentRepository.findByUserIdAndActiveTrue(userId).stream()
+            .filter(inv -> inv.getInvestmentType() == type)
+            .toList();
+        return computeXirrForInvestments(investments);
+    }
+
     private SipTransactionResponse toSipResponse(SipTransaction s) {
         return SipTransactionResponse.builder()
             .id(s.getId()).transactionDate(s.getTransactionDate())
@@ -815,6 +929,7 @@ public class InvestmentServiceImpl implements InvestmentService {
         if (!inv.getUserId().equals(userId)) throw new AccessDeniedException();
         return inv;
     }
+
 
     private String nameFor(CreateInvestmentRequest r) {
         if (r.getCompanyName() != null && !r.getCompanyName().isBlank()) return r.getCompanyName();
@@ -1065,6 +1180,7 @@ public class InvestmentServiceImpl implements InvestmentService {
         Investment inv = investmentRepository.findById(investmentId)
             .orElseThrow(() -> new ResourceNotFoundException("Investment", "id", investmentId));
         if (!inv.getUserId().equals(userId)) throw new AccessDeniedException("Access denied");
+        accountOwnershipGuard.validateAccountOwnership(req.getDebitAccountId(), userId);
 
         boolean isSell = "SELL".equalsIgnoreCase(req.getTransactionType());
         BigDecimal brokerage = req.getBrokerage() != null ? req.getBrokerage() : BigDecimal.ZERO;
@@ -1080,6 +1196,7 @@ public class InvestmentServiceImpl implements InvestmentService {
                 .quantity(inv.getUnits())
                 .pricePerShare(inv.getAvgBuyPrice())
                 .brokerage(inv.getBrokerage() != null ? inv.getBrokerage() : BigDecimal.ZERO)
+                .notes(SEED_TXN_NOTE)
                 .build());
         }
 

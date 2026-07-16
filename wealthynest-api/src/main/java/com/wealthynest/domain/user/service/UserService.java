@@ -13,6 +13,6 @@ public interface UserService extends UserDetailsService {
     UserResponse getProfile(UUID userId);
     UserResponse updateLastLogin(UUID userId);
     UserResponse updateProfile(UUID userId, UpdateProfileRequest request);
-    void changePassword(UUID userId, ChangePasswordRequest request);
+    void changePassword(UUID userId, ChangePasswordRequest request, String ipAddress, String userAgent);
     void closeAccount(UUID userId);
 }

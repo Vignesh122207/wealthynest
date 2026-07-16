@@ -4,11 +4,12 @@ import com.wealthynest.domain.income.entity.IncomePaymentMode;
 import com.wealthynest.domain.income.entity.IncomeSource;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
+import lombok.Setter;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
-@Getter
+@Getter @Setter
 public class CreateIncomeRequest {
     private UUID accountId;
     @NotNull  private IncomeSource source;

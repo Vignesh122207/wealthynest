@@ -26,7 +26,6 @@ import java.util.List;
 public class PriceRefreshScheduler {
 
     private final InvestmentRepository        investmentRepository;
-    private final StockPriceCacheRepository   stockPriceCacheRepository;
     private final GoldPriceCacheRepository    goldPriceCacheRepository;
     private final MFNavCacheRepository        mfNavCacheRepository;
     private final ExternalPriceService        externalPriceService;

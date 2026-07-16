@@ -25,4 +25,5 @@ public class BudgetResponse {
     private BigDecimal alertThreshold;
     private boolean    alertTriggered;
     private BudgetType budgetType;
+    private boolean    shared;
 }

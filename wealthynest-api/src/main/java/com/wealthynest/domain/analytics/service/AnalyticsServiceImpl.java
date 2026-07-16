@@ -77,15 +77,17 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                     .build();
         }).toList();
 
-        // Budget summaries — budgets are now templates, fetch all and compute spent for this period
+        // Budget summaries — budgets are now templates, fetch all and compute spent for this period.
+        // Spend is fetched via two grouped-by-category queries (not one query per budget).
         List<Budget> budgets = budgetRepository.findByUserId(userId);
+        Map<UUID, BigDecimal> monthlySpendByCategory = toUuidMap(expenseRepository.findCategorySpendingByUser(userId, year, month));
+        Map<UUID, BigDecimal> yearlySpendByCategory   = toUuidMap(expenseRepository.sumByUserAndYearGroupedByCategory(userId, year));
 
         List<BudgetSummaryResponse> budgetSummaries = budgets.stream().map(b -> {
             boolean isYearly = com.wealthynest.domain.budget.entity.BudgetType.YEARLY.equals(b.getBudgetType());
             BigDecimal spent = isYearly
-                ? expenseRepository.sumByUserCategoryAndYear(userId, b.getCategoryId(), year)
-                : expenseRepository.sumByUserCategoryAndMonth(userId, b.getCategoryId(), year, month);
-            if (spent == null) spent = BigDecimal.ZERO;
+                ? yearlySpendByCategory.getOrDefault(b.getCategoryId(), BigDecimal.ZERO)
+                : monthlySpendByCategory.getOrDefault(b.getCategoryId(), BigDecimal.ZERO);
             double pct = b.getAmount().compareTo(BigDecimal.ZERO) > 0
                     ? spent.divide(b.getAmount(), 4, RoundingMode.HALF_UP)
                            .multiply(BigDecimal.valueOf(100)).doubleValue()
@@ -95,6 +97,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                     .categoryId(b.getCategoryId())
                     .categoryName(cat != null ? cat.getName() : "Unknown")
                     .categoryColor(cat != null ? cat.getColor() : "#6366f1")
+                    .categoryIcon(cat != null ? cat.getIcon()  : "more-horizontal")
                     .budgeted(b.getAmount()).spent(spent)
                     .percentUsed(pct).overBudget(pct > 100).build();
         }).toList();
@@ -107,17 +110,28 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                                .max(BigDecimal.ZERO)
                 : BigDecimal.ZERO;
 
-        // 6-month trend (going back from the requested month)
-        List<MonthlyTrendResponse> monthlyTrend = new java.util.ArrayList<>();
+        // 6-month trend (going back from the requested month) — batch-fetch per distinct year touched
+        // instead of running 2 queries per month (up to 12 queries collapse to at most 4).
+        List<int[]> trendPeriods = new java.util.ArrayList<>();
         for (int i = 5; i >= 0; i--) {
             int trendMonth = month - i;
             int trendYear  = year;
             while (trendMonth < 1)  { trendMonth += 12; trendYear--; }
             while (trendMonth > 12) { trendMonth -= 12; trendYear++; }
-            BigDecimal tIncome  = incomeRepository.sumByUserAndPeriod(userId, trendYear, trendMonth);
-            BigDecimal tExpense = expenseRepository.sumByUserAndMonth(userId, trendYear, trendMonth);
-            if (tIncome  == null) tIncome  = BigDecimal.ZERO;
-            if (tExpense == null) tExpense = BigDecimal.ZERO;
+            trendPeriods.add(new int[]{trendYear, trendMonth});
+        }
+        Map<Integer, Map<Integer, BigDecimal>> incomeByYearMonth  = new java.util.HashMap<>();
+        Map<Integer, Map<Integer, BigDecimal>> expenseByYearMonth = new java.util.HashMap<>();
+        for (int trendYear : trendPeriods.stream().map(p -> p[0]).collect(Collectors.toSet())) {
+            incomeByYearMonth.put(trendYear, toMonthMap(incomeRepository.sumByUserAndYearGroupedByMonth(userId, trendYear)));
+            expenseByYearMonth.put(trendYear, toMonthMap(expenseRepository.sumByUserAndYearGroupedByMonth(userId, trendYear)));
+        }
+
+        List<MonthlyTrendResponse> monthlyTrend = new java.util.ArrayList<>();
+        for (int[] period : trendPeriods) {
+            int trendYear = period[0], trendMonth = period[1];
+            BigDecimal tIncome  = incomeByYearMonth.get(trendYear).getOrDefault(trendMonth, BigDecimal.ZERO);
+            BigDecimal tExpense = expenseByYearMonth.get(trendYear).getOrDefault(trendMonth, BigDecimal.ZERO);
             BigDecimal tSaved = tIncome.subtract(tExpense).max(BigDecimal.ZERO);
             String lbl = java.time.LocalDate.of(trendYear, trendMonth, 1)
                     .getMonth().getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.ENGLISH);
@@ -144,12 +158,13 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     @Override
     @Transactional(readOnly = true)
     public List<MonthlyTrendResponse> getAnnualTrend(UUID userId, int year) {
+        // 2 grouped queries for the whole year instead of 2 x 12 per-month queries.
+        Map<Integer, BigDecimal> incomeByMonth  = toMonthMap(incomeRepository.sumByUserAndYearGroupedByMonth(userId, year));
+        Map<Integer, BigDecimal> expenseByMonth = toMonthMap(expenseRepository.sumByUserAndYearGroupedByMonth(userId, year));
         List<MonthlyTrendResponse> result = new java.util.ArrayList<>();
         for (int m = 1; m <= 12; m++) {
-            BigDecimal income  = incomeRepository.sumByUserAndPeriod(userId, year, m);
-            BigDecimal expense = expenseRepository.sumByUserAndMonth(userId, year, m);
-            if (income  == null) income  = BigDecimal.ZERO;
-            if (expense == null) expense = BigDecimal.ZERO;
+            BigDecimal income  = incomeByMonth.getOrDefault(m, BigDecimal.ZERO);
+            BigDecimal expense = expenseByMonth.getOrDefault(m, BigDecimal.ZERO);
             String label = java.time.Month.of(m)
                     .getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.ENGLISH);
             result.add(MonthlyTrendResponse.builder()
@@ -159,5 +174,17 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                     .build());
         }
         return result;
+    }
+
+    private Map<UUID, BigDecimal> toUuidMap(List<Object[]> rows) {
+        Map<UUID, BigDecimal> map = new java.util.HashMap<>();
+        for (Object[] row : rows) map.put((UUID) row[0], (BigDecimal) row[1]);
+        return map;
+    }
+
+    private Map<Integer, BigDecimal> toMonthMap(List<Object[]> rows) {
+        Map<Integer, BigDecimal> map = new java.util.HashMap<>();
+        for (Object[] row : rows) map.put(((Number) row[0]).intValue(), (BigDecimal) row[1]);
+        return map;
     }
 }

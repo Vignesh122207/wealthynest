@@ -14,16 +14,26 @@ import java.util.UUID;
 @Repository
 public interface CategoryRepository extends JpaRepository<Category, UUID> {
 
-    @Query("SELECT c FROM Category c WHERE c.familyId = :familyId OR c.system = true ORDER BY c.name")
+    @Query("SELECT c FROM Category c WHERE (c.familyId = :familyId OR c.system = true) AND c.archived = false ORDER BY c.name")
     List<Category> findByFamilyIdOrSystem(UUID familyId);
 
-    @Query("SELECT c FROM Category c WHERE c.userId = :userId OR c.system = true ORDER BY c.name")
+    @Query("SELECT c FROM Category c WHERE (c.userId = :userId OR c.system = true) AND c.archived = false ORDER BY c.name")
     List<Category> findByUserIdOrSystem(UUID userId);
 
     List<Category> findBySystemTrue();
 
-    Optional<Category> findByNameAndSystemTrue(String name);
-    Optional<Category> findByNameAndTypeAndSystemTrue(String name, CategoryType type);
+    /**
+     * Finds a soft-deleted category the caller owns with the same name and type, so createCategory
+     * can revive it instead of inserting a duplicate — reconnecting its historical expenses.
+     */
+    @Query("""
+        SELECT c FROM Category c
+        WHERE c.archived = true AND c.system = false
+          AND LOWER(c.name) = LOWER(:name) AND c.type = :type
+          AND (c.userId = :userId OR (:familyId IS NOT NULL AND c.familyId = :familyId))
+        """)
+    Optional<Category> findArchivedForRevive(@Param("name") String name, @Param("type") CategoryType type,
+                                             @Param("userId") UUID userId, @Param("familyId") UUID familyId);
 
     @Modifying
     @Query("UPDATE Category c SET c.familyId = :familyId WHERE c.userId = :userId AND c.familyId IS NULL AND c.system = false")
@@ -32,4 +42,9 @@ public interface CategoryRepository extends JpaRepository<Category, UUID> {
     @Modifying
     @Query("UPDATE Category c SET c.familyId = null WHERE c.familyId = :familyId AND c.system = false")
     void clearFamilyId(@Param("familyId") UUID familyId);
+
+    /** Detaches one departing member's own categories from the family (reverts them to personal). */
+    @Modifying
+    @Query("UPDATE Category c SET c.familyId = null WHERE c.userId = :userId AND c.familyId = :familyId AND c.system = false")
+    void clearFamilyIdForUser(@Param("userId") UUID userId, @Param("familyId") UUID familyId);
 }

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { QUERY_KEYS } from "@/lib/constants";
 import { familyApi } from "../api/family.api";
 import { useAuthStore } from "@/features/auth/store/auth.store";
+import { apiErrorMessage } from "@/lib/utils";
 import type { Expense } from "@/features/expenses/types/expense.types";
 
 export function useFamily() {
@@ -48,8 +49,8 @@ export function useJoinFamily() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.FAMILY });
       toast.success("Joined family!");
     },
-    onError: (e: any) => {
-      const msg = e?.response?.data?.message ?? "";
+    onError: (e: unknown) => {
+      const msg = apiErrorMessage(e, "");
       if (msg.toLowerCase().includes("already")) toast.error("You are already in a family group.");
       else toast.error("Invalid invite code. Please check and try again.");
     },
@@ -78,7 +79,7 @@ export function useLeaveFamily() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.FAMILY });
       toast.success("You have left the family group.");
     },
-    onError: (e: any) => toast.error(e?.response?.data?.message ?? "Cannot leave family"),
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, "Cannot leave family")),
   });
 }
 
@@ -144,7 +145,7 @@ export function useTransferAdmin(familyId: string | undefined) {
       qc.invalidateQueries({ queryKey: [...QUERY_KEYS.FAMILY, "members", familyId] });
       toast.success("Member promoted to admin.");
     },
-    onError: (e: any) => toast.error(e?.response?.data?.message ?? "Failed to promote admin"),
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to promote admin")),
   });
 }
 
@@ -157,6 +158,6 @@ export function useRevokeAdmin(familyId: string | undefined) {
       qc.invalidateQueries({ queryKey: [...QUERY_KEYS.FAMILY, "members", familyId] });
       toast.success("Admin access revoked.");
     },
-    onError: (e: any) => toast.error(e?.response?.data?.message ?? "Failed to revoke admin"),
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to revoke admin")),
   });
 }
