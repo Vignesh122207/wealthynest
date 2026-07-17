@@ -38,7 +38,7 @@ public class DebtReminderScheduler {
                         debt.getUserId(), debt.getContactName(), debt.getAmount(), due, debt.getType().name());
                 notified++;
             } catch (Exception e) {
-                log.error("Debt reminder failed for debt {}: {}", debt.getId(), e.getMessage());
+                log.error("Debt reminder failed for debt {}: {}", debt.getId(), e.getMessage(), e);
             }
         }
         log.info("Debt reminder sweep complete: {} notification(s) sent", notified);

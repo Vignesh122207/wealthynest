@@ -111,7 +111,7 @@ public class RecurringTransferServiceImpl implements RecurringTransferService {
                 recurringTransferRepository.save(rule);
                 transferred++;
             } catch (Exception e) {
-                log.error("Failed to process recurring transfer rule {}: {}", rule.getId(), e.getMessage());
+                log.error("Failed to process recurring transfer rule {}: {}", rule.getId(), e.getMessage(), e);
             }
         }
         log.info("Recurring transfer run: {} rule(s) transferred on {}", transferred, today);

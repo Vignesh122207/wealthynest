@@ -26,7 +26,7 @@ public class RecurringExpenseScheduler {
             try {
                 created += processTemplate(template, today);
             } catch (Exception e) {
-                log.error("Error processing recurring expense {}: {}", template.getId(), e.getMessage());
+                log.error("Error processing recurring expense {}: {}", template.getId(), e.getMessage(), e);
             }
         }
         log.info("Recurring expense run complete: {} new expense(s) created from {} template(s)", created, templates.size());

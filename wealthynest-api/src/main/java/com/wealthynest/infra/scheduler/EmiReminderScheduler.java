@@ -38,7 +38,7 @@ public class EmiReminderScheduler {
                 notificationService.createEmiUpcomingNotification(loan.getUserId(), loan.getName(), loan.getEmiAmount(), nextEmiDate);
                 notified++;
             } catch (Exception e) {
-                log.error("EMI reminder failed for loan {}: {}", loan.getId(), e.getMessage());
+                log.error("EMI reminder failed for loan {}: {}", loan.getId(), e.getMessage(), e);
             }
         }
         log.info("EMI reminder sweep complete: {} notification(s) sent", notified);

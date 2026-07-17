@@ -38,7 +38,7 @@ public class LoanEmiScheduler {
                 if (!isEmiDay(loan.getEmiDay(), today)) continue;
                 if (loanPaymentService.processAutopay(loan, yyyymm)) paid++;
             } catch (Exception e) {
-                log.error("EMI autopay failed for loan {}: {}", loan.getId(), e.getMessage());
+                log.error("EMI autopay failed for loan {}: {}", loan.getId(), e.getMessage(), e);
             }
         }
         log.info("Loan EMI run: {} EMI(s) paid on {}", paid, today);

@@ -107,7 +107,7 @@ public class RecurringGoalContributionServiceImpl implements RecurringGoalContri
                 recurringGoalContributionRepository.save(rule);
                 contributed++;
             } catch (Exception e) {
-                log.error("Failed to process recurring goal contribution rule {}: {}", rule.getId(), e.getMessage());
+                log.error("Failed to process recurring goal contribution rule {}: {}", rule.getId(), e.getMessage(), e);
             }
         }
         log.info("Recurring goal contribution run: {} rule(s) contributed on {}", contributed, today);

@@ -117,7 +117,7 @@ public class RecurringIncomeServiceImpl implements RecurringIncomeService {
                 recurringIncomeRepository.save(rule);
                 credited++;
             } catch (Exception e) {
-                log.error("Failed to process recurring income rule {}: {}", rule.getId(), e.getMessage());
+                log.error("Failed to process recurring income rule {}: {}", rule.getId(), e.getMessage(), e);
             }
         }
         log.info("Recurring income run: {} rule(s) credited on {}", credited, today);

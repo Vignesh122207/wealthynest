@@ -156,7 +156,7 @@ public class JobSchedulerService {
                 unlock(conn, lockKey);
             }
         } catch (SQLException e) {
-            log.error("Advisory lock unavailable for job {}: {}", jobName, e.getMessage());
+            log.error("Advisory lock unavailable for job {}: {}", jobName, e.getMessage(), e);
         }
     }
 
