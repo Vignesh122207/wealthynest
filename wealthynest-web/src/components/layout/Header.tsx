@@ -139,8 +139,15 @@ export function Header({ title, subtitle, onExport }: HeaderProps) {
     function handleOutsideClick(e: MouseEvent) {
       if (notifsRef.current && !notifsRef.current.contains(e.target as Node)) setShowNotifs(false);
     }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setShowNotifs(false);
+    }
     document.addEventListener("mousedown", handleOutsideClick);
-    return () => document.removeEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, []);
 
   function toggleNotifs() {
@@ -170,17 +177,16 @@ export function Header({ title, subtitle, onExport }: HeaderProps) {
 
       <div className="flex items-center gap-1 shrink-0">
 
-        {/* Hide/show amounts — Home only; masks currency figures across every stat on the dashboard */}
-        {isHome && (
-          <button
-            onClick={toggleHideAmounts}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-            aria-label={hideAmounts ? "Show amounts" : "Hide amounts"}
-            aria-pressed={hideAmounts}
-          >
-            {hideAmounts ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </button>
-        )}
+        {/* Hide/show amounts — masks currency figures on every page, not just Home, since
+            usePrivacyStore/useAmountFormatter is read app-wide (Accounts, Investments, Budgets…). */}
+        <button
+          onClick={toggleHideAmounts}
+          className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+          aria-label={hideAmounts ? "Show amounts" : "Hide amounts"}
+          aria-pressed={hideAmounts}
+        >
+          {hideAmounts ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        </button>
 
         {/* Bell */}
         <div ref={notifsRef} className="relative">
@@ -193,6 +199,8 @@ export function Header({ title, subtitle, onExport }: HeaderProps) {
                 : "text-muted-foreground hover:text-foreground hover:bg-muted"
             )}
             aria-label="Notifications"
+            aria-haspopup="true"
+            aria-expanded={showNotifs}
           >
             <Bell className="w-4 h-4" />
             {unreadCount > 0 && (

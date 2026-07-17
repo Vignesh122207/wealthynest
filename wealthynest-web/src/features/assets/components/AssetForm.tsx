@@ -7,7 +7,7 @@ import { FormInput } from "@/components/forms/FormInput";
 import { FormSelect } from "@/components/forms/FormSelect";
 import { FormDatePicker } from "@/components/forms/FormDatePicker";
 import { Button } from "@/components/ui/Button";
-import { FormModalShell } from "@/components/ui/Modal";
+import { FormModalShell } from "@/components/ui/FormModalShell";
 import { FormModalHeader } from "@/components/transactions/FormModalHeader";
 import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
 import { BigAmountInput } from "@/components/transactions/BigAmountInput";

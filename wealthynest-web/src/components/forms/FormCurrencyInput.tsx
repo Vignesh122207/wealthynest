@@ -1,5 +1,5 @@
 "use client";
-import { forwardRef, type InputHTMLAttributes } from "react";
+import { forwardRef, useId, type InputHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 import { usePrefsStore, CURRENCIES } from "@/store/preferences.store";
 
@@ -10,9 +10,12 @@ interface FormCurrencyInputProps extends Omit<InputHTMLAttributes<HTMLInputEleme
 }
 
 export const FormCurrencyInput = forwardRef<HTMLInputElement, FormCurrencyInputProps>(
-  ({ label, error, currency, className, onChange, ...props }, ref) => {
+  ({ label, error, currency, className, onChange, id, ...props }, ref) => {
     const { currency: currCode } = usePrefsStore();
     const symbol = currency ?? (CURRENCIES.find(c => c.code === currCode)?.symbol ?? "₹");
+    const generatedId = useId();
+    const inputId = id ?? generatedId;
+    const errorId = `${inputId}-error`;
 
     // type="text" + inputMode="decimal", not type="number": WebKit (Safari/iOS) auto-selects a
     // number input's entire value on focus, making every amount field in the app pre-highlight
@@ -25,15 +28,18 @@ export const FormCurrencyInput = forwardRef<HTMLInputElement, FormCurrencyInputP
 
     return (
       <div className="space-y-1.5">
-        {label && <label className="block text-sm font-medium text-muted-foreground">{label}</label>}
+        {label && <label htmlFor={inputId} className="block text-sm font-medium text-muted-foreground">{label}</label>}
         <div className="relative">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium select-none">
             {symbol}
           </span>
           <input
             ref={ref}
+            id={inputId}
             type="text"
             inputMode="decimal"
+            aria-invalid={!!error || undefined}
+            aria-describedby={error ? errorId : undefined}
             onChange={handleChange}
             className={cn(
               "w-full h-10 pl-7 pr-3 rounded-xl text-sm transition-all outline-none",
@@ -46,7 +52,7 @@ export const FormCurrencyInput = forwardRef<HTMLInputElement, FormCurrencyInputP
             {...props}
           />
         </div>
-        {error && <p className="text-xs text-red-500 dark:text-red-400">{error}</p>}
+        {error && <p id={errorId} className="text-xs text-red-500 dark:text-red-400">{error}</p>}
       </div>
     );
   }

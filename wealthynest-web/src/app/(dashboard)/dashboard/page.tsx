@@ -1,16 +1,23 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { Receipt, Banknote, Sparkles, ArrowLeftRight } from "lucide-react";
 import Link from "next/link";
 import { type ExpenseFormValues } from "@/features/expenses/schemas/expense.schema";
 import { Header }                from "@/components/layout/Header";
 import { PremiumIcon }           from "@/components/icons/PremiumIcon";
 import { FloatingActionButton }  from "@/components/shared/FloatingActionButton";
-import { ExpenseForm }           from "@/components/transactions/ExpenseForm";
-import { IncomeForm, type IncomeFormValues, type IncomeSourceValue } from "@/components/transactions/IncomeForm";
-import { TransferFormModal, type TransferFormValues } from "@/components/transactions/TransferFormModal";
+import { QueryErrorState }       from "@/components/shared/QueryErrorState";
+import { type IncomeFormValues, type IncomeSourceValue } from "@/components/transactions/IncomeForm";
+import { type TransferFormValues } from "@/components/transactions/TransferFormModal";
 import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
+
+// Lazy-loaded: the Home dashboard's own bundle shouldn't carry all three quick-add forms just so
+// one can appear after a FAB click — each is only fetched the first time its modal actually opens.
+const ExpenseForm      = dynamic(() => import("@/components/transactions/ExpenseForm").then(m => m.ExpenseForm), { ssr: false });
+const IncomeForm       = dynamic(() => import("@/components/transactions/IncomeForm").then(m => m.IncomeForm), { ssr: false });
+const TransferFormModal = dynamic(() => import("@/components/transactions/TransferFormModal").then(m => m.TransferFormModal), { ssr: false });
 import { useDashboard }          from "@/features/dashboard/hooks/useDashboard";
 import { useAccounts }           from "@/features/accounts/hooks/useAccounts";
 import { useGoals }              from "@/features/goals/hooks/useGoals";
@@ -66,7 +73,7 @@ export default function DashboardPage() {
   const prevMonthNum = month === 1 ? 12 : month - 1;
   const prevYearNum  = month === 1 ? year - 1 : year;
 
-  const { data, isLoading }           = useDashboard(year, month);
+  const { data, isLoading, isError, refetch } = useDashboard(year, month);
   const { data: prevData }            = useDashboard(prevYearNum, prevMonthNum);
   const { data: walletAccounts = [], isLoading: accountsLoading } = useAccounts();
   const { data: goals = [] }          = useGoals();
@@ -293,6 +300,15 @@ export default function DashboardPage() {
             savingsRate={data?.savingsRate}
           />
 
+          {/* ── Core dashboard data failed — the widgets below would otherwise render a silent
+              zero-state indistinguishable from a genuinely new account, so this stands in for
+              them specifically rather than for the whole page (Accounts/Goals/Investments below
+              come from their own independent queries and can still succeed on their own). ── */}
+          {isError && (
+            <QueryErrorState onRetry={() => refetch()} className="py-8 bg-card border border-border rounded-2xl"
+              description="Couldn't load your monthly totals, budgets, or spending trend. Check your connection and try again." />
+          )}
+
           {/* ── Stat Overview: Net Worth, Investments, Income, Expenses, Savings Rate, Budget Progress ── */}
           <StatOverview
             netWorth={data?.totalNetWorth}
@@ -378,9 +394,12 @@ export default function DashboardPage() {
 
       {/* ── Floating Action Button ── */}
       <FloatingActionButton actions={[
-        { icon: Receipt,        label: "Add Expense", color: "rose",    onClick: () => setQuickModal("expense"),  disabled: walletAccounts.length === 0 },
-        { icon: Banknote,       label: "Add Income",  color: "emerald", onClick: () => setQuickModal("income"),   disabled: walletAccounts.filter(a => a.accountType !== "CREDIT_CARD").length === 0 },
-        { icon: ArrowLeftRight, label: "Transfer",    color: "indigo",  onClick: () => setQuickModal("transfer"), disabled: walletAccounts.length < 2 },
+        { icon: Receipt,        label: "Add Expense", color: "rose",    onClick: () => setQuickModal("expense"),  disabled: walletAccounts.length === 0,
+          disabledReason: "Add an account first" },
+        { icon: Banknote,       label: "Add Income",  color: "emerald", onClick: () => setQuickModal("income"),   disabled: walletAccounts.filter(a => a.accountType !== "CREDIT_CARD").length === 0,
+          disabledReason: "Add a bank or cash account first" },
+        { icon: ArrowLeftRight, label: "Transfer",    color: "indigo",  onClick: () => setQuickModal("transfer"), disabled: walletAccounts.length < 2,
+          disabledReason: "Add at least 2 accounts first" },
       ]} />
     </div>
   );

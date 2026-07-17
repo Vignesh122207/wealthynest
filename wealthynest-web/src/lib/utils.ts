@@ -134,3 +134,16 @@ export function getGreeting(): string {
 export function monthLabel(year: number, month: number): string {
   return new Date(year, month - 1).toLocaleString("en-IN", { month: "short", year: "numeric" });
 }
+
+// Escapes text before it's interpolated into an HTML string built by hand (e.g. the Reports
+// page's print/PDF template, assembled via document.write rather than React) — anywhere a
+// user-editable value like a category name rides along un-sanitized, e.g. via `${cat}` in a
+// template literal, it would otherwise execute as markup instead of rendering as plain text.
+export function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}

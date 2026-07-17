@@ -72,6 +72,7 @@ export function InvestmentCard({ inv, onEdit, dividendRecords, bankAccounts, inv
         bankAccounts={bankAccounts ?? []} investmentAccounts={investmentAccounts ?? []} />
     )}
     <div onClick={onEdit} role="button" tabIndex={0}
+      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEdit(); } }}
       className="bg-card border border-border rounded-2xl p-4 hover:border-indigo-500/40 hover:shadow-sm hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-3 min-w-0">

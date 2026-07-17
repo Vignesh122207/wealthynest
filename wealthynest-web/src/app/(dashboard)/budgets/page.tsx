@@ -10,12 +10,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Header } from "@/components/layout/Header";
 import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { QueryErrorState } from "@/components/shared/QueryErrorState";
 import { TableRowSkeleton } from "@/components/shared/LoadingSkeleton";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { FormSelect } from "@/components/forms/FormSelect";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { FormModalShell } from "@/components/ui/Modal";
+import { FormModalShell } from "@/components/ui/FormModalShell";
 import { PremiumIcon } from "@/components/icons/PremiumIcon";
 import { CategoryPicker } from "@/components/transactions/CategoryPicker";
 import { FormModalHeader } from "@/components/transactions/FormModalHeader";
@@ -112,7 +113,7 @@ export default function BudgetsPage() {
   const [newCatIcon,  setNewCatIcon]  = useState(CATEGORY_ICON_LIST[0].key);
   const [sortByUsage, setSortByUsage] = useState(false);
 
-  const { data: budgets = [], isLoading } = useBudgets(year, month);
+  const { data: budgets = [], isLoading, isError, refetch } = useBudgets(year, month);
   const { mutate: createBudget, isPending }              = useCreateBudget();
   const { mutate: deleteBudget }                         = useDeleteBudget();
   const { data: categories = [] }                        = useCategories("EXPENSE");
@@ -378,7 +379,9 @@ export default function BudgetsPage() {
                 </div>
               )}
             </div>
-            {isLoading ? <TableRowSkeleton rows={3} /> : list.length === 0 ? (
+            {isLoading ? <TableRowSkeleton rows={3} /> : isError ? (
+              <QueryErrorState onRetry={() => refetch()} description="Couldn't load your budgets. Check your connection and try again." />
+            ) : list.length === 0 ? (
               <EmptyState icon={Target} title={`No ${type === "MONTHLY" ? "monthly" : "yearly"} budgets`}
                 description={`Create a ${type === "MONTHLY" ? "monthly" : "yearly"} budget to track spending limits.`}
                 action={

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type CSSProperties } from "react";
+import { memo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
@@ -18,7 +18,7 @@ import { downloadAccountStatement } from "../utils/downloadAccountStatement";
 import type { WalletAccount } from "../types/account.types";
 import type { DebtRecord } from "@/features/debts/types/debt.types";
 
-export function AccountCard({ account, linkedDebts = [], onAddMoney, onAddExpense, onTransfer, onEdit, onSetPrimary, settingPrimary, onImportStatement }: {
+export const AccountCard = memo(function AccountCard({ account, linkedDebts = [], onAddMoney, onAddExpense, onTransfer, onEdit, onSetPrimary, settingPrimary, onImportStatement }: {
   account:      WalletAccount;
   linkedDebts?: DebtRecord[];
   onAddMoney:   () => void;
@@ -116,6 +116,7 @@ export function AccountCard({ account, linkedDebts = [], onAddMoney, onAddExpens
     // ── Credit card: premium card design ──────────────────────────────────────
     return (
       <div onClick={onEdit} role="button" tabIndex={0}
+        onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEdit(); } }}
         className="relative rounded-2xl shadow-sm hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 animate-fade-in-up cursor-pointer">
         {/* Background layer — clipped to the rounded corners on its own, so content (like the
             action menu below) isn't also clipped when it needs to overflow the card bounds. */}
@@ -240,6 +241,7 @@ export function AccountCard({ account, linkedDebts = [], onAddMoney, onAddExpens
 
   return (
     <div onClick={onEdit} role="button" tabIndex={0}
+      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEdit(); } }}
       className="relative bg-card border border-border/50 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 animate-fade-in-up flex flex-col cursor-pointer overflow-hidden">
       {/* Same premium gradient-edge treatment as the form modal headers, tinted to this account
           type's own Apple system color — a lighter touch than the credit card's full "physical
@@ -429,4 +431,4 @@ export function AccountCard({ account, linkedDebts = [], onAddMoney, onAddExpens
       </div>
     </div>
   );
-}
+});

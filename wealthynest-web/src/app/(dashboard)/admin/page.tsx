@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  Users, Ticket, History, Clock, LayoutDashboard,
+  Users, Ticket, History, Clock, LayoutDashboard, Loader2,
 } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { useAuthStore } from "@/features/auth/store/auth.store";
@@ -47,7 +47,17 @@ export default function AdminPage() {
     if (user && user.role !== "ADMIN") router.replace("/dashboard");
   }, [user, router]);
 
-  if (!user || user.role !== "ADMIN") return null;
+  // `user` is already hydrated from the persisted auth store by the time this route is
+  // reachable (DashboardLayout gates on that first) — this only covers the single frame
+  // before the redirect above commits for a non-admin, so a spinner reads as "loading",
+  // not a blank flash of an empty page.
+  if (!user || user.role !== "ADMIN") {
+    return (
+      <div className="flex flex-1 items-center justify-center min-h-screen">
+        <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col flex-1">

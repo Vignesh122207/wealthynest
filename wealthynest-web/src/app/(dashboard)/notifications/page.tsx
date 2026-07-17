@@ -10,6 +10,7 @@ import {
 import { Header } from "@/components/layout/Header";
 import { PageWrapper } from "@/components/layout/PageWrapper";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { QueryErrorState } from "@/components/shared/QueryErrorState";
 import { PremiumIcon, type IconTone } from "@/components/icons/PremiumIcon";
 import { type AppNotification, type NotifSeverity } from "@/hooks/useNotifications";
 import { useNotificationStore } from "@/store/notification.store";
@@ -161,7 +162,7 @@ function ListSkeleton() {
 export default function NotificationsPage() {
   const [filter, setFilter] = useState<Filter>("all");
 
-  const { data: serverNotifs = [], isLoading }     = useServerNotifications();
+  const { data: serverNotifs = [], isLoading, isError, refetch } = useServerNotifications();
   const { notifications: allNotifs, unreadCount }  = useMergedNotifications();
   const { seenIds, markSeen }                      = useNotificationStore();
   const markAllServer                              = useMarkAllServerRead();
@@ -234,6 +235,8 @@ export default function NotificationsPage() {
           {/* List */}
           {isLoading ? (
             <ListSkeleton />
+          ) : isError ? (
+            <QueryErrorState onRetry={() => refetch()} description="Couldn't load your notifications. Check your connection and try again." />
           ) : filtered.length === 0 ? (
             <EmptyState
               icon={Bell}

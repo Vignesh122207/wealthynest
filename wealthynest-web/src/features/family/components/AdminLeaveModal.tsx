@@ -1,7 +1,7 @@
 import { AlertTriangle, Check, LogOut } from "lucide-react";
 import { GlossyBadge } from "@/components/icons/PremiumIcon";
 import { Button } from "@/components/ui/Button";
-import { FormModalShell } from "@/components/ui/Modal";
+import { FormModalShell } from "@/components/ui/FormModalShell";
 import { FormModalHeader } from "@/components/transactions/FormModalHeader";
 import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
 import { cn, getInitials } from "@/lib/utils";

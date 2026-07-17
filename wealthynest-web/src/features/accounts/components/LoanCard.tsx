@@ -1,9 +1,10 @@
+import { memo } from "react";
 import { Download, HandCoins } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { useAmountFormatter } from "@/hooks/useAmountFormatter";
 import type { WalletAccount } from "../types/account.types";
 
-export function LoanCard({ account: a, onDownload, onEdit, onRecordPayment }: {
+export const LoanCard = memo(function LoanCard({ account: a, onDownload, onEdit, onRecordPayment }: {
   account: WalletAccount;
   onDownload:      () => void;
   onEdit:          () => void;
@@ -17,6 +18,7 @@ export function LoanCard({ account: a, onDownload, onEdit, onRecordPayment }: {
   const closed      = outstanding <= 0;
   return (
     <div onClick={onEdit} role="button" tabIndex={0}
+      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEdit(); } }}
       className="relative bg-card border border-border rounded-2xl p-5 space-y-4 cursor-pointer">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-3 min-w-0">
@@ -79,4 +81,4 @@ export function LoanCard({ account: a, onDownload, onEdit, onRecordPayment }: {
       )}
     </div>
   );
-}
+});

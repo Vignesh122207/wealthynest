@@ -180,6 +180,7 @@ function RuleCard({
 
   return (
     <div onClick={onEdit} role="button" tabIndex={0}
+      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEdit(); } }}
       aria-label={`Edit ${rule.fromAccountName} to ${rule.toAccountName} recurring transfer`}
       className={cn(
       "bg-card border rounded-2xl p-4 transition-all cursor-pointer hover:border-indigo-500/40 hover:shadow-sm hover:-translate-y-0.5 duration-200",

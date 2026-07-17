@@ -19,7 +19,14 @@
     --secondary:   220 20% 92%;
     --secondary-foreground: 222 47% 20%;
     --muted:       220 20% 94%;
-    --muted-foreground: 215 16% 42%;
+    /* L42→L30: the app leans on opacity modifiers (text-muted-foreground/60, /70, /80…) for a
+       3-tier text hierarchy, and at the old L42 those tiers measured 1.4–3.7:1 against --card/
+       --background — well under WCAG AA's 4.5:1 for normal text. This gets /80 to a clean
+       4.5:1+, /70 to 3:1+ (the large-text/UI-component bar) and close to 4.5:1 in most cases,
+       and /60 safely past 3:1 — without flattening the hierarchy the way fully closing the gap
+       (~L23) would have. Full-opacity text-muted-foreground was already compliant (5.6:1); this
+       mainly firms up the reduced-opacity tiers everything else is built from. */
+    --muted-foreground: 215 16% 30%;
     --accent:      220 20% 92%;
     --accent-foreground: 222 47% 9%;
     --destructive: 0 84% 55%;
@@ -48,7 +55,9 @@
     --secondary:   217 38% 16%;
     --secondary-foreground: 213 25% 92%;
     --muted:       217 38% 14%;
-    --muted-foreground: 215 18% 58%;
+    /* L58→L70 — same contrast fix as the light theme's --muted-foreground above, mirrored: gets
+       /80 and /70 opacity tiers to a clean 4.5:1+ against --card/--background, /60 past 3:1. */
+    --muted-foreground: 215 18% 70%;
     --accent:      217 38% 17%;
     --accent-foreground: 213 25% 92%;
     --destructive: 0 72% 71%;
@@ -169,104 +178,17 @@
   background: linear-gradient(135deg, #3730a3 0%, #4c1d95 60%, #5b21b6 100%);
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   LIGHT MODE OVERRIDES — maps hardcoded slate-* Tailwind classes to light values
-   ────────────────────────────────────────────────────────────────────────── */
-
-/* ── Page / layout backgrounds ─────────────────────────────────────────── */
-html:not(.dark) .bg-slate-950    { background-color: hsl(220 25% 97%); }
-html:not(.dark) .bg-slate-950\/80 { background-color: hsl(220 25% 97% / 0.85); }
-html:not(.dark) .bg-slate-950\/50 { background-color: hsl(220 25% 97% / 0.5); }
-html:not(.dark) .bg-slate-950\/30 { background-color: hsl(220 25% 97% / 0.3); }
-
-/* ── Card / surface backgrounds ────────────────────────────────────────── */
-html:not(.dark) .bg-slate-900    { background-color: hsl(0 0% 100%); }
-html:not(.dark) .bg-slate-900\/80 { background-color: hsl(0 0% 100% / 0.9); }
-html:not(.dark) .bg-slate-900\/70 { background-color: hsl(0 0% 100% / 0.85); }
-html:not(.dark) .bg-slate-900\/60 { background-color: hsl(0 0% 100%); }
-html:not(.dark) .bg-slate-900\/50 { background-color: hsl(0 0% 100% / 0.8); }
-html:not(.dark) .bg-slate-900\/40 { background-color: hsl(0 0% 100% / 0.7); }
-html:not(.dark) .bg-slate-900\/30 { background-color: hsl(220 25% 97%); }
-
-/* ── Secondary / hover backgrounds ─────────────────────────────────────── */
-html:not(.dark) .bg-slate-800    { background-color: hsl(220 16% 93%); }
-html:not(.dark) .bg-slate-800\/60 { background-color: hsl(220 16% 93%); }
-html:not(.dark) .bg-slate-800\/50 { background-color: hsl(220 16% 93% / 0.8); }
-html:not(.dark) .bg-slate-800\/40 { background-color: hsl(220 16% 93% / 0.7); }
-html:not(.dark) .bg-slate-800\/30 { background-color: hsl(220 16% 93% / 0.5); }
-html:not(.dark) .bg-slate-800\/20 { background-color: hsl(220 16% 95%); }
-html:not(.dark) .bg-slate-700    { background-color: hsl(220 14% 87%); }
-html:not(.dark) .bg-slate-700\/60 { background-color: hsl(220 14% 87% / 0.7); }
-html:not(.dark) .bg-slate-700\/40 { background-color: hsl(220 14% 87% / 0.5); }
-
-/* ── Hover backgrounds ──────────────────────────────────────────────────── */
-html:not(.dark) .hover\:bg-slate-900\/60:hover { background-color: hsl(220 20% 95%); }
-html:not(.dark) .hover\:bg-slate-800:hover     { background-color: hsl(220 16% 90%); }
-html:not(.dark) .hover\:bg-slate-800\/60:hover  { background-color: hsl(220 16% 90%); }
-html:not(.dark) .hover\:bg-slate-800\/40:hover  { background-color: hsl(220 16% 92%); }
-html:not(.dark) .hover\:bg-slate-700:hover      { background-color: hsl(220 14% 85%); }
-html:not(.dark) .group:hover .group-hover\:bg-slate-800\/60 { background-color: hsl(220 16% 90%); }
-
-/* ── Borders ────────────────────────────────────────────────────────────── */
-html:not(.dark) .border-slate-800    { border-color: hsl(220 20% 85%); }
-html:not(.dark) .border-slate-800\/60 { border-color: hsl(220 20% 85%); }
-html:not(.dark) .border-slate-800\/50 { border-color: hsl(220 20% 87%); }
-html:not(.dark) .border-slate-800\/40 { border-color: hsl(220 20% 89%); }
-html:not(.dark) .border-slate-800\/30 { border-color: hsl(220 20% 91%); }
-html:not(.dark) .border-slate-700    { border-color: hsl(220 18% 80%); }
-html:not(.dark) .border-slate-700\/60 { border-color: hsl(220 18% 83%); }
-html:not(.dark) .border-slate-700\/40 { border-color: hsl(220 18% 86%); }
-html:not(.dark) .border-slate-600    { border-color: hsl(220 14% 75%); }
-html:not(.dark) .border-slate-500\/20 { border-color: hsl(220 14% 85%); }
-
-/* ── Text ───────────────────────────────────────────────────────────────── */
-html:not(.dark) .text-slate-100 { color: hsl(222 47% 9%); }
-html:not(.dark) .text-slate-200 { color: hsl(222 40% 16%); }
-html:not(.dark) .text-slate-300 { color: hsl(220 22% 28%); }
-html:not(.dark) .text-slate-400 { color: hsl(215 16% 47%); }
-html:not(.dark) .text-slate-500 { color: hsl(215 14% 40%); }
-html:not(.dark) .text-slate-600 { color: hsl(215 13% 35%); }
-
-/* ── Hover text ─────────────────────────────────────────────────────────── */
-html:not(.dark) .hover\:text-slate-100:hover { color: hsl(222 47% 6%); }
-html:not(.dark) .hover\:text-slate-200:hover { color: hsl(222 47% 9%); }
-html:not(.dark) .hover\:text-slate-300:hover { color: hsl(220 22% 23%); }
-
-/* ── Group hover text ──────────────────────────────────────────────────── */
-html:not(.dark) .group:hover .group-hover\:text-slate-200 { color: hsl(222 47% 9%); }
-html:not(.dark) .group:hover .group-hover\:text-slate-300 { color: hsl(220 22% 23%); }
-
-/* ── Dividers ───────────────────────────────────────────────────────────── */
-html:not(.dark) .divide-slate-800\/60 > :not([hidden]) ~ :not([hidden]) { border-color: hsl(220 20% 88%); }
-html:not(.dark) .divide-slate-800\/30 > :not([hidden]) ~ :not([hidden]) { border-color: hsl(220 20% 90%); }
-html:not(.dark) .divide-slate-800\/40 > :not([hidden]) ~ :not([hidden]) { border-color: hsl(220 20% 88%); }
-html:not(.dark) .divide-slate-700 > :not([hidden]) ~ :not([hidden])     { border-color: hsl(220 18% 82%); }
-
-/* ── Ring ───────────────────────────────────────────────────────────────── */
-html:not(.dark) .ring-slate-700 { --tw-ring-color: hsl(220 18% 80%); }
-
-/* ── Backdrop ───────────────────────────────────────────────────────────── */
+/* ── Backdrop blur reads weaker against a light ground than a dark one, so light mode gets a
+   touch more of it to keep the same "frosted glass" strength Sidebar/Header/modal scrims want. ── */
 html:not(.dark) .backdrop-blur-sm { backdrop-filter: blur(8px); }
 
-/* ── Inline inputs ──────────────────────────────────────────────────────── */
-html:not(.dark) input.bg-slate-900\/60,
-html:not(.dark) input[class*="bg-slate-9"] {
-  background-color: hsl(0 0% 100%);
-  color: hsl(222 47% 9%);
-  border-color: hsl(220 20% 85%);
+/* ── Reduced motion — decorative-only, none of it carries information ────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .card-hover:hover { transform: none; }
 }
-html:not(.dark) input.placeholder-slate-500::placeholder { color: hsl(215 14% 55%); }
-
-/* ── Progress bar tracks ────────────────────────────────────────────────── */
-html:not(.dark) .bg-slate-800.rounded-full,
-html:not(.dark) .h-1\.5.bg-slate-800,
-html:not(.dark) .h-2.bg-slate-800,
-html:not(.dark) .h-1.bg-slate-800  { background-color: hsl(220 20% 88%); }
-
-/* ── Modal overlays ─────────────────────────────────────────────────────── */
-html:not(.dark) .bg-slate-900:not(.bg-slate-900\/60):not(.bg-slate-900\/70):not(.bg-slate-900\/50) {
-  background-color: hsl(0 0% 100%);
-}
-
-/* ── Row hover (tables) ─────────────────────────────────────────────────── */
-html:not(.dark) .hover\:bg-white\/\[0\.02\]:hover { background-color: hsl(220 20% 96%); }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useId, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import {
   format, parse, isValid, startOfMonth, endOfMonth, eachDayOfInterval,
@@ -21,6 +21,7 @@ interface FormDatePickerProps {
   placeholder?: string;
   disabled?:    boolean;
   name?:        string;
+  id?:          string;
 }
 
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -34,7 +35,7 @@ function parseDate(v?: string): Date | null {
 
 export function FormDatePicker({
   label, error, hint, value, onChange, onBlur,
-  placeholder = "Select date", disabled, name,
+  placeholder = "Select date", disabled, name, id,
 }: FormDatePickerProps) {
   const [open, setOpen]       = useState(false);
   const [view, setView]       = useState<View>("day");
@@ -42,6 +43,10 @@ export function FormDatePicker({
   const [dropPos, setDropPos] = useState<{ top?: number; bottom?: number; left: number; width: number } | null>(null);
   const inputRef   = useRef<HTMLDivElement>(null);
   const dropRef    = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLInputElement>(null);
+  const generatedId = useId();
+  const inputId    = id ?? generatedId;
+  const popupId    = `${inputId}-calendar`;
 
   // Keyboard day navigation (arrow keys / Home / End) — a roving-tabindex cell, kept in sync
   // with `cursor` so crossing a month boundary flips the visible grid instead of getting stuck.
@@ -124,8 +129,21 @@ export function FormDatePicker({
         onBlur?.();
       }
     };
+    // Escape closes from anywhere in the popup — needed in addition to the trigger input's own
+    // handler because opening moves focus onto a day cell inside the portal, not the input.
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      setOpen(false);
+      triggerRef.current?.focus();
+      onBlur?.();
+    };
     document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [open, onBlur]);
 
   const selectedDate = parseDate(value);
@@ -277,6 +295,10 @@ export function FormDatePicker({
   const dropdown = open && dropPos ? createPortal(
     <div
       ref={dropRef}
+      id={popupId}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Choose date"
       style={{ position: "fixed", top: dropPos.top, bottom: dropPos.bottom, left: dropPos.left, minWidth: dropPos.width, zIndex: 9999 }}
       className="w-64 max-h-[min(320px,calc(100vh-24px))] overflow-y-auto bg-card border border-border rounded-2xl shadow-2xl p-3"
     >
@@ -289,11 +311,23 @@ export function FormDatePicker({
 
   return (
     <div className="space-y-1.5">
-      {label && <label className="block text-sm font-medium text-muted-foreground">{label}</label>}
+      {label && <label htmlFor={inputId} className="block text-sm font-medium text-muted-foreground">{label}</label>}
       <div className="relative" ref={inputRef}>
-        <input type="text" name={name} value={displayValue} readOnly placeholder={placeholder}
+        <input id={inputId} ref={triggerRef} type="text" name={name} value={displayValue} readOnly placeholder={placeholder}
           disabled={disabled}
           onClick={openCalendar}
+          onKeyDown={(e) => {
+            if (disabled || open) return;
+            if (e.key === "Enter" || e.key === " " || e.key === "ArrowDown") {
+              e.preventDefault();
+              openCalendar();
+            }
+          }}
+          role="combobox"
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-controls={open ? popupId : undefined}
+          aria-invalid={!!error || undefined}
           className={cn(
             "w-full h-10 pl-3 pr-9 rounded-xl text-sm transition-all outline-none cursor-pointer select-none",
             "bg-background border border-border text-foreground placeholder:text-muted-foreground",

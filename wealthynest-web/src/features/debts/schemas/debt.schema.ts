@@ -13,4 +13,6 @@ export const debtSchema = z.object({
   }
 });
 
-export type DebtFormValues = z.infer<typeof debtSchema>;
+// z.input (pre-coercion), not z.infer (output): `amount` is z.coerce.number(), and the form
+// needs to allow a genuinely blank field on a new debt rather than a stray `0` default.
+export type DebtFormValues = z.input<typeof debtSchema>;

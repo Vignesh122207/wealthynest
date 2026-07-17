@@ -9,6 +9,7 @@ import {
 import { Header } from "@/components/layout/Header";
 import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { QueryErrorState } from "@/components/shared/QueryErrorState";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import {
   useInvestments, useCreateInvestment, useUpdateInvestment,
@@ -27,12 +28,26 @@ import { InvestmentCard } from "@/features/investments/components/InvestmentCard
 import { DividendSuggestionsSection } from "@/features/investments/components/DividendSuggestionsSection";
 import { TabSummaryBar } from "@/features/investments/components/TabSummaryBar";
 import { OverviewTab } from "@/features/investments/components/OverviewTab";
-import { StockForm, type StockFormDefaults } from "@/features/investments/components/forms/StockForm";
-import { MFForm, type MFFormDefaults } from "@/features/investments/components/forms/MFForm";
-import { GoldForm } from "@/features/investments/components/forms/GoldForm";
-import { FDForm } from "@/features/investments/components/forms/FDForm";
-import { BondForm } from "@/features/investments/components/forms/BondForm";
+import dynamic from "next/dynamic";
+import type { StockFormDefaults, StockSubmitValues } from "@/features/investments/components/forms/StockForm";
+import type { MFFormDefaults, MFSubmitValues } from "@/features/investments/components/forms/MFForm";
+import type { BondSubmitValues } from "@/features/investments/components/forms/BondForm";
+
+// Lazy-loaded: exactly one of these five ever renders at a time (the active tab, and only once
+// its add/edit modal is open) — this is the single heaviest page in the app, so keeping the
+// other four out of the initial bundle at any given moment noticeably shrinks it.
+const StockForm = dynamic(() => import("@/features/investments/components/forms/StockForm").then(m => m.StockForm), { ssr: false });
+const MFForm    = dynamic(() => import("@/features/investments/components/forms/MFForm").then(m => m.MFForm), { ssr: false });
+const GoldForm  = dynamic(() => import("@/features/investments/components/forms/GoldForm").then(m => m.GoldForm), { ssr: false });
+const FDForm    = dynamic(() => import("@/features/investments/components/forms/FDForm").then(m => m.FDForm), { ssr: false });
+const BondForm  = dynamic(() => import("@/features/investments/components/forms/BondForm").then(m => m.BondForm), { ssr: false });
 import type { GoldFormValues, FDFormValues, BondFormValues } from "@/features/investments/schemas/investment.schema";
+
+// The single shared submit handler below is wired to whichever of these 5 forms is showing for
+// the active tab — each form only ever calls it with its own shape, but there's no single static
+// type linking `tab` to `values` (they're independent params), so buildPayload still asserts the
+// specific shape per branch after switching on `currentTab`.
+type AnyInvestmentFormValues = StockSubmitValues | MFSubmitValues | GoldFormValues | FDFormValues | BondSubmitValues;
 import type {
   Investment, CreateInvestmentPayload,
 } from "@/features/investments/types/investment.types";
@@ -70,7 +85,7 @@ export default function InvestmentsPage() {
   const [stockSearch,  setStockSearch]  = useState("");
   const [incomeYear, setIncomeYear] = useState(new Date().getFullYear());
 
-  const { data: investments = [], isLoading } = useInvestments();
+  const { data: investments = [], isLoading, isError, refetch } = useInvestments();
   const { data: goldPrice }                   = useGoldPrice();
   const { data: goldPriceInfo }               = useGoldPriceInfo();
   const { data: accounts = [] }               = useAccounts();
@@ -115,28 +130,29 @@ export default function InvestmentsPage() {
     });
   }, [investments, tab, sortKey]);
 
-  const buildPayload = useCallback((values: any, currentTab: TabId): CreateInvestmentPayload => {
+  const buildPayload = useCallback((rawValues: AnyInvestmentFormValues, currentTab: TabId): CreateInvestmentPayload => {
     if (currentTab === "stocks") {
+      const values = rawValues as StockSubmitValues;
       const units = Number(values.units);
       const price = Number(values.avgBuyPrice);
       return {
         investmentType: "STOCK",
-        symbol: values.symbol, companyName: values.name ?? values.companyName, exchange: values.exchange ?? "NSE",
+        symbol: values.symbol, companyName: values.name, exchange: values.exchange ?? "NSE",
         units, avgBuyPrice: price, currentPrice: price,
         investedAmount: units * price, currentValue: units * price,
         purchaseDate: values.purchaseDate,
         brokerage: values.brokerage ? Number(values.brokerage) : undefined,
         linkedAccountId: values.linkedAccountId || undefined,
         debitAccountId: values.debitAccountId || undefined,
-        notes: values.notes,
       };
     }
     if (currentTab === "mf") {
+      const values = rawValues as MFSubmitValues;
       const units = Number(values.units);
       const nav   = Number(values.avgBuyPrice);
       return {
         investmentType: "MUTUAL_FUND",
-        schemeCode: values.schemeCode, companyName: values.name ?? values.companyName,
+        schemeCode: values.schemeCode, companyName: values.name,
         units, avgBuyPrice: nav, currentPrice: nav,
         investedAmount: units * nav, currentValue: units * nav,
         purchaseDate: values.purchaseDate,
@@ -145,6 +161,7 @@ export default function InvestmentsPage() {
       };
     }
     if (currentTab === "gold") {
+      const values = rawValues as GoldFormValues;
       const grams = Number(values.quantityGrams);
       const price = Number(values.avgBuyPrice);
       const karat = Number(values.goldKarat ?? 22);
@@ -158,10 +175,10 @@ export default function InvestmentsPage() {
         investedAmount: grams * price, currentValue: liveVal,
         purchaseDate: values.purchaseDate,
         debitAccountId: values.debitAccountId || undefined,
-        notes: values.notes,
       };
     }
     if (currentTab === "fd") {
+      const values = rawValues as FDFormValues;
       const principal = Number(values.investedAmount);
       return {
         investmentType: "FD", bankName: values.bankName,
@@ -170,10 +187,10 @@ export default function InvestmentsPage() {
         purchaseDate: values.purchaseDate, maturityDate: values.maturityDate,
         linkedAccountId: values.linkedAccountId || undefined,
         debitAccountId: values.debitAccountId || undefined,
-        notes: values.notes,
       };
     }
     // bonds
+    const values = rawValues as BondSubmitValues;
     const faceVal = Number(values.faceValuePerBond);
     const qty     = Number(values.quantity);
     // _investedAmount is set by BondForm.handleBondSubmit (accounts for secondary market price)
@@ -189,11 +206,10 @@ export default function InvestmentsPage() {
       maturityDate: values.maturityDate || undefined,
       linkedAccountId: values.linkedAccountId || undefined,
       debitAccountId: values.debitAccountId || undefined,
-      notes: values.notes,
     };
   }, [goldPrice]);
 
-  const handleSubmit = useCallback((values: any) => {
+  const handleSubmit = useCallback((values: AnyInvestmentFormValues) => {
     const payload = buildPayload(values, tab);
     if (editItem) {
       update({ id: editItem.id, payload }, { onSuccess: () => { setEditItem(null); setShowForm(false); } });
@@ -342,6 +358,8 @@ const tabCounts = useMemo(() => investments.reduce((acc, i) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             {[1, 2, 3].map(i => <div key={i} className="h-44 bg-muted/40 rounded-2xl animate-pulse" />)}
           </div>
+        ) : isError ? (
+          <QueryErrorState onRetry={() => refetch()} description="Couldn't load your investments. Check your connection and try again." />
         ) : tab === "overview" ? (
           <OverviewTab investments={investments} year={incomeYear} onYearChange={setIncomeYear} incomeHistory={incomeHistory} portfolioXirr={portfolioXirr} />
         ) : filtered.length === 0 ? (

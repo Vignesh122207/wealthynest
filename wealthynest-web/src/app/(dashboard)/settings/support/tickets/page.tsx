@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { PageWrapper } from "@/components/layout/PageWrapper";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { QueryErrorState } from "@/components/shared/QueryErrorState";
 import { useMyTickets } from "@/features/support/hooks/useSupport";
 import type { TicketStatus, TicketPriority } from "@/features/support/types/support.types";
 import { cn } from "@/lib/utils";
@@ -26,7 +27,7 @@ const CATEGORY_EMOJI: Record<string, string> = {
 };
 
 export default function MyTicketsPage() {
-  const { data, isLoading } = useMyTickets(0);
+  const { data, isLoading, isError, refetch } = useMyTickets(0);
   const tickets = data?.data ?? [];
 
   return (
@@ -53,6 +54,10 @@ export default function MyTicketsPage() {
               {[1,2,3].map(i => (
                 <div key={i} className="h-20 bg-muted/50 rounded-2xl animate-pulse" />
               ))}
+            </div>
+          ) : isError ? (
+            <div className="bg-card border border-border rounded-2xl">
+              <QueryErrorState onRetry={() => refetch()} description="Couldn't load your tickets. Check your connection and try again." />
             </div>
           ) : tickets.length === 0 ? (
             <div className="bg-card border border-border rounded-2xl">

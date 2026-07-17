@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { CreditCard, HandCoins, RefreshCw, ArrowLeftRight } from "lucide-react";
 import { getCategoryIcon, getCategoryColor, INCOME_ICON_MAP } from "@/lib/categoryMeta";
 import { PremiumIcon } from "@/components/icons/PremiumIcon";
@@ -22,7 +23,7 @@ export function DebtBadge({ debtLabel, debtContactName }: { debtLabel?: string; 
   );
 }
 
-export function ExpenseRow({ expense, accountName, onEdit }: {
+export const ExpenseRow = memo(function ExpenseRow({ expense, accountName, onEdit }: {
   expense:     Expense;
   accountName: string | undefined;
   onEdit:      () => void;
@@ -55,9 +56,9 @@ export function ExpenseRow({ expense, accountName, onEdit }: {
       <p className="text-sm font-bold text-red-500 dark:text-red-400 tabular-nums shrink-0">−{fmt(expense.amount)}</p>
     </button>
   );
-}
+});
 
-export function IncomeRow({ entry, accountName, onEdit }: {
+export const IncomeRow = memo(function IncomeRow({ entry, accountName, onEdit }: {
   entry:       IncomeEntry;
   accountName: string | undefined;
   onEdit:      () => void;
@@ -84,9 +85,9 @@ export function IncomeRow({ entry, accountName, onEdit }: {
       <p className="text-sm font-bold text-emerald-500 dark:text-emerald-400 tabular-nums shrink-0">+{fmt(entry.amount)}</p>
     </button>
   );
-}
+});
 
-export function TransferRow({ transfer, onEdit }: {
+export const TransferRow = memo(function TransferRow({ transfer, onEdit }: {
   transfer: AccountTransfer;
   onEdit:   () => void;
 }) {
@@ -123,4 +124,4 @@ export function TransferRow({ transfer, onEdit }: {
       </p>
     </button>
   );
-}
+});

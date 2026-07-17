@@ -98,6 +98,7 @@ function NavItem({ href, label, icon, gradient, active, badge, onClick }: {
     <Link
       href={href}
       onClick={onClick}
+      aria-current={active ? "page" : undefined}
       className={cn(
         "relative flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 group",
         active

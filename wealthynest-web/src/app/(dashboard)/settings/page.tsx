@@ -209,6 +209,7 @@ export default function SettingsPage() {
         <ConfirmDialog open title="Close your account?"
           description="Your account will be deactivated immediately and you will be signed out. Your data is retained. Only an admin can reactivate your account."
           confirmLabel="Yes, close account" danger
+          typeToConfirm="CLOSE"
           onConfirm={() => closeAccount()}
           onCancel={() => setShowClose(false)} />
       )}

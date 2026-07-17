@@ -12,6 +12,9 @@ import {
   PieChart, Pie, Cell, LineChart, Line, ReferenceLine,
 } from "recharts";
 import { Header } from "@/components/layout/Header";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { QueryErrorState } from "@/components/shared/QueryErrorState";
+import { Button } from "@/components/ui/Button";
 import { PremiumIcon, type IconTone } from "@/components/icons/PremiumIcon";
 import { useAnnualTrend } from "@/features/analytics/hooks/useAnalytics";
 import { useDashboard } from "@/features/dashboard/hooks/useDashboard";
@@ -60,7 +63,7 @@ export default function AnalyticsPage() {
 
   // The dashboard endpoint already computes a trailing 6-month trend server-side (same window
   // `months` builds above) — reuse it instead of firing one /analytics/dashboard call per month.
-  const { data: current, isLoading: trendLoading } = useDashboard(year, month);
+  const { data: current, isLoading: trendLoading, isError: trendError, refetch: refetchTrend } = useDashboard(year, month);
   const { data: thisYearData }  = useAnnualTrend(year);
   const { data: lastYearData }  = useAnnualTrend(year - 1);
 
@@ -145,12 +148,38 @@ export default function AnalyticsPage() {
 
   const hasInvestments = current && (current.totalInvested > 0 || current.totalInvestmentValue > 0);
 
+  // Distinct from the per-section empties below (no budgets this month, no investments yet) —
+  // this only fires when there's nothing tracked anywhere, ever, so a brand-new family doesn't
+  // land on a page of five stacked charts all showing flat zero lines with no explanation.
+  const hasAnyData = !trendLoading && (
+    trendData.some(d => d.Income > 0 || d.Expenses > 0) ||
+    categoryData.length > 0 ||
+    budgetData.length > 0 ||
+    !!hasInvestments
+  );
+
   return (
     <div className="flex flex-col flex-1 bg-background">
       <Header title="Analytics" subtitle="Deeper trends and patterns across your finances" />
       <main className="flex-1 p-4 md:p-5 lg:p-6 pb-36 lg:pb-24 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-5">
 
+        {trendError ? (
+          <QueryErrorState onRetry={() => refetchTrend()} description="Couldn't load your analytics. Check your connection and try again." />
+        ) : !trendLoading && !hasAnyData ? (
+          <EmptyState
+            icon={BarChart2}
+            title="Nothing to analyze yet"
+            description="Log a few expenses or set up a budget, and your trends, savings rate, and category breakdown will show up here automatically."
+            action={
+              <div className="flex gap-2">
+                <Link href="/expenses"><Button variant="primary">Log an expense</Button></Link>
+                <Link href="/budgets"><Button variant="secondary">Set up a budget</Button></Link>
+              </div>
+            }
+          />
+        ) : (
+        <>
         {/* Month Navigator */}
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
@@ -455,6 +484,8 @@ export default function AnalyticsPage() {
               Add Investments →
             </Link>
           </div>
+        )}
+        </>
         )}
         </div>
       </main>

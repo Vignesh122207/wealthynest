@@ -51,7 +51,7 @@ const STATUS_CONFIG: Record<TicketStatus, {
   },
   CLOSED:      {
     label: "Closed",
-    badge: "bg-slate-500/10 text-slate-500 border border-slate-500/20",
+    badge: "bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20",
     activePill: "bg-slate-500 text-white border-slate-500 shadow-sm",
     icon: XCircle,
     dot: "bg-slate-400",
@@ -328,7 +328,7 @@ function TicketDetail({ ticketId, onBack }: { ticketId: string; onBack: () => vo
         </form>
       ) : (
         <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground bg-muted/40 rounded-2xl py-5 border border-border">
-          <XCircle className="w-4 h-4 text-slate-400" />
+          <XCircle className="w-4 h-4 text-muted-foreground" />
           This ticket is closed — no further replies can be sent.
         </div>
       )}

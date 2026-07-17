@@ -1,24 +1,16 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
-  Plus, Receipt, ChevronLeft, ChevronRight,
-  Banknote, CreditCard, RefreshCw, Wallet,
-  ArrowUpRight, ArrowDownLeft, ArrowLeftRight, HandCoins,
+  Receipt, Banknote, Wallet, ArrowLeftRight,
 } from "lucide-react";
-import { getCategoryIcon, getCategoryColor, INCOME_ICON_MAP } from "@/lib/categoryMeta";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
 import { Header } from "@/components/layout/Header";
 import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { TableRowSkeleton } from "@/components/shared/LoadingSkeleton";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { ExpenseForm } from "@/components/transactions/ExpenseForm";
-import { IncomeForm, type IncomeFormValues, type IncomeSourceValue } from "@/components/transactions/IncomeForm";
-import { TransferFormModal, type TransferFormValues } from "@/components/transactions/TransferFormModal";
-import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
+import { type IncomeFormValues, type IncomeSourceValue } from "@/components/transactions/IncomeForm";
+import { type TransferFormValues } from "@/components/transactions/TransferFormModal";
 import {
   useExpenses, useCreateExpense, useUpdateExpense, useDeleteExpense,
 } from "@/features/expenses/hooks/useExpenses";
@@ -36,16 +28,13 @@ import { type ExpenseFormValues } from "@/features/expenses/schemas/expense.sche
 import type { SplitParticipant } from "@/features/expenses/types/expense.types";
 import { exportCsv, exportIncomeCsv, exportTransfersCsv, exportAllCsv } from "@/features/expenses/utils/csvExport";
 import { pad } from "@/features/expenses/utils/filterHelpers";
-import { ExpenseRow, IncomeRow, TransferRow, DebtBadge } from "@/features/expenses/components/TransactionRows";
-import { Chip } from "@/features/expenses/components/Chip";
 import { TypeTabs } from "@/features/expenses/components/TypeTabs";
 import { DateControls } from "@/features/expenses/components/DateControls";
 import { StatCards } from "@/features/expenses/components/StatCards";
 import { Toolbar } from "@/features/expenses/components/Toolbar";
-import { ImportStatementModal } from "@/features/statementimport/components/ImportStatementModal";
 import { FilterPanel } from "@/features/expenses/components/FilterPanel";
 import type { TxType, DateMode, SortKey, Channel } from "@/features/expenses/types/filters.types";
-import { formatDate, cn, pctChange } from "@/lib/utils";
+import { pctChange } from "@/lib/utils";
 import { buildUsageCounts, sortByUsage, pickSmartDefault } from "@/lib/mostUsed";
 import { useAmountFormatter } from "@/hooks/useAmountFormatter";
 import { usePrefsStore, CURRENCIES } from "@/store/preferences.store";
@@ -55,6 +44,23 @@ import type { Category } from "@/features/categories/types/category.types";
 import type { Expense } from "@/features/expenses/types/expense.types";
 import type { IncomeEntry } from "@/features/income/types/income.types";
 import type { AccountTransfer } from "@/features/accounts/types/account.types";
+import type { TxRow } from "./_components/types";
+import { ExpensesTabContent } from "./_components/ExpensesTabContent";
+import { IncomeTabContent } from "./_components/IncomeTabContent";
+import { TransfersTabContent } from "./_components/TransfersTabContent";
+import { AllTabContent } from "./_components/AllTabContent";
+
+// Lazy-loaded: both are large forms only ever needed after a user opens them, never on first
+// paint — keeping them out of the page's initial bundle noticeably shrinks it on a page that's
+// already one of the app's heaviest.
+const TransactionModals = dynamic(
+  () => import("./_components/TransactionModals").then(m => m.TransactionModals),
+  { ssr: false }
+);
+const ImportStatementModal = dynamic(
+  () => import("@/features/statementimport/components/ImportStatementModal").then(m => m.ImportStatementModal),
+  { ssr: false }
+);
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -164,7 +170,7 @@ export default function TransactionsPage() {
     size: PAGE_SIZE,
   };
 
-  const { data: expenseData, isLoading: expensesLoading } = useExpenses(expenseFilters);
+  const { data: expenseData, isLoading: expensesLoading, isError: expensesError, refetch: refetchExpenses } = useExpenses(expenseFilters);
 
   // Previous month, used by the stat-card deltas below (dashboardSummary vs prevDashboardSummary)
   const prevMonthNum = month === 1 ? 12 : month - 1;
@@ -173,11 +179,11 @@ export default function TransactionsPage() {
   // ─── Income data ───────────────────────────────────────────────────────────
   const incomeYear  = dateMode === "all" ? undefined : year;
   const incomeMonth = dateMode === "month" ? month : undefined;
-  const { data: incomeData = [], isLoading: incomeLoading } = useIncome(incomeYear, incomeMonth);
+  const { data: incomeData = [], isLoading: incomeLoading, isError: incomeError, refetch: refetchIncome } = useIncome(incomeYear, incomeMonth);
   const { data: allIncomeRaw = [] } = useIncome(incomeYear, incomeMonth, true);
 
   // ─── Transfer data ─────────────────────────────────────────────────────────
-  const { data: transfersPage, isLoading: transfersLoading } = useTransfers(0, 500);
+  const { data: transfersPage, isLoading: transfersLoading, isError: transfersError, refetch: refetchTransfers } = useTransfers(0, 500);
   const allTransfers = useMemo(() => transfersPage?.data ?? [], [transfersPage]);
 
   // ─── All-time data, unscoped by the selected date range ────────────────────
@@ -244,11 +250,6 @@ export default function TransactionsPage() {
   }, [filteredTransfers, debouncedSearch, selectedAccountIds]);
 
   // ─── "All" merged rows ─────────────────────────────────────────────────────
-  type TxRow =
-    | { kind: "expense";  date: string; data: Expense }
-    | { kind: "income";   date: string; data: IncomeEntry }
-    | { kind: "transfer"; date: string; data: AccountTransfer };
-
   const { data: allExpensesRaw } = useExpenses({
     startDate: startDate as string | undefined,
     endDate:   endDate as string | undefined,
@@ -717,85 +718,26 @@ export default function TransactionsPage() {
     <div className="flex flex-col flex-1">
       <Header title="Transactions" subtitle="Track and manage all your money movements" onExport={handleExport} />
 
-      {/* Expense modals */}
-      {confirmId && (
-        <ConfirmDialog open title="Delete Expense"
-          description="This expense will be permanently deleted and cannot be undone."
-          confirmLabel="Delete" danger
-          onConfirm={() => { deleteExpense(confirmId); setConfirmId(null); }}
-          onCancel={() => setConfirmId(null)} />
-      )}
-      {confirmIncomeId && (
-        <ConfirmDialog open title="Delete Income Entry"
-          description="This income entry will be permanently deleted."
-          confirmLabel="Delete" danger
-          onConfirm={() => { deleteIncome(confirmIncomeId); setConfirmIncomeId(null); }}
-          onCancel={() => setConfirmIncomeId(null)} />
-      )}
-      {confirmTransferId && (
-        <ConfirmDialog open title="Delete Transfer"
-          description="This transfer record will be permanently deleted."
-          confirmLabel="Delete" danger
-          onConfirm={() => { deleteTransfer(confirmTransferId); setConfirmTransferId(null); }}
-          onCancel={() => setConfirmTransferId(null)} />
-      )}
-
-      {/* Add/edit modals */}
-      {(showCreate || editExpense) && (
-        <TransactionModalOverlay onDismiss={() => { setShowCreate(false); setEditExpense(null); }}>
-          {showCreate && (
-            <ExpenseForm title="New Expense" defaultCategoryId={defaultExpenseCategoryId} {...sharedFormProps}
-              familyMembers={familyMembers}
-              onSubmit={handleCreate} onCancel={() => setShowCreate(false)}
-              isPending={creating} submitLabel="Add Expense" />
-          )}
-          {editExpense && (
-            <ExpenseForm
-              title={`Edit — ${editExpense.description || editExpense.categoryName || "Expense"}`}
-              defaultValues={{ categoryId: editExpense.categoryId, accountId: editExpense.accountId ?? "",
-                amount: editExpense.amount, description: editExpense.description ?? "", expenseDate: editExpense.expenseDate }}
-              {...sharedFormProps}
-              onSubmit={handleUpdate} onCancel={() => setEditExpense(null)}
-              onDelete={() => { const id = editExpense.id; setEditExpense(null); setConfirmId(id); }}
-              isPending={updating} submitLabel="Save Changes" />
-          )}
-        </TransactionModalOverlay>
-      )}
-
-      {(showAddIncome || editIncome) && (
-        <TransactionModalOverlay onDismiss={() => { setShowAddIncome(false); setEditIncome(null); }}>
-          {showAddIncome && (
-            <IncomeForm onSubmit={handleAddIncome} onCancel={() => setShowAddIncome(false)}
-              defaultSource={defaultIncomeSource} sourceUsageCounts={incomeSourceUsage}
-              isPending={addingIncome} accounts={allAccounts} incomeCategories={incomeCategories} />
-          )}
-          {editIncome && (
-            <IncomeForm
-              defaultValues={{ source: editIncome.source as IncomeSourceValue, amount: editIncome.amount,
-                incomeDate: editIncome.incomeDate, accountId: editIncome.accountId ?? "",
-                description: editIncome.description ?? "" }}
-              onSubmit={handleUpdateIncome} onCancel={() => setEditIncome(null)}
-              onDelete={() => { const id = editIncome.id; setEditIncome(null); setConfirmIncomeId(id); }}
-              sourceUsageCounts={incomeSourceUsage}
-              isPending={updatingIncome} accounts={allAccounts} incomeCategories={incomeCategories} isEdit />
-          )}
-        </TransactionModalOverlay>
-      )}
-
-      {(showAddTransfer || editTransfer) && (
-        <TransactionModalOverlay onDismiss={() => { setShowAddTransfer(false); setEditTransfer(null); }}>
-          {showAddTransfer && (
-            <TransferFormModal onSubmit={handleAddTransfer} onCancel={() => setShowAddTransfer(false)}
-              isPending={transferring} accounts={allAccounts} />
-          )}
-          {editTransfer && (
-            <TransferFormModal
-              editTransferRef={editTransfer}
-              onSubmit={handleUpdateTransfer} onCancel={() => setEditTransfer(null)}
-              onDelete={() => { const id = editTransfer.id; setEditTransfer(null); setConfirmTransferId(id); }}
-              isPending={updatingTransfer} accounts={allAccounts} isEdit />
-          )}
-        </TransactionModalOverlay>
+      {/* Gates the dynamic import itself — TransactionModals is otherwise unconditionally
+          mounted (its own internal `{x && <Modal/>}` checks are one level too deep for
+          next/dynamic to defer fetching its chunk until one of them is actually true). */}
+      {(confirmId || confirmIncomeId || confirmTransferId || showCreate || editExpense ||
+        showAddIncome || editIncome || showAddTransfer || editTransfer) && (
+        <TransactionModals
+          sharedFormProps={sharedFormProps} familyMembers={familyMembers}
+          allAccounts={allAccounts} incomeCategories={incomeCategories}
+          confirmId={confirmId} setConfirmId={setConfirmId} deleteExpense={deleteExpense}
+          confirmIncomeId={confirmIncomeId} setConfirmIncomeId={setConfirmIncomeId} deleteIncome={deleteIncome}
+          confirmTransferId={confirmTransferId} setConfirmTransferId={setConfirmTransferId} deleteTransfer={deleteTransfer}
+          showCreate={showCreate} setShowCreate={setShowCreate} editExpense={editExpense} setEditExpense={setEditExpense}
+          defaultExpenseCategoryId={defaultExpenseCategoryId}
+          handleCreate={handleCreate} handleUpdate={handleUpdate} creating={creating} updating={updating}
+          showAddIncome={showAddIncome} setShowAddIncome={setShowAddIncome} editIncome={editIncome} setEditIncome={setEditIncome}
+          defaultIncomeSource={defaultIncomeSource} incomeSourceUsage={incomeSourceUsage}
+          handleAddIncome={handleAddIncome} handleUpdateIncome={handleUpdateIncome} addingIncome={addingIncome} updatingIncome={updatingIncome}
+          showAddTransfer={showAddTransfer} setShowAddTransfer={setShowAddTransfer} editTransfer={editTransfer} setEditTransfer={setEditTransfer}
+          handleAddTransfer={handleAddTransfer} handleUpdateTransfer={handleUpdateTransfer} transferring={transferring} updatingTransfer={updatingTransfer}
+        />
       )}
 
       <main className="flex-1 p-4 md:p-5 lg:p-6 pb-36 lg:pb-24 overflow-auto">
@@ -851,381 +793,56 @@ export default function TransactionsPage() {
 
         {/* ── EXPENSES TAB ─────────────────────────────────────────────────── */}
         {txType === "expenses" && (
-          <div className="space-y-3">
-            {chips.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {chips.map(c => <Chip key={c.label} label={c.label} onRemove={c.clear} />)}
-              </div>
-            )}
-
-            {/* Expense list */}
-            <div className="bg-card border border-border rounded-2xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                <h3 className="font-semibold text-foreground text-sm">Expenses</h3>
-                <div className="flex items-center gap-3">
-                  {expenseTabTotal > 0 && <span className="text-xs font-bold text-red-500 dark:text-red-400 tabular-nums">−{fmt(expenseTabTotal)}</span>}
-                  <span className="text-xs text-muted-foreground/80">{expenseTabRows.length} total</span>
-                </div>
-              </div>
-              {expensesLoading ? <TableRowSkeleton rows={6} /> : expenses.length === 0 ? (
-                <EmptyState icon={Receipt} title={!hasAccounts ? "No accounts yet" : "No expenses found"}
-                  description={
-                    !hasAccounts ? "Add a bank, cash, or credit account before logging expenses."
-                      : activeFilterCount > 0 ? "No expenses match the active filters." : "Track your spending by adding your first expense."
-                  }
-                  action={
-                    !hasAccounts ? addAccountCta
-                      : activeFilterCount > 0
-                      ? <button onClick={clearAllFilters} className="text-sm text-indigo-500 hover:text-indigo-600 font-medium transition-colors">Clear filters</button>
-                      : <button onClick={() => setShowCreate(true)}
-                          className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
-                          <Plus className="w-4 h-4" /> Add Expense
-                        </button>
-                  } />
-              ) : (
-                <div>
-                  {sortedDates.map(date => {
-                    const dayTotal = grouped[date].reduce((s, e) => s + e.amount, 0);
-                    return (
-                      <div key={date}>
-                        <div className="flex items-center justify-between px-4 py-2 bg-muted/50 border-b border-border/50">
-                          <span className="text-xs font-semibold text-foreground/60 uppercase tracking-widest">{formatDate(date)}</span>
-                          <span className="text-xs font-semibold text-red-500/70 tabular-nums">−{fmt(dayTotal)}</span>
-                        </div>
-                        <div className="divide-y divide-border/50">
-                          {grouped[date].map(expense => (
-                            <ExpenseRow key={expense.id} expense={expense}
-                              accountName={expense.accountId ? accountMap[expense.accountId] : undefined}
-                              onEdit={() => { setShowCreate(false); setEditExpense(expense); }} />
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {totalPages > 1 && (
-                    <div className="flex items-center justify-between px-4 py-3 border-t border-border/60">
-                      <p className="text-xs text-muted-foreground">
-                        {listPage * PAGE_SIZE + 1}–{Math.min((listPage + 1) * PAGE_SIZE, serverTotal)} of {serverTotal}
-                      </p>
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => setListPage(0)} disabled={listPage === 0} aria-label="First page"
-                          className="px-1.5 py-1 rounded-lg hover:bg-muted disabled:opacity-30 text-xs text-muted-foreground font-medium transition-colors">«</button>
-                        <button onClick={() => setListPage(p => Math.max(0, p - 1))} disabled={listPage === 0} aria-label="Previous page"
-                          className="p-1.5 rounded-lg hover:bg-muted disabled:opacity-30 transition-colors">
-                          <ChevronLeft className="w-3.5 h-3.5 text-muted-foreground" />
-                        </button>
-                        <span className="text-xs text-muted-foreground px-2 tabular-nums">{listPage + 1} / {totalPages}</span>
-                        <button onClick={() => setListPage(p => Math.min(totalPages - 1, p + 1))} disabled={listPage >= totalPages - 1} aria-label="Next page"
-                          className="p-1.5 rounded-lg hover:bg-muted disabled:opacity-30 transition-colors">
-                          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
-                        </button>
-                        <button onClick={() => setListPage(totalPages - 1)} disabled={listPage >= totalPages - 1} aria-label="Last page"
-                          className="px-1.5 py-1 rounded-lg hover:bg-muted disabled:opacity-30 text-xs text-muted-foreground font-medium transition-colors">»</button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+          <ExpensesTabContent
+            chips={chips} expensesLoading={expensesLoading} expensesError={expensesError} onRetryExpenses={refetchExpenses} expenses={expenses}
+            hasAccounts={hasAccounts} activeFilterCount={activeFilterCount} addAccountCta={addAccountCta}
+            clearAllFilters={clearAllFilters} onAddExpense={() => setShowCreate(true)}
+            expenseTabTotal={expenseTabTotal} expenseTabRowCount={expenseTabRows.length}
+            sortedDates={sortedDates} grouped={grouped} fmt={fmt} accountMap={accountMap}
+            onEditExpense={(expense) => { setShowCreate(false); setEditExpense(expense); }}
+            totalPages={totalPages} listPage={listPage} setListPage={setListPage}
+            serverTotal={serverTotal} pageSize={PAGE_SIZE}
+          />
         )}
 
         {/* ── INCOME TAB ───────────────────────────────────────────────────── */}
         {txType === "income" && (
-          <div className="space-y-3">
-            {incomeTabChips.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {incomeTabChips.map(c => <Chip key={c.label} label={c.label} onRemove={c.clear} />)}
-              </div>
-            )}
-
-            <div className="bg-card border border-border rounded-2xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                <h3 className="font-semibold text-foreground text-sm">Income</h3>
-                <div className="flex items-center gap-3">
-                  {searchedIncome.length > 0 && (
-                    <span className="text-xs font-bold text-emerald-500 dark:text-emerald-400 tabular-nums">
-                      +{fmt(searchedIncome.reduce((s, i) => s + i.amount, 0))}
-                    </span>
-                  )}
-                  <span className="text-xs text-muted-foreground/80">{searchedIncome.length} total</span>
-                </div>
-              </div>
-              {incomeLoading ? <TableRowSkeleton rows={4} /> : searchedIncome.length === 0 ? (
-                <EmptyState icon={ArrowUpRight} title={!hasIncomeAccounts ? "No accounts yet" : "No income this period"}
-                  description={!hasIncomeAccounts ? "Add a bank or cash account before recording income." : "Record income to track what's coming in."}
-                  action={
-                    !hasIncomeAccounts ? addAccountCta
-                      : <button onClick={() => setShowAddIncome(true)}
-                      className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
-                      <Plus className="w-4 h-4" /> Add Income
-                    </button>
-                  } />
-              ) : (
-                <div>
-                  {incomeSortedDates.map(date => (
-                    <div key={date}>
-                      <div className="flex items-center justify-between px-4 py-2 bg-muted/50 border-b border-border/50">
-                        <span className="text-xs font-semibold text-foreground/60 uppercase tracking-widest">{formatDate(date)}</span>
-                        <span className="text-xs font-semibold text-emerald-500/80 tabular-nums">
-                          +{fmt(incomeGrouped[date].reduce((s, i) => s + i.amount, 0))}
-                        </span>
-                      </div>
-                      <div className="divide-y divide-border/50">
-                        {incomeGrouped[date].map(entry => (
-                          <IncomeRow key={entry.id} entry={entry}
-                            accountName={entry.accountId ? accountMap[entry.accountId] : undefined}
-                            onEdit={() => { setShowAddIncome(false); setEditIncome(entry); }} />
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          <IncomeTabContent
+            chips={incomeTabChips} incomeLoading={incomeLoading} incomeError={incomeError} onRetryIncome={refetchIncome} searchedIncome={searchedIncome}
+            hasIncomeAccounts={hasIncomeAccounts} addAccountCta={addAccountCta}
+            onAddIncome={() => setShowAddIncome(true)}
+            incomeSortedDates={incomeSortedDates} incomeGrouped={incomeGrouped} fmt={fmt} accountMap={accountMap}
+            onEditIncome={(entry) => { setShowAddIncome(false); setEditIncome(entry); }}
+          />
         )}
 
         {/* ── TRANSFERS TAB ────────────────────────────────────────────────── */}
         {txType === "transfers" && (
-          <div className="space-y-3">
-            {transferTabChips.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {transferTabChips.map(c => <Chip key={c.label} label={c.label} onRemove={c.clear} />)}
-              </div>
-            )}
-
-            <div className="bg-card border border-border rounded-2xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                <h3 className="font-semibold text-foreground text-sm">Transfers</h3>
-                <div className="flex items-center gap-3">
-                  {searchedTransfers.length > 0 && (
-                    <span className="text-xs font-bold text-indigo-500 dark:text-indigo-400 tabular-nums">
-                      {fmt(searchedTransfers.reduce((s, t) => s + t.amount, 0))}
-                    </span>
-                  )}
-                  <span className="text-xs text-muted-foreground/80">{searchedTransfers.length} total</span>
-                </div>
-              </div>
-              {transfersLoading ? <TableRowSkeleton rows={4} /> : searchedTransfers.length === 0 ? (
-                <EmptyState icon={ArrowLeftRight} title={allAccounts.length < 2 ? "Need at least 2 accounts" : "No transfers this period"}
-                  description={allAccounts.length < 2 ? "Transfers move money between two of your own accounts — add another account first." : "Move money between your accounts."}
-                  action={
-                    allAccounts.length < 2 ? addAccountCta
-                      : <button onClick={() => setShowAddTransfer(true)}
-                      className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
-                      <Plus className="w-4 h-4" /> New Transfer
-                    </button>
-                  } />
-              ) : (
-                <div>
-                  {transferSortedDates.map(date => (
-                    <div key={date}>
-                      <div className="flex items-center justify-between px-4 py-2 bg-muted/50 border-b border-border/50">
-                        <span className="text-xs font-semibold text-foreground/60 uppercase tracking-widest">{formatDate(date)}</span>
-                        <span className="text-xs font-semibold text-indigo-500/70 tabular-nums">
-                          {fmt(transferGrouped[date].reduce((s, t) => s + t.amount, 0))}
-                        </span>
-                      </div>
-                      <div className="divide-y divide-border/50">
-                        {transferGrouped[date].map(transfer => (
-                          <TransferRow key={transfer.id} transfer={transfer}
-                            onEdit={() => { setShowAddTransfer(false); setEditTransfer(transfer); }} />
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          <TransfersTabContent
+            chips={transferTabChips} transfersLoading={transfersLoading} transfersError={transfersError} onRetryTransfers={refetchTransfers} searchedTransfers={searchedTransfers}
+            hasTwoAccounts={allAccounts.length >= 2} addAccountCta={addAccountCta}
+            onAddTransfer={() => setShowAddTransfer(true)}
+            transferSortedDates={transferSortedDates} transferGrouped={transferGrouped} fmt={fmt}
+            onEditTransfer={(transfer) => { setShowAddTransfer(false); setEditTransfer(transfer); }}
+          />
         )}
 
         {/* ── ALL TAB ──────────────────────────────────────────────────────── */}
         {txType === "all" && (
-          <div className="space-y-3">
-            {allTabChips.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {allTabChips.map(c => <Chip key={c.label} label={c.label} onRemove={c.clear} />)}
-              </div>
-            )}
-
-            <div className="bg-card border border-border rounded-2xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                <h3 className="font-semibold text-foreground text-sm">All Transactions</h3>
-                <div className="flex items-center gap-3">
-                  {filteredMergedRows.length > 0 && (
-                    <span className={cn("text-xs font-bold tabular-nums", allTabNet >= 0 ? "text-emerald-500 dark:text-emerald-400" : "text-red-500 dark:text-red-400")}>
-                      {allTabNet >= 0 ? "+" : "−"}{fmt(Math.abs(allTabNet))}
-                    </span>
-                  )}
-                  <span className="text-xs text-muted-foreground/80">{filteredMergedRows.length} total</span>
-                </div>
-              </div>
-              {(expensesLoading || incomeLoading || transfersLoading) ? <TableRowSkeleton rows={6} /> :
-               filteredMergedRows.length === 0 ? (
-                <EmptyState icon={Receipt}
-                  title={mergedRows.length === 0 ? "No transactions this period" : "No transactions match your filters"}
-                  description={
-                    mergedRows.length === 0
-                      ? "Add your first transaction using the button above."
-                      : "Try clearing the search or filters to see everything again."
-                  }
-                  action={
-                    mergedRows.length > 0 && (activeFilterCount > 0 || search)
-                      ? <button onClick={() => { clearAllFilters(); setSearch(""); }} className="text-sm text-indigo-500 hover:text-indigo-600 font-medium transition-colors">Clear filters</button>
-                      : undefined
-                  } />
-              ) : (
-                <div>
-                  {allSortedDates.map(date => (
-                    <div key={date}>
-                      <div className="px-4 py-2 bg-muted/50 border-b border-border/50">
-                        <span className="text-xs font-semibold text-foreground/60 uppercase tracking-widest">{formatDate(date)}</span>
-                      </div>
-                      <div className="divide-y divide-border/50">
-                        {allGrouped[date].map((row, i) => {
-                          if (row.kind === "expense") {
-                            const e = row.data as Expense;
-                            const catIcon2  = getCategoryIcon({ name: e.categoryName ?? "", icon: e.categoryIcon });
-                            const catColor2 = getCategoryColor(e.categoryName ?? "", e.categoryColor);
-                            return (
-                              <button type="button" key={i} onClick={() => { setShowCreate(false); setEditExpense(e); }}
-                                aria-label={`Edit ${e.description || e.categoryName || "expense"}, ${fmt(e.amount)}`}
-                                className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors text-left">
-                                <PremiumIcon icon={catIcon2} hex={catColor2} size="sm" className="w-9 h-9" />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-foreground truncate leading-5">
-                                    {e.description || e.categoryName || "Expense"}
-                                  </p>
-                                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                    {e.categoryName && (
-                                      <span className="text-xs px-1.5 py-0.5 rounded-md font-medium"
-                                        style={{ backgroundColor: catColor2 + "18", color: catColor2 }}>{e.categoryName}</span>
-                                    )}
-                                    {e.accountId && accountMap[e.accountId] && (
-                                      <span className="text-xs text-muted-foreground/50">{accountMap[e.accountId]}</span>
-                                    )}
-                                    {e.paymentMethod === "CREDIT_CARD" && (
-                                      <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-500/15 text-rose-500 dark:text-rose-400 font-medium">Card</span>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="text-right shrink-0">
-                                  <p className="text-sm font-bold text-red-500 dark:text-red-400 tabular-nums">−{fmt(e.amount)}</p>
-                                  {e.accountId && balanceMap.has(`expense-${e.id}`) && (
-                                    <p className="text-[11px] text-muted-foreground/50 tabular-nums mt-0.5">Bal {fmt(balanceMap.get(`expense-${e.id}`)!)}</p>
-                                  )}
-                                </div>
-                              </button>
-                            );
-                          }
-                          if (row.kind === "income") {
-                            const income = row.data as IncomeEntry;
-                            const src2 = INCOME_ICON_MAP[income.source] ?? INCOME_ICON_MAP.OTHER;
-                            return (
-                              <button type="button" key={i} onClick={() => setEditIncome(income)}
-                                aria-label={`Edit ${income.description || "income entry"}, ${fmt(income.amount)}`}
-                                className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors text-left">
-                                <PremiumIcon icon={src2.icon} hex={src2.color} size="sm" className="w-9 h-9" />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-foreground truncate leading-5">
-                                    {income.description || INCOME_SOURCES.find(s => s.value === income.source)?.label || income.source}
-                                  </p>
-                                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                    <span className="text-xs px-1.5 py-0.5 rounded-md font-medium"
-                                      style={{ backgroundColor: src2.color + "20", color: src2.color }}>
-                                      {INCOME_SOURCES.find(s => s.value === income.source)?.label ?? income.source}
-                                    </span>
-                                    {income.accountId && accountMap[income.accountId] && (
-                                      <span className="text-xs text-muted-foreground/50">{accountMap[income.accountId]}</span>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="text-right shrink-0">
-                                  <p className="text-sm font-bold text-emerald-500 dark:text-emerald-400 tabular-nums">+{fmt(income.amount)}</p>
-                                  {income.accountId && balanceMap.has(`income-${income.id}`) && (
-                                    <p className="text-[11px] text-muted-foreground/50 tabular-nums mt-0.5">Bal {fmt(balanceMap.get(`income-${income.id}`)!)}</p>
-                                  )}
-                                </div>
-                              </button>
-                            );
-                          }
-                          const transfer = row.data as AccountTransfer;
-                          const isAdj  = transfer.adjustment;
-                          const isDebt = transfer.debt;
-                          const isIn   = !!transfer.toAccountId;
-                          const txnSign = (isAdj || isDebt) ? (isIn ? "+" : "−") : "";
-                          // A one-sided transfer (debt/adjustment) only ever has the "from" or the
-                          // "to" side set, never both — show whichever side actually has a balance
-                          // entry instead of assuming "from" (which left money received back with
-                          // no balance shown at all, since only toAccountId is set on that leg).
-                          const balanceKey = balanceMap.has(`transfer-${transfer.id}-from`)
-                            ? `transfer-${transfer.id}-from`
-                            : `transfer-${transfer.id}-to`;
-                          return (
-                            <button type="button" key={i} onClick={() => setEditTransfer(transfer)}
-                              aria-label={`Edit transfer, ${fmt(transfer.amount)}`}
-                              className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors text-left">
-                              <PremiumIcon icon={isDebt ? (isIn ? HandCoins : CreditCard) : isAdj ? RefreshCw : ArrowLeftRight}
-                                hex={isDebt ? (isIn ? "#14b8a6" : "#f43f5e") : undefined}
-                                tone={isDebt ? undefined : isAdj ? "gray" : "indigo"} size="sm" className="w-9 h-9" />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-foreground truncate leading-5">
-                                  {transfer.description || `${transfer.fromAccountName} → ${transfer.toAccountName}`}
-                                </p>
-                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                  {isDebt ? (
-                                    <DebtBadge debtLabel={transfer.debtLabel} debtContactName={transfer.debtContactName} />
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground/60">{transfer.fromAccountName} → {transfer.toAccountName}</span>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="text-right shrink-0">
-                                <p className={cn("text-sm font-bold tabular-nums",
-                                  isDebt ? (isIn ? "text-teal-500 dark:text-teal-400" : "text-rose-500 dark:text-rose-400")
-                                    : isAdj ? "text-muted-foreground" : "text-indigo-500 dark:text-indigo-400")}>
-                                  {txnSign}{fmt(transfer.amount)}
-                                </p>
-                                {balanceMap.has(balanceKey) && (
-                                  <p className="text-[11px] text-muted-foreground/50 tabular-nums mt-0.5">Bal {fmt(balanceMap.get(balanceKey)!)}</p>
-                                )}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* All-tab pagination */}
-                  {allTotalPages > 1 && (
-                    <div className="flex items-center justify-between px-4 py-3 border-t border-border/60">
-                      <p className="text-xs text-muted-foreground">
-                        {allPage * ALL_PAGE_SIZE + 1}–{Math.min((allPage + 1) * ALL_PAGE_SIZE, mergedRows.length)} of {mergedRows.length}
-                      </p>
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => setAllPage(0)} disabled={allPage === 0} aria-label="First page"
-                          className="px-1.5 py-1 rounded-lg hover:bg-muted disabled:opacity-30 text-xs text-muted-foreground font-medium transition-colors">«</button>
-                        <button onClick={() => setAllPage(p => Math.max(0, p - 1))} disabled={allPage === 0} aria-label="Previous page"
-                          className="p-1.5 rounded-lg hover:bg-muted disabled:opacity-30 transition-colors">
-                          <ChevronLeft className="w-3.5 h-3.5 text-muted-foreground" />
-                        </button>
-                        <span className="text-xs text-muted-foreground px-2 tabular-nums">{allPage + 1} / {allTotalPages}</span>
-                        <button onClick={() => setAllPage(p => Math.min(allTotalPages - 1, p + 1))} disabled={allPage >= allTotalPages - 1} aria-label="Next page"
-                          className="p-1.5 rounded-lg hover:bg-muted disabled:opacity-30 transition-colors">
-                          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
-                        </button>
-                        <button onClick={() => setAllPage(allTotalPages - 1)} disabled={allPage >= allTotalPages - 1} aria-label="Last page"
-                          className="px-1.5 py-1 rounded-lg hover:bg-muted disabled:opacity-30 text-xs text-muted-foreground font-medium transition-colors">»</button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+          <AllTabContent
+            chips={allTabChips} isLoading={expensesLoading || incomeLoading || transfersLoading}
+            isError={expensesError || incomeError || transfersError}
+            onRetry={() => { refetchExpenses(); refetchIncome(); refetchTransfers(); }}
+            filteredMergedRows={filteredMergedRows} mergedRowsLength={mergedRows.length} allTabNet={allTabNet}
+            fmt={fmt} accountMap={accountMap} balanceMap={balanceMap}
+            activeFilterCount={activeFilterCount} search={search}
+            onClearFiltersAndSearch={() => { clearAllFilters(); setSearch(""); }}
+            allSortedDates={allSortedDates} allGrouped={allGrouped}
+            onEditExpense={(e) => { setShowCreate(false); setEditExpense(e); }}
+            onEditIncome={(i) => setEditIncome(i)}
+            onEditTransfer={(t) => setEditTransfer(t)}
+            allTotalPages={allTotalPages} allPage={allPage} setAllPage={setAllPage} allPageSize={ALL_PAGE_SIZE}
+          />
         )}
 
 </div>

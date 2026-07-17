@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PieChart, Users, Pencil, Receipt } from "lucide-react";
-import { FormModalShell } from "@/components/ui/Modal";
+import { FormModalShell } from "@/components/ui/FormModalShell";
 import { Button } from "@/components/ui/Button";
 import { FormSelect } from "@/components/forms/FormSelect";
 import { BigAmountInput } from "@/components/transactions/BigAmountInput";

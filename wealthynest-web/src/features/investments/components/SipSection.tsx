@@ -24,7 +24,13 @@ export function SipSection({ investmentId }: { investmentId: string }) {
   const { mutate: addSip, isPending }               = useAddSipTransaction();
   const { mutate: deleteSip }                       = useDeleteSipTransaction();
 
-  const form = useForm({ resolver: zodResolver(sipSchema), defaultValues: { transactionDate: new Date().toISOString().slice(0, 10), amount: "" as any, units: "", nav: "" } });
+  // `amount` starts undefined (not 0) so the currency field renders genuinely blank on a new
+  // SIP entry rather than pre-filled — react-hook-form's DefaultValues<T> allows this per-field
+  // regardless of the schema's own (non-optional) output type.
+  const form = useForm({
+    resolver: zodResolver(sipSchema),
+    defaultValues: { transactionDate: new Date().toISOString().slice(0, 10), amount: undefined, units: "", nav: "" },
+  });
 
   const onAddSip = form.handleSubmit((vals) => {
     addSip({
@@ -37,7 +43,7 @@ export function SipSection({ investmentId }: { investmentId: string }) {
         transactionType: "BUY",
       },
     }, {
-      onSuccess: () => { form.reset({ transactionDate: new Date().toISOString().slice(0, 10), amount: "" as any, units: "", nav: "" }); setShowAdd(false); },
+      onSuccess: () => { form.reset({ transactionDate: new Date().toISOString().slice(0, 10), amount: undefined, units: "", nav: "" }); setShowAdd(false); },
     });
   });
 

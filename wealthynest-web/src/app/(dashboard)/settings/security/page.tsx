@@ -10,6 +10,7 @@ import { Header } from "@/components/layout/Header";
 import { PageWrapper } from "@/components/layout/PageWrapper";
 import { PremiumIcon } from "@/components/icons/PremiumIcon";
 import { InfoTooltip } from "@/components/ui/Tooltip";
+import { FormInput } from "@/components/forms/FormInput";
 import {
   useChangePassword, useChangeEmail, useEnablePin, useDisablePin,
   usePasskeys, useRegisterPasskey, useDeletePasskey,
@@ -43,25 +44,25 @@ function PasswordField({ label, reg, error, placeholder }: {
 }) {
   const [show, setShow] = useState(false);
   return (
-    <div className="space-y-1">
-      {label && <label className="text-xs font-medium text-muted-foreground block">{label}</label>}
-      <div className="relative">
-        <input
-          {...reg}
-          type={show ? "text" : "password"}
-          className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground pr-10 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-          placeholder={placeholder ?? "••••••••"}
-        />
+    <FormInput
+      {...reg}
+      label={label}
+      error={error}
+      type={show ? "text" : "password"}
+      placeholder={placeholder ?? "••••••••"}
+      className="h-auto py-2.5"
+      endAdornment={
         <button
           type="button"
           onClick={() => setShow(v => !v)}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+          tabIndex={-1}
+          aria-label={show ? "Hide password" : "Show password"}
+          className="text-muted-foreground hover:text-foreground transition-colors"
         >
           {show ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
         </button>
-      </div>
-      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
-    </div>
+      }
+    />
   );
 }
 
@@ -106,12 +107,14 @@ function EmailChangeSection() {
 
       {showForm ? (
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground block">New email address</label>
-            <input {...form.register("newEmail")} type="email" placeholder="you@example.com"
-              className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/40" />
-            {form.formState.errors.newEmail && <p className="text-xs text-red-600 dark:text-red-400">{form.formState.errors.newEmail.message}</p>}
-          </div>
+          <FormInput
+            {...form.register("newEmail")}
+            label="New email address"
+            type="email"
+            placeholder="you@example.com"
+            className="h-auto py-2.5"
+            error={form.formState.errors.newEmail?.message}
+          />
           <PasswordField label="Current password" reg={form.register("currentPassword")}
             error={form.formState.errors.currentPassword?.message} />
           <div className="flex gap-2">
@@ -205,19 +208,25 @@ function PinSection() {
           <PasswordField label="Current password" reg={form.register("currentPassword")}
             error={form.formState.errors.currentPassword?.message} />
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground block">PIN</label>
-              <input {...form.register("pin")} type="password" inputMode="numeric" maxLength={6}
-                placeholder="4-6 digits"
-                className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/40" />
-              {form.formState.errors.pin && <p className="text-xs text-red-600 dark:text-red-400">{form.formState.errors.pin.message}</p>}
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground block">Confirm PIN</label>
-              <input {...form.register("confirmPin")} type="password" inputMode="numeric" maxLength={6}
-                className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/40" />
-              {form.formState.errors.confirmPin && <p className="text-xs text-red-600 dark:text-red-400">{form.formState.errors.confirmPin.message}</p>}
-            </div>
+            <FormInput
+              {...form.register("pin")}
+              label="PIN"
+              type="password"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="4-6 digits"
+              className="h-auto py-2.5"
+              error={form.formState.errors.pin?.message}
+            />
+            <FormInput
+              {...form.register("confirmPin")}
+              label="Confirm PIN"
+              type="password"
+              inputMode="numeric"
+              maxLength={6}
+              className="h-auto py-2.5"
+              error={form.formState.errors.confirmPin?.message}
+            />
           </div>
           <div className="flex gap-2">
             <button type="submit" disabled={enabling}
@@ -286,9 +295,16 @@ function PasskeysSection() {
       )}
 
       {showAdd ? (
-        <div className="flex gap-2">
-          <input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="e.g. My iPhone"
-            className="flex-1 h-9 px-3 rounded-xl bg-background border border-border text-sm text-foreground placeholder-muted-foreground/50 outline-none focus:border-indigo-500" />
+        <div className="flex gap-2 items-start">
+          <div className="flex-1">
+            <FormInput
+              value={nickname}
+              onChange={e => setNickname(e.target.value)}
+              placeholder="e.g. My iPhone"
+              className="h-9"
+              aria-label="Passkey nickname"
+            />
+          </div>
           <button onClick={handleAdd} disabled={registering}
             className="h-9 px-3.5 rounded-xl text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-60 transition-colors flex items-center gap-1.5">
             {registering && <Loader2 className="w-3.5 h-3.5 animate-spin" />} {registering ? "Follow your device's prompt…" : "Continue"}
