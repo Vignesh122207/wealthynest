@@ -344,9 +344,8 @@ public class AutoIncomeScheduler {
     /** Seeds live Yahoo price for all active STOCK investments that have no StockPriceCache entry. */
     public void seedMissingStockPrices() {
         // Collect distinct symbols across all active stock holdings
-        List<Investment> stocks = investmentRepository.findAll().stream()
-            .filter(i -> i.isActive() && i.getInvestmentType() == InvestmentType.STOCK
-                && i.getSymbol() != null)
+        List<Investment> stocks = investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK).stream()
+            .filter(i -> i.getSymbol() != null)
             .toList();
 
         // Deduplicate by symbol so we make one Yahoo call per symbol

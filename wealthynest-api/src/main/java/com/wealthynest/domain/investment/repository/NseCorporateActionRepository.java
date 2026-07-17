@@ -15,8 +15,15 @@ public interface NseCorporateActionRepository extends JpaRepository<NseCorporate
     List<NseCorporateAction> findBySymbolAndExDateAfterOrderByExDateDesc(String symbol, LocalDate after);
     boolean existsBySymbolAndActionTypeAndExDate(String symbol, String actionType, LocalDate exDate);
 
+    /** exDate stays a plain range predicate (not YEAR(ca.exDate) = :year) so it can use the
+     * symbol/exDate index instead of forcing a per-row function evaluation. */
+    default List<NseCorporateAction> findDividendsBySymbolsAndYear(Collection<String> symbols, int year) {
+        LocalDate start = LocalDate.of(year, 1, 1);
+        return findDividendsBySymbolsAndDateRange(symbols, start, start.plusYears(1));
+    }
+
     @Query("SELECT ca FROM NseCorporateAction ca WHERE ca.symbol IN :symbols AND ca.actionType = 'DIVIDEND' " +
-           "AND YEAR(ca.exDate) = :year ORDER BY ca.exDate DESC")
-    List<NseCorporateAction> findDividendsBySymbolsAndYear(
-            @Param("symbols") Collection<String> symbols, @Param("year") int year);
+           "AND ca.exDate >= :start AND ca.exDate < :end ORDER BY ca.exDate DESC")
+    List<NseCorporateAction> findDividendsBySymbolsAndDateRange(
+            @Param("symbols") Collection<String> symbols, @Param("start") LocalDate start, @Param("end") LocalDate end);
 }

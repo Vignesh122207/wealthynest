@@ -536,7 +536,7 @@ class AutoIncomeSchedulerTest {
         @Test
         @DisplayName("no investments in repository → no Yahoo calls")
         void noActiveStocks_noYahooCalls() {
-            when(investmentRepository.findAll()).thenReturn(Collections.emptyList());
+            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK)).thenReturn(Collections.emptyList());
 
             scheduler.seedMissingStockPrices();
 
@@ -547,7 +547,7 @@ class AutoIncomeSchedulerTest {
         @DisplayName("Yahoo returns null price → bulk update skipped, no exception")
         void yahooReturnsNull_warnsAndContinues() {
             Investment inv = buildStockInvestment("RELIANCE", LocalDate.now().minusYears(1));
-            when(investmentRepository.findAll()).thenReturn(List.of(inv));
+            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK)).thenReturn(List.of(inv));
             when(externalPriceService.fetchStockPrice(anyString())).thenReturn(null);
 
             scheduler.seedMissingStockPrices();
@@ -560,7 +560,7 @@ class AutoIncomeSchedulerTest {
         void singleSymbol_cacheCreatedAndBulkUpdateCalled() {
             Investment inv = buildStockInvestment("RELIANCE", LocalDate.now().minusYears(1));
             BigDecimal price = new BigDecimal("2500.00");
-            when(investmentRepository.findAll()).thenReturn(List.of(inv));
+            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK)).thenReturn(List.of(inv));
             when(externalPriceService.fetchStockPrice("RELIANCE.NS")).thenReturn(price);
             when(stockPriceCacheRepository.findById("RELIANCE")).thenReturn(Optional.empty());
             when(stockPriceCacheRepository.save(any())).thenReturn(new StockPriceCache());
@@ -577,7 +577,7 @@ class AutoIncomeSchedulerTest {
         void multipleInvestmentsSameSymbol_onlyOneYahooCall() {
             Investment inv1 = buildStockInvestment("TCS", LocalDate.now().minusYears(1));
             Investment inv2 = buildStockInvestment("TCS", LocalDate.now().minusMonths(6));
-            when(investmentRepository.findAll()).thenReturn(List.of(inv1, inv2));
+            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK)).thenReturn(List.of(inv1, inv2));
             when(externalPriceService.fetchStockPrice("TCS.NS")).thenReturn(new BigDecimal("3700"));
             when(stockPriceCacheRepository.findById("TCS")).thenReturn(Optional.empty());
             when(stockPriceCacheRepository.save(any())).thenReturn(new StockPriceCache());
@@ -597,7 +597,7 @@ class AutoIncomeSchedulerTest {
             StockPriceCache existingCache = StockPriceCache.builder()
                 .symbol("INFY").exchange("NSE").currentPrice(prev).build();
 
-            when(investmentRepository.findAll()).thenReturn(List.of(inv));
+            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK)).thenReturn(List.of(inv));
             when(externalPriceService.fetchStockPrice("INFY.NS")).thenReturn(newPx);
             when(stockPriceCacheRepository.findById("INFY")).thenReturn(Optional.of(existingCache));
             when(stockPriceCacheRepository.save(any())).thenReturn(existingCache);
@@ -617,7 +617,7 @@ class AutoIncomeSchedulerTest {
             // Production code sleeps 1 s between symbols — this test takes ~1 s
             Investment inv1 = buildStockInvestment("RELIANCE", LocalDate.now().minusYears(1));
             Investment inv2 = buildStockInvestment("TCS",      LocalDate.now().minusYears(1));
-            when(investmentRepository.findAll()).thenReturn(List.of(inv1, inv2));
+            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK)).thenReturn(List.of(inv1, inv2));
             when(externalPriceService.fetchStockPrice("RELIANCE.NS")).thenReturn(new BigDecimal("2500"));
             when(externalPriceService.fetchStockPrice("TCS.NS")).thenReturn(new BigDecimal("3700"));
             when(stockPriceCacheRepository.findById(anyString())).thenReturn(Optional.empty());

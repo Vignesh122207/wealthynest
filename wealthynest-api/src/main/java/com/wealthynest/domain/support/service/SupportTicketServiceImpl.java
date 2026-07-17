@@ -48,9 +48,7 @@ public class SupportTicketServiceImpl implements SupportTicketService {
         ticket = ticketRepository.save(ticket);
 
         // Notify all admins in-app
-        List<User> admins = userRepository.findAll().stream()
-                .filter(u -> UserRole.ADMIN.equals(u.getRole()))
-                .collect(Collectors.toList());
+        List<User> admins = userRepository.findByRole(UserRole.ADMIN);
         User submitter = userRepository.findById(userId).orElse(null);
         String submitterName = submitter != null ? submitter.getFullName() : "A user";
         for (User admin : admins) {

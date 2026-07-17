@@ -20,6 +20,12 @@ public interface CategoryRepository extends JpaRepository<Category, UUID> {
     @Query("SELECT c FROM Category c WHERE (c.userId = :userId OR c.system = true) AND c.archived = false ORDER BY c.name")
     List<Category> findByUserIdOrSystem(UUID userId);
 
+    /** Same scope as findByUserIdOrSystem but includes archived categories — for lookups (like the
+     * dashboard's category-id -> name map) that must still resolve a name for expenses that point
+     * at a since-archived category, instead of falling back to "Other". */
+    @Query("SELECT c FROM Category c WHERE (c.userId = :userId OR c.system = true)")
+    List<Category> findByUserIdOrSystemIncludingArchived(UUID userId);
+
     List<Category> findBySystemTrue();
 
     /**

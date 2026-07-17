@@ -1,6 +1,14 @@
 spring:
   application:
     name: wealthynest-api
+  threads:
+    virtual:
+      # Tomcat serves each request on a virtual thread instead of a platform thread, so blocking
+      # JDBC/Redis/external-HTTP calls (the bulk of every request in this app) no longer consume a
+      # limited platform-thread slot for their full duration — meaningfully higher concurrency
+      # headroom under load. Safe here: the codebase has exactly one `synchronized` block (a rare,
+      # short-lived double-checked-locking init in AuthServiceImpl), so pinning risk is negligible.
+      enabled: true
   profiles:
     active: ${APP_ENV:dev}
   datasource:

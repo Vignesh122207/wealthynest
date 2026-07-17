@@ -55,8 +55,10 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         if (totalInvValue  == null) totalInvValue  = BigDecimal.ZERO;
         if (totalDividends == null) totalDividends = BigDecimal.ZERO;
 
-        // Category breakdown
-        Map<UUID, Category> catMap = categoryRepository.findAll().stream()
+        // Category breakdown — scoped to this user's own + system categories (including archived,
+        // since a historical expense can still point at a since-archived category) instead of the
+        // whole platform's categories.
+        Map<UUID, Category> catMap = categoryRepository.findByUserIdOrSystemIncludingArchived(userId).stream()
                 .collect(Collectors.toMap(Category::getId, c -> c));
 
         List<Object[]> catRows = expenseRepository.findCategorySpendingByUser(userId, year, month);
