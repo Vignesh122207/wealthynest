@@ -38,9 +38,9 @@ export function DebtPulse({ debts }: DebtPulseProps) {
   return (
     <Link
       href="/debts"
-      className="flex items-center gap-3 rounded-2xl border border-orange-500/20 bg-orange-500/5 hover:bg-orange-500/8 px-4 py-3 transition-colors animate-fade-in-up"
+      className="flex items-center gap-3 rounded-2xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/8 px-4 py-3 transition-colors animate-fade-in-up"
     >
-      <PremiumIcon icon={Handshake} tone="orange" size="sm" />
+      <PremiumIcon icon={Handshake} tone="red" size="sm" />
       <p className="flex-1 text-sm min-w-0 truncate">
         <span className="font-semibold text-foreground">{parts.join(" · ")}</span>
         {nextDue && dueLabel && (
