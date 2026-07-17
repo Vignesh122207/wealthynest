@@ -122,16 +122,25 @@ public class BudgetServiceImpl implements BudgetService {
             ? preloadedCats.get(r.getCategoryId())
             : categoryRepository.findById(r.getCategoryId()).orElse(null);
         BigDecimal spent;
+        BigDecimal annualSpent;
         if (r.getBudgetType() == BudgetType.YEARLY) {
             spent = familyId != null
                 ? expenseRepository.sumByFamilyCategoryAndYear(familyId, r.getCategoryId(), year)
                 : expenseRepository.sumByUserCategoryAndYear(userId, r.getCategoryId(), year);
+            annualSpent = spent;
         } else {
             spent = familyId != null
                 ? expenseRepository.sumByFamilyCategoryAndMonth(familyId, r.getCategoryId(), year, month)
                 : expenseRepository.sumByUserCategoryAndMonth(userId, r.getCategoryId(), year, month);
+            // Full calendar-year spend in this category, independent of the requested month —
+            // lets callers build an annualized total (budgeted monthly x12 + yearly) that pairs
+            // with a real actual-spend figure instead of extrapolating from a single month.
+            annualSpent = familyId != null
+                ? expenseRepository.sumByFamilyCategoryAndYear(familyId, r.getCategoryId(), year)
+                : expenseRepository.sumByUserCategoryAndYear(userId, r.getCategoryId(), year);
         }
         if (spent == null) spent = BigDecimal.ZERO;
+        if (annualSpent == null) annualSpent = BigDecimal.ZERO;
         BigDecimal remaining = r.getAmount().subtract(spent);
         double pct = r.getAmount().compareTo(BigDecimal.ZERO) > 0
             ? spent.divide(r.getAmount(), 4, RoundingMode.HALF_UP)
@@ -143,7 +152,7 @@ public class BudgetServiceImpl implements BudgetService {
             .categoryName(cat != null ? cat.getName() : null)
             .categoryIcon(cat != null ? cat.getIcon() : null)
             .categoryColor(cat != null ? cat.getColor() : null)
-            .amount(r.getAmount()).spent(spent).remaining(remaining)
+            .amount(r.getAmount()).spent(spent).annualSpent(annualSpent).remaining(remaining)
             .percentUsed(pct).overBudget(pct > 100.0)
             .periodMonth(month).periodYear(year)
             .alertThreshold(threshold)

@@ -17,6 +17,7 @@ public class BudgetResponse {
     private String     categoryColor;
     private BigDecimal amount;
     private BigDecimal spent;
+    private BigDecimal annualSpent;
     private BigDecimal remaining;
     private double     percentUsed;
     private boolean    overBudget;

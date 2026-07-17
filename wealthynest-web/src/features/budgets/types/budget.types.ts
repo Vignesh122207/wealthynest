@@ -8,6 +8,7 @@ export interface Budget {
   categoryColor?: string;
   amount:         number;
   spent:          number;
+  annualSpent:    number;
   remaining:      number;
   percentUsed:    number;
   overBudget:     boolean;

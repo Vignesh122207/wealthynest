@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { FormCurrencyInput } from "@/components/forms/FormCurrencyInput";
 import { FormModalHeader } from "@/components/transactions/FormModalHeader";
 import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
+import { FormModalShell } from "@/components/ui/FormModalShell";
 import { resolveGoalIcon } from "@/lib/categoryMeta";
 import { useUpdateGoal } from "@/features/goals/hooks/useGoals";
 import type { Goal } from "@/features/goals/types/goal.types";
@@ -34,8 +35,8 @@ export function AddSavingsModal({ goal, goalColor, onClose }: { goal: Goal; goal
   };
 
   return (
-    <TransactionModalOverlay onDismiss={onClose}>
-      <div className="bg-card border border-border rounded-2xl p-5 w-full max-w-sm shadow-2xl">
+    <TransactionModalOverlay onDismiss={onClose} maxWidth="max-w-sm">
+      <FormModalShell accent={mode === "add" ? "from-emerald-400 to-emerald-600" : "from-red-400 to-red-600"}>
         <FormModalHeader icon={resolveGoalIcon(goal)} hex={goalColor} title={goal.name} onClose={onClose} />
         <p className="text-xs text-muted-foreground -mt-3 mb-4">
           {mode === "add" ? `${formatCurrency(remaining)} remaining` : `${formatCurrency(goal.savedAmount)} available to withdraw`}
@@ -83,7 +84,7 @@ export function AddSavingsModal({ goal, goalColor, onClose }: { goal: Goal; goal
             </button>
           </div>
         </form>
-      </div>
+      </FormModalShell>
     </TransactionModalOverlay>
   );
 }

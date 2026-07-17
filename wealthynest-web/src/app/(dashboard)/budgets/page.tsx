@@ -3,7 +3,7 @@
 import { useState } from "react";
 import {
   Plus, Target, ChevronLeft, ChevronRight, AlertTriangle,
-  Calendar, CalendarDays, Tag, Check, ArrowUpDown, PieChart, Wallet, X, Users,
+  Calendar, CalendarDays, Tag, Check, ArrowUpDown, PieChart, Wallet, X, Users, BadgeCheck,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -179,15 +179,20 @@ export default function BudgetsPage() {
   const monthlyBudgets = sorted(budgets.filter(b => b.budgetType === "MONTHLY"));
   const yearlyBudgets  = sorted(budgets.filter(b => b.budgetType === "YEARLY"));
 
-  const totalBudgeted   = budgets.reduce((s, b) => s + b.amount, 0);
-  const totalSpent      = budgets.reduce((s, b) => s + b.spent,  0);
-  const totalRemaining  = Math.max(0, totalBudgeted - totalSpent);
-  const overBudgetCount = budgets.filter(b => b.overBudget).length;
-
   const monthlyBudgeted  = monthlyBudgets.reduce((s, b) => s + b.amount, 0);
   const monthlySpent     = monthlyBudgets.reduce((s, b) => s + b.spent, 0);
   const yearlyBudgeted   = yearlyBudgets.reduce((s, b) => s + b.amount, 0);
   const yearlySpent      = yearlyBudgets.reduce((s, b) => s + b.spent, 0);
+
+  // Monthly and yearly budgets live on different time bases (a monthly amount recurs
+  // every month, a yearly amount doesn't) — summing them raw would understate the true
+  // annual commitment. Annualize monthly (×12) before combining with yearly (as-is).
+  // annualSpent (from the API) is the actual full-calendar-year spend in each budget's
+  // category regardless of type, so it pairs honestly with annualBudgeted — no extrapolation.
+  const annualBudgeted   = monthlyBudgeted * 12 + yearlyBudgeted;
+  const annualSpent      = budgets.reduce((s, b) => s + b.annualSpent, 0);
+  const annualRemaining  = Math.max(0, annualBudgeted - annualSpent);
+  const overBudgetCount  = budgets.filter(b => b.overBudget).length;
 
   return (
     <div className="flex flex-col flex-1">
@@ -323,7 +328,7 @@ export default function BudgetsPage() {
             <button onClick={() => setSortByUsage(v => !v)}
               className={cn("flex items-center gap-1.5 h-9 px-3 rounded-xl text-xs font-medium transition-all border",
                 sortByUsage
-                  ? "bg-amber-600/20 border-amber-500/30 text-amber-600 dark:text-amber-400"
+                  ? "bg-gradient-to-r from-amber-500 to-orange-600 border-transparent text-white shadow-lg shadow-amber-500/25"
                   : "bg-muted/60 border-border text-muted-foreground hover:text-foreground")}>
               <ArrowUpDown className="w-3.5 h-3.5" />
               {sortByUsage ? "Sorted by usage" : "Sort by usage"}
@@ -333,21 +338,38 @@ export default function BudgetsPage() {
 
         {/* Summary */}
         {budgets.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Card className="p-4">
               <PremiumIcon icon={Wallet} tone="orange" size="xs" className="mb-2" />
-              <p className="text-xs text-muted-foreground mb-1">Total Budgeted</p>
-              <p className="text-lg font-bold text-foreground tabular-nums">{fmt(totalBudgeted)}</p>
+              <p className="text-xs text-muted-foreground mb-1">Budgeted This Year</p>
+              <p className="text-lg font-bold text-foreground tabular-nums">{fmt(annualBudgeted)}</p>
+              {(monthlyBudgeted > 0 || yearlyBudgeted > 0) && (
+                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                  {monthlyBudgeted > 0 && (
+                    <span className="inline-flex items-center gap-1 pl-1 pr-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-medium tabular-nums">
+                      <Calendar className="w-2.5 h-2.5" /> {fmt(monthlyBudgeted)}<span className="opacity-60">/mo×12</span>
+                    </span>
+                  )}
+                  {yearlyBudgeted > 0 && (
+                    <span className="inline-flex items-center gap-1 pl-1 pr-1.5 py-0.5 rounded-md bg-violet-500/10 text-violet-600 dark:text-violet-400 text-[10px] font-medium tabular-nums">
+                      <CalendarDays className="w-2.5 h-2.5" /> {fmt(yearlyBudgeted)}<span className="opacity-60">/yr</span>
+                    </span>
+                  )}
+                </div>
+              )}
             </Card>
             <Card className="p-4">
               <PremiumIcon icon={Target} tone="red" size="xs" className="mb-2" />
-              <p className="text-xs text-muted-foreground mb-1">Total Spent</p>
-              <p className="text-lg font-bold text-red-600 dark:text-red-400 tabular-nums">{fmt(totalSpent)}</p>
+              <p className="text-xs text-muted-foreground mb-1">Spent This Year</p>
+              <p className="text-lg font-bold text-red-600 dark:text-red-400 tabular-nums">{fmt(annualSpent)}</p>
+              <span className="inline-flex items-center gap-1 mt-1.5 pl-1 pr-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-medium">
+                <BadgeCheck className="w-2.5 h-2.5" /> Actual · Jan–Dec {year}
+              </span>
             </Card>
             <Card className="p-4">
               <PremiumIcon icon={Check} tone="green" size="xs" className="mb-2" />
-              <p className="text-xs text-muted-foreground mb-1">Remaining</p>
-              <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{fmt(totalRemaining)}</p>
+              <p className="text-xs text-muted-foreground mb-1">Remaining This Year</p>
+              <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{fmt(annualRemaining)}</p>
             </Card>
             <Card className={cn("p-4", overBudgetCount > 0 && "border-red-500/30")}>
               <PremiumIcon icon={AlertTriangle} tone={overBudgetCount > 0 ? "red" : "gray"} size="xs" className="mb-2" />
