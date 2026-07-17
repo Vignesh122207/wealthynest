@@ -44,6 +44,7 @@ const REAL_LOGO_FILES: Record<string, string> = {
   "upstox":               "/bank-logos/upstox.png",
   "5paisa":               "/bank-logos/5paisa.png",
   "dhan":                 "/bank-logos/dhan.jpg",
+  "standard chartered bank": "/bank-logos/standardchartered.svg",
 };
 
 export function getRealLogoFile(name?: string): string | undefined {
@@ -64,6 +65,7 @@ export function getRealLogoFile(name?: string): string | undefined {
 const LOGO_FIT_OVERRIDES: Record<string, "contain"> = {
   "zerodha": "contain",
   "canara bank": "contain",
+  "standard chartered bank": "contain",
 };
 
 export function getLogoFit(name?: string): "cover" | "contain" {
@@ -74,26 +76,66 @@ export function getLogoFit(name?: string): "cover" | "contain" {
 export interface BankMonogram { initials: string; hex: string; }
 
 const BANK_MONOGRAMS: Record<string, BankMonogram> = {
+  // Public sector banks
   "state bank of india":       { initials: "SBI",  hex: "#2A5DB0" },
+  "punjab national bank":      { initials: "PNB",  hex: "#7A1F2B" },
+  "bank of baroda":            { initials: "BOB",  hex: "#F7941D" },
+  "canara bank":                { initials: "CNR",  hex: "#FFB300" },
+  "union bank of india":       { initials: "UBI",  hex: "#F58220" },
+  "bank of india":             { initials: "BOI",  hex: "#004C97" },
+  "indian bank":               { initials: "IB",   hex: "#00693E" },
+  "central bank of india":     { initials: "CBI",  hex: "#00539C" },
+  "indian overseas bank":      { initials: "IOB",  hex: "#ED1C24" },
+  "uco bank":                  { initials: "UCO",  hex: "#C8102E" },
+  "bank of maharashtra":       { initials: "BOM",  hex: "#00558C" },
+  "punjab & sind bank":        { initials: "PSB",  hex: "#004C97" },
+
+  // Private sector banks
   "hdfc bank":                 { initials: "HDFC", hex: "#E31E24" },
   "icici bank":                { initials: "ICICI",hex: "#F58220" },
   "axis bank":                 { initials: "AXIS", hex: "#97144D" },
   "kotak mahindra bank":       { initials: "KTK",  hex: "#ED1C24" },
-  "punjab national bank":      { initials: "PNB",  hex: "#7A1F2B" },
-  "bank of baroda":            { initials: "BOB",  hex: "#F7941D" },
-  "canara bank":                { initials: "CNR",  hex: "#FFB300" },
-  "yes bank":                  { initials: "YES",  hex: "#003D7C" },
   "indusind bank":             { initials: "IIB",  hex: "#A6192E" },
-  "federal bank":              { initials: "FED",  hex: "#003DA5" },
+  "yes bank":                  { initials: "YES",  hex: "#003D7C" },
   "idfc first bank":           { initials: "IDFC", hex: "#A31F34" },
-  "union bank of india":       { initials: "UBI",  hex: "#F58220" },
-  "indian bank":               { initials: "IB",   hex: "#00693E" },
-  "bank of india":             { initials: "BOI",  hex: "#004C97" },
-  "bandhan bank":              { initials: "BDN",  hex: "#A6192E" },
-  "au small finance bank":     { initials: "AU",   hex: "#E4002B" },
+  "federal bank":              { initials: "FED",  hex: "#003DA5" },
   "south indian bank":         { initials: "SIB",  hex: "#006838" },
   "rbl bank":                  { initials: "RBL",  hex: "#7A1F2B" },
-  "uco bank":                  { initials: "UCO",  hex: "#C8102E" },
+  "bandhan bank":              { initials: "BDN",  hex: "#A6192E" },
+  "idbi bank":                 { initials: "IDBI", hex: "#ED1C24" },
+  "city union bank":           { initials: "CUB",  hex: "#F58220" },
+  "dcb bank":                  { initials: "DCB",  hex: "#ED1C24" },
+  "karnataka bank":            { initials: "KBL",  hex: "#003DA5" },
+  "karur vysya bank":          { initials: "KVB",  hex: "#7A1F2B" },
+  "tamilnad mercantile bank":  { initials: "TMB",  hex: "#F58220" },
+  "jammu & kashmir bank":      { initials: "J&K",  hex: "#7A1F2B" },
+  "dhanlaxmi bank":            { initials: "DXB",  hex: "#A6192E" },
+  "csb bank":                  { initials: "CSB",  hex: "#004C97" },
+  "nainital bank":             { initials: "NTL",  hex: "#00563F" },
+
+  // Small finance banks
+  "au small finance bank":     { initials: "AU",   hex: "#E4002B" },
+  "equitas small finance bank":{ initials: "EQ",   hex: "#ED1C24" },
+  "ujjivan small finance bank":{ initials: "UJJ",  hex: "#F58220" },
+  "jana small finance bank":   { initials: "JANA", hex: "#00A651" },
+  "esaf small finance bank":   { initials: "ESAF", hex: "#00A651" },
+  "suryoday small finance bank":{ initials: "SUR", hex: "#F7941D" },
+  "utkarsh small finance bank":{ initials: "UTK",  hex: "#F58220" },
+  "north east small finance bank":{ initials: "NESFB", hex: "#00A651" },
+  "shivalik small finance bank":{ initials: "SHIV", hex: "#003DA5" },
+  "unity small finance bank":  { initials: "UNITY",hex: "#5A38F6" },
+  "capital small finance bank":{ initials: "CAP",  hex: "#004C97" },
+
+  // Payments banks
+  "airtel payments bank":      { initials: "APB",  hex: "#ED1C24" },
+  "india post payments bank":  { initials: "IPPB", hex: "#F58220" },
+  "fino payments bank":        { initials: "FINO", hex: "#8DC63F" },
+  "paytm payments bank":       { initials: "PPBL", hex: "#00BAF2" },
+  "jio payments bank":         { initials: "JIO",  hex: "#0F1B4C" },
+  "nsdl payments bank":        { initials: "NSDL", hex: "#003DA5" },
+
+  // Foreign banks operating in India
+  "standard chartered bank":   { initials: "SC",   hex: "#0473EA" },
 };
 
 const BROKER_MONOGRAMS: Record<string, BankMonogram> = {

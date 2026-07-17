@@ -16,27 +16,71 @@ export const QUERY_KEYS = {
   GOALS:          ["goals"]                  as const,
 } as const;
 
+// Every RBI-scheduled commercial bank (public + private), small finance bank, and payments
+// bank — not just the dozen-odd biggest names — so the "which bank is this account with"
+// picker doesn't force a smaller/regional bank's users into "Other". Grouped by RBI category
+// below purely for readability; the picker itself just flattens this into one list.
 export const INDIAN_BANKS = [
+  // Public sector banks
   "State Bank of India",
+  "Punjab National Bank",
+  "Bank of Baroda",
+  "Canara Bank",
+  "Union Bank of India",
+  "Bank of India",
+  "Indian Bank",
+  "Central Bank of India",
+  "Indian Overseas Bank",
+  "UCO Bank",
+  "Bank of Maharashtra",
+  "Punjab & Sind Bank",
+
+  // Private sector banks
   "HDFC Bank",
   "ICICI Bank",
   "Axis Bank",
   "Kotak Mahindra Bank",
-  "Punjab National Bank",
-  "Bank of Baroda",
-  "Canara Bank",
-  "Yes Bank",
   "IndusInd Bank",
-  "Federal Bank",
+  "Yes Bank",
   "IDFC First Bank",
-  "Union Bank of India",
-  "Indian Bank",
-  "Bank of India",
-  "Bandhan Bank",
-  "AU Small Finance Bank",
+  "Federal Bank",
   "South Indian Bank",
   "RBL Bank",
-  "UCO Bank",
+  "Bandhan Bank",
+  "IDBI Bank",
+  "City Union Bank",
+  "DCB Bank",
+  "Karnataka Bank",
+  "Karur Vysya Bank",
+  "Tamilnad Mercantile Bank",
+  "Jammu & Kashmir Bank",
+  "Dhanlaxmi Bank",
+  "CSB Bank",
+  "Nainital Bank",
+
+  // Small finance banks
+  "AU Small Finance Bank",
+  "Equitas Small Finance Bank",
+  "Ujjivan Small Finance Bank",
+  "Jana Small Finance Bank",
+  "ESAF Small Finance Bank",
+  "Suryoday Small Finance Bank",
+  "Utkarsh Small Finance Bank",
+  "North East Small Finance Bank",
+  "Shivalik Small Finance Bank",
+  "Unity Small Finance Bank",
+  "Capital Small Finance Bank",
+
+  // Payments banks
+  "Airtel Payments Bank",
+  "India Post Payments Bank",
+  "Fino Payments Bank",
+  "Paytm Payments Bank",
+  "Jio Payments Bank",
+  "NSDL Payments Bank",
+
+  // Foreign banks operating in India
+  "Standard Chartered Bank",
 ];
 
 // Ordered by approximate active-user market share, so the most-used brokers surface first

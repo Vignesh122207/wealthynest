@@ -1,10 +1,66 @@
 // NSE symbol → real logo file (public/stock-logos/), same two-tier fallback as bankLogos.ts:
 // real file → colored monogram (brand-adjacent hex + initials) → generic PremiumIcon badge.
-// No real files curated yet (see StockLogo.tsx) — this map exists now so dropping files into
-// public/stock-logos/ later is a pure data change, no component change. Hex values here are
-// brand-adjacent approximations, not verified trademark colors — same rigor as BANK_MONOGRAMS
-// in bankLogos.ts, good enough for a small colored badge, not meant to be pixel-exact.
-const REAL_LOGO_FILES: Record<string, string> = {};
+// Sourced from each company's own Wikipedia infobox `logo` field (verified per-company, not
+// blind search) rather than any third-party logo API — Clearbit is dead and NSE coverage on
+// the Logo.dev/Google-favicon style services is unreliable anyway. Two results that turned out
+// to be a JPEG photo wrapped in an SVG container (Grasim, Hindalco) were dropped in favor of
+// their monogram; Bajaj Auto's Wikipedia infobox has no logo uploaded at all. All three still
+// fall through to STOCK_MONOGRAMS below like any other unmatched symbol.
+const REAL_LOGO_FILES: Record<string, string> = {
+  RELIANCE:    "/stock-logos/RELIANCE.svg",
+  TCS:         "/stock-logos/TCS.svg",
+  HDFCBANK:    "/stock-logos/HDFCBANK.svg",
+  INFY:        "/stock-logos/INFY.svg",
+  ICICIBANK:   "/stock-logos/ICICIBANK.svg",
+  HINDUNILVR:  "/stock-logos/HINDUNILVR.svg",
+  ITC:         "/stock-logos/ITC.svg",
+  SBIN:        "/stock-logos/SBIN.svg",
+  BHARTIARTL:  "/stock-logos/BHARTIARTL.svg",
+  KOTAKBANK:   "/stock-logos/KOTAKBANK.svg",
+  LT:          "/stock-logos/LT.svg",
+  AXISBANK:    "/stock-logos/AXISBANK.svg",
+  ASIANPAINT:  "/stock-logos/ASIANPAINT.svg",
+  MARUTI:      "/stock-logos/MARUTI.svg",
+  TITAN:       "/stock-logos/TITAN.svg",
+  SUNPHARMA:   "/stock-logos/SUNPHARMA.svg",
+  ULTRACEMCO:  "/stock-logos/ULTRACEMCO.svg",
+  NESTLEIND:   "/stock-logos/NESTLEIND.svg",
+  WIPRO:       "/stock-logos/WIPRO.svg",
+  BAJFINANCE:  "/stock-logos/BAJFINANCE.svg",
+  HCLTECH:     "/stock-logos/HCLTECH.svg",
+  TATAMOTORS:  "/stock-logos/TATAMOTORS.svg",
+  TATASTEEL:   "/stock-logos/TATASTEEL.svg",
+  TATACONSUM:  "/stock-logos/TATACONSUM.png",
+  ADANIENT:    "/stock-logos/ADANIENT.svg",
+  ADANIPORTS:  "/stock-logos/ADANIPORTS.svg",
+  POWERGRID:   "/stock-logos/POWERGRID.svg",
+  NTPC:        "/stock-logos/NTPC.svg",
+  ONGC:        "/stock-logos/ONGC.svg",
+  COALINDIA:   "/stock-logos/COALINDIA.svg",
+  JSWSTEEL:    "/stock-logos/JSWSTEEL.svg",
+  DRREDDY:     "/stock-logos/DRREDDY.svg",
+  CIPLA:       "/stock-logos/CIPLA.svg",
+  DIVISLAB:    "/stock-logos/DIVISLAB.svg",
+  EICHERMOT:   "/stock-logos/EICHERMOT.svg",
+  HEROMOTOCO:  "/stock-logos/HEROMOTOCO.svg",
+  "M&M":       "/stock-logos/M_M.svg",
+  BRITANNIA:   "/stock-logos/BRITANNIA.svg",
+  TECHM:       "/stock-logos/TECHM.svg",
+  SBILIFE:     "/stock-logos/SBILIFE.svg",
+  HDFCLIFE:    "/stock-logos/HDFCLIFE.svg",
+  BAJAJFINSV:  "/stock-logos/BAJAJFINSV.svg",
+  APOLLOHOSP:  "/stock-logos/APOLLOHOSP.svg",
+  INDUSINDBK:  "/stock-logos/INDUSINDBK.svg",
+  UPL:         "/stock-logos/UPL.svg",
+  VEDL:        "/stock-logos/VEDL.svg",
+  GAIL:        "/stock-logos/GAIL.svg",
+  IOC:         "/stock-logos/IOC.svg",
+  BPCL:        "/stock-logos/BPCL.svg",
+  ZOMATO:      "/stock-logos/ZOMATO.svg",
+  PAYTM:       "/stock-logos/PAYTM.svg",
+  IRCTC:       "/stock-logos/IRCTC.svg",
+  DMART:       "/stock-logos/DMART.svg",
+};
 
 export function getRealStockLogoFile(symbol?: string): string | undefined {
   if (!symbol) return undefined;
