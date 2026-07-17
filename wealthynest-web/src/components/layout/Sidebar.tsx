@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Home, LineChart, Gem, ArrowLeftRight, Target, Wallet,
-  TrendingUp, UsersRound, Bell, ShieldCheck, X,
+  Home, ChartNoAxesCombined, Gem, ArrowLeftRight, Target, Wallet,
+  TrendingUp, Bell, ShieldCheck, X,
   FileText, Handshake, Settings, Heart, LogOut, PieChart,
   type LucideIcon,
 } from "lucide-react";
+import { FamilyGroupIcon } from "@/components/icons/FamilyGroupIcon";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { useLogout } from "@/features/auth/hooks/useAuth";
@@ -22,8 +23,8 @@ type Gradient = [string, string];
 // stops (previously Family/Budgets were both flat "pink" and Accounts/Reports
 // were both flat "blue"; Family/Support WealthyNest later collided again once
 // Support WealthyNest moved to a warm rose→pink gradient of its own — Family
-// settled on terracotta/brown, reading as "home/hearth", a hue no other item
-// touches). Reports/Settings both end on slate, which is deliberate: Reports
+// settled on a warm coral/terracotta, reading as "home/hearth", a hue no other
+// item touches). Reports/Settings both end on slate, which is deliberate: Reports
 // keeps a brand-indigo starting stop so it reads as "data", Settings stays
 // fully neutral since it's pure utility.
 const NAV_GROUPS = [
@@ -53,8 +54,8 @@ const NAV_GROUPS = [
   {
     label: "Insights",
     items: [
-      { href: "/analytics",     label: "Analytics",     icon: LineChart, gradient: ["#14b8a6", "#06b6d4"] as Gradient },
-      { href: "/family",        label: "Family",        icon: UsersRound, gradient: ["#c2703d", "#7c4a1e"] as Gradient },
+      { href: "/analytics",     label: "Analytics",     icon: ChartNoAxesCombined, gradient: ["#14b8a6", "#06b6d4"] as Gradient },
+      { href: "/family",        label: "Family",        icon: FamilyGroupIcon, gradient: ["#FAA18F", "#D9714E"] as Gradient },
       { href: "/reports",       label: "Reports",       icon: FileText,  gradient: ["#4f46e5", "#64748b"] as Gradient },
       { href: "/notifications", label: "Notifications", icon: Bell,      gradient: ["#6366f1", "#7c3aed"] as Gradient },
     ],
