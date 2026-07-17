@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   Plus, TrendingUp, Search, X,
-  Layers, Coins, Building2, BadgePercent,
+  Layers, Coins, Building2, BadgePercent, Upload,
 } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
@@ -41,6 +41,8 @@ const MFForm    = dynamic(() => import("@/features/investments/components/forms/
 const GoldForm  = dynamic(() => import("@/features/investments/components/forms/GoldForm").then(m => m.GoldForm), { ssr: false });
 const FDForm    = dynamic(() => import("@/features/investments/components/forms/FDForm").then(m => m.FDForm), { ssr: false });
 const BondForm  = dynamic(() => import("@/features/investments/components/forms/BondForm").then(m => m.BondForm), { ssr: false });
+const ImportCasModal = dynamic(
+  () => import("@/features/casimport/components/ImportCasModal").then(m => m.ImportCasModal), { ssr: false });
 import type { GoldFormValues, FDFormValues, BondFormValues } from "@/features/investments/schemas/investment.schema";
 
 // The single shared submit handler below is wired to whichever of these 5 forms is showing for
@@ -79,6 +81,7 @@ export default function InvestmentsPage() {
     if (p && TABS.some(t => t.id === p)) setTab(p);
   }, [searchParams]);
   const [showForm,  setShowForm]  = useState(false);
+  const [showCasImport, setShowCasImport] = useState(false);
   const [editItem,  setEditItem]  = useState<Investment | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [sortKey,      setSortKey]      = useState<SortKey>("value_desc");
@@ -460,11 +463,14 @@ const tabCounts = useMemo(() => investments.reduce((acc, i) => {
               { icon: Coins,      label: "Gold",          color: "amber",   onClick: () => { setTab("gold");   setEditItem(null); setShowForm(true); } },
               { icon: Building2,  label: "Fixed Deposit", color: "sky",     onClick: () => { setTab("fd");     setEditItem(null); setShowForm(true); } },
               { icon: BadgePercent, label: "Bond",        color: "violet",  onClick: () => { setTab("bonds");  setEditItem(null); setShowForm(true); } },
+              { icon: Upload,     label: "Import from CAS", color: "rose",  onClick: () => setShowCasImport(true) },
             ]
           : [
               { icon: Plus, label: `Add ${TABS.find(t => t.id === tab)?.label.replace(/s$/, "") ?? "Investment"}`, color: "indigo", onClick: () => { setEditItem(null); setShowForm(true); } },
             ]
       } />
+
+      {showCasImport && <ImportCasModal onClose={() => setShowCasImport(false)} />}
     </div>
   );
 }

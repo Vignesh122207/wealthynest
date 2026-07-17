@@ -55,6 +55,7 @@ public class InvestmentServiceImpl implements InvestmentService {
     private final GoldPriceCacheRepository      goldPriceCacheRepository;
     private final MFNavCacheRepository          mfNavCacheRepository;
     private final StockMasterRepository         stockMasterRepository;
+    private final MfMasterRepository            mfMasterRepository;
     private final SipTransactionRepository      sipTransactionRepository;
     private final NseCorporateActionRepository  corpActionRepository;
     private final InvestmentIncomeLogRepository incomeLogRepository;
@@ -404,9 +405,12 @@ public class InvestmentServiceImpl implements InvestmentService {
 
     @Override
     public List<InvestmentSearchResult> searchMF(String query) {
-        return externalPriceService.searchMFSchemes(query).stream()
+        if (query == null || query.isBlank()) return List.of();
+        // Local mf_master lookup instead of proxying live to mfapi.in on every keystroke — see
+        // MfMasterSyncScheduler for how the table stays current.
+        return mfMasterRepository.search(query.trim(), Pageable.ofSize(15)).stream()
             .map(m -> InvestmentSearchResult.builder()
-                .schemeCode(m.get("schemeCode")).name(m.get("schemeName")).type("MF").build())
+                .schemeCode(m.getSchemeCode()).name(m.getSchemeName()).type("MF").build())
             .toList();
     }
 

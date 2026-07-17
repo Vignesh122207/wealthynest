@@ -50,6 +50,19 @@ const FUND_HOUSE_MONOGRAMS: Array<[prefix: string, monogram: FundHouseMonogram]>
   ["lic",                   { initials: "LIC",   hex: "#00563F" }],
   ["union",                 { initials: "UNION", hex: "#F58220" }],
   ["iifl",                  { initials: "IIFL",  hex: "#1B3F8B" }],
+  ["mahindra manulife",     { initials: "MM",    hex: "#ED1C24" }],
+  ["360 one",               { initials: "360",   hex: "#1A1A2E" }],
+  ["trust",                 { initials: "TRUST", hex: "#003DA5" }],
+  ["shriram",               { initials: "SHRI",  hex: "#ED1C24" }],
+  ["old bridge",            { initials: "OB",    hex: "#1A1A2E" }],
+  ["samco",                 { initials: "SAMCO", hex: "#00A651" }],
+  ["bank of india",         { initials: "BOI",   hex: "#F58220" }],
+  ["taurus",                { initials: "TAUR",  hex: "#003DA5" }],
+  ["itci",                  { initials: "ITI",   hex: "#003876" }],
+  ["helios",                { initials: "HELI",  hex: "#1A1A2E" }],
+  ["nj mutual",             { initials: "NJ",    hex: "#003DA5" }],
+  ["unifi",                 { initials: "UNIFI", hex: "#00563F" }],
+  ["zerodha",               { initials: "ZRDH",  hex: "#387ED1" }],
 ];
 FUND_HOUSE_MONOGRAMS.sort((a, b) => b[0].length - a[0].length);
 

@@ -8,6 +8,7 @@ import com.wealthynest.infra.scheduler.DebtReminderScheduler;
 import com.wealthynest.infra.scheduler.EmiReminderScheduler;
 import com.wealthynest.infra.scheduler.LoanEmiScheduler;
 import com.wealthynest.infra.scheduler.LowBalanceScheduler;
+import com.wealthynest.infra.scheduler.MfMasterSyncScheduler;
 import com.wealthynest.infra.scheduler.NetWorthSnapshotScheduler;
 import com.wealthynest.infra.scheduler.PriceRefreshScheduler;
 import com.wealthynest.infra.scheduler.RecurringExpenseScheduler;
@@ -60,6 +61,7 @@ public class JobSchedulerService {
     private final EmiReminderScheduler        emiReminderScheduler;
     private final RecurringTransferScheduler  recurringTransferScheduler;
     private final RecurringGoalContributionScheduler recurringGoalContributionScheduler;
+    private final MfMasterSyncScheduler       mfMasterSyncScheduler;
     private final DataSource                  dataSource;
 
     /** Namespaces this service's advisory-lock keys away from any future unrelated use of the
@@ -192,6 +194,7 @@ public class JobSchedulerService {
             case "RECURRING_INCOME"     -> recurringIncomeScheduler.processRecurringIncome();
             case "NET_WORTH_SNAPSHOT"   -> netWorthSnapshotScheduler.takeMonthlySnapshots();
             case "STOCK_WEEKLY_REFRESH" -> stockDataScheduler.weeklyMasterRefresh();
+            case "MF_MASTER_SYNC"       -> mfMasterSyncScheduler.weeklySync();
             case "LOAN_EMI"             -> loanEmiScheduler.processDueEmis();
             case "LOW_BALANCE_CHECK"    -> lowBalanceScheduler.checkAllAccounts();
             case "SPEND_ANOMALY_CHECK"  -> spendAnomalyScheduler.checkRecentExpenses();

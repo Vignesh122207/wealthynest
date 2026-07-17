@@ -11,8 +11,12 @@ public interface ExternalPriceService {
     /** Returns raw gold prices: 22k, 24k, spot_usd, usd_inr */
     GoldPriceData fetchGoldPriceData();
 
-    /** Search MF schemes. Returns {schemeCode, schemeName} pairs */
-    List<Map<String,String>> searchMFSchemes(String query);
+    /**
+     * Pulls mfapi.in's full scheme list (all AMCs, all schemes — tens of thousands of rows) in one
+     * call and replaces the local mf_master table with it. Returns the number of schemes synced.
+     * Search itself queries mf_master, not mfapi.in directly — see InvestmentServiceImpl.searchMF().
+     */
+    int syncMfMaster();
 
     /** Returns current NAV for scheme code */
     MFNavData fetchMFNav(String schemeCode);
