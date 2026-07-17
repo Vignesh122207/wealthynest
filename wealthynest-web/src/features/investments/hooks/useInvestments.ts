@@ -175,7 +175,6 @@ export function useLogIncome() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["income-history"] });
       qc.invalidateQueries({ queryKey: ["dividend-suggestions"] });
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.DIVIDENDS });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
       toast.success("Dividend logged to income");

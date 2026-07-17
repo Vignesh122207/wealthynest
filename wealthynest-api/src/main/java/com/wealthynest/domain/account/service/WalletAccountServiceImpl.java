@@ -66,6 +66,13 @@ public class WalletAccountServiceImpl implements WalletAccountService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<AccountResponse> getAccountsForUsers(List<UUID> userIds) {
+        if (userIds.isEmpty()) return List.of();
+        return enrichBatch(accountRepository.findByUserIdInAndArchivedFalse(userIds));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<AccountResponse> getArchivedAccounts(UUID userId) {
         List<WalletAccount> accounts = accountRepository.findByUserIdAndArchivedTrueOrderByCreatedAtAsc(userId);
         return enrichBatch(accounts);
@@ -297,6 +304,11 @@ public class WalletAccountServiceImpl implements WalletAccountService {
         } catch (Exception e) {
             log.warn("Low balance check failed for account={}: {}", accountId, e.getMessage());
         }
+    }
+
+    @Override
+    public BigDecimal getCurrentBalance(UUID id, UUID userId) {
+        return enrich(findAndValidate(id, userId)).getCurrentBalance();
     }
 
     // ─── private helpers ───────────────────────────────────────────────────────

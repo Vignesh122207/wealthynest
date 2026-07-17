@@ -77,21 +77,4 @@ public class BudgetController {
         return ResponseEntity.ok(ApiResponse.noContent());
     }
 
-    @PostMapping("/copy")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<Integer>> copyBudgets(
-            @RequestParam(required = false) Integer fromYear,
-            @RequestParam(required = false) Integer fromMonth,
-            @RequestParam(required = false) Integer toYear,
-            @RequestParam(required = false) Integer toMonth) {
-        UUID userId   = SecurityUtils.requireCurrentUserId();
-        UUID familyId = SecurityUtils.getCurrentFamilyId().orElse(null);
-        LocalDate now = LocalDate.now();
-        int fy = fromYear  != null ? fromYear  : (now.getMonthValue() == 1 ? now.getYear() - 1 : now.getYear());
-        int fm = fromMonth != null ? fromMonth : (now.getMonthValue() == 1 ? 12 : now.getMonthValue() - 1);
-        int ty = toYear    != null ? toYear    : now.getYear();
-        int tm = toMonth   != null ? toMonth   : now.getMonthValue();
-        int count = budgetService.copyBudgets(userId, familyId, fy, fm, ty, tm);
-        return ResponseEntity.ok(ApiResponse.success(count));
-    }
 }

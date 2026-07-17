@@ -12,5 +12,4 @@ public interface BudgetService {
     List<BudgetResponse> getBudgets(UUID userId, UUID familyId, int year, int month);
     List<BudgetResponse> getBudgetsForCategory(UUID userId, UUID categoryId, int year, int month);
     void                 deleteBudget(UUID budgetId, UUID userId, UUID familyId);
-    int                  copyBudgets(UUID userId, UUID familyId, int fromYear, int fromMonth, int toYear, int toMonth);
 }

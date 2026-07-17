@@ -18,6 +18,11 @@ public interface LiabilityRepository extends JpaRepository<Liability, UUID> {
     @Query("SELECT COALESCE(SUM(l.outstandingAmount),0) FROM Liability l WHERE l.userId = :userId AND l.active = true")
     BigDecimal sumOutstandingByUser(UUID userId);
 
+    /** Same as sumOutstandingByUser but for a whole set of users in one query — used by family
+     * net worth so it isn't run once per member. */
+    @Query("SELECT COALESCE(SUM(l.outstandingAmount),0) FROM Liability l WHERE l.userId IN :userIds AND l.active = true")
+    BigDecimal sumOutstandingByUserIn(@Param("userIds") List<UUID> userIds);
+
     @Modifying
     @Query("UPDATE Liability l SET l.familyId = :familyId WHERE l.userId = :userId AND l.familyId IS NULL")
     void migrateUserLiabilitiesToFamily(@Param("familyId") UUID familyId, @Param("userId") UUID userId);

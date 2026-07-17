@@ -21,6 +21,11 @@ public interface InvestmentRepository extends JpaRepository<Investment, UUID> {
     @Query("SELECT COALESCE(SUM(i.currentValue),0) FROM Investment i WHERE i.userId = :userId AND i.active = true")
     BigDecimal sumCurrentValueByUser(UUID userId);
 
+    /** Same as sumCurrentValueByUser but for a whole set of users in one query — used by family
+     * net worth so it isn't run once per member. */
+    @Query("SELECT COALESCE(SUM(i.currentValue),0) FROM Investment i WHERE i.userId IN :userIds AND i.active = true")
+    BigDecimal sumCurrentValueByUserIn(@Param("userIds") List<UUID> userIds);
+
     @Query("SELECT COALESCE(SUM(i.investedAmount),0) FROM Investment i WHERE i.userId = :userId AND i.active = true")
     BigDecimal sumInvestedAmountByUser(UUID userId);
 

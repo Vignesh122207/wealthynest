@@ -13,6 +13,10 @@ import java.util.UUID;
 
 public interface WalletAccountService {
     List<AccountResponse>           getAccounts(UUID userId);
+
+    /** Same enrichment as getAccounts, but for several users' accounts in one batched pass —
+     * used by family-wide aggregations so it isn't run once per member. */
+    List<AccountResponse>           getAccountsForUsers(List<UUID> userIds);
     List<AccountResponse>           getArchivedAccounts(UUID userId);
     AccountResponse                 createAccount(UUID userId, CreateAccountRequest request);
     AccountResponse                 updateAccount(UUID id, UUID userId, CreateAccountRequest request);
@@ -27,4 +31,8 @@ public interface WalletAccountService {
     AccountResponse                 adjustBalance(UUID id, UUID userId, BigDecimal targetBalance);
     AccountResponse                 setPrimary(UUID id, UUID userId);
     void                            checkLowBalance(UUID accountId, UUID userId);
+
+    /** Single-account balance lookup — avoids enriching every account the user owns (as
+     * getAccounts() does) when only one account's current balance is actually needed. */
+    BigDecimal                      getCurrentBalance(UUID id, UUID userId);
 }

@@ -10,6 +10,7 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -38,6 +39,23 @@ public class JwtTokenProvider {
         }
     }
     public boolean isAccessToken(String token)  { return "ACCESS".equals(extractAllClaims(token).get("type", String.class)); }
+
+    /**
+     * Parses and signature-verifies the token exactly once, returning its claims — or empty if
+     * malformed, expired, or otherwise invalid. Callers that need multiple facts about a token
+     * (subject, type, id, expiry) should use this instead of chaining isTokenValid/isAccessToken/
+     * extractSubject/extractAllClaims, each of which independently re-parses and re-verifies.
+     */
+    public Optional<Claims> parseValidClaims(String token) {
+        try {
+            Claims claims = extractAllClaims(token);
+            if (claims.getExpiration().before(new Date())) return Optional.empty();
+            return Optional.of(claims);
+        } catch (JwtException | IllegalArgumentException e) {
+            log.warn("Invalid JWT token: {}", e.getMessage());
+            return Optional.empty();
+        }
+    }
 
     private String buildToken(Map<String, Object> claims, String subject, String jwtId, long expiryMs) {
         Date now = new Date();

@@ -38,7 +38,10 @@ public class AccountBalanceGuard {
      */
     public void validateSufficientBalance(UUID accountId, UUID userId, BigDecimal amount, BigDecimal previousAmount) {
         if (accountId == null || amount == null) return;
-        WalletAccount account = accountRepository.findByIdAndUserId(accountId, userId)
+        // Locked for the rest of the caller's transaction: without this, two concurrent writes
+        // against the same account both read the balance before either commits and both pass
+        // validation, letting the account go negative / over its credit limit (see class javadoc).
+        WalletAccount account = accountRepository.findByIdAndUserIdForUpdate(accountId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("WalletAccount", "id", accountId));
         BigDecimal already = previousAmount != null ? previousAmount : BigDecimal.ZERO;
         BigDecimal balance = currentBalance(account);

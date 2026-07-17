@@ -115,11 +115,8 @@ public class LoanPaymentService {
     }
 
     private BigDecimal currentOutstanding(UUID loanId, UUID userId) {
-        return walletAccountService.getAccounts(userId).stream()
-                .filter(a -> loanId.equals(a.getId()))
-                .findFirst()
-                .map(a -> a.getCurrentBalance() != null ? a.getCurrentBalance() : BigDecimal.ZERO)
-                .orElse(BigDecimal.ZERO);
+        BigDecimal balance = walletAccountService.getCurrentBalance(loanId, userId);
+        return balance != null ? balance : BigDecimal.ZERO;
     }
 
     public record AccountResult(BigDecimal interestPaid, BigDecimal principalPaid, BigDecimal newOutstanding) {}

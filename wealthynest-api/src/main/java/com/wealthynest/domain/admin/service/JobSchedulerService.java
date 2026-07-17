@@ -25,6 +25,11 @@ import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -55,6 +60,11 @@ public class JobSchedulerService {
     private final EmiReminderScheduler        emiReminderScheduler;
     private final RecurringTransferScheduler  recurringTransferScheduler;
     private final RecurringGoalContributionScheduler recurringGoalContributionScheduler;
+    private final DataSource                  dataSource;
+
+    /** Namespaces this service's advisory-lock keys away from any future unrelated use of the
+     * same mechanism — the actual job identity lives in the low 32 bits (see lockKeyFor). */
+    private static final long ADVISORY_LOCK_NAMESPACE = 0x4A4F4200_00000000L;
 
     private final ThreadPoolTaskScheduler taskScheduler = new ThreadPoolTaskScheduler();
     private final Map<String, ScheduledFuture<?>> futures = new ConcurrentHashMap<>();
@@ -120,14 +130,55 @@ public class JobSchedulerService {
         futures.put(cfg.getJobName(), future);
     }
 
+    /**
+     * Runs a job under a Postgres session-level advisory lock keyed by job name, so that if this
+     * service is ever scaled to more than one instance, only one instance actually executes a
+     * given job's body on a given tick — the others see the lock held and skip immediately instead
+     * of both crediting the same recurring income or debiting the same EMI. The lock is taken and
+     * released on a connection borrowed directly from the pool (bypassing Spring's transactional
+     * connection) so its lifecycle can't leak across pooled-connection reuse.
+     */
     private void runScheduled(String jobName) {
         log.info("Scheduled run: {}", jobName);
-        markRunning(jobName);
-        try {
-            runJob(jobName);
-            markSuccess(jobName);
-        } catch (Exception e) {
-            markFailed(jobName, e.getMessage());
+        long lockKey = lockKeyFor(jobName);
+        try (Connection conn = dataSource.getConnection()) {
+            if (!tryLock(conn, lockKey)) {
+                log.info("Skipping {} — already running on another instance", jobName);
+                return;
+            }
+            try {
+                markRunning(jobName);
+                runJob(jobName);
+                markSuccess(jobName);
+            } catch (Exception e) {
+                markFailed(jobName, e.getMessage());
+            } finally {
+                unlock(conn, lockKey);
+            }
+        } catch (SQLException e) {
+            log.error("Advisory lock unavailable for job {}: {}", jobName, e.getMessage());
+        }
+    }
+
+    private long lockKeyFor(String jobName) {
+        return ADVISORY_LOCK_NAMESPACE | (jobName.hashCode() & 0xFFFFFFFFL);
+    }
+
+    private boolean tryLock(Connection conn, long lockKey) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement("SELECT pg_try_advisory_lock(?)")) {
+            ps.setLong(1, lockKey);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() && rs.getBoolean(1);
+            }
+        }
+    }
+
+    private void unlock(Connection conn, long lockKey) {
+        try (PreparedStatement ps = conn.prepareStatement("SELECT pg_advisory_unlock(?)")) {
+            ps.setLong(1, lockKey);
+            ps.execute();
+        } catch (SQLException e) {
+            log.warn("Failed to release advisory lock {}: {}", lockKey, e.getMessage());
         }
     }
 

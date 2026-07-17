@@ -18,6 +18,4 @@ export const budgetsApi = {
   updateBudget: async (id: string, p: UpdateBudgetPayload): Promise<Budget> =>
     (await apiClient.put<ApiResponse<Budget>>(`/budgets/${id}`, p)).data.data,
   deleteBudget: async (id: string): Promise<void> => { await apiClient.delete(`/budgets/${id}`); },
-  copyBudgets: async (fromYear: number, fromMonth: number, toYear: number, toMonth: number): Promise<number> =>
-    (await apiClient.post<ApiResponse<number>>(`/budgets/copy?fromYear=${fromYear}&fromMonth=${fromMonth}&toYear=${toYear}&toMonth=${toMonth}`)).data.data,
 };

@@ -270,11 +270,12 @@ public class FamilyServiceImpl implements FamilyService {
         if (target.getRole() == UserRole.ADMIN) {
             throw new BusinessException("Cannot revoke app-level admin rights", HttpStatus.FORBIDDEN);
         }
+        String previousRole = target.getRole().name();
         target.setRole(UserRole.MEMBER);
         userRepository.save(target);
         log.info("Admin revoked in family {}: {} revoked admin from {}", familyId, adminId, targetId);
         auditService.log(adminId, "FAMILY_ADMIN_REVOKED", "FAMILY", familyId,
-                Map.of("targetUserId", targetId.toString(), "role", "FAMILY_ADMIN"),
+                Map.of("targetUserId", targetId.toString(), "role", previousRole),
                 Map.of("targetUserId", targetId.toString(), "role", "MEMBER"), ipAddress, userAgent);
     }
 

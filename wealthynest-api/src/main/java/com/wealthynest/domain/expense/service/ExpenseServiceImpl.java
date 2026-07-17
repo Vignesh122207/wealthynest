@@ -91,6 +91,7 @@ public class ExpenseServiceImpl implements ExpenseService {
         if (request.getRecurrenceRule()!= null) expense.setRecurrenceRule(request.getRecurrenceRule());
         if (request.getPaymentMethod() != null) expense.setPaymentMethod(request.getPaymentMethod());
         if (request.getAmount() != null) {
+            expenseSplitService.validateAmountCoversSplits(expenseId, expense.getAmount());
             accountBalanceGuard.validateSufficientBalance(expense.getAccountId(), userId, expense.getAmount(), previousAmount);
         }
         return enrich(expenseMapper.toResponse(expenseRepository.save(expense)));

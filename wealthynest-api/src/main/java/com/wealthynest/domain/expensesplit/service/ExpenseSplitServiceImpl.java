@@ -50,6 +50,7 @@ public class ExpenseSplitServiceImpl implements ExpenseSplitService {
         Set<UUID> familyMemberIds = userRepository.findByFamilyId(expense.getFamilyId())
                 .stream().map(User::getId).collect(Collectors.toSet());
 
+        Set<UUID> seenParticipants = new java.util.HashSet<>();
         BigDecimal totalShares = BigDecimal.ZERO;
         for (SplitParticipantRequest p : splitWith) {
             if (p.getUserId().equals(expense.getUserId())) {
@@ -57,6 +58,9 @@ public class ExpenseSplitServiceImpl implements ExpenseSplitService {
             }
             if (!familyMemberIds.contains(p.getUserId())) {
                 throw new BusinessException("Split participants must be members of your family group.", HttpStatus.BAD_REQUEST);
+            }
+            if (!seenParticipants.add(p.getUserId())) {
+                throw new BusinessException("Each participant can only appear once in a split.", HttpStatus.BAD_REQUEST);
             }
             totalShares = totalShares.add(p.getShareAmount());
         }
@@ -135,6 +139,17 @@ public class ExpenseSplitServiceImpl implements ExpenseSplitService {
     @Transactional
     public void settleWithCounterpart(UUID userId, UUID counterpartId) {
         splitRepository.settleBetween(userId, counterpartId, Instant.now());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void validateAmountCoversSplits(UUID expenseId, BigDecimal newAmount) {
+        BigDecimal totalShares = splitRepository.sumSharesByExpenseId(expenseId);
+        if (totalShares.compareTo(newAmount) > 0) {
+            throw new BusinessException(
+                    "This expense is split for " + totalShares + " — reduce or remove the splits before lowering the amount below that.",
+                    HttpStatus.BAD_REQUEST);
+        }
     }
 
     private ExpenseSplitResponse toResponse(ExpenseSplit s, Map<UUID, Expense> expenseMap,

@@ -11,8 +11,6 @@ export const QUERY_KEYS = {
   LIABILITIES:    ["liabilities"]           as const,
   NET_WORTH_SUMMARY: ["net-worth", "summary"] as const,
   INVESTMENTS:    ["investments"]            as const,
-  DIVIDENDS:      ["dividends"]              as const,
-  BOND_INTERESTS: ["bond-interests"]         as const,
   NOTIFICATIONS:  ["notifications"]          as const,
   FAMILY:         ["family"]                 as const,
   GOALS:          ["goals"]                  as const,

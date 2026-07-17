@@ -13,6 +13,7 @@ import com.wealthynest.domain.networth.dto.response.NetWorthSummaryResponse.Asse
 import com.wealthynest.domain.networth.dto.response.NetWorthSummaryResponse.LiabilityBreakdown;
 import com.wealthynest.domain.networth.entity.NetWorthSnapshot;
 import com.wealthynest.domain.networth.repository.NetWorthSnapshotRepository;
+import com.wealthynest.domain.user.entity.User;
 import com.wealthynest.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -199,39 +200,31 @@ public class NetWorthServiceImpl implements NetWorthService {
 
     @Override @Transactional(readOnly = true)
     public BigDecimal getFamilyNetWorth(UUID familyId) {
-        var members = userRepository.findByFamilyId(familyId);
-        BigDecimal total = BigDecimal.ZERO;
-        for (var member : members) {
-            UUID uid = member.getId();
-            // Wallet accounts — split into liquid balances and debt (credit cards + loans)
-            BigDecimal walletBalance = BigDecimal.ZERO;
-            BigDecimal ccDebt = BigDecimal.ZERO;
-            for (AccountResponse a : walletAccountService.getAccounts(uid)) {
-                BigDecimal bal = a.getCurrentBalance() != null ? a.getCurrentBalance() : BigDecimal.ZERO;
-                if ("CREDIT_CARD".equals(a.getAccountType()) || "LOAN".equals(a.getAccountType())) {
-                    ccDebt = ccDebt.add(bal.max(BigDecimal.ZERO));
-                } else {
-                    walletBalance = walletBalance.add(bal);
-                }
-            }
-            // Investment portfolio
-            BigDecimal invValue = investmentRepository.sumCurrentValueByUser(uid);
-            if (invValue == null) invValue = BigDecimal.ZERO;
-            // Manual assets only — excludes investment-linked assets to avoid double-counting with invValue
-            BigDecimal assetValue = assetRepository.sumManualAssetValueByUser(uid);
-            if (assetValue == null) assetValue = BigDecimal.ZERO;
-            // Manual liabilities
-            BigDecimal liabilities = liabilityRepository.sumOutstandingByUser(uid);
-            if (liabilities == null) liabilities = BigDecimal.ZERO;
+        List<UUID> memberIds = userRepository.findByFamilyId(familyId).stream().map(User::getId).toList();
+        if (memberIds.isEmpty()) return BigDecimal.ZERO;
 
-            total = total
-                .add(walletBalance)
-                .add(invValue)
-                .add(assetValue)
-                .subtract(liabilities)
-                .subtract(ccDebt);
+        // One batched enrich pass across every member's accounts instead of one getAccounts()
+        // call (and its own ~8 grouped queries) per member.
+        BigDecimal walletBalance = BigDecimal.ZERO;
+        BigDecimal ccDebt = BigDecimal.ZERO;
+        for (AccountResponse a : walletAccountService.getAccountsForUsers(memberIds)) {
+            BigDecimal bal = a.getCurrentBalance() != null ? a.getCurrentBalance() : BigDecimal.ZERO;
+            if ("CREDIT_CARD".equals(a.getAccountType()) || "LOAN".equals(a.getAccountType())) {
+                ccDebt = ccDebt.add(bal.max(BigDecimal.ZERO));
+            } else {
+                walletBalance = walletBalance.add(bal);
+            }
         }
-        return total;
+
+        BigDecimal invValue = investmentRepository.sumCurrentValueByUserIn(memberIds);
+        if (invValue == null) invValue = BigDecimal.ZERO;
+        // Manual assets only — excludes investment-linked assets to avoid double-counting with invValue
+        BigDecimal assetValue = assetRepository.sumManualAssetValueByUserIn(memberIds);
+        if (assetValue == null) assetValue = BigDecimal.ZERO;
+        BigDecimal liabilities = liabilityRepository.sumOutstandingByUserIn(memberIds);
+        if (liabilities == null) liabilities = BigDecimal.ZERO;
+
+        return walletBalance.add(invValue).add(assetValue).subtract(liabilities).subtract(ccDebt);
     }
 
     @Override

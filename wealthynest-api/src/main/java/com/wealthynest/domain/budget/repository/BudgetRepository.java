@@ -14,9 +14,6 @@ import java.util.UUID;
 @Repository
 public interface BudgetRepository extends JpaRepository<Budget, UUID> {
 
-    List<Budget>     findByUserIdAndPeriodYearAndPeriodMonthAndBudgetType(UUID userId, int year, int month, BudgetType type);
-    Optional<Budget> findByUserIdAndCategoryIdAndPeriodYearAndPeriodMonthAndBudgetType(UUID userId, UUID categoryId, int year, int month, BudgetType type);
-
     // All budgets for a user (templates — no period filter)
     List<Budget> findByUserId(UUID userId);
 

@@ -24,6 +24,12 @@ public interface AssetRepository extends JpaRepository<Asset, UUID> {
            "AND a.id NOT IN (SELECT i.assetId FROM Investment i WHERE i.userId = :userId AND i.active = true AND i.assetId IS NOT NULL)")
     BigDecimal sumManualAssetValueByUser(@Param("userId") UUID userId);
 
+    /** Same as sumManualAssetValueByUser but for a whole set of users in one query — used by
+     * family net worth so it isn't run once per member. */
+    @Query("SELECT COALESCE(SUM(a.currentValue),0) FROM Asset a WHERE a.userId IN :userIds AND a.active = true " +
+           "AND a.id NOT IN (SELECT i.assetId FROM Investment i WHERE i.userId IN :userIds AND i.active = true AND i.assetId IS NOT NULL)")
+    BigDecimal sumManualAssetValueByUserIn(@Param("userIds") List<UUID> userIds);
+
     @Query("SELECT COALESCE(SUM(a.currentValue),0) FROM Asset a WHERE a.familyId = :familyId AND a.active = true")
     BigDecimal sumCurrentValueByFamily(UUID familyId);
 

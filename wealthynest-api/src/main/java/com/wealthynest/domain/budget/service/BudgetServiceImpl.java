@@ -103,31 +103,6 @@ public class BudgetServiceImpl implements BudgetService {
         budgetRepository.delete(budget);
     }
 
-    @Override
-    @Transactional
-    public int copyBudgets(UUID userId, UUID familyId, int fromYear, int fromMonth, int toYear, int toMonth) {
-        List<Budget> source = budgetRepository.findByUserIdAndPeriodYearAndPeriodMonthAndBudgetType(userId, fromYear, fromMonth, BudgetType.MONTHLY);
-        if (source.isEmpty()) return 0;
-        int copied = 0;
-        for (Budget b : source) {
-            Optional<Budget> existing = budgetRepository.findByUserIdAndCategoryIdAndPeriodYearAndPeriodMonthAndBudgetType(userId, b.getCategoryId(), toYear, toMonth, BudgetType.MONTHLY);
-            if (existing.isEmpty()) {
-                budgetRepository.save(Budget.builder()
-                    .userId(userId)
-                    .familyId(null)
-                    .categoryId(b.getCategoryId())
-                    .amount(b.getAmount())
-                    .budgetType(BudgetType.MONTHLY)
-                    .alertThreshold(b.getAlertThreshold())
-                    .periodYear(toYear)
-                    .periodMonth(toMonth)
-                    .build());
-                copied++;
-            }
-        }
-        return copied;
-    }
-
     private Budget findAndValidateOwner(UUID budgetId, UUID userId, UUID familyId) {
         Budget budget = budgetRepository.findById(budgetId)
             .orElseThrow(() -> new ResourceNotFoundException("Budget", "id", budgetId));

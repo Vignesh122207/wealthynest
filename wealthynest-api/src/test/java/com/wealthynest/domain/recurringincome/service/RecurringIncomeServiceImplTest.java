@@ -18,6 +18,7 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
@@ -70,12 +71,13 @@ class RecurringIncomeServiceImplTest {
     }
 
     private WalletAccount walletAccountOf(AccountType type) {
-        return WalletAccount.builder()
-            .id(UUID.randomUUID())
+        WalletAccount account = WalletAccount.builder()
             .userId(UUID.randomUUID())
             .accountType(type)
             .name(type.name())
             .build();
+        ReflectionTestUtils.setField(account, "id", UUID.randomUUID());
+        return account;
     }
 
     /** Returns a day-of-month guaranteed to differ from today's day-of-month. */
