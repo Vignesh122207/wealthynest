@@ -183,14 +183,27 @@ export default function FamilyPage() {
             <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
           </div>
 
+        ) : !hasFamily ? (
+          // Checked before isError: after leaving/being removed/deleting the group, the auth
+          // store's familyId goes to undefined and this query is disabled — but a query that
+          // errored earlier (e.g. a brief race against DashboardLayout's getMe() resync, which
+          // can momentarily still see the old familyId right after the group is gone) keeps
+          // isError=true forever since disabling a query doesn't clear its last status. Without
+          // this check first, that stale error outlives the family and the page gets stuck on
+          // "Couldn't load your family" even though there's correctly no family to load anymore.
+          <NoFamilyOnboarding
+            mode={mode} setMode={setMode}
+            familyName={familyName} setFamilyName={setFamilyName}
+            inviteCode={inviteCode} setInviteCode={setInviteCode}
+            handleCreate={handleCreate} handleJoin={handleJoin}
+            creating={creating} joining={joining} reset={reset} />
+
         ) : isError ? (
-          // Distinct from "no family yet" below — hasFamily (from the auth store) can be true
-          // while `family` itself is still undefined here, and falling through to the "create
-          // or join a family" onboarding hero for an existing member whose request just failed
-          // would read as if their group had vanished.
+          // A real member whose family fetch just failed (network blip, server error) — distinct
+          // from the !hasFamily case above, so this never misreads as "your group vanished."
           <QueryErrorState onRetry={() => refetch()} description="Couldn't load your family. Check your connection and try again." />
 
-        ) : hasFamily && family ? (
+        ) : family ? (
           /* ── Family Dashboard ─────────────────────────── */
           <div className="space-y-4">
 
@@ -250,12 +263,12 @@ export default function FamilyPage() {
           </div>
 
         ) : (
-          <NoFamilyOnboarding
-            mode={mode} setMode={setMode}
-            familyName={familyName} setFamilyName={setFamilyName}
-            inviteCode={inviteCode} setInviteCode={setInviteCode}
-            handleCreate={handleCreate} handleJoin={handleJoin}
-            creating={creating} joining={joining} reset={reset} />
+          // hasFamily is true and there's no error, but `family` itself hasn't arrived yet
+          // (e.g. the query is enabled but hasn't resolved on this render) — same spinner as
+          // the isLoading branch above rather than a fourth distinct UI for a transient instant.
+          <div className="flex items-center justify-center h-48">
+            <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
+          </div>
         )}
 
       </PageWrapper>
