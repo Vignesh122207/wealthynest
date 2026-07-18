@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, Mail, MessageCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { PublicNav, PublicFooter } from "@/components/layout/PublicNav";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
+import {useState} from "react";
+import {ChevronDown, Mail, MessageCircle} from "lucide-react";
+import {cn} from "@/lib/utils";
+import {PublicFooter, PublicNav} from "@/components/layout/PublicNav";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
 
 const FAQS = [
   {

@@ -1,10 +1,10 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { QUERY_KEYS } from "@/lib/constants";
-import { goalsApi } from "../api/goals.api";
-import type { CreateGoalPayload } from "../types/goal.types";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {toast} from "sonner";
+import {QUERY_KEYS} from "@/lib/constants";
+import {goalsApi} from "../api/goals.api";
+import type {CreateGoalPayload} from "../types/goal.types";
 
 export function useGoals() {
   return useQuery({

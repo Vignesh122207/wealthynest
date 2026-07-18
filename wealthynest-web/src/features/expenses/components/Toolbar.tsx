@@ -1,4 +1,4 @@
-import { Search, SlidersHorizontal, Upload } from "lucide-react";
+import {Search, SlidersHorizontal, Upload} from "lucide-react";
 
 // Add Expense/Income/Transfer already live on the FAB (visible on every screen size, not just
 // mobile) — a second "Add Transaction" dropdown here duplicated it. Import is the one action the

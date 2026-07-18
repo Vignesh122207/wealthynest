@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Target } from "lucide-react";
-import { cn, monthLabel } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { getCategoryColor, getCategoryIcon } from "@/lib/categoryMeta";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { EmptyState } from "@/components/shared/EmptyState";
-import type { BudgetSummary } from "@/features/dashboard/types/dashboard.types";
+import {Target} from "lucide-react";
+import {cn, monthLabel} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {getCategoryColor, getCategoryIcon} from "@/lib/categoryMeta";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {EmptyState} from "@/components/shared/EmptyState";
+import type {BudgetSummary} from "@/features/dashboard/types/dashboard.types";
 
 interface BudgetSectionProps {
   budgetSummaries: BudgetSummary[];

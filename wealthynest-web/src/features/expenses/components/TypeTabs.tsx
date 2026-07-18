@@ -1,6 +1,6 @@
-import { Receipt, ArrowDownLeft, ArrowUpRight, ArrowLeftRight } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { TxType } from "../types/filters.types";
+import {ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Receipt} from "lucide-react";
+import {cn} from "@/lib/utils";
+import type {TxType} from "../types/filters.types";
 
 // Matches this page's own FAB action colors (Add Expense=rose, Add Income=emerald,
 // Transfer=indigo) — same per-type solid-fill template as Investments/Accounts/Debts.
@@ -24,7 +24,7 @@ export function TypeTabs({ value, onChange, counts }: {
   return (
     <div className="flex gap-1 overflow-x-auto max-w-full" style={{ scrollbarWidth: "none" }}>
       {tabs.map(t => (
-        <button key={t.key} onClick={() => onChange(t.key)}
+        <button key={t.key} data-testid={`type-tab-${t.key}`} onClick={() => onChange(t.key)}
           className={cn(
             "flex items-center gap-2 h-9 px-4 rounded-xl text-xs font-medium whitespace-nowrap transition-all shrink-0",
             value === t.key ? cn(TAB_ACTIVE_BG[t.key], "text-white") : "bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted"

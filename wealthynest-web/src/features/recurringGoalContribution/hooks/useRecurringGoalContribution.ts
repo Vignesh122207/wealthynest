@@ -1,11 +1,11 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {toast} from "sonner";
 import {
-  recurringGoalContributionApi,
-  type CreateRecurringGoalContributionPayload,
-  type UpdateRecurringGoalContributionPayload,
+    type CreateRecurringGoalContributionPayload,
+    recurringGoalContributionApi,
+    type UpdateRecurringGoalContributionPayload,
 } from "../api/recurringGoalContribution.api";
 
 const KEY = ["recurring-goal-contribution"] as const;

@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import {useState} from "react";
+import {useForm} from "react-hook-form";
+import {zodResolver} from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { Mail, Loader2, ArrowLeft, CheckCircle2 } from "lucide-react";
-import { forgotPasswordSchema, type ForgotPasswordFormValues } from "../schemas/auth.schema";
-import { useForgotPassword } from "../hooks/useAuth";
-import { BrandMark } from "@/components/icons/BrandMark";
-import { cn } from "@/lib/utils";
+import {ArrowLeft, CheckCircle2, Loader2, Mail} from "lucide-react";
+import {type ForgotPasswordFormValues, forgotPasswordSchema} from "../schemas/auth.schema";
+import {useForgotPassword} from "../hooks/useAuth";
+import {BrandMark} from "@/components/icons/BrandMark";
+import {cn} from "@/lib/utils";
 
 export function ForgotPasswordForm() {
   const [sent, setSent]            = useState(false);

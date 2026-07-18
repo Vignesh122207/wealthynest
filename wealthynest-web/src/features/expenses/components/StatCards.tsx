@@ -1,7 +1,7 @@
-import { Wallet, Receipt, TrendingUp, Layers, type LucideIcon } from "lucide-react";
-import { PremiumIcon, type IconTone } from "@/components/icons/PremiumIcon";
-import { cn } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
+import {Layers, type LucideIcon, Receipt, TrendingUp, Wallet} from "lucide-react";
+import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
+import {cn} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 
 function StatTile({ icon, tone, label, value, delta }: {
   icon: LucideIcon; tone: IconTone; label: string; value: string; delta?: React.ReactNode;

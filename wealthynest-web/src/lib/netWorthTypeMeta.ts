@@ -1,8 +1,20 @@
 import {
-  Home, Car, Gem, PiggyBank, Building2, HandCoins, Package,
-  Landmark, Wallet, TrendingUp, Layers, BadgePercent, Coins,
-  CreditCard, GraduationCap,
-  type LucideIcon,
+    BadgePercent,
+    Building2,
+    Car,
+    Coins,
+    CreditCard,
+    Gem,
+    GraduationCap,
+    HandCoins,
+    Home,
+    Landmark,
+    Layers,
+    type LucideIcon,
+    Package,
+    PiggyBank,
+    TrendingUp,
+    Wallet,
 } from "lucide-react";
 
 export interface NetWorthTypeMetaEntry {

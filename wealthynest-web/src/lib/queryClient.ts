@@ -1,6 +1,6 @@
-import { QueryCache, QueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { apiErrorMessage } from "./utils";
+import {QueryCache, QueryClient} from "@tanstack/react-query";
+import {toast} from "sonner";
+import {apiErrorMessage} from "./utils";
 
 // Mutations already toast their own success/error per-hook (see e.g. useDebts.ts) — this only
 // covers reads. Without it, a failed useQuery just leaves `data` undefined and every page renders

@@ -1,24 +1,41 @@
 "use client";
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { ArrowLeft, Loader2, Eye, EyeOff, ShieldCheck, Check, KeyRound, X, Fingerprint, Trash2, Mail } from "lucide-react";
-import Link from "next/link";
-import { Header } from "@/components/layout/Header";
-import { PageWrapper } from "@/components/layout/PageWrapper";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { InfoTooltip } from "@/components/ui/Tooltip";
-import { FormInput } from "@/components/forms/FormInput";
+import {useState} from "react";
+import type {UseFormRegisterReturn} from "react-hook-form";
+import {useForm} from "react-hook-form";
+import {zodResolver} from "@hookform/resolvers/zod";
+import {z} from "zod";
 import {
-  useChangePassword, useChangeEmail, useEnablePin, useDisablePin,
-  usePasskeys, useRegisterPasskey, useDeletePasskey,
+    ArrowLeft,
+    Check,
+    Eye,
+    EyeOff,
+    Fingerprint,
+    KeyRound,
+    Loader2,
+    Mail,
+    ShieldCheck,
+    Trash2,
+    X
+} from "lucide-react";
+import Link from "next/link";
+import {Header} from "@/components/layout/Header";
+import {PageWrapper} from "@/components/layout/PageWrapper";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {InfoTooltip} from "@/components/ui/Tooltip";
+import {FormInput} from "@/components/forms/FormInput";
+import {
+    useChangeEmail,
+    useChangePassword,
+    useDeletePasskey,
+    useDisablePin,
+    useEnablePin,
+    usePasskeys,
+    useRegisterPasskey,
 } from "@/features/auth/hooks/useAuth";
-import { useAuthStore } from "@/features/auth/store/auth.store";
-import { isWebAuthnSupported } from "@/features/auth/utils/webauthn";
-import { formatDate } from "@/lib/utils";
-import type { UseFormRegisterReturn } from "react-hook-form";
+import {useAuthStore} from "@/features/auth/store/auth.store";
+import {isWebAuthnSupported} from "@/features/auth/utils/webauthn";
+import {formatDate} from "@/lib/utils";
 
 const PASSWORD_TIPS = [
   "At least 8 characters",
@@ -36,11 +53,12 @@ const schema = z.object({
 });
 type Values = z.infer<typeof schema>;
 
-function PasswordField({ label, reg, error, placeholder }: {
+function PasswordField({ label, reg, error, placeholder, testId }: {
   label?: string;
   reg: UseFormRegisterReturn;
   error?: string;
   placeholder?: string;
+  testId?: string;
 }) {
   const [show, setShow] = useState(false);
   return (
@@ -48,6 +66,7 @@ function PasswordField({ label, reg, error, placeholder }: {
       {...reg}
       label={label}
       error={error}
+      data-testid={testId}
       type={show ? "text" : "password"}
       placeholder={placeholder ?? "••••••••"}
       className="h-auto py-2.5"
@@ -372,6 +391,7 @@ export default function SecurityPage() {
                 label="Current password"
                 reg={form.register("currentPassword")}
                 error={form.formState.errors.currentPassword?.message}
+                testId="security-current-password-input"
               />
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5">
@@ -386,16 +406,19 @@ export default function SecurityPage() {
                   reg={form.register("newPassword")}
                   error={form.formState.errors.newPassword?.message}
                   placeholder="At least 8 characters"
+                  testId="security-new-password-input"
                 />
               </div>
               <PasswordField
                 label="Confirm new password"
                 reg={form.register("confirmPassword")}
                 error={form.formState.errors.confirmPassword?.message}
+                testId="security-confirm-password-input"
               />
               <button
                 type="submit"
                 disabled={isPending}
+                data-testid="security-password-submit"
                 className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors"
               >
                 {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}

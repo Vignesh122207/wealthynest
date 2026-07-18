@@ -1,10 +1,10 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
-import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
-import { FormModalHeader } from "@/components/transactions/FormModalHeader";
-import { cn } from "@/lib/utils";
-import type { WalletAccount } from "@/features/accounts/types/account.types";
+import {Trash2} from "lucide-react";
+import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
+import {FormModalHeader} from "@/components/transactions/FormModalHeader";
+import {cn} from "@/lib/utils";
+import type {WalletAccount} from "@/features/accounts/types/account.types";
 
 interface DeleteAccountModalProps {
   deleteTarget: WalletAccount;

@@ -2,19 +2,30 @@
 
 import Link from "next/link";
 import {
-  Lock, Bell, Sun, Tag, RefreshCw,
-  Mail, Ticket, Plus, HelpCircle, Shield, FileText,
-  LogOut, Trash2, ChevronRight,
-  type LucideIcon,
+    Bell,
+    ChevronRight,
+    FileText,
+    HelpCircle,
+    Lock,
+    LogOut,
+    type LucideIcon,
+    Mail,
+    Plus,
+    RefreshCw,
+    Shield,
+    Sun,
+    Tag,
+    Ticket,
+    Trash2,
 } from "lucide-react";
-import { Header } from "@/components/layout/Header";
-import { PageWrapper } from "@/components/layout/PageWrapper";
-import { PremiumIcon, GlossyBadge, type IconTone } from "@/components/icons/PremiumIcon";
-import { useAuthStore } from "@/features/auth/store/auth.store";
-import { useLogout, useCloseAccount } from "@/features/auth/hooks/useAuth";
-import { getInitials } from "@/lib/utils";
-import { useState } from "react";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import {Header} from "@/components/layout/Header";
+import {PageWrapper} from "@/components/layout/PageWrapper";
+import {GlossyBadge, type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
+import {useAuthStore} from "@/features/auth/store/auth.store";
+import {useCloseAccount, useLogout} from "@/features/auth/hooks/useAuth";
+import {getInitials} from "@/lib/utils";
+import {useState} from "react";
+import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
 
 // ─── Menu item ────────────────────────────────────────────────────────────────
 

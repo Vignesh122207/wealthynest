@@ -1,11 +1,11 @@
 "use client";
 
-import { ArrowLeft, Bell } from "lucide-react";
+import {ArrowLeft, Bell} from "lucide-react";
 import Link from "next/link";
-import { Header } from "@/components/layout/Header";
-import { PageWrapper } from "@/components/layout/PageWrapper";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { useNotificationStore, type NotifPrefs } from "@/store/notification.store";
+import {Header} from "@/components/layout/Header";
+import {PageWrapper} from "@/components/layout/PageWrapper";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {type NotifPrefs, useNotificationStore} from "@/store/notification.store";
 
 const NOTIF_ITEMS: { key: keyof NotifPrefs; label: string; description: string; emoji: string }[] = [
   { key: "budgets",  emoji: "🎯", label: "Budget alerts",       description: "Get warned when a budget category is nearly full or exceeded" },
@@ -14,12 +14,13 @@ const NOTIF_ITEMS: { key: keyof NotifPrefs; label: string; description: string; 
   { key: "maturity", emoji: "⏰", label: "Upcoming maturities", description: "Alert for FDs and bonds maturing within the next 30 days" },
 ];
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ checked, onChange, testId }: { checked: boolean; onChange: (v: boolean) => void; testId?: string }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      data-testid={testId}
       onClick={() => onChange(!checked)}
       className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${
         checked ? "bg-indigo-600" : "bg-muted-foreground/25"
@@ -67,6 +68,7 @@ export default function NotificationsPage() {
               </p>
             </div>
             <Toggle
+              testId="notif-pref-all"
               checked={!allOff}
               onChange={v => (Object.keys(prefs) as (keyof NotifPrefs)[]).forEach(k => setPref(k, v))}
             />
@@ -81,7 +83,7 @@ export default function NotificationsPage() {
                   <p className="text-sm font-medium text-foreground">{label}</p>
                   <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{description}</p>
                 </div>
-                <Toggle checked={prefs[key]} onChange={v => setPref(key, v)} />
+                <Toggle testId={`notif-pref-${key}`} checked={prefs[key]} onChange={v => setPref(key, v)} />
               </div>
             ))}
           </div>

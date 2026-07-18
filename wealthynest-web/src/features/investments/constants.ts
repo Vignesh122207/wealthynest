@@ -1,5 +1,5 @@
-import { BarChart3, TrendingUp, Layers, Coins, Building2, BadgePercent } from "lucide-react";
-import type { InvestmentType } from "./types/investment.types";
+import {BadgePercent, BarChart3, Building2, Coins, Layers, TrendingUp} from "lucide-react";
+import type {InvestmentType} from "./types/investment.types";
 
 export type PickerAccountList = { id: string; name: string; bankName?: string; currentBalance: number }[];
 

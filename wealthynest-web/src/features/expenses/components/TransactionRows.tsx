@@ -1,13 +1,13 @@
-import { memo } from "react";
-import { CreditCard, HandCoins, RefreshCw, ArrowLeftRight } from "lucide-react";
-import { getCategoryIcon, getCategoryColor, INCOME_ICON_MAP } from "@/lib/categoryMeta";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { cn } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { INCOME_SOURCES } from "@/lib/constants";
-import type { Expense } from "@/features/expenses/types/expense.types";
-import type { IncomeEntry } from "@/features/income/types/income.types";
-import type { AccountTransfer } from "@/features/accounts/types/account.types";
+import {memo} from "react";
+import {ArrowLeftRight, CreditCard, HandCoins, RefreshCw} from "lucide-react";
+import {getCategoryColor, getCategoryIcon, INCOME_ICON_MAP} from "@/lib/categoryMeta";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {cn} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {INCOME_SOURCES} from "@/lib/constants";
+import type {Expense} from "@/features/expenses/types/expense.types";
+import type {IncomeEntry} from "@/features/income/types/income.types";
+import type {AccountTransfer} from "@/features/accounts/types/account.types";
 
 // Debt-linked transfers carry a structured debtLabel + debtContactName so the counterparty is
 // always visible in the badge, even when the row's own description was overwritten by a custom

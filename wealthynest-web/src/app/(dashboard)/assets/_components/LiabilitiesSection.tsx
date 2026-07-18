@@ -1,10 +1,10 @@
-import { Plus, ChevronDown, ChevronUp, AlertTriangle, Wallet } from "lucide-react";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { QueryErrorState } from "@/components/shared/QueryErrorState";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { LiabilityRow } from "@/features/liability/components/LiabilityRow";
-import type { Liability } from "@/features/liability/types/liability.types";
-import type { NetWorthSummary } from "@/features/networth/types/networth.types";
+import {AlertTriangle, ChevronDown, ChevronUp, Plus, Wallet} from "lucide-react";
+import {EmptyState} from "@/components/shared/EmptyState";
+import {QueryErrorState} from "@/components/shared/QueryErrorState";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {LiabilityRow} from "@/features/liability/components/LiabilityRow";
+import type {Liability} from "@/features/liability/types/liability.types";
+import type {NetWorthSummary} from "@/features/networth/types/networth.types";
 
 const PREVIEW_COUNT = 3;
 

@@ -1,6 +1,6 @@
-import { apiClient } from "@/lib/axios";
-import type { ApiResponse } from "@/types/api.types";
-import type { MySplits } from "../types/expensesplit.types";
+import {apiClient} from "@/lib/axios";
+import type {ApiResponse} from "@/types/api.types";
+import type {MySplits} from "../types/expensesplit.types";
 
 export const expenseSplitsApi = {
   getMySplits: async (): Promise<MySplits> =>

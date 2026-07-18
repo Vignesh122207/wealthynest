@@ -1,11 +1,11 @@
 "use client";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { authApi } from "../api/auth.api";
-import { useAuthStore } from "../store/auth.store";
-import { createPasskey, getPasskeyAssertion } from "../utils/webauthn";
-import type { LoginFormValues, RegisterFormValues } from "../schemas/auth.schema";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {useRouter} from "next/navigation";
+import {toast} from "sonner";
+import {authApi} from "../api/auth.api";
+import {useAuthStore} from "../store/auth.store";
+import {createPasskey, getPasskeyAssertion} from "../utils/webauthn";
+import type {LoginFormValues, RegisterFormValues} from "../schemas/auth.schema";
 
 type ApiError = { response?: { data?: { message?: string; error?: string } } };
 

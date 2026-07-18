@@ -1,21 +1,35 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import {usePathname} from "next/navigation";
 import {
-  Home, ChartNoAxesCombined, Gem, ArrowLeftRight, Target, Wallet,
-  TrendingUp, Bell, ShieldCheck, X,
-  FileText, Handshake, Settings, Heart, LogOut, PieChart,
-  type LucideIcon,
+    ArrowLeftRight,
+    Bell,
+    ChartNoAxesCombined,
+    FileText,
+    Gem,
+    Handshake,
+    Heart,
+    Home,
+    KeyRound,
+    LogOut,
+    type LucideIcon,
+    PieChart,
+    Settings,
+    ShieldCheck,
+    Target,
+    TrendingUp,
+    Wallet,
+    X,
 } from "lucide-react";
-import { FamilyGroupIcon } from "@/components/icons/FamilyGroupIcon";
-import { cn } from "@/lib/utils";
-import { useAuthStore } from "@/features/auth/store/auth.store";
-import { useLogout } from "@/features/auth/hooks/useAuth";
-import { useUIStore } from "@/store/ui.store";
-import { useMergedNotifications } from "@/features/notifications/hooks/useServerNotifications";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { BrandMark } from "@/components/icons/BrandMark";
+import {FamilyGroupIcon} from "@/components/icons/FamilyGroupIcon";
+import {cn} from "@/lib/utils";
+import {useAuthStore} from "@/features/auth/store/auth.store";
+import {useLogout} from "@/features/auth/hooks/useAuth";
+import {useUIStore} from "@/store/ui.store";
+import {useMergedNotifications} from "@/features/notifications/hooks/useServerNotifications";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {BrandMark} from "@/components/icons/BrandMark";
 
 type Gradient = [string, string];
 
@@ -64,6 +78,7 @@ const NAV_GROUPS = [
     label: "Account",
     items: [
       { href: "/settings",           label: "Settings",            icon: Settings, gradient: ["#6b7280", "#475569"] as Gradient },
+      { href: "/vault",              label: "Vault",                icon: KeyRound, gradient: ["#27272a", "#c2703d"] as Gradient },
       { href: "/support-wealthynest", label: "Support WealthyNest", icon: Heart,    gradient: ["#fb7185", "#db2777"] as Gradient },
     ],
   },
@@ -98,6 +113,7 @@ function NavItem({ href, label, icon, gradient, active, badge, onClick }: {
   return (
     <Link
       href={href}
+      data-testid={`nav-link-${href.replace(/^\//, "")}`}
       onClick={onClick}
       aria-current={active ? "page" : undefined}
       className={cn(
@@ -175,6 +191,7 @@ export function Sidebar() {
       {/* ── Sign out ── */}
       <div className="px-3 pb-4 pt-3 border-t border-[hsl(var(--sidebar-border))] shrink-0">
         <button
+          data-testid="nav-logout"
           onClick={() => { logout(); closeMobileMenu(); }}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-500/10 transition-all"
         >

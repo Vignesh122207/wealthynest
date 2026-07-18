@@ -1,17 +1,17 @@
 "use client";
 
-import { useMemo } from "react";
-import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { FormInput } from "@/components/forms/FormInput";
-import { FormCurrencyInput } from "@/components/forms/FormCurrencyInput";
-import { FormSelect } from "@/components/forms/FormSelect";
-import { FormDatePicker } from "@/components/forms/FormDatePicker";
-import { AccountPicker } from "@/components/transactions/AccountPicker";
-import { FormButtons } from "./FormButtons";
-import { fdSchema, type FDFormValues } from "@/features/investments/schemas/investment.schema";
-import { COMPOUND_FREQ, type PickerAccountList } from "@/features/investments/constants";
-import { formatCurrency } from "@/lib/utils";
+import {useMemo} from "react";
+import {Controller, useForm} from "react-hook-form";
+import {zodResolver} from "@hookform/resolvers/zod";
+import {FormInput} from "@/components/forms/FormInput";
+import {FormCurrencyInput} from "@/components/forms/FormCurrencyInput";
+import {FormSelect} from "@/components/forms/FormSelect";
+import {FormDatePicker} from "@/components/forms/FormDatePicker";
+import {AccountPicker} from "@/components/transactions/AccountPicker";
+import {FormButtons} from "./FormButtons";
+import {type FDFormValues, fdSchema} from "@/features/investments/schemas/investment.schema";
+import {COMPOUND_FREQ, type PickerAccountList} from "@/features/investments/constants";
+import {formatCurrency} from "@/lib/utils";
 
 export function FDForm({ defaultValues, onSubmit, onCancel, isPending, bankAccounts, investmentAccounts, isEditing }: {
   defaultValues?: Partial<FDFormValues>;
@@ -44,19 +44,19 @@ export function FDForm({ defaultValues, onSubmit, onCancel, isPending, bankAccou
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <FormInput label="Bank / Institution" placeholder="e.g. HDFC Bank"
+        <FormInput label="Bank / Institution" placeholder="e.g. HDFC Bank" data-testid="fd-bank-name-input"
           {...form.register("bankName")} error={form.formState.errors.bankName?.message} />
-        <FormCurrencyInput label="Principal Amount" {...form.register("investedAmount")}
+        <FormCurrencyInput label="Principal Amount" data-testid="fd-invested-amount-input" {...form.register("investedAmount")}
           error={form.formState.errors.investedAmount?.message} />
-        <FormInput label="Interest Rate (% p.a.)" type="number" step="0.01"
+        <FormInput label="Interest Rate (% p.a.)" type="number" step="0.01" data-testid="fd-coupon-rate-input"
           {...form.register("couponRate")} error={form.formState.errors.couponRate?.message} />
         <Controller control={form.control} name="purchaseDate" render={({ field, fieldState }) => (
           <FormDatePicker label="FD Start Date" value={field.value ?? ""} onChange={field.onChange}
-            onBlur={field.onBlur} error={fieldState.error?.message} />
+            onBlur={field.onBlur} error={fieldState.error?.message} testId="fd-purchase-date-input" />
         )} />
         <Controller control={form.control} name="maturityDate" render={({ field, fieldState }) => (
           <FormDatePicker label="Maturity Date" value={field.value ?? ""} onChange={field.onChange}
-            onBlur={field.onBlur} error={fieldState.error?.message} />
+            onBlur={field.onBlur} error={fieldState.error?.message} testId="fd-maturity-date-input" />
         )} />
         <FormSelect label="Compounding" options={COMPOUND_FREQ} {...form.register("compoundingFrequency")} />
         {maturityAmt != null && (
@@ -68,14 +68,14 @@ export function FDForm({ defaultValues, onSubmit, onCancel, isPending, bankAccou
         {bankAccounts.length > 0 && (
           <Controller control={form.control} name="linkedAccountId" render={({ field }) => (
             <AccountPicker label="Credit Maturity To" allowClear
-              bankAccounts={bankAccounts} value={field.value ?? ""} onChange={field.onChange} />
+              bankAccounts={bankAccounts} value={field.value ?? ""} onChange={field.onChange} testId="fd-linked-account-picker" />
           )} />
         )}
         {!isEditing && (bankAccounts.length > 0 || investmentAccounts.length > 0) && (
           <Controller control={form.control} name="debitAccountId" render={({ field }) => (
             <AccountPicker label="Debit from Account (optional)" placeholder="None (no debit)" allowClear
               bankAccounts={bankAccounts} investmentAccounts={investmentAccounts}
-              value={field.value ?? ""} onChange={field.onChange} />
+              value={field.value ?? ""} onChange={field.onChange} testId="fd-debit-account-picker" />
           )} />
         )}
       </div>

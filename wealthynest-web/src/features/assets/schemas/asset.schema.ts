@@ -1,4 +1,4 @@
-import { z } from "zod";
+import {z} from "zod";
 
 export const ASSET_TYPE_VALUES = [
   "BANK_ACCOUNT", "CASH", "STOCK", "MUTUAL_FUND", "BOND", "GOLD",

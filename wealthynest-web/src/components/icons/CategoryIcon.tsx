@@ -1,5 +1,5 @@
-import { getCategoryIcon, getCategoryColor } from "@/lib/categoryMeta";
-import { PremiumIcon, type IconStateProps, type IconSize } from "./PremiumIcon";
+import {getCategoryColor, getCategoryIcon} from "@/lib/categoryMeta";
+import {type IconSize, type IconStateProps, PremiumIcon} from "./PremiumIcon";
 
 interface CategoryIconProps extends IconStateProps {
   /** Category name — drives the keyword-matched icon/color fallback. */

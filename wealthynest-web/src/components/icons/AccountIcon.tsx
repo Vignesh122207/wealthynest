@@ -1,6 +1,6 @@
-import type { AccountType } from "@/features/accounts/types/account.types";
-import { ACCOUNT_TYPE_META } from "@/lib/accountTypeMeta";
-import { PremiumIcon, type IconStateProps, type IconSize } from "./PremiumIcon";
+import type {AccountType} from "@/features/accounts/types/account.types";
+import {ACCOUNT_TYPE_META} from "@/lib/accountTypeMeta";
+import {type IconSize, type IconStateProps, PremiumIcon} from "./PremiumIcon";
 
 interface AccountIconProps extends IconStateProps {
   type: AccountType;

@@ -1,40 +1,51 @@
 "use client";
 
-import { useState } from "react";
+import {useState} from "react";
 import {
-  Plus, Target, ChevronLeft, ChevronRight, AlertTriangle,
-  Calendar, CalendarDays, Tag, Check, ArrowUpDown, PieChart, Wallet, X, Users, BadgeCheck,
+    AlertTriangle,
+    ArrowUpDown,
+    BadgeCheck,
+    Calendar,
+    CalendarDays,
+    Check,
+    ChevronLeft,
+    ChevronRight,
+    PieChart,
+    Plus,
+    Tag,
+    Target,
+    Users,
+    Wallet,
+    X,
 } from "lucide-react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Header } from "@/components/layout/Header";
-import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { QueryErrorState } from "@/components/shared/QueryErrorState";
-import { TableRowSkeleton } from "@/components/shared/LoadingSkeleton";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { FormSelect } from "@/components/forms/FormSelect";
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import { FormModalShell } from "@/components/ui/FormModalShell";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { CategoryPicker } from "@/components/transactions/CategoryPicker";
-import { FormModalHeader } from "@/components/transactions/FormModalHeader";
-import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
-import { BigAmountInput } from "@/components/transactions/BigAmountInput";
-import { getCategoryIcon, getCategoryColor } from "@/lib/categoryMeta";
-import { CATEGORY_ICON_LIST, CATEGORY_COLOR_PALETTE, suggestUnusedCombo } from "@/lib/categoryIcons";
-import {
-  useBudgets, useCreateBudget, useDeleteBudget,
-} from "@/features/budgets/hooks/useBudgets";
-import { useCategories, useCreateCategory, useDeleteCategory } from "@/features/categories/hooks/useCategories";
-import { budgetSchema, type BudgetFormValues } from "@/features/budgets/schemas/budget.schema";
-import { BudgetDetailModal } from "@/features/budgets/components/BudgetDetailModal";
-import type { Budget, BudgetType } from "@/features/budgets/types/budget.types";
-import { cn } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { useAuthStore } from "@/features/auth/store/auth.store";
-import { toast } from "sonner";
+import {useForm} from "react-hook-form";
+import {zodResolver} from "@hookform/resolvers/zod";
+import {Header} from "@/components/layout/Header";
+import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
+import {EmptyState} from "@/components/shared/EmptyState";
+import {QueryErrorState} from "@/components/shared/QueryErrorState";
+import {TableRowSkeleton} from "@/components/shared/LoadingSkeleton";
+import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
+import {FormSelect} from "@/components/forms/FormSelect";
+import {Button} from "@/components/ui/Button";
+import {Card} from "@/components/ui/Card";
+import {FormModalShell} from "@/components/ui/FormModalShell";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {CategoryPicker} from "@/components/transactions/CategoryPicker";
+import {FormModalHeader} from "@/components/transactions/FormModalHeader";
+import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
+import {BigAmountInput} from "@/components/transactions/BigAmountInput";
+import {getCategoryColor, getCategoryIcon} from "@/lib/categoryMeta";
+import {CATEGORY_COLOR_PALETTE, CATEGORY_ICON_LIST, suggestUnusedCombo} from "@/lib/categoryIcons";
+import {useBudgets, useCreateBudget, useDeleteBudget,} from "@/features/budgets/hooks/useBudgets";
+import {useCategories, useCreateCategory, useDeleteCategory} from "@/features/categories/hooks/useCategories";
+import {type BudgetFormValues, budgetSchema} from "@/features/budgets/schemas/budget.schema";
+import {BudgetDetailModal} from "@/features/budgets/components/BudgetDetailModal";
+import type {Budget, BudgetType} from "@/features/budgets/types/budget.types";
+import {cn} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {useAuthStore} from "@/features/auth/store/auth.store";
+import {toast} from "sonner";
 
 function monthLabel(year: number, month: number) {
   return new Date(year, month - 1).toLocaleString("en-IN", { month: "long", year: "numeric" });
@@ -226,7 +237,7 @@ export default function BudgetsPage() {
               </p>
               <div className="flex gap-2 mb-4 flex-wrap">
                 {(["MONTHLY", "YEARLY"] as BudgetType[]).map(t => (
-                  <button key={t} type="button"
+                  <button key={t} type="button" data-testid={`budget-type-${t}`}
                     onClick={() => { setBudgetType(t); form.setValue("budgetType", t); }}
                     className={cn("flex items-center gap-2 px-4 h-9 rounded-xl text-sm font-medium transition-all border",
                       budgetType === t
@@ -247,6 +258,7 @@ export default function BudgetsPage() {
                   onChange={id => form.setValue("categoryId", id, { shouldValidate: true })}
                   error={form.formState.errors.categoryId?.message}
                   manageHref="/settings/categories"
+                  testId="budget-category-picker"
                 />
                 <button type="button" onClick={openAddCategory}
                   className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 hover:text-amber-500 transition-colors">
@@ -284,11 +296,11 @@ export default function BudgetsPage() {
                     </button>
                   </div>
                 )}
-                <BigAmountInput colorClass="text-amber-500 dark:text-amber-400"
+                <BigAmountInput colorClass="text-amber-500 dark:text-amber-400" testId="budget-amount-input"
                   error={form.formState.errors.amount?.message} inputProps={form.register("amount")} />
                 <FormSelect label="Alert At (%)" options={ALERT_OPTIONS} {...form.register("alertThreshold")} />
                 <div className="flex gap-2 pt-1">
-                  <Button type="submit" variant="gradient" loading={isPending}
+                  <Button type="submit" data-testid="budget-form-submit" variant="gradient" loading={isPending}
                     className="flex-1 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 shadow-amber-500/25 disabled:shadow-none">
                     {isPending ? "Saving…" : "Create"}
                   </Button>
@@ -305,7 +317,7 @@ export default function BudgetsPage() {
         {/* Navigator + Actions */}
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-1.5">
-            <button onClick={() => navigate(-1)}
+            <button onClick={() => navigate(-1)} aria-label="Previous month"
               className="w-8 h-8 rounded-lg bg-muted/60 hover:bg-muted flex items-center justify-center transition-all">
               <ChevronLeft className="w-4 h-4 text-muted-foreground" />
             </button>
@@ -313,7 +325,7 @@ export default function BudgetsPage() {
               <span className="text-sm font-semibold text-foreground">{monthLabel(year, month)}</span>
               <p className="text-xs text-muted-foreground leading-tight">Monthly budgets · Yearly shows {year}</p>
             </div>
-            <button onClick={() => navigate(1)} disabled={isCurrentMonth}
+            <button onClick={() => navigate(1)} disabled={isCurrentMonth} aria-label="Next month"
               className="w-8 h-8 rounded-lg bg-muted/60 hover:bg-muted flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed">
               <ChevronRight className="w-4 h-4 text-muted-foreground" />
             </button>
@@ -449,7 +461,7 @@ export default function BudgetsPage() {
 
       {/* ── Floating Action Button ── */}
       <FloatingActionButton actions={[
-        { icon: Target, label: "Add Budget", color: "amber", onClick: () => setShowForm(true) },
+        { icon: Target, label: "Add Budget", color: "amber", testId: "fab-add-budget", onClick: () => setShowForm(true) },
       ]} />
     </div>
   );

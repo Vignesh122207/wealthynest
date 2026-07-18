@@ -1,6 +1,6 @@
-import { apiClient } from "@/lib/axios";
-import type { ApiResponse } from "@/types/api.types";
-import type { CreateGoalPayload, Goal } from "../types/goal.types";
+import {apiClient} from "@/lib/axios";
+import type {ApiResponse} from "@/types/api.types";
+import type {CreateGoalPayload, Goal} from "../types/goal.types";
 
 export const goalsApi = {
   getAll: async (): Promise<Goal[]> =>

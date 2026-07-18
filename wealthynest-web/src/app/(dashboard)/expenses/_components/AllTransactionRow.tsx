@@ -1,16 +1,16 @@
 "use client";
 
-import { memo } from "react";
-import { CreditCard, RefreshCw, ArrowLeftRight, HandCoins } from "lucide-react";
-import { getCategoryIcon, getCategoryColor, INCOME_ICON_MAP } from "@/lib/categoryMeta";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { DebtBadge } from "@/features/expenses/components/TransactionRows";
-import { INCOME_SOURCES } from "@/lib/constants";
-import { cn } from "@/lib/utils";
-import type { Expense } from "@/features/expenses/types/expense.types";
-import type { IncomeEntry } from "@/features/income/types/income.types";
-import type { AccountTransfer } from "@/features/accounts/types/account.types";
-import type { TxRow } from "./types";
+import {memo} from "react";
+import {ArrowLeftRight, CreditCard, HandCoins, RefreshCw} from "lucide-react";
+import {getCategoryColor, getCategoryIcon, INCOME_ICON_MAP} from "@/lib/categoryMeta";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {DebtBadge} from "@/features/expenses/components/TransactionRows";
+import {INCOME_SOURCES} from "@/lib/constants";
+import {cn} from "@/lib/utils";
+import type {Expense} from "@/features/expenses/types/expense.types";
+import type {IncomeEntry} from "@/features/income/types/income.types";
+import type {AccountTransfer} from "@/features/accounts/types/account.types";
+import type {TxRow} from "./types";
 
 interface AllTransactionRowProps {
   row: TxRow;

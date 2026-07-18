@@ -1,14 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer,
-} from "recharts";
-import { TrendingUp } from "lucide-react";
-import { cn, formatTrendDelta, formatChartTickINR } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { CHART_COLORS } from "@/lib/chartColors";
-import type { NetWorthHistoryPoint } from "@/features/networth/types/networth.types";
+import {Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,} from "recharts";
+import {TrendingUp} from "lucide-react";
+import {cn, formatChartTickINR, formatTrendDelta} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {CHART_COLORS} from "@/lib/chartColors";
+import type {NetWorthHistoryPoint} from "@/features/networth/types/networth.types";
 
 interface NetWorthTrendProps {
   history:      NetWorthHistoryPoint[];

@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import {cn} from "@/lib/utils";
 
 interface FormModalShellProps {
   /** Tailwind gradient stop classes for the top accent strip, e.g. "from-fuchsia-500 to-pink-600". */

@@ -1,12 +1,12 @@
 "use client";
 
-import { AlertTriangle } from "lucide-react";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { getLiabilityTypeMeta, typeLabel } from "@/lib/netWorthTypeMeta";
-import { LIABILITY_TYPES } from "@/lib/constants";
-import { formatDate, cn } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import type { Liability } from "../types/liability.types";
+import {AlertTriangle} from "lucide-react";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {getLiabilityTypeMeta, typeLabel} from "@/lib/netWorthTypeMeta";
+import {LIABILITY_TYPES} from "@/lib/constants";
+import {cn, formatDate} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import type {Liability} from "../types/liability.types";
 
 function paidPct(outstanding: number, principal: number) {
   if (!principal || principal <= 0) return 0;

@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import {useState} from "react";
+import {useForm} from "react-hook-form";
+import {zodResolver} from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { Eye, EyeOff, Loader2, AlertTriangle, ShieldCheck } from "lucide-react";
-import { resetPasswordSchema, type ResetPasswordFormValues } from "../schemas/auth.schema";
-import { useResetPassword } from "../hooks/useAuth";
-import { BrandMark } from "@/components/icons/BrandMark";
-import { cn } from "@/lib/utils";
+import {AlertTriangle, Eye, EyeOff, Loader2, ShieldCheck} from "lucide-react";
+import {type ResetPasswordFormValues, resetPasswordSchema} from "../schemas/auth.schema";
+import {useResetPassword} from "../hooks/useAuth";
+import {BrandMark} from "@/components/icons/BrandMark";
+import {cn} from "@/lib/utils";
 
 interface Props {
   token: string;

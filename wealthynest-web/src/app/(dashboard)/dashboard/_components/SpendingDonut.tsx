@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
-import { Receipt } from "lucide-react";
-import { monthLabel } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { getCategoryColor, getCategoryIcon } from "@/lib/categoryMeta";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { EmptyState } from "@/components/shared/EmptyState";
-import type { CategorySpending } from "@/features/dashboard/types/dashboard.types";
+import {Cell, Pie, PieChart, ResponsiveContainer, Tooltip} from "recharts";
+import {Receipt} from "lucide-react";
+import {monthLabel} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {getCategoryColor, getCategoryIcon} from "@/lib/categoryMeta";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {EmptyState} from "@/components/shared/EmptyState";
+import type {CategorySpending} from "@/features/dashboard/types/dashboard.types";
 
 interface SpendingDonutProps {
   categoryBreakdown: CategorySpending[];

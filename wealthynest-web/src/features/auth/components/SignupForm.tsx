@@ -1,15 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import {useState} from "react";
+import {useForm, useWatch} from "react-hook-form";
+import {zodResolver} from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { Eye, EyeOff, IndianRupee, Loader2, ShieldCheck, Target, Wallet } from "lucide-react";
-import { BrandMark } from "@/components/icons/BrandMark";
-import { GoogleSignInButton } from "./GoogleSignInButton";
-import { registerSchema, type RegisterFormValues } from "../schemas/auth.schema";
-import { useRegister } from "../hooks/useAuth";
-import { cn } from "@/lib/utils";
+import {Eye, EyeOff, IndianRupee, Loader2, ShieldCheck, Target, Wallet} from "lucide-react";
+import {BrandMark} from "@/components/icons/BrandMark";
+import {GoogleSignInButton} from "./GoogleSignInButton";
+import {type RegisterFormValues, registerSchema} from "../schemas/auth.schema";
+import {useRegister} from "../hooks/useAuth";
+import {cn} from "@/lib/utils";
 
 const googleClientIdConfigured = !!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
@@ -145,6 +145,7 @@ export function SignupForm() {
               <div key={name} className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">{label}</label>
                 <input
+                  data-testid={`signup-${name}-input`}
                   type={type}
                   placeholder={placeholder}
                   {...form.register(name)}
@@ -166,6 +167,7 @@ export function SignupForm() {
               <label className="text-xs font-medium text-muted-foreground">Password</label>
               <div className="relative">
                 <input
+                  data-testid="signup-password-input"
                   type={showPassword ? "text" : "password"}
                   placeholder="Min 8 chars, uppercase, number"
                   {...form.register("password")}
@@ -192,6 +194,7 @@ export function SignupForm() {
               <label className="text-xs font-medium text-muted-foreground">Confirm password</label>
               <div className="relative">
                 <input
+                  data-testid="signup-confirm-password-input"
                   type={showConfirm ? "text" : "password"}
                   placeholder="••••••••"
                   {...form.register("confirmPassword")}
@@ -212,7 +215,7 @@ export function SignupForm() {
               )}
             </div>
 
-            <button type="submit" disabled={isPending}
+            <button data-testid="signup-submit" type="submit" disabled={isPending}
               className={cn(
                 "w-full h-11 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 mt-1",
                 "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/30",

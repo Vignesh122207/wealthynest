@@ -1,41 +1,51 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import {useMemo, useState} from "react";
 import dynamic from "next/dynamic";
-import { Wallet, HandCoins } from "lucide-react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Header } from "@/components/layout/Header";
-import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { type IncomeFormValues, type IncomeSourceValue } from "@/components/transactions/IncomeForm";
-import { type TransferFormValues } from "@/components/transactions/TransferFormModal";
-import type { ExpenseFormValues } from "@/features/expenses/schemas/expense.schema";
+import {Wallet} from "lucide-react";
+import {useForm} from "react-hook-form";
+import {zodResolver} from "@hookform/resolvers/zod";
+import {Header} from "@/components/layout/Header";
+import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
+import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
+import {type IncomeFormValues, type IncomeSourceValue} from "@/components/transactions/IncomeForm";
+import {type TransferFormValues} from "@/components/transactions/TransferFormModal";
+import type {ExpenseFormValues} from "@/features/expenses/schemas/expense.schema";
 import {
-  useAccounts, useArchivedAccounts, useCreateAccount, useUpdateAccount,
-  useDeleteAccount, useArchiveAccount, useUnarchiveAccount, useSetPrimaryAccount,
-  useTransfer, useAdjustBalance, useRecordLoanPayment,
+    useAccounts,
+    useAdjustBalance,
+    useArchiveAccount,
+    useArchivedAccounts,
+    useCreateAccount,
+    useDeleteAccount,
+    useRecordLoanPayment,
+    useSetPrimaryAccount,
+    useTransfer,
+    useUnarchiveAccount,
+    useUpdateAccount,
 } from "@/features/accounts/hooks/useAccounts";
-import { usePrefsStore, CURRENCIES } from "@/store/preferences.store";
-import { AccountCard } from "@/features/accounts/components/AccountCard";
-import { LoanCard } from "@/features/accounts/components/LoanCard";
-import { downloadAccountStatement } from "@/features/accounts/utils/downloadAccountStatement";
+import {CURRENCIES, usePrefsStore} from "@/store/preferences.store";
+import {AccountCard} from "@/features/accounts/components/AccountCard";
+import {LoanCard} from "@/features/accounts/components/LoanCard";
+import {downloadAccountStatement} from "@/features/accounts/utils/downloadAccountStatement";
 import {
-  createAccountSchema, LOAN_TYPE_LABELS, type CreateAccountForm,
+    type CreateAccountForm,
+    createAccountSchema,
+    LOAN_TYPE_LABELS,
 } from "@/features/accounts/schemas/account.schema";
-import { useExpenses, useCreateExpense } from "@/features/expenses/hooks/useExpenses";
-import { useIncome, useCreateIncome } from "@/features/income/hooks/useIncome";
-import { useDebts } from "@/features/debts/hooks/useDebts";
-import type { DebtRecord } from "@/features/debts/types/debt.types";
-import { useCategories } from "@/features/categories/hooks/useCategories";
-import { useCreateRecurringIncome } from "@/features/recurringIncome/hooks/useRecurringIncome";
-import { buildUsageCounts, pickSmartDefault } from "@/lib/mostUsed";
-import type { AccountType, WalletAccount } from "@/features/accounts/types/account.types";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { AccountStatStrip } from "./_components/AccountStatStrip";
-import { AccountFilterTabs, type SectionFilter } from "./_components/AccountFilterTabs";
-import { AccountsGrid } from "./_components/AccountsGrid";
-import { ArchivedAccountsSection } from "./_components/ArchivedAccountsSection";
+import {useCreateExpense, useExpenses} from "@/features/expenses/hooks/useExpenses";
+import {useCreateIncome, useIncome} from "@/features/income/hooks/useIncome";
+import {useDebts} from "@/features/debts/hooks/useDebts";
+import type {DebtRecord} from "@/features/debts/types/debt.types";
+import {useCategories} from "@/features/categories/hooks/useCategories";
+import {useCreateRecurringIncome} from "@/features/recurringIncome/hooks/useRecurringIncome";
+import {buildUsageCounts, pickSmartDefault} from "@/lib/mostUsed";
+import type {AccountType, WalletAccount} from "@/features/accounts/types/account.types";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {AccountStatStrip} from "./_components/AccountStatStrip";
+import {AccountFilterTabs} from "./_components/AccountFilterTabs";
+import {AccountsGrid} from "./_components/AccountsGrid";
+import {ArchivedAccountsSection} from "./_components/ArchivedAccountsSection";
 
 // Lazy-loaded: all four are only ever needed after a user opens one of them, never on first
 // paint — keeping them out of the page's initial bundle shrinks it noticeably, since together
@@ -470,7 +480,7 @@ export default function AccountsPage() {
 
       {/* ── Floating Action Button ── */}
       <FloatingActionButton actions={[
-        { icon: Wallet, label: "Add Account", color: "indigo", onClick: () => openCreate("BANK_ACCOUNT") },
+        { icon: Wallet, label: "Add Account", color: "indigo", testId: "fab-add-account", onClick: () => openCreate("BANK_ACCOUNT") },
       ]} />
     </div>
   );

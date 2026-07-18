@@ -1,5 +1,5 @@
-import { ICONS } from "./iconRegistry";
-import { PremiumIcon, type IconStateProps, type IconSize } from "./PremiumIcon";
+import {ICONS} from "./iconRegistry";
+import {type IconSize, type IconStateProps, PremiumIcon} from "./PremiumIcon";
 
 interface MenuIconProps extends IconStateProps {
   /** Nav item key from iconRegistry's "nav" group, e.g. "overview", "accounts", "settings". */

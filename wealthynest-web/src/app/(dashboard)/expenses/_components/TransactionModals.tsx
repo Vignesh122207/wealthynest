@@ -1,16 +1,16 @@
 "use client";
 
-import { type ComponentProps } from "react";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { ExpenseForm } from "@/components/transactions/ExpenseForm";
-import { IncomeForm, type IncomeFormValues, type IncomeSourceValue } from "@/components/transactions/IncomeForm";
-import { TransferFormModal, type TransferFormValues } from "@/components/transactions/TransferFormModal";
-import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
-import { type ExpenseFormValues } from "@/features/expenses/schemas/expense.schema";
-import type { SplitParticipant, Expense } from "@/features/expenses/types/expense.types";
-import type { IncomeEntry } from "@/features/income/types/income.types";
-import type { AccountTransfer, WalletAccount } from "@/features/accounts/types/account.types";
-import type { Category } from "@/features/categories/types/category.types";
+import {type ComponentProps} from "react";
+import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
+import {ExpenseForm} from "@/components/transactions/ExpenseForm";
+import {IncomeForm, type IncomeFormValues, type IncomeSourceValue} from "@/components/transactions/IncomeForm";
+import {TransferFormModal, type TransferFormValues} from "@/components/transactions/TransferFormModal";
+import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
+import {type ExpenseFormValues} from "@/features/expenses/schemas/expense.schema";
+import type {Expense, SplitParticipant} from "@/features/expenses/types/expense.types";
+import type {IncomeEntry} from "@/features/income/types/income.types";
+import type {AccountTransfer, WalletAccount} from "@/features/accounts/types/account.types";
+import type {Category} from "@/features/categories/types/category.types";
 
 // All three add/edit modal groups (Expense/Income/Transfer) plus their three delete-confirm
 // dialogs — split out of the Transactions page purely to cut its size; every prop here is a

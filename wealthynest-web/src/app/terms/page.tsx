@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
-import { ScrollText } from "lucide-react";
-import { LegalPageChrome } from "@/components/layout/LegalPageChrome";
+import type {Metadata} from "next";
+import {ScrollText} from "lucide-react";
+import {LegalPageChrome} from "@/components/layout/LegalPageChrome";
 
 export const metadata: Metadata = { title: "Terms of Service" };
 

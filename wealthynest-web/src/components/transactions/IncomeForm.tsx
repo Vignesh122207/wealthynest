@@ -1,22 +1,22 @@
 "use client";
 
-import { useState } from "react";
-import { Check, RefreshCw, Wallet } from "lucide-react";
-import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { cn } from "@/lib/utils";
-import { FormInput } from "@/components/forms/FormInput";
-import { FormDatePicker } from "@/components/forms/FormDatePicker";
-import { incomeSchema } from "@/features/income/schemas/income.schema";
-import { INCOME_SOURCES } from "@/lib/constants";
-import { INCOME_ICON_MAP } from "@/lib/categoryMeta";
-import { sortByUsage } from "@/lib/mostUsed";
-import type { Category } from "@/features/categories/types/category.types";
-import { CategoryPicker } from "./CategoryPicker";
-import { AccountPicker } from "./AccountPicker";
-import { BigAmountInput } from "./BigAmountInput";
-import { FormModalHeader } from "./FormModalHeader";
+import {useState} from "react";
+import {Check, RefreshCw, Wallet} from "lucide-react";
+import {Controller, useForm} from "react-hook-form";
+import {zodResolver} from "@hookform/resolvers/zod";
+import {z} from "zod";
+import {cn} from "@/lib/utils";
+import {FormInput} from "@/components/forms/FormInput";
+import {FormDatePicker} from "@/components/forms/FormDatePicker";
+import {incomeSchema} from "@/features/income/schemas/income.schema";
+import {INCOME_SOURCES} from "@/lib/constants";
+import {INCOME_ICON_MAP} from "@/lib/categoryMeta";
+import {sortByUsage} from "@/lib/mostUsed";
+import type {Category} from "@/features/categories/types/category.types";
+import {CategoryPicker} from "./CategoryPicker";
+import {AccountPicker} from "./AccountPicker";
+import {BigAmountInput} from "./BigAmountInput";
+import {FormModalHeader} from "./FormModalHeader";
 
 // ─── Income Form ──────────────────────────────────────────────────────────────
 
@@ -110,7 +110,7 @@ export function IncomeForm({ onSubmit, onCancel, onDelete, isPending, accounts, 
         <FormModalHeader icon={Wallet} tone="emerald"
           title={isEdit ? "Edit Income" : "Add Income"} onDelete={onDelete} onClose={onCancel} />
         <form onSubmit={form.handleSubmit(handleValidatedSubmit)} className="space-y-4">
-          <BigAmountInput colorClass="text-emerald-500 dark:text-emerald-400"
+          <BigAmountInput colorClass="text-emerald-500 dark:text-emerald-400" testId="income-amount-input"
             error={form.formState.errors.amount?.message} inputProps={form.register("amount")} />
 
           <Controller control={form.control} name="incomeDate" render={({ field, fieldState }) => (
@@ -121,7 +121,7 @@ export function IncomeForm({ onSubmit, onCancel, onDelete, isPending, accounts, 
             <CategoryPicker label={hasCategoryOptions ? "Category" : "Source"} placeholder="Select source"
               categories={sourceOptions} value={field.value ?? ""} onChange={field.onChange}
               error={fieldState.error?.message} iconFor={sourceIconFor}
-              manageHref={hasCategoryOptions ? "/settings/categories" : undefined} />
+              manageHref={hasCategoryOptions ? "/settings/categories" : undefined} testId="income-source-picker" />
           )} />
 
           {!hasDepositAccounts ? (
@@ -131,7 +131,7 @@ export function IncomeForm({ onSubmit, onCancel, onDelete, isPending, accounts, 
           ) : (
             <Controller control={form.control} name="accountId" render={({ field, fieldState }) => (
               <AccountPicker label="Deposit to Account" cashAccounts={depositCash} bankAccounts={depositBank} creditAccounts={[]}
-                value={field.value ?? ""} onChange={field.onChange} error={fieldState.error?.message} />
+                value={field.value ?? ""} onChange={field.onChange} error={fieldState.error?.message} testId="income-account-picker" />
             )} />
           )}
           <FormInput label="Description (optional)" placeholder="e.g. June salary" {...form.register("description")} />
@@ -169,7 +169,7 @@ export function IncomeForm({ onSubmit, onCancel, onDelete, isPending, accounts, 
           )}
 
           <div className="flex gap-2 pt-1">
-            <button type="submit" disabled={isPending}
+            <button type="submit" data-testid="income-form-submit" disabled={isPending}
               className="flex items-center justify-center gap-2 flex-1 h-11 rounded-xl text-sm font-semibold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-lg shadow-emerald-500/25 transition-all disabled:opacity-60 disabled:shadow-none">
               <Check className="w-4 h-4" /> {isPending ? "Saving…" : isEdit ? "Save Changes" : makeRecurring ? "Add & Set Recurring" : "Add Income"}
             </button>

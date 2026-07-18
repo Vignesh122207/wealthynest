@@ -1,6 +1,6 @@
-import { apiClient } from "@/lib/axios";
-import type { ApiResponse } from "@/types/api.types";
-import type { DebtRecord, DebtType } from "../types/debt.types";
+import {apiClient} from "@/lib/axios";
+import type {ApiResponse} from "@/types/api.types";
+import type {DebtRecord, DebtType} from "../types/debt.types";
 
 export interface CreateDebtPayload {
   type:          DebtType;

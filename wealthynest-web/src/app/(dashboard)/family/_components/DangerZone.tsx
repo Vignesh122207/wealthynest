@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, LogOut, Trash2 } from "lucide-react";
+import {Loader2, LogOut, Trash2} from "lucide-react";
 
 // ── Danger-zone section (always rendered at the very bottom) ─────────────────
 
@@ -36,7 +36,7 @@ export function DangerZone({
           Leave <span className="font-semibold">{familyName}</span>? Your personal data stays in your account.
         </p>
         <div className="flex gap-2">
-          <button onClick={onLeave} disabled={leaving}
+          <button onClick={onLeave} disabled={leaving} data-testid="family-confirm-leave"
             className="flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-all disabled:opacity-60">
             {leaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}
             Yes, leave
@@ -62,10 +62,11 @@ export function DangerZone({
           <input id="delete-family-confirm" autoFocus autoComplete="off"
             value={deleteConfirmText} onChange={e => setDeleteConfirmText(e.target.value)}
             disabled={deleting}
+            data-testid="family-delete-confirm-input"
             className="w-full h-9 px-3 rounded-xl text-sm bg-background border border-border text-foreground outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/25 transition-all disabled:opacity-50" />
         </div>
         <div className="flex gap-2">
-          <button onClick={onDelete} disabled={deleting || deleteBlocked}
+          <button onClick={onDelete} disabled={deleting || deleteBlocked} data-testid="family-confirm-delete"
             className="flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-all disabled:opacity-60">
             {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
             Yes, delete group
@@ -85,16 +86,17 @@ export function DangerZone({
           <>
             <button
               onClick={() => membersCount <= 1 ? onEnterConfirmLeave() : onEnterAdminLeave()}
+              data-testid="family-leave-trigger"
               className="flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium text-red-600 dark:text-red-500 bg-red-500/8 border border-red-500/30 hover:bg-red-500/15 transition-all">
               <LogOut className="w-3.5 h-3.5" /> Leave Group
             </button>
-            <button onClick={onEnterConfirmDelete}
+            <button onClick={onEnterConfirmDelete} data-testid="family-delete-trigger"
               className="flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium text-red-600 dark:text-red-500 bg-red-500/8 border border-red-500/30 hover:bg-red-500/15 transition-all">
               <Trash2 className="w-3.5 h-3.5" /> Delete Group
             </button>
           </>
         ) : (
-          <button onClick={onEnterConfirmLeave} disabled={leaving}
+          <button onClick={onEnterConfirmLeave} disabled={leaving} data-testid="family-leave-trigger"
             className="flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium text-red-600 dark:text-red-500 bg-red-500/8 border border-red-500/30 hover:bg-red-500/15 transition-all disabled:opacity-60">
             <LogOut className="w-3.5 h-3.5" /> Leave Group
           </button>

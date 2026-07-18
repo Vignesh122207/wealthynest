@@ -1,22 +1,37 @@
 "use client";
 
-import { memo, useRef, useState, type CSSProperties } from "react";
-import { createPortal } from "react-dom";
+import {type CSSProperties, memo, useRef, useState} from "react";
+import {createPortal} from "react-dom";
 import Link from "next/link";
 import {
-  Plus, ArrowLeftRight, TrendingUp, TrendingDown, ChevronDown,
-  Receipt, Banknote, AlertCircle, Calendar, Wifi, Download, Upload, Eye, EyeOff,
-  CreditCard, Star, List, Repeat,
+  AlertCircle,
+  ArrowLeftRight,
+  Banknote,
+  Calendar,
+  ChevronDown,
+  CreditCard,
+  Download,
+  Eye,
+  EyeOff,
+  List,
+  Plus,
+  Receipt,
+  Repeat,
+  Star,
+  TrendingDown,
+  TrendingUp,
+  Upload,
+  Wifi,
 } from "lucide-react";
-import { ACCOUNT_TYPE_META } from "@/lib/accountTypeMeta";
-import { BankLogo } from "@/components/icons/BankLogo";
-import { lighten } from "@/components/icons/PremiumIcon";
-import { getBankMonogram } from "@/lib/bankLogos";
-import { formatDate, cn } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { downloadAccountStatement } from "../utils/downloadAccountStatement";
-import type { WalletAccount } from "../types/account.types";
-import type { DebtRecord } from "@/features/debts/types/debt.types";
+import {ACCOUNT_TYPE_META} from "@/lib/accountTypeMeta";
+import {BankLogo} from "@/components/icons/BankLogo";
+import {lighten} from "@/components/icons/PremiumIcon";
+import {getBankMonogram} from "@/lib/bankLogos";
+import {cn, formatDate} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {downloadAccountStatement} from "../utils/downloadAccountStatement";
+import type {WalletAccount} from "../types/account.types";
+import type {DebtRecord} from "@/features/debts/types/debt.types";
 
 export const AccountCard = memo(function AccountCard({ account, linkedDebts = [], onAddMoney, onAddExpense, onTransfer, onEdit, onSetPrimary, settingPrimary, onImportStatement }: {
   account:      WalletAccount;

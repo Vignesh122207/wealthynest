@@ -28,7 +28,7 @@ export interface SplitParticipant {
 export interface CreateExpensePayload {
   categoryId:      string;
   budgetId?:       string;
-  accountId?:      string;
+  accountId:       string;
   amount:          number;
   description?:    string;
   notes?:          string;

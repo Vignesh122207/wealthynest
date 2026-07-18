@@ -1,10 +1,10 @@
 "use client";
 
-import { Check, Copy, Shield, TrendingUp, ArrowDownLeft, ArrowUpRight, PiggyBank, Trophy } from "lucide-react";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { SlotBar } from "@/features/family/components/SlotBar";
-import { cn } from "@/lib/utils";
-import type { Family, FamilyMonthlyStats } from "@/features/family/types/family.types";
+import {ArrowDownLeft, ArrowUpRight, Check, Copy, PiggyBank, Shield, TrendingUp, Trophy} from "lucide-react";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {SlotBar} from "@/features/family/components/SlotBar";
+import {cn} from "@/lib/utils";
+import type {Family, FamilyMonthlyStats} from "@/features/family/types/family.types";
 
 const firstName = (name: string) => name.trim().split(/\s+/).filter(Boolean)[0] || name;
 
@@ -47,7 +47,7 @@ export function FamilyOverviewStats({
             <p className="text-xs text-amber-600 dark:text-amber-400">Group full — remove a member to allow new joins</p>
           ) : (
             <div className="flex items-center gap-2">
-              <span className="font-mono text-base font-bold tracking-widest text-indigo-600 dark:text-indigo-400">{family.inviteCode}</span>
+              <span data-testid="family-invite-code-display" className="font-mono text-base font-bold tracking-widest text-indigo-600 dark:text-indigo-400">{family.inviteCode}</span>
               <button onClick={copyCode}
                 className="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-indigo-600/15 hover:bg-indigo-600/25 text-indigo-600 dark:text-indigo-400 transition-all">
                 {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}

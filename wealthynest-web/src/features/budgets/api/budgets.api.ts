@@ -1,6 +1,6 @@
-import { apiClient } from "@/lib/axios";
-import type { ApiResponse } from "@/types/api.types";
-import type { Budget, CreateBudgetPayload, UpdateBudgetPayload } from "../types/budget.types";
+import {apiClient} from "@/lib/axios";
+import type {ApiResponse} from "@/types/api.types";
+import type {Budget, CreateBudgetPayload, UpdateBudgetPayload} from "../types/budget.types";
 
 export const budgetsApi = {
   getBudgets: async (year?: number, month?: number): Promise<Budget[]> => {

@@ -1,7 +1,7 @@
-import { AlertTriangle, Target } from "lucide-react";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { cn } from "@/lib/utils";
-import type { Budget } from "@/features/budgets/types/budget.types";
+import {AlertTriangle, Target} from "lucide-react";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {cn} from "@/lib/utils";
+import type {Budget} from "@/features/budgets/types/budget.types";
 
 // ── Budget Overview ────────────────────────────────────────────────────────────
 

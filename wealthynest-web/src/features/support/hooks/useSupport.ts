@@ -1,7 +1,7 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supportApi } from "../api/support.api";
-import { toast } from "sonner";
-import type { CreateTicketPayload, ReplyPayload, TicketStatus } from "../types/support.types";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {supportApi} from "../api/support.api";
+import {toast} from "sonner";
+import type {CreateTicketPayload, ReplyPayload, TicketStatus} from "../types/support.types";
 
 const KEYS = {
   mine:      (p: number) => ["tickets", "mine", p],

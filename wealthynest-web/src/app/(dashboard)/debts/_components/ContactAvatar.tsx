@@ -1,4 +1,4 @@
-import { GlossyBadge, TONE_HEX } from "@/components/icons/PremiumIcon";
+import {GlossyBadge, TONE_HEX} from "@/components/icons/PremiumIcon";
 
 // ── Contact avatar — monogram badge, consistent with BankLogo's fallback look ──
 

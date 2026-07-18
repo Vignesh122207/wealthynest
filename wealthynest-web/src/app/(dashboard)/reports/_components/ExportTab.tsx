@@ -1,15 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { Download, Database, Loader2, Receipt, Wallet, ArrowLeftRight, Landmark, LineChart, Coins } from "lucide-react";
-import { toast } from "sonner";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { expensesApi } from "@/features/expenses/api/expenses.api";
-import { accountsApi } from "@/features/accounts/api/accounts.api";
-import { investmentsApi } from "@/features/investments/api/investments.api";
-import { incomeApi } from "@/features/income/api/income.api";
-import type { IncomeEntry } from "@/features/income/types/income.types";
-import { getYears, triggerLocalCsv } from "./reportHelpers";
+import {useState} from "react";
+import {ArrowLeftRight, Coins, Database, Download, Landmark, LineChart, Loader2, Receipt, Wallet} from "lucide-react";
+import {toast} from "sonner";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {expensesApi} from "@/features/expenses/api/expenses.api";
+import {accountsApi} from "@/features/accounts/api/accounts.api";
+import {investmentsApi} from "@/features/investments/api/investments.api";
+import {incomeApi} from "@/features/income/api/income.api";
+import type {IncomeEntry} from "@/features/income/types/income.types";
+import {getYears, triggerLocalCsv} from "./reportHelpers";
 
 export function ExportTab() {
   const years  = getYears();
@@ -147,6 +147,7 @@ export function ExportTab() {
               <button
                 onClick={() => handleExport(key)}
                 disabled={!!loading[key]}
+                data-testid={`export-csv-${key}`}
                 className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 hover:border-indigo-500/60 hover:bg-indigo-500/5 px-3 py-1.5 rounded-xl transition-all disabled:opacity-60 shrink-0"
               >
                 {loading[key] ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}

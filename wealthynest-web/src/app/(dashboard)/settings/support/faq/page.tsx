@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowLeft, HelpCircle, ChevronRight, X } from "lucide-react";
+import {useState} from "react";
+import {ArrowLeft, ChevronRight, HelpCircle, X} from "lucide-react";
 import Link from "next/link";
-import { Header } from "@/components/layout/Header";
-import { PageWrapper } from "@/components/layout/PageWrapper";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { cn } from "@/lib/utils";
+import {Header} from "@/components/layout/Header";
+import {PageWrapper} from "@/components/layout/PageWrapper";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {cn} from "@/lib/utils";
 
 const FAQS = [
   {

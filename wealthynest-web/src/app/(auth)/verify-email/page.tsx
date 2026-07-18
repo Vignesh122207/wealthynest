@@ -1,12 +1,12 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import {Suspense, useEffect, useState} from "react";
+import {useSearchParams} from "next/navigation";
 import Link from "next/link";
-import { Loader2, CheckCircle2, XCircle, Mail, RefreshCw } from "lucide-react";
-import { useVerifyEmail, useResendVerification } from "@/features/auth/hooks/useAuth";
-import { apiErrorMessage } from "@/lib/utils";
-import { BrandMark } from "@/components/icons/BrandMark";
+import {CheckCircle2, Loader2, Mail, RefreshCw, XCircle} from "lucide-react";
+import {useResendVerification, useVerifyEmail} from "@/features/auth/hooks/useAuth";
+import {apiErrorMessage} from "@/lib/utils";
+import {BrandMark} from "@/components/icons/BrandMark";
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();

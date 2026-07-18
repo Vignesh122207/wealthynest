@@ -1,7 +1,7 @@
-import { apiClient } from "@/lib/axios";
-import type { ApiResponse, PagedResponse } from "@/types/api.types";
-import type { Family, FamilyMember, FamilyMonthlyStats } from "../types/family.types";
-import type { Expense } from "@/features/expenses/types/expense.types";
+import {apiClient} from "@/lib/axios";
+import type {ApiResponse, PagedResponse} from "@/types/api.types";
+import type {Family, FamilyMember, FamilyMonthlyStats} from "../types/family.types";
+import type {Expense} from "@/features/expenses/types/expense.types";
 
 export const familyApi = {
   createFamily: async (name: string): Promise<Family> =>

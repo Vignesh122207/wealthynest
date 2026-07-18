@@ -1,8 +1,8 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { FormDatePicker } from "@/components/forms/FormDatePicker";
-import { cn } from "@/lib/utils";
-import { monthLabel } from "../utils/filterHelpers";
-import type { DateMode } from "../types/filters.types";
+import {ChevronLeft, ChevronRight} from "lucide-react";
+import {FormDatePicker} from "@/components/forms/FormDatePicker";
+import {cn} from "@/lib/utils";
+import {monthLabel} from "../utils/filterHelpers";
+import type {DateMode} from "../types/filters.types";
 
 export function DateControls({ dateMode, setDateMode, year, setYear, month, setMonth,
   customStart, setCustomStart, customEnd, setCustomEnd }: {
@@ -27,7 +27,7 @@ export function DateControls({ dateMode, setDateMode, year, setYear, month, setM
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex items-center h-9 bg-muted/60 border border-border rounded-xl p-0.5">
           {(["month", "year", "all", "custom"] as DateMode[]).map(m => (
-            <button key={m} onClick={() => setDateMode(m)}
+            <button key={m} onClick={() => setDateMode(m)} data-testid={`date-mode-${m}`}
               className={cn("px-2.5 h-7 rounded-lg text-[11px] font-medium transition-all",
                 dateMode === m ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
               {m === "month" ? "Month" : m === "year" ? "Year" : m === "custom" ? "Custom" : "All"}

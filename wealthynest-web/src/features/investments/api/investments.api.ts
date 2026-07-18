@@ -1,16 +1,16 @@
-import { apiClient } from "@/lib/axios";
-import type { ApiResponse } from "@/types/api.types";
+import {apiClient} from "@/lib/axios";
+import type {ApiResponse} from "@/types/api.types";
 import type {
-  Investment,
-  CreateInvestmentPayload,
-  InvestmentSearchResult,
-  SipTransaction,
-  CreateSipPayload,
-  DividendSuggestion,
-  IncomeHistory,
-  StockTransaction,
-  CreateStockTransactionPayload,
-  InvestmentType,
+    CreateInvestmentPayload,
+    CreateSipPayload,
+    CreateStockTransactionPayload,
+    DividendSuggestion,
+    IncomeHistory,
+    Investment,
+    InvestmentSearchResult,
+    InvestmentType,
+    SipTransaction,
+    StockTransaction,
 } from "../types/investment.types";
 
 export const investmentsApi = {

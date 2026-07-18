@@ -1,17 +1,17 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
-import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { FormInput } from "@/components/forms/FormInput";
-import { FormCurrencyInput } from "@/components/forms/FormCurrencyInput";
-import { FormSelect } from "@/components/forms/FormSelect";
-import { FormDatePicker } from "@/components/forms/FormDatePicker";
-import { AccountPicker } from "@/components/transactions/AccountPicker";
-import { FormButtons } from "./FormButtons";
-import { bondSchema, type BondFormValues } from "@/features/investments/schemas/investment.schema";
-import { COUPON_FREQ, type PickerAccountList } from "@/features/investments/constants";
-import { formatCurrency } from "@/lib/utils";
+import {useEffect, useMemo, useRef} from "react";
+import {Controller, useForm} from "react-hook-form";
+import {zodResolver} from "@hookform/resolvers/zod";
+import {FormInput} from "@/components/forms/FormInput";
+import {FormCurrencyInput} from "@/components/forms/FormCurrencyInput";
+import {FormSelect} from "@/components/forms/FormSelect";
+import {FormDatePicker} from "@/components/forms/FormDatePicker";
+import {AccountPicker} from "@/components/transactions/AccountPicker";
+import {FormButtons} from "./FormButtons";
+import {type BondFormValues, bondSchema} from "@/features/investments/schemas/investment.schema";
+import {COUPON_FREQ, type PickerAccountList} from "@/features/investments/constants";
+import {formatCurrency} from "@/lib/utils";
 
 export type BondSubmitValues = BondFormValues & { _investedAmount: number };
 
@@ -34,14 +34,23 @@ export function BondForm({ defaultValues, onSubmit, onCancel, isPending, bankAcc
   const freq     = form.watch("couponFrequency") ?? "HALF_YEARLY";
   const tdsRateW = Number(form.watch("tdsRate")            ?? 0);
 
-  // Auto-fill totalInvested when face value or quantity changes, but only if user hasn't overridden it
+  // Auto-fill totalInvested when face value or quantity changes, but only if the user hasn't
+  // overridden it. Tracks the *last value this effect itself set* rather than comparing against
+  // today's newly-expected total — comparing against today's expected value was a real bug:
+  // filling Face Value first (auto-setting totalInvested at faceValue*1, the default quantity)
+  // then Quantity second left totalInvested permanently stuck, because that check treated
+  // "doesn't match the newly-recomputed total" as "the user overrode it", even though this
+  // effect itself had set the stale value moments earlier.
+  const lastAutoTotalRef = useRef<number | null>(null);
   useEffect(() => {
     if (faceVal > 0 && qty > 0) {
       const current = Number(form.getValues("totalInvested") ?? 0);
       const expected = faceVal * qty;
-      // Only auto-set if blank or still matches a previous face-value calculation
-      if (!current || Math.abs(current - expected) < 0.01) {
+      const stillFollowing = !current
+        || (lastAutoTotalRef.current !== null && Math.abs(current - lastAutoTotalRef.current) < 0.01);
+      if (stillFollowing) {
         form.setValue("totalInvested", expected);
+        lastAutoTotalRef.current = expected;
       }
     }
   }, [faceVal, qty]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -61,30 +70,33 @@ export function BondForm({ defaultValues, onSubmit, onCancel, isPending, bankAcc
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="sm:col-span-2 lg:col-span-3">
           <FormInput label="Bond Name" placeholder="e.g. RBI Savings Bond, Govt of India 7.26% 2032"
+            data-testid="bond-name-input"
             {...form.register("companyName")} error={form.formState.errors.companyName?.message} />
         </div>
-        <FormCurrencyInput label="Face Value per Bond" {...form.register("faceValuePerBond")}
+        <FormCurrencyInput label="Face Value per Bond" data-testid="bond-face-value-input" {...form.register("faceValuePerBond")}
           error={form.formState.errors.faceValuePerBond?.message} />
         <FormInput label="Quantity (no. of bonds)" type="number" min="1"
+          data-testid="bond-quantity-input"
           {...form.register("quantity")} error={form.formState.errors.quantity?.message} />
-        <FormCurrencyInput label="Total Invested" {...form.register("totalInvested")}
+        <FormCurrencyInput label="Total Invested" data-testid="bond-total-invested-input" {...form.register("totalInvested")}
           error={form.formState.errors.totalInvested?.message} />
         <FormInput label="Coupon Rate (% p.a.)" type="number" step="0.01"
+          data-testid="bond-coupon-rate-input"
           {...form.register("couponRate")} error={form.formState.errors.couponRate?.message} />
         <FormSelect label="Coupon Frequency" options={COUPON_FREQ} {...form.register("couponFrequency")} />
         <FormInput label="TDS Rate (%, 0 if N/A)" type="number" step="0.01" min="0" max="30"
           placeholder="e.g. 10"
-          {...form.register("tdsRate")} />
+          {...form.register("tdsRate")} error={form.formState.errors.tdsRate?.message} />
         <FormInput label="Credit Day of Month (1–31)" type="number" min="1" max="31"
           placeholder="e.g. 15"
-          {...form.register("couponCreditDay")} />
+          {...form.register("couponCreditDay")} error={form.formState.errors.couponCreditDay?.message} />
         <Controller control={form.control} name="purchaseDate" render={({ field, fieldState }) => (
           <FormDatePicker label="Purchase Date" value={field.value ?? ""} onChange={field.onChange}
-            onBlur={field.onBlur} error={fieldState.error?.message} />
+            onBlur={field.onBlur} error={fieldState.error?.message} testId="bond-purchase-date-input" />
         )} />
         <Controller control={form.control} name="maturityDate" render={({ field }) => (
           <FormDatePicker label="Maturity Date (optional)" value={field.value ?? ""} onChange={field.onChange}
-            onBlur={field.onBlur} placeholder="Leave blank if perpetual" />
+            onBlur={field.onBlur} placeholder="Leave blank if perpetual" testId="bond-maturity-date-input" />
         )} />
         {grossCouponAmt != null && (
           <div className="sm:col-span-2 lg:col-span-3 bg-violet-500/10 border border-violet-500/20 rounded-xl p-3 space-y-1">

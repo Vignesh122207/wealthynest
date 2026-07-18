@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { FileText, BarChart2, CalendarDays, Database } from "lucide-react";
-import { Header } from "@/components/layout/Header";
-import { PageWrapper } from "@/components/layout/PageWrapper";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { cn } from "@/lib/utils";
-import { MonthlyTab } from "./_components/MonthlyTab";
-import { AnnualTab } from "./_components/AnnualTab";
-import { ExportTab } from "./_components/ExportTab";
+import {useState} from "react";
+import {BarChart2, CalendarDays, Database, FileText} from "lucide-react";
+import {Header} from "@/components/layout/Header";
+import {PageWrapper} from "@/components/layout/PageWrapper";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {cn} from "@/lib/utils";
+import {MonthlyTab} from "./_components/MonthlyTab";
+import {AnnualTab} from "./_components/AnnualTab";
+import {ExportTab} from "./_components/ExportTab";
 
 const TABS = [
   { id: "monthly", label: "Monthly",     icon: CalendarDays },
@@ -42,6 +42,7 @@ export default function ReportsPage() {
             {TABS.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
+                data-testid={`reports-tab-${id}`}
                 onClick={() => setTab(id)}
                 className={cn(
                   "flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-all",

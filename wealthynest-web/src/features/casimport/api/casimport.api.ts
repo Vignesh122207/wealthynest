@@ -1,6 +1,6 @@
-import { apiClient } from "@/lib/axios";
-import type { ApiResponse } from "@/types/api.types";
-import type { CasConfirmRow, CasImportResult, CasPreview } from "../types/casimport.types";
+import {apiClient} from "@/lib/axios";
+import type {ApiResponse} from "@/types/api.types";
+import type {CasConfirmRow, CasImportResult, CasPreview} from "../types/casimport.types";
 
 export const casImportApi = {
   preview: async (file: File, password?: string): Promise<CasPreview> => {

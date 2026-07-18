@@ -1,11 +1,11 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {toast} from "sonner";
 import {
-  recurringIncomeApi,
-  type CreateRecurringIncomePayload,
-  type UpdateRecurringIncomePayload,
+    type CreateRecurringIncomePayload,
+    recurringIncomeApi,
+    type UpdateRecurringIncomePayload,
 } from "../api/recurringIncome.api";
 
 const KEY = ["recurring-income"] as const;

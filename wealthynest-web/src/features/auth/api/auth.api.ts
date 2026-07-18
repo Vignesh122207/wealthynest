@@ -1,6 +1,6 @@
-import { apiClient } from "@/lib/axios";
-import type { ApiResponse } from "@/types/api.types";
-import type { AuthResponse, LoginPayload, RegisterPayload, User, Passkey } from "../types/auth.types";
+import {apiClient} from "@/lib/axios";
+import type {ApiResponse} from "@/types/api.types";
+import type {AuthResponse, LoginPayload, Passkey, RegisterPayload, User} from "../types/auth.types";
 
 export const authApi = {
   login:    async (p: LoginPayload):    Promise<AuthResponse> => (await apiClient.post<ApiResponse<AuthResponse>>("/auth/login",    p)).data.data,

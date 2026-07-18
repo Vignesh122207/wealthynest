@@ -1,16 +1,16 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import {Suspense, useState} from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Header } from "@/components/layout/Header";
-import { PageWrapper } from "@/components/layout/PageWrapper";
-import { ArrowLeft, TrendingUp, Receipt, ArrowLeftRight, Flag } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { IncomeTab } from "./_tabs/IncomeTab";
-import { ExpensesTab } from "./_tabs/ExpensesTab";
-import { TransfersTab } from "./_tabs/TransfersTab";
-import { GoalsTab } from "./_tabs/GoalsTab";
+import {useRouter, useSearchParams} from "next/navigation";
+import {Header} from "@/components/layout/Header";
+import {PageWrapper} from "@/components/layout/PageWrapper";
+import {ArrowLeft, ArrowLeftRight, Flag, Receipt, TrendingUp} from "lucide-react";
+import {cn} from "@/lib/utils";
+import {IncomeTab} from "./_tabs/IncomeTab";
+import {ExpensesTab} from "./_tabs/ExpensesTab";
+import {TransfersTab} from "./_tabs/TransfersTab";
+import {GoalsTab} from "./_tabs/GoalsTab";
 
 type RuleType = "income" | "expenses" | "transfers" | "goals";
 

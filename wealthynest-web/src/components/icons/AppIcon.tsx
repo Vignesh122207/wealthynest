@@ -1,4 +1,4 @@
-import { PremiumIcon } from "./PremiumIcon";
+import {PremiumIcon} from "./PremiumIcon";
 
 // The generic entry point into the icon system: any lucide glyph + a tone or
 // hex. Every other named icon component (CategoryIcon, AccountIcon, MenuIcon,

@@ -1,13 +1,13 @@
 "use client";
 
-import { Plus, Wallet } from "lucide-react";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { QueryErrorState } from "@/components/shared/QueryErrorState";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { AddMoreCard } from "@/features/accounts/components/AddMoreCard";
-import { ACCOUNT_TYPE_META } from "@/lib/accountTypeMeta";
-import type { AccountType, WalletAccount } from "@/features/accounts/types/account.types";
-import type { SectionFilter } from "./AccountFilterTabs";
+import {Plus, Wallet} from "lucide-react";
+import {EmptyState} from "@/components/shared/EmptyState";
+import {QueryErrorState} from "@/components/shared/QueryErrorState";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {AddMoreCard} from "@/features/accounts/components/AddMoreCard";
+import {ACCOUNT_TYPE_META} from "@/lib/accountTypeMeta";
+import type {AccountType, WalletAccount} from "@/features/accounts/types/account.types";
+import type {SectionFilter} from "./AccountFilterTabs";
 
 interface AccountsGridProps {
   isLoading: boolean;

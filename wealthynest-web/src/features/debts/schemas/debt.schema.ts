@@ -1,4 +1,4 @@
-import { z } from "zod";
+import {z} from "zod";
 
 export const debtSchema = z.object({
   contactName:  z.string().min(1, "Name is required").max(100),

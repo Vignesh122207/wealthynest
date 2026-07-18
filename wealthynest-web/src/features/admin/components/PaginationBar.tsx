@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import {ChevronLeft, ChevronRight} from "lucide-react";
 
 export function PaginationBar({ page, totalPages, totalElements, pageSize, onPage }: {
   page: number; totalPages: number; totalElements: number; pageSize: number;

@@ -1,23 +1,23 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { Check, Pause, Play, Unlink, Flag } from "lucide-react";
-import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { FormCurrencyInput } from "@/components/forms/FormCurrencyInput";
-import { FormDatePicker } from "@/components/forms/FormDatePicker";
-import { Button } from "@/components/ui/Button";
-import { FormModalShell } from "@/components/ui/FormModalShell";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { AccountPicker } from "@/components/transactions/AccountPicker";
-import { FormModalHeader } from "@/components/transactions/FormModalHeader";
-import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
-import { BigAmountInput } from "@/components/transactions/BigAmountInput";
-import { resolveGoalIcon, GOAL_COLORS, GOAL_PRESETS, GOAL_ICON_OPTIONS } from "@/lib/categoryMeta";
-import { useAccounts } from "@/features/accounts/hooks/useAccounts";
-import type { Goal } from "@/features/goals/types/goal.types";
-import { cn } from "@/lib/utils";
-import { goalSchema, type GoalFormValues } from "./goalSchema";
+import {useRef, useState} from "react";
+import {Check, Flag, Pause, Play, Unlink} from "lucide-react";
+import {Controller, useForm} from "react-hook-form";
+import {zodResolver} from "@hookform/resolvers/zod";
+import {FormCurrencyInput} from "@/components/forms/FormCurrencyInput";
+import {FormDatePicker} from "@/components/forms/FormDatePicker";
+import {Button} from "@/components/ui/Button";
+import {FormModalShell} from "@/components/ui/FormModalShell";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {AccountPicker} from "@/components/transactions/AccountPicker";
+import {FormModalHeader} from "@/components/transactions/FormModalHeader";
+import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
+import {BigAmountInput} from "@/components/transactions/BigAmountInput";
+import {GOAL_COLORS, GOAL_ICON_OPTIONS, GOAL_PRESETS, resolveGoalIcon} from "@/lib/categoryMeta";
+import {useAccounts} from "@/features/accounts/hooks/useAccounts";
+import type {Goal} from "@/features/goals/types/goal.types";
+import {cn} from "@/lib/utils";
+import {type GoalFormValues, goalSchema} from "./goalSchema";
 
 // ─── Goal Form ────────────────────────────────────────────────────────────────
 
@@ -103,6 +103,7 @@ export function GoalForm({ goal, goalColor, isCreate, onSubmit, onCancel, onClos
                   <PremiumIcon icon={livePreviewIcon} hex={goalColor} size="sm" />
                 </button>
                 <input
+                  data-testid="goal-name-input"
                   ref={(el) => { nameInputRef.current = el; nameRhfRef(el); }}
                   placeholder="e.g. Emergency Fund"
                   className="flex-1 h-10 px-3 rounded-xl bg-muted/60 border border-border text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:border-fuchsia-500 transition-colors"
@@ -135,7 +136,7 @@ export function GoalForm({ goal, goalColor, isCreate, onSubmit, onCancel, onClos
               )}
             </div>
 
-            <BigAmountInput label="Target Amount" colorClass="text-fuchsia-500 dark:text-fuchsia-400"
+            <BigAmountInput label="Target Amount" colorClass="text-fuchsia-500 dark:text-fuchsia-400" testId="goal-target-amount-input"
               error={form.formState.errors.targetAmount?.message} inputProps={form.register("targetAmount")} />
 
             <div>
@@ -160,6 +161,7 @@ export function GoalForm({ goal, goalColor, isCreate, onSubmit, onCancel, onClos
               <AccountPicker label="Link to Account (optional — auto-syncs progress)"
                 cashAccounts={cashAccounts} bankAccounts={bankAccounts} creditAccounts={[]}
                 emergencyFundAccounts={emergencyFundAccounts}
+                testId="goal-account-picker"
                 value={accountId}
                 onChange={id => {
                   setAccountId(id);
@@ -199,7 +201,7 @@ export function GoalForm({ goal, goalColor, isCreate, onSubmit, onCancel, onClos
             )}
 
             <div className="flex gap-2 pt-1">
-              <Button type="submit" variant="gradient" loading={isPending}
+              <Button type="submit" data-testid="goal-form-submit" variant="gradient" loading={isPending}
                 className="flex-1 bg-gradient-to-r from-fuchsia-500 to-purple-600 hover:from-fuchsia-400 hover:to-purple-500 shadow-fuchsia-500/25 disabled:shadow-none">
                 <Check className="w-4 h-4" /> {isPending ? "Saving…" : "Save Goal"}
               </Button>

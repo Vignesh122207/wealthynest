@@ -1,12 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { ChevronDown, Star, Wallet } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { ACCOUNT_TYPE_META } from "@/lib/accountTypeMeta";
-import { BankLogo } from "@/components/icons/BankLogo";
-import { DropdownPanel } from "./DropdownPanel";
+import {useRef, useState} from "react";
+import {ChevronDown, Star, Wallet} from "lucide-react";
+import {cn} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {ACCOUNT_TYPE_META} from "@/lib/accountTypeMeta";
+import {BankLogo} from "@/components/icons/BankLogo";
+import {DropdownPanel} from "./DropdownPanel";
 
 // ─── Account Picker — icon per type, star for primary, bank name only ─────────
 
@@ -36,6 +36,7 @@ export function accountPickerLabel(a: { name: string; bankName?: string }) {
 export function AccountPicker({
   label = "Paid Via", cashAccounts = [], bankAccounts, creditAccounts = [], emergencyFundAccounts = [],
   investmentAccounts = [], value, onChange, error, placeholder = "Select account", allowClear = false, clearLabel = "None",
+  testId = "account-picker",
 }: {
   label?: string;
   cashAccounts?:   { id: string; name: string; currentBalance: number }[];
@@ -51,6 +52,9 @@ export function AccountPicker({
   /** Adds a "None" row at the top of the list so an optional field can be explicitly cleared. */
   allowClear?: boolean;
   clearLabel?: string;
+  /** Base for this instance's data-testid (trigger/panel/option) — pass a distinct value when
+   * more than one AccountPicker renders in the same form (e.g. Transfer's From/To). */
+  testId?: string;
 }) {
   const { fmtExact } = useAmountFormatter();
   const [open, setOpen] = useState(false);
@@ -68,7 +72,7 @@ export function AccountPicker({
   return (
     <div>
       <label className="block text-sm font-medium text-muted-foreground mb-1.5">{label}</label>
-      <button type="button" ref={triggerRef} onClick={() => setOpen(v => !v)}
+      <button type="button" ref={triggerRef} data-testid={`${testId}-trigger`} onClick={() => setOpen(v => !v)}
         className={cn("w-full h-11 px-3 rounded-xl border flex items-center gap-2.5 text-sm text-left transition-all",
           "bg-background text-foreground hover:border-indigo-500/50",
           error ? "border-red-500/60" : "border-border")}>
@@ -89,9 +93,9 @@ export function AccountPicker({
         <ChevronDown className={cn("w-4 h-4 text-muted-foreground/60 shrink-0 transition-transform", open && "rotate-180")} />
       </button>
       <DropdownPanel anchorRef={triggerRef} open={open} onClose={() => setOpen(false)}>
-        <div className="flex-1 min-h-0 overflow-y-auto">
+        <div data-testid={`${testId}-panel`} className="flex-1 min-h-0 overflow-y-auto">
           {allowClear && (
-            <button type="button" onClick={() => { onChange(""); setOpen(false); }}
+            <button type="button" data-testid={`${testId}-clear`} onClick={() => { onChange(""); setOpen(false); }}
               className={cn("w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-left transition-colors",
                 value === "" ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" : "text-muted-foreground hover:bg-muted/60")}>
               <Wallet className="w-4 h-4 shrink-0" />
@@ -101,7 +105,7 @@ export function AccountPicker({
           {accounts.map(a => {
             const meta = ACCOUNT_TYPE_META[KIND_TO_ACCOUNT_TYPE[a.kind]];
             return (
-              <button key={a.id} type="button" onClick={() => { onChange(a.id); setOpen(false); }}
+              <button key={a.id} type="button" data-testid={`${testId}-option-${a.id}`} onClick={() => { onChange(a.id); setOpen(false); }}
                 className={cn("w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-left transition-colors",
                   a.id === value ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" : "text-foreground hover:bg-muted/60")}>
                 <BankLogo name={a.bankName} fallbackIcon={meta.icon} fallbackHex={meta.hex} size="xs" />

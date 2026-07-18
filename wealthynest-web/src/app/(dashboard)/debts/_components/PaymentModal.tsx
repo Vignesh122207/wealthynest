@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Check, Wallet } from "lucide-react";
-import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
-import { usePrefsStore, CURRENCIES } from "@/store/preferences.store";
-import { cn, formatCurrency } from "@/lib/utils";
-import type { DebtRecord } from "@/features/debts/types/debt.types";
-import { ContactAvatar } from "./ContactAvatar";
+import {useState} from "react";
+import {Check, Wallet} from "lucide-react";
+import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
+import {CURRENCIES, usePrefsStore} from "@/store/preferences.store";
+import {cn, formatCurrency} from "@/lib/utils";
+import type {DebtRecord} from "@/features/debts/types/debt.types";
+import {ContactAvatar} from "./ContactAvatar";
 
 // ── Payment / Received Modal ──────────────────────────────────────────────────
 
@@ -62,7 +62,7 @@ export function PaymentModal({ debt, onSave, onClose, saving }: {
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground/80">{currSymbol}</span>
-              <input type="text" inputMode="decimal" value={amount}
+              <input type="text" inputMode="decimal" value={amount} data-testid="debt-payment-amount-input"
                 onChange={e => setAmount(e.target.value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1"))}
                 placeholder="0"
                 className="w-full h-11 pl-6 pr-3 rounded-xl text-sm bg-background border border-border text-foreground outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/40 transition-all" />
@@ -88,7 +88,7 @@ export function PaymentModal({ debt, onSave, onClose, saving }: {
             className="h-12 px-5 rounded-xl text-sm text-muted-foreground bg-muted hover:bg-muted/80 transition-all">
             Cancel
           </button>
-          <button onClick={() => Number(amount) > 0 && onSave(Number(amount), note)}
+          <button data-testid="debt-payment-submit" onClick={() => Number(amount) > 0 && onSave(Number(amount), note)}
             disabled={saving || !amount || Number(amount) <= 0}
             className={cn(
               "flex-1 h-12 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2",

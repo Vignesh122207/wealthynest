@@ -1,17 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, Menu, Moon, Sun, AlertCircle, CheckCircle2, Info, X, Eye, EyeOff, Download } from "lucide-react";
-import { useTheme } from "next-themes";
-import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { cn, getInitials } from "@/lib/utils";
-import { useUIStore } from "@/store/ui.store";
-import { useAuthStore } from "@/features/auth/store/auth.store";
-import { type AppNotification, type NotifSeverity } from "@/hooks/useNotifications";
-import { useNotificationStore } from "@/store/notification.store";
-import { useMergedNotifications } from "@/features/notifications/hooks/useServerNotifications";
-import { usePrivacyStore } from "@/store/privacy.store";
+import {AlertCircle, Bell, CheckCircle2, Download, Eye, EyeOff, Info, Menu, Moon, Sun, X} from "lucide-react";
+import {useTheme} from "next-themes";
+import {usePathname} from "next/navigation";
+import {useEffect, useRef, useState} from "react";
+import {cn, getInitials} from "@/lib/utils";
+import {useUIStore} from "@/store/ui.store";
+import {useAuthStore} from "@/features/auth/store/auth.store";
+import {type AppNotification, type NotifSeverity} from "@/hooks/useNotifications";
+import {useNotificationStore} from "@/store/notification.store";
+import {useMergedNotifications} from "@/features/notifications/hooks/useServerNotifications";
+import {usePrivacyStore} from "@/store/privacy.store";
 
 // ─── Severity helpers ────────────────────────────────────────────────────────
 
@@ -163,12 +163,14 @@ export function Header({ title, subtitle, onExport }: HeaderProps) {
       <div className="flex items-center gap-3 min-w-0">
         <button
           onClick={toggleMobileMenu}
+          data-testid="mobile-menu-toggle"
+          aria-label="Open menu"
           className="lg:hidden text-muted-foreground hover:text-foreground transition-colors p-1 shrink-0"
         >
           <Menu className="w-5 h-5" />
         </button>
         <div className="min-w-0">
-          <h1 className="text-base font-semibold text-foreground truncate">{title}</h1>
+          <h1 data-testid="page-header-title" className="text-base font-semibold text-foreground truncate">{title}</h1>
           {subtitle && (
             <p className="text-xs text-muted-foreground/70 truncate hidden sm:block">{subtitle}</p>
           )}

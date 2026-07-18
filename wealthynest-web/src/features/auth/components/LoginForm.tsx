@@ -1,17 +1,29 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useForm, type UseFormReturn } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import {useEffect, useState} from "react";
+import {useForm, type UseFormReturn} from "react-hook-form";
+import {zodResolver} from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { Eye, EyeOff, Loader2, ShieldCheck, TrendingUp, Wallet, AlertTriangle, KeyRound, Fingerprint, Lock, ArrowLeft } from "lucide-react";
-import { loginSchema, type LoginFormValues } from "../schemas/auth.schema";
-import { useLogin, usePinLogin, usePasskeyLogin } from "../hooks/useAuth";
-import { useAuthStore } from "../store/auth.store";
-import { isWebAuthnSupported } from "../utils/webauthn";
-import { GoogleSignInButton } from "./GoogleSignInButton";
-import { BrandMark } from "@/components/icons/BrandMark";
-import { cn } from "@/lib/utils";
+import {
+    AlertTriangle,
+    ArrowLeft,
+    Eye,
+    EyeOff,
+    Fingerprint,
+    KeyRound,
+    Loader2,
+    Lock,
+    ShieldCheck,
+    TrendingUp,
+    Wallet
+} from "lucide-react";
+import {type LoginFormValues, loginSchema} from "../schemas/auth.schema";
+import {useLogin, usePasskeyLogin, usePinLogin} from "../hooks/useAuth";
+import {useAuthStore} from "../store/auth.store";
+import {isWebAuthnSupported} from "../utils/webauthn";
+import {GoogleSignInButton} from "./GoogleSignInButton";
+import {BrandMark} from "@/components/icons/BrandMark";
+import {cn} from "@/lib/utils";
 
 // A still-valid refresh token from a prior full login lets this device skip straight to a PIN
 // prompt instead of the full form — see AuthServiceImpl.pinLogin for why a PIN alone (without
@@ -38,6 +50,7 @@ function PinLoginStep({ name, onUsePassword }: { name: string; onUsePassword: ()
       </div>
       <form onSubmit={onSubmit} className="space-y-4">
         <input
+          data-testid="login-pin-input"
           type="password"
           inputMode="numeric"
           maxLength={6}
@@ -49,7 +62,7 @@ function PinLoginStep({ name, onUsePassword }: { name: string; onUsePassword: ()
             bg-background border border-border text-foreground placeholder:text-muted-foreground
             focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/25"
         />
-        <button type="submit" disabled={isPending || pin.length < 4}
+        <button data-testid="login-pin-submit" type="submit" disabled={isPending || pin.length < 4}
           className="w-full h-11 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2
             bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/30
             disabled:opacity-60 disabled:cursor-not-allowed">
@@ -57,7 +70,7 @@ function PinLoginStep({ name, onUsePassword }: { name: string; onUsePassword: ()
           {isPending ? "Verifying…" : "Continue"}
         </button>
       </form>
-      <button onClick={onUsePassword}
+      <button data-testid="login-pin-use-password" onClick={onUsePassword}
         className="mt-6 w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors">
         Sign in with password instead
       </button>
@@ -109,6 +122,7 @@ function PasswordLoginStep({ form, onSubmit, isPending, emailNotVerified, onBack
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Email</label>
           <input
+            data-testid="login-password-step-email-input"
             type="email"
             placeholder="you@example.com"
             autoFocus
@@ -121,7 +135,7 @@ function PasswordLoginStep({ form, onSubmit, isPending, emailNotVerified, onBack
             )}
           />
           {form.formState.errors.email && (
-            <p className="text-xs text-red-600 dark:text-red-400">{form.formState.errors.email.message}</p>
+            <p data-testid="login-email-error" className="text-xs text-red-600 dark:text-red-400">{form.formState.errors.email.message}</p>
           )}
         </div>
 
@@ -134,6 +148,7 @@ function PasswordLoginStep({ form, onSubmit, isPending, emailNotVerified, onBack
           </div>
           <div className="relative">
             <input
+              data-testid="login-password-step-password-input"
               type={showPassword ? "text" : "password"}
               placeholder="••••••••"
               {...form.register("password")}
@@ -156,6 +171,7 @@ function PasswordLoginStep({ form, onSubmit, isPending, emailNotVerified, onBack
 
         <div className="flex items-center gap-2.5">
           <input
+            data-testid="login-remember-me"
             type="checkbox"
             id="rememberMe"
             {...form.register("rememberMe")}
@@ -166,7 +182,7 @@ function PasswordLoginStep({ form, onSubmit, isPending, emailNotVerified, onBack
           </label>
         </div>
 
-        <button type="submit" disabled={isPending}
+        <button data-testid="login-password-submit" type="submit" disabled={isPending}
           className={cn(
             "w-full h-12 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2",
             "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/30",
@@ -177,7 +193,7 @@ function PasswordLoginStep({ form, onSubmit, isPending, emailNotVerified, onBack
         </button>
       </form>
 
-      <button onClick={onBack}
+      <button data-testid="login-back-button" onClick={onBack}
         className="mt-6 w-full flex items-center justify-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
         <ArrowLeft className="w-3.5 h-3.5" /> Back
       </button>
@@ -305,6 +321,7 @@ export function LoginForm() {
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">Email</label>
                 <input
+                  data-testid="login-email-input"
                   type="email"
                   placeholder="you@example.com"
                   {...form.register("email")}
@@ -326,6 +343,7 @@ export function LoginForm() {
               {/* Remember me — applies to whichever method below is used */}
               <div className="flex items-center gap-2.5">
                 <input
+                  data-testid="login-remember-me"
                   type="checkbox"
                   id="rememberMe"
                   {...form.register("rememberMe")}
@@ -341,7 +359,7 @@ export function LoginForm() {
 
               {/* Passkey */}
               {isWebAuthnSupported() && (
-                <button type="button" onClick={handlePasskeyLogin} disabled={passkeyPending}
+                <button data-testid="login-passkey-button" type="button" onClick={handlePasskeyLogin} disabled={passkeyPending}
                   className="w-full h-11 rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-2
                     bg-muted hover:bg-muted/80 text-foreground disabled:opacity-60 disabled:cursor-not-allowed">
                   {passkeyPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Fingerprint className="w-4 h-4" />}
@@ -350,7 +368,7 @@ export function LoginForm() {
               )}
 
               {/* Password — its own full screen, not an inline expand here */}
-              <button type="button" onClick={() => setShowPasswordStep(true)}
+              <button data-testid="login-use-password-button" type="button" onClick={() => setShowPasswordStep(true)}
                 className="w-full h-11 rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-2
                   text-muted-foreground hover:text-foreground hover:bg-muted/60">
                 <Lock className="w-3.5 h-3.5" /> Sign in with password

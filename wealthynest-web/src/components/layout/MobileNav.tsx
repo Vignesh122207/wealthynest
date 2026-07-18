@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Home, Wallet, ArrowLeftRight, TrendingUp, PieChart, Menu } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { NAV_GRADIENTS } from "@/components/layout/Sidebar";
-import { useUIStore } from "@/store/ui.store";
+import {usePathname} from "next/navigation";
+import {ArrowLeftRight, Home, Menu, PieChart, TrendingUp, Wallet} from "lucide-react";
+import {cn} from "@/lib/utils";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {NAV_GRADIENTS} from "@/components/layout/Sidebar";
+import {useUIStore} from "@/store/ui.store";
 
 // Same neutral gray→slate pair the Sidebar uses for Settings — fitting since "More" opens the
 // same full nav that Settings lives in, and it's the one tab here that isn't a page of its own.

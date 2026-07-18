@@ -1,25 +1,25 @@
 "use client";
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { PieChart, Users, Pencil, Receipt } from "lucide-react";
-import { FormModalShell } from "@/components/ui/FormModalShell";
-import { Button } from "@/components/ui/Button";
-import { FormSelect } from "@/components/forms/FormSelect";
-import { BigAmountInput } from "@/components/transactions/BigAmountInput";
-import { CategoryPicker } from "@/components/transactions/CategoryPicker";
-import { FormModalHeader } from "@/components/transactions/FormModalHeader";
-import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
-import { useUpdateBudget } from "@/features/budgets/hooks/useBudgets";
-import { useCategories } from "@/features/categories/hooks/useCategories";
-import { useExpenses } from "@/features/expenses/hooks/useExpenses";
-import { useFamilyExpenses } from "@/features/family/hooks/useFamily";
-import { useAuthStore } from "@/features/auth/store/auth.store";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { editBudgetSchema, type EditBudgetFormValues } from "@/features/budgets/schemas/budget.schema";
-import type { Budget } from "@/features/budgets/types/budget.types";
-import { cn, formatDate } from "@/lib/utils";
+import {useState} from "react";
+import {useForm} from "react-hook-form";
+import {zodResolver} from "@hookform/resolvers/zod";
+import {Pencil, PieChart, Receipt, Users} from "lucide-react";
+import {FormModalShell} from "@/components/ui/FormModalShell";
+import {Button} from "@/components/ui/Button";
+import {FormSelect} from "@/components/forms/FormSelect";
+import {BigAmountInput} from "@/components/transactions/BigAmountInput";
+import {CategoryPicker} from "@/components/transactions/CategoryPicker";
+import {FormModalHeader} from "@/components/transactions/FormModalHeader";
+import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
+import {useUpdateBudget} from "@/features/budgets/hooks/useBudgets";
+import {useCategories} from "@/features/categories/hooks/useCategories";
+import {useExpenses} from "@/features/expenses/hooks/useExpenses";
+import {useFamilyExpenses} from "@/features/family/hooks/useFamily";
+import {useAuthStore} from "@/features/auth/store/auth.store";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {type EditBudgetFormValues, editBudgetSchema} from "@/features/budgets/schemas/budget.schema";
+import type {Budget} from "@/features/budgets/types/budget.types";
+import {cn, formatDate} from "@/lib/utils";
 
 const ALERT_OPTIONS = [
   { value: "50", label: "50%" }, { value: "60", label: "60%" },
@@ -129,12 +129,12 @@ export function BudgetDetailModal({ budget, onClose, onDelete }: {
 
         {tab === "edit" ? (
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <CategoryPicker categories={categoryOptions} value={selectedCategoryId} onChange={setSelectedCategoryId} />
-            <BigAmountInput colorClass="text-amber-500 dark:text-amber-400"
+            <CategoryPicker categories={categoryOptions} value={selectedCategoryId} onChange={setSelectedCategoryId} testId="budget-edit-category-picker" />
+            <BigAmountInput colorClass="text-amber-500 dark:text-amber-400" testId="budget-edit-amount-input"
               error={form.formState.errors.amount?.message} inputProps={form.register("amount")} />
             <FormSelect label="Alert At (%)" options={ALERT_OPTIONS} error={form.formState.errors.alertThreshold?.message} {...form.register("alertThreshold")} />
             <div className="flex gap-2 pt-1">
-              <Button type="submit" variant="gradient" loading={isPending}
+              <Button type="submit" data-testid="budget-edit-submit" variant="gradient" loading={isPending}
                 className="flex-1 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 shadow-amber-500/25 disabled:shadow-none">
                 {isPending ? "Saving…" : "Update"}
               </Button>

@@ -1,14 +1,14 @@
 "use client";
 
-import { ArrowLeft, Plus, Ticket, ChevronRight, MessageSquare, Clock } from "lucide-react";
+import {ArrowLeft, ChevronRight, Clock, MessageSquare, Plus, Ticket} from "lucide-react";
 import Link from "next/link";
-import { Header } from "@/components/layout/Header";
-import { PageWrapper } from "@/components/layout/PageWrapper";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { QueryErrorState } from "@/components/shared/QueryErrorState";
-import { useMyTickets } from "@/features/support/hooks/useSupport";
-import type { TicketStatus, TicketPriority } from "@/features/support/types/support.types";
-import { cn } from "@/lib/utils";
+import {Header} from "@/components/layout/Header";
+import {PageWrapper} from "@/components/layout/PageWrapper";
+import {EmptyState} from "@/components/shared/EmptyState";
+import {QueryErrorState} from "@/components/shared/QueryErrorState";
+import {useMyTickets} from "@/features/support/hooks/useSupport";
+import type {TicketPriority, TicketStatus} from "@/features/support/types/support.types";
+import {cn} from "@/lib/utils";
 
 const STATUS_CONFIG: Record<TicketStatus, { label: string; color: string }> = {
   OPEN:        { label: "Open",        color: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20" },

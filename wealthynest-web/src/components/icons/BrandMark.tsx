@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import {cn} from "@/lib/utils";
 
 // The mark itself — a sprout rising from a nest, echoing "WealthyNest" directly
 // rather than the generic plant-in-a-circle most finance apps use. Kept in sync

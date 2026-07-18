@@ -1,11 +1,21 @@
-import { SlidersHorizontal, X, ArrowUpDown, Tag, CreditCard, IndianRupee, RefreshCw, Wallet, type LucideIcon } from "lucide-react";
-import { PremiumIcon, type IconTone } from "@/components/icons/PremiumIcon";
-import { getCategoryIcon, getCategoryColor } from "@/lib/categoryMeta";
-import { ACCOUNT_TYPE_META } from "@/lib/accountTypeMeta";
-import { cn } from "@/lib/utils";
-import { SortPills } from "./SortPills";
-import type { TxType, SortKey, Channel } from "../types/filters.types";
-import type { Category } from "@/features/categories/types/category.types";
+import {
+    ArrowUpDown,
+    CreditCard,
+    IndianRupee,
+    type LucideIcon,
+    RefreshCw,
+    SlidersHorizontal,
+    Tag,
+    Wallet,
+    X
+} from "lucide-react";
+import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
+import {getCategoryColor, getCategoryIcon} from "@/lib/categoryMeta";
+import {ACCOUNT_TYPE_META} from "@/lib/accountTypeMeta";
+import {cn} from "@/lib/utils";
+import {SortPills} from "./SortPills";
+import type {Channel, SortKey, TxType} from "../types/filters.types";
+import type {Category} from "@/features/categories/types/category.types";
 
 export function FilterPanel({
   open, onClose, txType,

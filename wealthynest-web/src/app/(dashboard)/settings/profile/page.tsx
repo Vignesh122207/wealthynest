@@ -1,16 +1,16 @@
 "use client";
 
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { ArrowLeft, Loader2, Lock } from "lucide-react";
+import {useForm} from "react-hook-form";
+import {zodResolver} from "@hookform/resolvers/zod";
+import {z} from "zod";
+import {ArrowLeft, Loader2, Lock} from "lucide-react";
 import Link from "next/link";
-import { Header } from "@/components/layout/Header";
-import { PageWrapper } from "@/components/layout/PageWrapper";
-import { GlossyBadge } from "@/components/icons/PremiumIcon";
-import { useAuthStore } from "@/features/auth/store/auth.store";
-import { useUpdateProfile } from "@/features/auth/hooks/useAuth";
-import { getInitials } from "@/lib/utils";
+import {Header} from "@/components/layout/Header";
+import {PageWrapper} from "@/components/layout/PageWrapper";
+import {GlossyBadge} from "@/components/icons/PremiumIcon";
+import {useAuthStore} from "@/features/auth/store/auth.store";
+import {useUpdateProfile} from "@/features/auth/hooks/useAuth";
+import {getInitials} from "@/lib/utils";
 
 const schema = z.object({
   fullName: z.string().min(2, "Name must be at least 2 characters").max(100),
@@ -72,6 +72,7 @@ export default function ProfilePage() {
                 <label className="text-xs font-medium text-muted-foreground block">Full name</label>
                 <input
                   {...form.register("fullName")}
+                  data-testid="profile-fullname-input"
                   className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                   placeholder="Your full name"
                 />
@@ -100,6 +101,7 @@ export default function ProfilePage() {
               <button
                 type="submit"
                 disabled={isPending}
+                data-testid="profile-form-submit"
                 className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors mt-2"
               >
                 {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import {z} from "zod";
 
 export const LIABILITY_TYPE_VALUES = [
   "HOME_LOAN", "CAR_LOAN", "PERSONAL_LOAN", "CREDIT_CARD", "EDUCATION_LOAN", "GOLD_LOAN", "BUSINESS_LOAN", "OTHER",

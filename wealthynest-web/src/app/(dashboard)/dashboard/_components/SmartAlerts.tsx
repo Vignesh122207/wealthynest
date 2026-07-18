@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { X, Lightbulb, Bell, RefreshCw } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import type { Expense } from "@/features/expenses/types/expense.types";
+import {Bell, Lightbulb, RefreshCw, X} from "lucide-react";
+import {cn} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import type {Expense} from "@/features/expenses/types/expense.types";
 
 interface SmartInsight {
   category: string;

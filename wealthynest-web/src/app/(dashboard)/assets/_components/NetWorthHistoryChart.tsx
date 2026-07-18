@@ -1,12 +1,21 @@
 "use client";
 
-import { TrendingUp } from "lucide-react";
+import {TrendingUp} from "lucide-react";
 import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, ReferenceLine, Tooltip, ResponsiveContainer,
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Line,
+    LineChart,
+    ReferenceLine,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
 } from "recharts";
-import { cn, formatChartTickINR } from "@/lib/utils";
-import type { useChartTheme } from "@/hooks/useChartTheme";
-import type { NetWorthHistoryPoint } from "@/features/networth/types/networth.types";
+import {cn, formatChartTickINR} from "@/lib/utils";
+import type {useChartTheme} from "@/hooks/useChartTheme";
+import type {NetWorthHistoryPoint} from "@/features/networth/types/networth.types";
 
 // ─── Net Worth History ────────────────────────────────────────────────────────
 

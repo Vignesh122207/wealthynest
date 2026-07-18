@@ -1,4 +1,4 @@
-import { z } from "zod";
+import {z} from "zod";
 
 export const incomeSchema = z.object({
   source:      z.enum(["SALARY","FREELANCE","BUSINESS","RENTAL","BONUS","INTEREST","DIVIDEND","OTHER"]),

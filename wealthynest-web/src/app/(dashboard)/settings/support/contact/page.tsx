@@ -1,10 +1,10 @@
 "use client";
 
-import { ArrowLeft, Mail, Clock, HelpCircle, Ticket, ChevronRight } from "lucide-react";
+import {ArrowLeft, ChevronRight, Clock, HelpCircle, Mail, Ticket} from "lucide-react";
 import Link from "next/link";
-import { Header } from "@/components/layout/Header";
-import { PageWrapper } from "@/components/layout/PageWrapper";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
+import {Header} from "@/components/layout/Header";
+import {PageWrapper} from "@/components/layout/PageWrapper";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
 
 export default function ContactPage() {
   return (

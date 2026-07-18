@@ -1,6 +1,6 @@
-import { apiClient } from "@/lib/axios";
-import type { ApiResponse } from "@/types/api.types";
-import type { RecurringGoalContribution } from "../types/recurringGoalContribution.types";
+import {apiClient} from "@/lib/axios";
+import type {ApiResponse} from "@/types/api.types";
+import type {RecurringGoalContribution} from "../types/recurringGoalContribution.types";
 
 export interface CreateRecurringGoalContributionPayload {
   goalId:     string;

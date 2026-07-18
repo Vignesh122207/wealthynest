@@ -1,12 +1,46 @@
 import {
-  ShoppingCart, Utensils, Car, Clapperboard, ShoppingBag,
-  HeartPulse, BookOpen, Zap, Home, Shield, Smartphone,
-  Sparkles, Dumbbell, Baby, Gift, Plane, TrendingUp,
-  CreditCard, Banknote, Package, Store, Percent, Coins,
-  ShieldCheck, GraduationCap, Landmark, Briefcase, Heart, Laptop, Target,
-  type LucideIcon,
+    Baby,
+    Banknote,
+    BookOpen,
+    Briefcase,
+    Building2,
+    Car,
+    Clapperboard,
+    Cloud,
+    Coins,
+    CreditCard,
+    Dumbbell,
+    FileText,
+    Gamepad2,
+    Gift,
+    Globe,
+    GraduationCap,
+    Heart,
+    HeartPulse,
+    Home,
+    KeyRound,
+    Landmark,
+    Laptop,
+    type LucideIcon,
+    Mail,
+    Package,
+    Percent,
+    Plane,
+    Shield,
+    ShieldCheck,
+    ShoppingBag,
+    ShoppingCart,
+    Smartphone,
+    Sparkles,
+    Store,
+    Target,
+    TrendingUp,
+    Users,
+    Utensils,
+    Wifi,
+    Zap,
 } from "lucide-react";
-import { CATEGORY_ICON_MAP } from "./categoryIcons";
+import {CATEGORY_ICON_MAP} from "./categoryIcons";
 
 export interface CategoryMeta { icon: LucideIcon; color: string; }
 
@@ -203,3 +237,35 @@ export const GOAL_PRESETS: { name: string; icon: LucideIcon }[] = [
   { name: "New Business",   icon: Briefcase },
   { name: "Custom Goal",    icon: Target },
 ];
+
+// ── Vault item icon palette ────────────────────────────────────────────────────
+// Curated for the kinds of accounts/notes people actually store in a password
+// vault — generic services, not a general "any category" set like GOAL_ICON_OPTIONS.
+export const VAULT_ICON_OPTIONS: { key: string; icon: LucideIcon }[] = [
+  { key: "KeyRound",    icon: KeyRound },
+  { key: "Mail",        icon: Mail },
+  { key: "Globe",       icon: Globe },
+  { key: "CreditCard",  icon: CreditCard },
+  { key: "Landmark",    icon: Landmark },
+  { key: "ShoppingBag", icon: ShoppingBag },
+  { key: "Building2",   icon: Building2 },
+  { key: "Wifi",        icon: Wifi },
+  { key: "Clapperboard",icon: Clapperboard },
+  { key: "Gamepad2",    icon: Gamepad2 },
+  { key: "Cloud",       icon: Cloud },
+  { key: "Smartphone",  icon: Smartphone },
+  { key: "Users",       icon: Users },
+  { key: "FileText",    icon: FileText },
+];
+
+const VAULT_ICON_KEY_MAP: Record<string, LucideIcon> = Object.fromEntries(
+  VAULT_ICON_OPTIONS.map(({ key, icon }) => [key, icon]),
+);
+
+// An explicitly-picked icon wins; otherwise fall back to a type-derived default
+// (no keyword/name matching like getGoalIcon — vault titles are arbitrary
+// service names, not the small fixed vocabulary goal names tend to use).
+export function resolveVaultIcon(item: { itemType: "LOGIN" | "SECURE_NOTE"; icon?: string | null }): LucideIcon {
+  if (item.icon && VAULT_ICON_KEY_MAP[item.icon]) return VAULT_ICON_KEY_MAP[item.icon];
+  return item.itemType === "LOGIN" ? KeyRound : FileText;
+}

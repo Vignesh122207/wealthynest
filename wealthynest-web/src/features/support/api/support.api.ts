@@ -1,6 +1,6 @@
-import { apiClient } from "@/lib/axios";
-import type { Ticket, CreateTicketPayload, ReplyPayload, TicketStatus } from "../types/support.types";
-import type { PagedResponse } from "@/types/api.types";
+import {apiClient} from "@/lib/axios";
+import type {CreateTicketPayload, ReplyPayload, Ticket, TicketStatus} from "../types/support.types";
+import type {PagedResponse} from "@/types/api.types";
 
 const BASE = "/support/tickets";
 const ADMIN = "/admin/tickets";

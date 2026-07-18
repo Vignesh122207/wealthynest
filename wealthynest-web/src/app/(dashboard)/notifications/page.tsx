@@ -1,21 +1,37 @@
 "use client";
 
-import { useState } from "react";
+import {useState} from "react";
 import Link from "next/link";
 import {
-  Bell, AlertCircle, AlertTriangle, CheckCircle2, Info,
-  TrendingUp, Target, Flag, Clock, X, Wallet, Flame, CalendarClock, Landmark,
-  type LucideIcon,
+    AlertCircle,
+    AlertTriangle,
+    Bell,
+    CalendarClock,
+    CheckCircle2,
+    Clock,
+    Flag,
+    Flame,
+    Info,
+    Landmark,
+    type LucideIcon,
+    Target,
+    TrendingUp,
+    Wallet,
+    X,
 } from "lucide-react";
-import { Header } from "@/components/layout/Header";
-import { PageWrapper } from "@/components/layout/PageWrapper";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { QueryErrorState } from "@/components/shared/QueryErrorState";
-import { PremiumIcon, type IconTone } from "@/components/icons/PremiumIcon";
-import { type AppNotification, type NotifSeverity } from "@/hooks/useNotifications";
-import { useNotificationStore } from "@/store/notification.store";
-import { useServerNotifications, useMarkAllServerRead, useMergedNotifications } from "@/features/notifications/hooks/useServerNotifications";
-import { cn } from "@/lib/utils";
+import {Header} from "@/components/layout/Header";
+import {PageWrapper} from "@/components/layout/PageWrapper";
+import {EmptyState} from "@/components/shared/EmptyState";
+import {QueryErrorState} from "@/components/shared/QueryErrorState";
+import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
+import {type AppNotification, type NotifSeverity} from "@/hooks/useNotifications";
+import {useNotificationStore} from "@/store/notification.store";
+import {
+    useMarkAllServerRead,
+    useMergedNotifications,
+    useServerNotifications
+} from "@/features/notifications/hooks/useServerNotifications";
+import {cn} from "@/lib/utils";
 
 const SEVERITY_ICON: Record<NotifSeverity, LucideIcon> = {
   error:   AlertCircle,
@@ -207,6 +223,7 @@ export default function NotificationsPage() {
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllRead}
+                data-testid="notifications-mark-all-read"
                 className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
               >
                 Mark all as read

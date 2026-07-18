@@ -1,14 +1,24 @@
 "use client";
 
-import { useMemo } from "react";
-import { Landmark, TrendingUp, Banknote, Receipt, PiggyBank, Target, CheckCircle2, AlertTriangle, type LucideIcon } from "lucide-react";
-import { cn, pctChange, formatTrendDelta } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { CHART_COLORS } from "@/lib/chartColors";
-import { PremiumIcon, type IconTone } from "@/components/icons/PremiumIcon";
-import type { NetWorthHistoryPoint } from "@/features/networth/types/networth.types";
-import type { Investment } from "@/features/investments/types/investment.types";
-import type { BudgetSummary } from "@/features/dashboard/types/dashboard.types";
+import {useMemo} from "react";
+import {
+    AlertTriangle,
+    Banknote,
+    CheckCircle2,
+    Landmark,
+    type LucideIcon,
+    PiggyBank,
+    Receipt,
+    Target,
+    TrendingUp
+} from "lucide-react";
+import {cn, formatTrendDelta, pctChange} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {CHART_COLORS} from "@/lib/chartColors";
+import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
+import type {NetWorthHistoryPoint} from "@/features/networth/types/networth.types";
+import type {Investment} from "@/features/investments/types/investment.types";
+import type {BudgetSummary} from "@/features/dashboard/types/dashboard.types";
 
 interface StatOverviewProps {
   netWorth:          number | undefined;

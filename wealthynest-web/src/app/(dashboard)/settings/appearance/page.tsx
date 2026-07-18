@@ -1,14 +1,14 @@
 "use client";
 
-import { ArrowLeft, Sun, Moon, Monitor } from "lucide-react";
+import {ArrowLeft, Monitor, Moon, Sun} from "lucide-react";
 import Link from "next/link";
-import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
-import { Header } from "@/components/layout/Header";
-import { PageWrapper } from "@/components/layout/PageWrapper";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { usePrefsStore, CURRENCIES } from "@/store/preferences.store";
-import { cn } from "@/lib/utils";
+import {useTheme} from "next-themes";
+import {useEffect, useState} from "react";
+import {Header} from "@/components/layout/Header";
+import {PageWrapper} from "@/components/layout/PageWrapper";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {CURRENCIES, usePrefsStore} from "@/store/preferences.store";
+import {cn} from "@/lib/utils";
 
 const THEMES = [
   { id: "light",  label: "Light",  icon: Sun,     desc: "Clean white background" },
@@ -48,6 +48,7 @@ export default function AppearancePage() {
                   <button
                     key={id}
                     onClick={() => setTheme(id)}
+                    data-testid={`theme-option-${id}`}
                     className={cn(
                       "flex flex-col items-center gap-2.5 p-4 rounded-2xl border transition-all",
                       theme === id
@@ -77,6 +78,7 @@ export default function AppearancePage() {
                 <button
                   key={c.code}
                   onClick={() => setCurrency(c.code as Parameters<typeof setCurrency>[0])}
+                  data-testid={`currency-option-${c.code}`}
                   className={cn(
                     "w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors",
                     currency === c.code

@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { MobileNav } from "@/components/layout/MobileNav";
-import { useAuthStore } from "@/features/auth/store/auth.store";
-import { authApi } from "@/features/auth/api/auth.api";
+import {useEffect, useState} from "react";
+import {useRouter} from "next/navigation";
+import {Sidebar} from "@/components/layout/Sidebar";
+import {MobileNav} from "@/components/layout/MobileNav";
+import {useAuthStore} from "@/features/auth/store/auth.store";
+import {authApi} from "@/features/auth/api/auth.api";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, setUser } = useAuthStore();
@@ -16,9 +16,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Sync user profile from server on every dashboard load so familyId / role
   // are always fresh (prevents stale persisted store after joining a family).
+  //
+  // Guarded by userVersion: this request is dispatched on mount, but if the user acts fast
+  // enough (e.g. creating/joining a family right after landing on the page), a mutation's own
+  // setUser() call can land *before* this resolves. Without the version check, this resync would
+  // then overwrite that more recent update with the stale pre-mutation snapshot it originally
+  // fetched — reverting familyId back to null and bouncing the UI back to onboarding right after
+  // a successful create. Only apply the result if nothing else has updated the store since.
   useEffect(() => {
     if (!hydrated || !isAuthenticated) return;
-    authApi.getMe().then(setUser).catch(() => {});
+    const versionAtRequest = useAuthStore.getState().userVersion;
+    authApi.getMe().then((freshUser) => {
+      if (useAuthStore.getState().userVersion !== versionAtRequest) return;
+      setUser(freshUser);
+    }).catch(() => {});
   }, [hydrated, isAuthenticated, setUser]);
 
   useEffect(() => {

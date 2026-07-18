@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Handshake } from "lucide-react";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import type { DebtRecord } from "@/features/debts/types/debt.types";
+import {Handshake} from "lucide-react";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import type {DebtRecord} from "@/features/debts/types/debt.types";
 
 interface DebtPulseProps {
   debts: DebtRecord[];

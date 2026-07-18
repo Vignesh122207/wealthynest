@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, ChevronUp, ArrowUpCircle, ArrowDownCircle, Flag, Trash2, Loader2 } from "lucide-react";
-import { cn, formatDate } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { useStockTransactions, useDeleteStockTransaction } from "../hooks/useInvestments";
-import { fmtNum } from "../utils/formatNum";
+import {useState} from "react";
+import {ArrowDownCircle, ArrowUpCircle, ChevronDown, ChevronUp, Flag, Trash2} from "lucide-react";
+import {cn, formatDate} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
+import {useDeleteStockTransaction, useStockTransactions} from "../hooks/useInvestments";
+import {fmtNum} from "../utils/formatNum";
 
 // Matches InvestmentServiceImpl.SEED_TXN_NOTE exactly — a backfilled "opening position" row
 // (created automatically the first time Buy More/Sell ran on a holding added before this ledger

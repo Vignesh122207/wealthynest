@@ -1,8 +1,8 @@
-import { ArrowUpRight, ArrowDownLeft, TrendingUp, TrendingDown } from "lucide-react";
-import { PremiumIcon, type IconTone } from "@/components/icons/PremiumIcon";
-import { cn } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import type { DebtRecord } from "@/features/debts/types/debt.types";
+import {ArrowDownLeft, ArrowUpRight, TrendingDown, TrendingUp} from "lucide-react";
+import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
+import {cn} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import type {DebtRecord} from "@/features/debts/types/debt.types";
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 

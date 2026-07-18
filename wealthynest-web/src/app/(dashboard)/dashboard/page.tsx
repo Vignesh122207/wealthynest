@@ -1,53 +1,52 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import {useMemo, useState} from "react";
 import dynamic from "next/dynamic";
-import { Receipt, Banknote, Sparkles, ArrowLeftRight } from "lucide-react";
+import {ArrowLeftRight, Banknote, Receipt, Sparkles} from "lucide-react";
 import Link from "next/link";
-import { type ExpenseFormValues } from "@/features/expenses/schemas/expense.schema";
-import { Header }                from "@/components/layout/Header";
-import { PremiumIcon }           from "@/components/icons/PremiumIcon";
-import { FloatingActionButton }  from "@/components/shared/FloatingActionButton";
-import { QueryErrorState }       from "@/components/shared/QueryErrorState";
-import { type IncomeFormValues, type IncomeSourceValue } from "@/components/transactions/IncomeForm";
-import { type TransferFormValues } from "@/components/transactions/TransferFormModal";
-import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
+import {type ExpenseFormValues} from "@/features/expenses/schemas/expense.schema";
+import {Header} from "@/components/layout/Header";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
+import {QueryErrorState} from "@/components/shared/QueryErrorState";
+import {type IncomeFormValues, type IncomeSourceValue} from "@/components/transactions/IncomeForm";
+import {type TransferFormValues} from "@/components/transactions/TransferFormModal";
+import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
+import {useDashboard} from "@/features/dashboard/hooks/useDashboard";
+import {useAccounts, useTransfer} from "@/features/accounts/hooks/useAccounts";
+import {useGoals} from "@/features/goals/hooks/useGoals";
+import {useCategories} from "@/features/categories/hooks/useCategories";
+import {useCreateExpense, useExpenses} from "@/features/expenses/hooks/useExpenses";
+import {useCreateIncome, useIncome} from "@/features/income/hooks/useIncome";
+import {useInvestments} from "@/features/investments/hooks/useInvestments";
+import {useNetWorthHistory} from "@/features/networth/hooks/useNetWorth";
+import {useDebts} from "@/features/debts/hooks/useDebts";
+import {useAuthStore} from "@/features/auth/store/auth.store";
+import {useChartTheme} from "@/hooks/useChartTheme";
+import {pctChange} from "@/lib/utils";
+import {buildUsageCounts, sortByUsage} from "@/lib/mostUsed";
+import {toast} from "sonner";
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+import {GreetingBanner} from "./_components/GreetingBanner";
+import {StatOverview} from "./_components/StatOverview";
+import {SmartAlerts} from "./_components/SmartAlerts";
+import {NetWorthTrend} from "./_components/NetWorthTrend";
+import {WalletOverview} from "./_components/WalletOverview";
+import {SpendingDonut} from "./_components/SpendingDonut";
+import {BudgetSection} from "./_components/BudgetSection";
+import {SixMonthTrend} from "./_components/SixMonthTrend";
+import {TransactionList} from "./_components/TransactionList";
+import {GoalsSummary} from "./_components/GoalsSummary";
+import {InvestmentPanel} from "./_components/InvestmentPanel";
+import {DebtPulse} from "./_components/DebtPulse";
+import {TwoColRow} from "./_components/TwoColRow";
 
 // Lazy-loaded: the Home dashboard's own bundle shouldn't carry all three quick-add forms just so
 // one can appear after a FAB click — each is only fetched the first time its modal actually opens.
 const ExpenseForm      = dynamic(() => import("@/components/transactions/ExpenseForm").then(m => m.ExpenseForm), { ssr: false });
 const IncomeForm       = dynamic(() => import("@/components/transactions/IncomeForm").then(m => m.IncomeForm), { ssr: false });
 const TransferFormModal = dynamic(() => import("@/components/transactions/TransferFormModal").then(m => m.TransferFormModal), { ssr: false });
-import { useDashboard }          from "@/features/dashboard/hooks/useDashboard";
-import { useAccounts }           from "@/features/accounts/hooks/useAccounts";
-import { useGoals }              from "@/features/goals/hooks/useGoals";
-import { useCategories }         from "@/features/categories/hooks/useCategories";
-import { useCreateExpense, useExpenses } from "@/features/expenses/hooks/useExpenses";
-import { useCreateIncome, useIncome } from "@/features/income/hooks/useIncome";
-import { useTransfer }           from "@/features/accounts/hooks/useAccounts";
-import { useInvestments }        from "@/features/investments/hooks/useInvestments";
-import { useNetWorthHistory }    from "@/features/networth/hooks/useNetWorth";
-import { useDebts }              from "@/features/debts/hooks/useDebts";
-import { useAuthStore }          from "@/features/auth/store/auth.store";
-import { useChartTheme }         from "@/hooks/useChartTheme";
-import { pctChange } from "@/lib/utils";
-import { buildUsageCounts, sortByUsage } from "@/lib/mostUsed";
-import { toast }                 from "sonner";
-
-// ── Sub-components ────────────────────────────────────────────────────────────
-import { GreetingBanner }   from "./_components/GreetingBanner";
-import { StatOverview }     from "./_components/StatOverview";
-import { SmartAlerts }      from "./_components/SmartAlerts";
-import { NetWorthTrend }    from "./_components/NetWorthTrend";
-import { WalletOverview }   from "./_components/WalletOverview";
-import { SpendingDonut }    from "./_components/SpendingDonut";
-import { BudgetSection }    from "./_components/BudgetSection";
-import { SixMonthTrend }    from "./_components/SixMonthTrend";
-import { TransactionList }  from "./_components/TransactionList";
-import { GoalsSummary }     from "./_components/GoalsSummary";
-import { InvestmentPanel }  from "./_components/InvestmentPanel";
-import { DebtPulse }        from "./_components/DebtPulse";
-import { TwoColRow }        from "./_components/TwoColRow";
 
 // ── Quick-add modals ──────────────────────────────────────────────────────────
 
@@ -134,7 +133,7 @@ export default function DashboardPage() {
   const { mutate: createTransfer, isPending: creatingTransfer } = useTransfer();
 
   const handleCreateExpense = (values: ExpenseFormValues) => {
-    const accountId = values.accountId || undefined;
+    const accountId = values.accountId;
     const accountType = walletAccounts.find(a => a.id === accountId)?.accountType;
     const paymentMethod = accountType === "CASH_WALLET" ? "CASH"
       : accountType === "CREDIT_CARD" ? "CREDIT_CARD" : accountType ? "BANK_ACCOUNT" : undefined;

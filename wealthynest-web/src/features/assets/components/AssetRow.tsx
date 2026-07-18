@@ -1,11 +1,11 @@
 "use client";
 
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { getAssetTypeMeta, typeLabel } from "@/lib/netWorthTypeMeta";
-import { ASSET_TYPES } from "@/lib/constants";
-import { formatDate } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import type { Asset } from "../types/asset.types";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {getAssetTypeMeta, typeLabel} from "@/lib/netWorthTypeMeta";
+import {ASSET_TYPES} from "@/lib/constants";
+import {formatDate} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import type {Asset} from "../types/asset.types";
 
 export function AssetRow({ asset, onEdit }: {
   asset:  Asset;

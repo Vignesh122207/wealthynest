@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import {X} from "lucide-react";
 
 export function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (

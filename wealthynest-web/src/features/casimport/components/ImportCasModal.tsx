@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { Upload, FileText, Check, X, AlertTriangle, ArrowRight, Plus, Trash2 } from "lucide-react";
-import { toast } from "sonner";
-import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
-import { FormModalHeader } from "@/components/transactions/FormModalHeader";
-import { Button } from "@/components/ui/Button";
-import { cn } from "@/lib/utils";
-import { usePreviewCas, useConfirmCasImport } from "../hooks/useCasImport";
-import type { CasConfirmRow, CasParsedHolding, CasPreview } from "../types/casimport.types";
+import {useState} from "react";
+import {AlertTriangle, ArrowRight, Check, FileText, Plus, Trash2, Upload, X} from "lucide-react";
+import {toast} from "sonner";
+import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
+import {FormModalHeader} from "@/components/transactions/FormModalHeader";
+import {Button} from "@/components/ui/Button";
+import {cn} from "@/lib/utils";
+import {useConfirmCasImport, usePreviewCas} from "../hooks/useCasImport";
+import type {CasConfirmRow, CasParsedHolding, CasPreview} from "../types/casimport.types";
 
 type Step = "upload" | "password" | "review" | "result";
 
@@ -133,6 +133,7 @@ export function ImportCasModal({ onClose }: { onClose: () => void }) {
                 <FileText className="w-6 h-6 text-muted-foreground/60" />
                 <span className="text-sm text-muted-foreground">{file ? file.name : "Click to choose your CAS PDF"}</span>
                 <input type="file" accept=".pdf,application/pdf" className="hidden"
+                  data-testid="import-cas-file-input"
                   onChange={e => handleFileChange(e.target.files?.[0] ?? null)} />
               </label>
               {previewing && <p className="text-xs text-muted-foreground text-center">Reading PDF…</p>}
@@ -218,6 +219,7 @@ export function ImportCasModal({ onClose }: { onClose: () => void }) {
 
               <div className="flex gap-2">
                 <Button variant="gradient" onClick={handleConfirm} loading={confirming} disabled={!canConfirm}
+                  data-testid="import-cas-confirm"
                   className="flex-1 bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-400 hover:to-pink-500 shadow-rose-500/25">
                   <Check className="w-4 h-4" /> Import {includedRows.length} holding{includedRows.length !== 1 ? "s" : ""}
                 </Button>
@@ -240,7 +242,7 @@ export function ImportCasModal({ onClose }: { onClose: () => void }) {
                   {result.errors.map((e, i) => <p key={i} className="text-[11px] text-muted-foreground pl-5">{e}</p>)}
                 </div>
               )}
-              <Button variant="gradient" onClick={onClose}
+              <Button variant="gradient" onClick={onClose} data-testid="import-cas-close-result"
                 className="w-full bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-400 hover:to-pink-500 shadow-rose-500/25">
                 <X className="w-4 h-4" /> Close
               </Button>

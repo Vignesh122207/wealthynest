@@ -1,33 +1,33 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import {useMemo, useState} from "react";
 import Link from "next/link";
-import { Header } from "@/components/layout/Header";
-import { PageWrapper } from "@/components/layout/PageWrapper";
-import { ArrowLeft, Plus, Check, Lock, Tag, Banknote, Receipt, AlertTriangle, type LucideIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { FormModalHeader } from "@/components/transactions/FormModalHeader";
-import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
+import {Header} from "@/components/layout/Header";
+import {PageWrapper} from "@/components/layout/PageWrapper";
+import {AlertTriangle, ArrowLeft, Banknote, Check, Lock, type LucideIcon, Plus, Receipt, Tag} from "lucide-react";
+import {cn} from "@/lib/utils";
+import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
+import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {FormModalHeader} from "@/components/transactions/FormModalHeader";
+import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
 import {
-  CATEGORY_ICON_GROUPS,
-  CATEGORY_ICON_MAP,
-  CATEGORY_COLOR_PALETTE,
-  suggestUnusedCombo,
-  findDuplicateCategory,
-  categoriesUsingIcon,
-  categoriesUsingColor,
+    categoriesUsingColor,
+    categoriesUsingIcon,
+    CATEGORY_COLOR_PALETTE,
+    CATEGORY_ICON_GROUPS,
+    CATEGORY_ICON_MAP,
+    findDuplicateCategory,
+    suggestUnusedCombo,
 } from "@/lib/categoryIcons";
-import { getCategoryColor } from "@/lib/categoryMeta";
+import {getCategoryColor} from "@/lib/categoryMeta";
 import {
-  useCategories,
-  useCreateCategory,
-  useUpdateCategory,
-  useDeleteCategory,
+    useCategories,
+    useCreateCategory,
+    useDeleteCategory,
+    useUpdateCategory,
 } from "@/features/categories/hooks/useCategories";
-import type { Category } from "@/features/categories/types/category.types";
+import type {Category} from "@/features/categories/types/category.types";
 
 // "Loan Interest" (expense) and "Interest" (income) are seeded with the same
 // icon key ('percent') — mapping that key alone would still leave the two
@@ -99,6 +99,7 @@ function CategoryFormModal({
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder={isIncome ? "e.g. Rental Income" : "e.g. Gym & Fitness"}
+              data-testid="category-name-input"
               className="w-full h-10 px-3 rounded-xl text-sm bg-background border border-border text-foreground placeholder-muted-foreground/40 outline-none focus:border-indigo-500 transition-all"
             />
             {name.trim().length > 0 && name.trim().length < 2 && (
@@ -188,6 +189,7 @@ function CategoryFormModal({
               onClick={() => { if (valid) onSave({ name: name.trim(), icon, color }); }}
               type="button"
               disabled={saving || !valid}
+              data-testid="category-form-submit"
               className={cn("flex-1 h-11 rounded-xl text-sm font-semibold text-white shadow-lg transition-all disabled:opacity-60 disabled:shadow-none flex items-center justify-center gap-1.5 bg-gradient-to-r",
                 isIncome ? "from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 shadow-emerald-500/25" : "from-rose-500 to-red-600 hover:from-rose-400 hover:to-red-500 shadow-rose-500/25")}>
               <Check className="w-3.5 h-3.5" />
@@ -281,7 +283,7 @@ export default function CategoriesSettingsPage() {
             { key: "EXPENSE", label: "Expense", icon: Receipt,  bg: "bg-rose-600" },
             { key: "INCOME",  label: "Income",   icon: Banknote, bg: "bg-emerald-600" },
           ] as const).map(t => (
-            <button key={t.key} onClick={() => switchTab(t.key)}
+            <button key={t.key} onClick={() => switchTab(t.key)} data-testid={`category-tab-${t.key}`}
               className={cn(
                 "flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium whitespace-nowrap transition-all shrink-0",
                 tab === t.key ? cn(t.bg, "text-white") : "bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -406,8 +408,8 @@ export default function CategoriesSettingsPage() {
       )}
 
       <FloatingActionButton actions={[
-        { icon: Receipt,  label: "New Expense Category", color: "rose",    onClick: () => { setTab("EXPENSE"); setFormMode("create"); } },
-        { icon: Banknote, label: "New Income Category",  color: "emerald", onClick: () => { setTab("INCOME");  setFormMode("create"); } },
+        { icon: Receipt,  label: "New Expense Category", color: "rose",    testId: "fab-add-expense-category", onClick: () => { setTab("EXPENSE"); setFormMode("create"); } },
+        { icon: Banknote, label: "New Income Category",  color: "emerald", testId: "fab-add-income-category",  onClick: () => { setTab("INCOME");  setFormMode("create"); } },
       ]} />
     </div>
   );

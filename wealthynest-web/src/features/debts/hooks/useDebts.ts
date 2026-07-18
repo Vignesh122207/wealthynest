@@ -1,16 +1,11 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { QUERY_KEYS } from "@/lib/constants";
-import { apiErrorMessage } from "@/lib/utils";
-import {
-  debtsApi,
-  type CreateDebtPayload,
-  type UpdateDebtPayload,
-  type RecordPaymentPayload,
-} from "../api/debts.api";
-import type { DebtType } from "../types/debt.types";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {toast} from "sonner";
+import {QUERY_KEYS} from "@/lib/constants";
+import {apiErrorMessage} from "@/lib/utils";
+import {type CreateDebtPayload, debtsApi, type RecordPaymentPayload, type UpdateDebtPayload,} from "../api/debts.api";
+import type {DebtType} from "../types/debt.types";
 
 const KEY = ["debts"] as const;
 

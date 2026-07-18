@@ -1,7 +1,7 @@
 "use client";
 
-import { Trash2, X, type LucideIcon } from "lucide-react";
-import { PremiumIcon, type IconTone } from "@/components/icons/PremiumIcon";
+import {type LucideIcon, Trash2, X} from "lucide-react";
+import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
 
 export function FormModalHeader({ icon, tone, hex, title, onDelete, onClose }: {
   icon: LucideIcon;

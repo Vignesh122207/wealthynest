@@ -1,21 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import {useState} from "react";
 import {
-  Loader2, Send, ShieldCheck, ChevronRight, ArrowLeft,
-  Search, MessageSquare, Clock, RefreshCw, ChevronLeft, X,
-  Ticket, Circle, CheckCircle2, XCircle,
+    ArrowLeft,
+    CheckCircle2,
+    ChevronLeft,
+    ChevronRight,
+    Circle,
+    Clock,
+    Loader2,
+    MessageSquare,
+    RefreshCw,
+    Search,
+    Send,
+    ShieldCheck,
+    Ticket,
+    X,
+    XCircle,
 } from "lucide-react";
 import Link from "next/link";
-import { Header } from "@/components/layout/Header";
-import { PageWrapper } from "@/components/layout/PageWrapper";
+import {Header} from "@/components/layout/Header";
+import {PageWrapper} from "@/components/layout/PageWrapper";
 import {
-  useAdminTickets, useAdminTicket,
-  useAdminReply, useAdminUpdateStatus,
+    useAdminReply,
+    useAdminTicket,
+    useAdminTickets,
+    useAdminUpdateStatus,
 } from "@/features/support/hooks/useSupport";
-import { useDebounce } from "@/hooks/useDebounce";
-import type { TicketStatus, TicketPriority, Ticket as TicketType } from "@/features/support/types/support.types";
-import { cn } from "@/lib/utils";
+import {useDebounce} from "@/hooks/useDebounce";
+import type {Ticket as TicketType, TicketPriority, TicketStatus} from "@/features/support/types/support.types";
+import {cn} from "@/lib/utils";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 

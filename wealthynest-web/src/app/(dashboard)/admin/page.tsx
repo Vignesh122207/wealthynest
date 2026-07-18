@@ -1,20 +1,18 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import {
-  Users, Ticket, History, Clock, LayoutDashboard, Loader2,
-} from "lucide-react";
-import { Header } from "@/components/layout/Header";
-import { useAuthStore } from "@/features/auth/store/auth.store";
-import { useAdminStats } from "@/features/admin/hooks/useAdmin";
-import { useOpenTicketCount } from "@/features/support/hooks/useSupport";
-import { OverviewTab } from "@/features/admin/components/OverviewTab";
-import { UsersTab } from "@/features/admin/components/UsersTab";
-import { TicketsTab } from "@/features/admin/components/TicketsTab";
-import { AuditTab } from "@/features/admin/components/AuditTab";
-import { JobsTab } from "@/features/admin/components/JobsTab";
-import { cn } from "@/lib/utils";
+import {useRouter} from "next/navigation";
+import {useEffect, useState} from "react";
+import {Clock, History, LayoutDashboard, Loader2, Ticket, Users,} from "lucide-react";
+import {Header} from "@/components/layout/Header";
+import {useAuthStore} from "@/features/auth/store/auth.store";
+import {useAdminStats} from "@/features/admin/hooks/useAdmin";
+import {useOpenTicketCount} from "@/features/support/hooks/useSupport";
+import {OverviewTab} from "@/features/admin/components/OverviewTab";
+import {UsersTab} from "@/features/admin/components/UsersTab";
+import {TicketsTab} from "@/features/admin/components/TicketsTab";
+import {AuditTab} from "@/features/admin/components/AuditTab";
+import {JobsTab} from "@/features/admin/components/JobsTab";
+import {cn} from "@/lib/utils";
 
 type Tab = "overview" | "users" | "tickets" | "audit" | "jobs";
 
@@ -71,7 +69,7 @@ export default function AdminPage() {
               const isActive = tab === t.id;
               const showBadge = t.id === "tickets" && (openTickets?.count ?? 0) > 0;
               return (
-                <button key={t.id} onClick={() => setTab(t.id)}
+                <button key={t.id} onClick={() => setTab(t.id)} data-testid={`admin-tab-${t.id}`}
                   className={cn(
                     "flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap flex-1 justify-center relative",
                     isActive

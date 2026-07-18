@@ -1,23 +1,21 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Plus, Target, ChevronDown, ChevronUp, Trophy } from "lucide-react";
-import { Header } from "@/components/layout/Header";
-import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { QueryErrorState } from "@/components/shared/QueryErrorState";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { GOAL_COLORS } from "@/lib/categoryMeta";
-import {
-  useGoals, useCreateGoal, useUpdateGoal, useDeleteGoal,
-} from "@/features/goals/hooks/useGoals";
-import type { Goal } from "@/features/goals/types/goal.types";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { type GoalFormValues } from "./_components/goalSchema";
-import { AddSavingsModal } from "./_components/AddSavingsModal";
-import { GoalCard } from "./_components/GoalCard";
-import { GoalForm } from "./_components/GoalForm";
+import {useMemo, useState} from "react";
+import {ChevronDown, ChevronUp, Plus, Target, Trophy} from "lucide-react";
+import {Header} from "@/components/layout/Header";
+import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
+import {EmptyState} from "@/components/shared/EmptyState";
+import {QueryErrorState} from "@/components/shared/QueryErrorState";
+import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {GOAL_COLORS} from "@/lib/categoryMeta";
+import {useCreateGoal, useDeleteGoal, useGoals, useUpdateGoal,} from "@/features/goals/hooks/useGoals";
+import type {Goal} from "@/features/goals/types/goal.types";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {type GoalFormValues} from "./_components/goalSchema";
+import {AddSavingsModal} from "./_components/AddSavingsModal";
+import {GoalCard} from "./_components/GoalCard";
+import {GoalForm} from "./_components/GoalForm";
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -242,7 +240,7 @@ export default function GoalsPage() {
 
       {/* ── Floating Action Button ── */}
       <FloatingActionButton actions={[
-        { icon: Target, label: "Add Goal", color: "fuchsia", onClick: () => { setShowCreate(true); setEditGoal(null); } },
+        { icon: Target, label: "Add Goal", color: "fuchsia", testId: "fab-add-goal", onClick: () => { setShowCreate(true); setEditGoal(null); } },
       ]} />
     </div>
   );

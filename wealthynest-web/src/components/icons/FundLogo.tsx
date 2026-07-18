@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import type { LucideIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { getRealFundLogoFile, getFundHouseMonogram } from "@/lib/fundHouseLogos";
-import { PremiumIcon, GlossyBadge, SIZE_MAP, type IconSize, type IconTone } from "./PremiumIcon";
+import {useState} from "react";
+import type {LucideIcon} from "lucide-react";
+import {cn} from "@/lib/utils";
+import {getFundHouseMonogram, getRealFundLogoFile} from "@/lib/fundHouseLogos";
+import {GlossyBadge, type IconSize, type IconTone, PremiumIcon, SIZE_MAP} from "./PremiumIcon";
 
 interface FundLogoProps {
   /** Full scheme name as returned by the NAV search (e.g. "HDFC Flexi Cap Fund - Growth"). */

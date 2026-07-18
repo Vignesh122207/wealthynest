@@ -1,38 +1,39 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import {useMemo, useState} from "react";
 import dynamic from "next/dynamic";
-import { Plus, Banknote } from "lucide-react";
-import { Header } from "@/components/layout/Header";
-import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
-import { useChartTheme } from "@/hooks/useChartTheme";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import {Banknote, Plus} from "lucide-react";
+import {Header} from "@/components/layout/Header";
+import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
+import {useChartTheme} from "@/hooks/useChartTheme";
+import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
+import {useAssets, useCreateAsset, useDeleteAsset, useUpdateAsset,} from "@/features/assets/hooks/useAssets";
+import type {AssetFormValues} from "@/features/assets/schemas/asset.schema";
 import {
-  useAssets, useCreateAsset, useUpdateAsset, useDeleteAsset,
-} from "@/features/assets/hooks/useAssets";
-import type { AssetFormValues } from "@/features/assets/schemas/asset.schema";
-import {
-  useLiabilities, useCreateLiability, useUpdateLiability, useDeleteLiability,
+    useCreateLiability,
+    useDeleteLiability,
+    useLiabilities,
+    useUpdateLiability,
 } from "@/features/liability/hooks/useLiabilities";
+import type {LiabilityFormValues} from "@/features/liability/schemas/liability.schema";
+import {useNetWorthHistory, useNetWorthSummary} from "@/features/networth/hooks/useNetWorth";
+import type {Asset} from "@/features/assets/types/asset.types";
+import type {CreateLiabilityPayload, Liability} from "@/features/liability/types/liability.types";
+import {ASSET_TYPES} from "@/lib/constants";
+import {typeLabel} from "@/lib/netWorthTypeMeta";
+import {withCategoricalColors} from "@/lib/chartColors";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {INV_TYPE_META, INVESTMENT_TYPE_KEYS} from "./_components/netWorthMeta";
+import {NetWorthBanner} from "./_components/NetWorthBanner";
+import {AutoLinkedAssets} from "./_components/AutoLinkedAssets";
+import {AssetAllocationChart} from "./_components/AssetAllocationChart";
+import {AssetsSection} from "./_components/AssetsSection";
+import {LiabilitiesSection} from "./_components/LiabilitiesSection";
+import {NetWorthHistoryChart} from "./_components/NetWorthHistoryChart";
 
 // Lazy-loaded: only fetched once a user actually opens the add/edit form.
 const AssetForm     = dynamic(() => import("@/features/assets/components/AssetForm").then(m => m.AssetForm), { ssr: false });
 const LiabilityForm = dynamic(() => import("@/features/liability/components/LiabilityForm").then(m => m.LiabilityForm), { ssr: false });
-import type { LiabilityFormValues } from "@/features/liability/schemas/liability.schema";
-import { useNetWorthSummary, useNetWorthHistory } from "@/features/networth/hooks/useNetWorth";
-import type { Asset } from "@/features/assets/types/asset.types";
-import type { Liability, CreateLiabilityPayload } from "@/features/liability/types/liability.types";
-import { ASSET_TYPES } from "@/lib/constants";
-import { typeLabel } from "@/lib/netWorthTypeMeta";
-import { withCategoricalColors } from "@/lib/chartColors";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { INV_TYPE_META, INVESTMENT_TYPE_KEYS } from "./_components/netWorthMeta";
-import { NetWorthBanner } from "./_components/NetWorthBanner";
-import { AutoLinkedAssets } from "./_components/AutoLinkedAssets";
-import { AssetAllocationChart } from "./_components/AssetAllocationChart";
-import { AssetsSection } from "./_components/AssetsSection";
-import { LiabilitiesSection } from "./_components/LiabilitiesSection";
-import { NetWorthHistoryChart } from "./_components/NetWorthHistoryChart";
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -243,8 +244,8 @@ export default function NetWorthPage() {
 
       {/* ── Floating Action Button ── */}
       <FloatingActionButton actions={[
-        { icon: Plus,    label: "Add Asset",     color: "emerald", onClick: () => { setShowAssetForm(true); setEditAsset(null); } },
-        { icon: Banknote, label: "Add Liability", color: "rose",    onClick: () => { setShowLiabForm(true); setEditLiability(null); } },
+        { icon: Plus,    label: "Add Asset",     color: "emerald", testId: "fab-add-asset",     onClick: () => { setShowAssetForm(true); setEditAsset(null); } },
+        { icon: Banknote, label: "Add Liability", color: "rose",    testId: "fab-add-liability", onClick: () => { setShowLiabForm(true); setEditLiability(null); } },
       ]} />
     </div>
   );

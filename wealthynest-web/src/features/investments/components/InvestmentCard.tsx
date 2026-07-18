@@ -1,22 +1,22 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { TrendingUp, TrendingDown, Info } from "lucide-react";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { StockLogo } from "@/components/icons/StockLogo";
-import { FundLogo } from "@/components/icons/FundLogo";
-import { BankLogo } from "@/components/icons/BankLogo";
-import { INVESTMENT_TYPE_META } from "@/lib/investmentTypeMeta";
-import { formatCurrency, formatDate, cn } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { useXirr } from "@/features/investments/hooks/useInvestments";
-import { StockTransactionModal } from "./StockTransactionModal";
-import { StockTransactionHistoryPanel } from "./StockTransactionHistoryPanel";
-import { InvestmentIncomePanel } from "./InvestmentIncomePanel";
-import { SipSection } from "./SipSection";
-import { fmtNum } from "../utils/formatNum";
-import type { PickerAccountList } from "../constants";
-import type { Investment, IncomeHistoryRecord } from "@/features/investments/types/investment.types";
+import {useMemo, useState} from "react";
+import {Info, TrendingDown, TrendingUp} from "lucide-react";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {StockLogo} from "@/components/icons/StockLogo";
+import {FundLogo} from "@/components/icons/FundLogo";
+import {BankLogo} from "@/components/icons/BankLogo";
+import {INVESTMENT_TYPE_META} from "@/lib/investmentTypeMeta";
+import {cn, formatCurrency, formatDate} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {useXirr} from "@/features/investments/hooks/useInvestments";
+import {StockTransactionModal} from "./StockTransactionModal";
+import {StockTransactionHistoryPanel} from "./StockTransactionHistoryPanel";
+import {InvestmentIncomePanel} from "./InvestmentIncomePanel";
+import {SipSection} from "./SipSection";
+import {fmtNum} from "../utils/formatNum";
+import type {PickerAccountList} from "../constants";
+import type {IncomeHistoryRecord, Investment} from "@/features/investments/types/investment.types";
 
 // Annualized return (accounts for the timing of every buy/sell), shown only for Stock and Mutual
 // Fund cards — the two types with variable, multi-dated cashflows where the plain gain % above
@@ -71,7 +71,7 @@ export function InvestmentCard({ inv, onEdit, dividendRecords, bankAccounts, inv
       <StockTransactionModal inv={inv} type={stockTxnModal} onClose={() => setStockTxnModal(null)}
         bankAccounts={bankAccounts ?? []} investmentAccounts={investmentAccounts ?? []} />
     )}
-    <div onClick={onEdit} role="button" tabIndex={0}
+    <div data-testid="investment-card" onClick={onEdit} role="button" tabIndex={0}
       onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEdit(); } }}
       className="bg-card border border-border rounded-2xl p-4 hover:border-indigo-500/40 hover:shadow-sm hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
       <div className="flex items-start justify-between gap-3 mb-3">

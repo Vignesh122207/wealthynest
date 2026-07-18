@@ -1,7 +1,7 @@
-import { Receipt } from "lucide-react";
-import { PremiumIcon, GlossyBadge } from "@/components/icons/PremiumIcon";
-import { getInitials } from "@/lib/utils";
-import type { Expense } from "@/features/expenses/types/expense.types";
+import {Receipt} from "lucide-react";
+import {GlossyBadge, PremiumIcon} from "@/components/icons/PremiumIcon";
+import {getInitials} from "@/lib/utils";
+import type {Expense} from "@/features/expenses/types/expense.types";
 
 const firstName = (name: string) => name.trim().split(/\s+/).filter(Boolean)[0] || name;
 

@@ -1,10 +1,10 @@
 "use client";
 
-import { Archive, ArchiveRestore, ChevronDown, Trash2 } from "lucide-react";
-import { BankLogo } from "@/components/icons/BankLogo";
-import { ACCOUNT_TYPE_META } from "@/lib/accountTypeMeta";
-import { cn } from "@/lib/utils";
-import type { AccountType, WalletAccount } from "@/features/accounts/types/account.types";
+import {Archive, ArchiveRestore, ChevronDown, Trash2} from "lucide-react";
+import {BankLogo} from "@/components/icons/BankLogo";
+import {ACCOUNT_TYPE_META} from "@/lib/accountTypeMeta";
+import {cn} from "@/lib/utils";
+import type {AccountType, WalletAccount} from "@/features/accounts/types/account.types";
 
 interface ArchivedAccountsSectionProps {
   filteredArchived: WalletAccount[];
@@ -35,7 +35,7 @@ export function ArchivedAccountsSection({
           {filteredArchived.map(a => {
             const meta = ACCOUNT_TYPE_META[a.accountType as AccountType] ?? ACCOUNT_TYPE_META.BANK_ACCOUNT;
             return (
-              <div key={a.id} className="flex items-center gap-3 bg-muted/40 border border-border/50 rounded-2xl px-4 py-3">
+              <div key={a.id} data-testid="archived-account-row" className="flex items-center gap-3 bg-muted/40 border border-border/50 rounded-2xl px-4 py-3">
                 <BankLogo name={a.bankName} fallbackIcon={meta.icon} fallbackHex={meta.hex} size="sm" className="w-9 h-9" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{a.name}</p>

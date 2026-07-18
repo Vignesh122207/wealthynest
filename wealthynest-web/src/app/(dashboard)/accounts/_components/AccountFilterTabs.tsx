@@ -1,8 +1,8 @@
 "use client";
 
-import { LayoutGrid, Landmark, Wallet, TrendingUp, CreditCard, HandCoins } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { WalletAccount } from "@/features/accounts/types/account.types";
+import {CreditCard, HandCoins, Landmark, LayoutGrid, TrendingUp, Wallet} from "lucide-react";
+import {cn} from "@/lib/utils";
+import type {WalletAccount} from "@/features/accounts/types/account.types";
 
 export type SectionFilter = "all" | "bank" | "cash" | "cc" | "loan" | "invest";
 

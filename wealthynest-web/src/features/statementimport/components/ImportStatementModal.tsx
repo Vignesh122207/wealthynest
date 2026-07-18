@@ -1,18 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { Upload, FileText, Check, X, AlertTriangle, ArrowRight, Tags } from "lucide-react";
-import { toast } from "sonner";
-import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
-import { FormModalHeader } from "@/components/transactions/FormModalHeader";
-import { AccountPicker } from "@/components/transactions/AccountPicker";
-import { CategoryPicker } from "@/components/transactions/CategoryPicker";
-import { Button } from "@/components/ui/Button";
-import { cn } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { useCategories } from "@/features/categories/hooks/useCategories";
-import { usePreviewStatement, useConfirmImport } from "../hooks/useStatementImport";
-import type { ColumnMapping, ConfirmRow, ParsedRow, StatementPreview } from "../types/statementimport.types";
+import {useState} from "react";
+import {AlertTriangle, ArrowRight, Check, FileText, Tags, Upload, X} from "lucide-react";
+import {toast} from "sonner";
+import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
+import {FormModalHeader} from "@/components/transactions/FormModalHeader";
+import {AccountPicker} from "@/components/transactions/AccountPicker";
+import {CategoryPicker} from "@/components/transactions/CategoryPicker";
+import {Button} from "@/components/ui/Button";
+import {cn} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {useCategories} from "@/features/categories/hooks/useCategories";
+import {useConfirmImport, usePreviewStatement} from "../hooks/useStatementImport";
+import type {ColumnMapping, ConfirmRow, ParsedRow, StatementPreview} from "../types/statementimport.types";
 
 type Step = "upload" | "mapping" | "password" | "review" | "result";
 
@@ -110,12 +110,14 @@ export function ImportStatementModal({ onClose, bankAccounts, cashAccounts, init
               <p className="text-xs text-muted-foreground -mt-3">
                 Upload a CSV or PDF statement from your bank or UPI app. You&apos;ll review every row before anything is saved.
               </p>
-              <AccountPicker label="Import into account" bankAccounts={bankAccounts} cashAccounts={cashAccounts}
+              <AccountPicker label="Import into account" testId="import-statement-account-picker"
+                bankAccounts={bankAccounts} cashAccounts={cashAccounts}
                 value={accountId} onChange={setAccountId} />
               <label className="flex flex-col items-center justify-center gap-2 h-32 rounded-xl border-2 border-dashed border-border hover:border-cyan-500/50 cursor-pointer transition-colors">
                 <FileText className="w-6 h-6 text-muted-foreground/60" />
                 <span className="text-sm text-muted-foreground">{file ? file.name : "Click to choose a CSV or PDF file"}</span>
                 <input type="file" accept=".csv,text/csv,.pdf,application/pdf" className="hidden"
+                  data-testid="import-statement-file-input"
                   onChange={e => handleFileChange(e.target.files?.[0] ?? null)} />
               </label>
               {previewing && <p className="text-xs text-muted-foreground text-center">Reading file…</p>}
@@ -128,7 +130,7 @@ export function ImportStatementModal({ onClose, bankAccounts, cashAccounts, init
                 This PDF is password-protected. Enter the password (often your date of birth or PAN) to continue.
               </p>
               <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                placeholder="PDF password" autoFocus
+                placeholder="PDF password" autoFocus data-testid="import-statement-password-input"
                 className="w-full h-9 px-3 rounded-lg bg-muted/60 border border-border text-sm text-foreground" />
               <div className="flex gap-2">
                 <Button variant="gradient" onClick={handlePasswordSubmit} loading={previewing} disabled={!password}
@@ -146,15 +148,15 @@ export function ImportStatementModal({ onClose, bankAccounts, cashAccounts, init
                 Couldn&apos;t auto-detect your bank&apos;s column layout — match them below.
               </p>
               <div className="grid grid-cols-2 gap-3">
-                <ColumnSelect label="Date column" headers={previewData.headers}
+                <ColumnSelect label="Date column" headers={previewData.headers} testId="import-statement-map-date"
                   value={mapping.dateColumn} onChange={v => setMapping(m => ({ ...m, dateColumn: v }))} />
-                <ColumnSelect label="Description column" headers={previewData.headers}
+                <ColumnSelect label="Description column" headers={previewData.headers} testId="import-statement-map-description"
                   value={mapping.descriptionColumn} onChange={v => setMapping(m => ({ ...m, descriptionColumn: v }))} />
-                <ColumnSelect label="Debit / withdrawal column" headers={previewData.headers}
+                <ColumnSelect label="Debit / withdrawal column" headers={previewData.headers} testId="import-statement-map-debit"
                   value={mapping.debitColumn} onChange={v => setMapping(m => ({ ...m, debitColumn: v }))} />
-                <ColumnSelect label="Credit / deposit column" headers={previewData.headers}
+                <ColumnSelect label="Credit / deposit column" headers={previewData.headers} testId="import-statement-map-credit"
                   value={mapping.creditColumn} onChange={v => setMapping(m => ({ ...m, creditColumn: v }))} />
-                <ColumnSelect label="— or a single amount column" headers={previewData.headers}
+                <ColumnSelect label="— or a single amount column" headers={previewData.headers} testId="import-statement-map-amount"
                   value={mapping.amountColumn} onChange={v => setMapping(m => ({ ...m, amountColumn: v }))} />
               </div>
               <div className="border border-border rounded-xl overflow-x-auto">
@@ -213,7 +215,7 @@ export function ImportStatementModal({ onClose, bankAccounts, cashAccounts, init
                     {selectedForBulkCount} selected
                   </span>
                   <div className="flex-1 min-w-0">
-                    <CategoryPicker compact categories={categoryOptions} value=""
+                    <CategoryPicker compact categories={categoryOptions} value="" testId="import-bulk-category"
                       placeholder="Apply category to selected…" onChange={applyCategoryToSelected} />
                   </div>
                   <button type="button" onClick={clearBulkSelection}
@@ -232,6 +234,7 @@ export function ImportStatementModal({ onClose, bankAccounts, cashAccounts, init
                       !r.valid && "opacity-60",
                       r.selected && "bg-indigo-500/10 ring-1 ring-inset ring-indigo-500/30")}>
                     <input type="checkbox" checked={r.included} disabled={!r.valid} title="Include in import"
+                      data-testid={`import-row-checkbox-${r.rowIndex}`}
                       onChange={() => toggleRow(i)} className="shrink-0 accent-indigo-500" />
                     <div className={cn("flex-1 min-w-0", bulkSelectable && "cursor-pointer")}
                       onClick={bulkSelectable ? () => toggleSelected(i) : undefined}
@@ -244,6 +247,7 @@ export function ImportStatementModal({ onClose, bankAccounts, cashAccounts, init
                     {r.type === "DEBIT" && r.valid && (
                       <div className="w-36 shrink-0">
                         <CategoryPicker compact categories={categoryOptions} value={r.categoryId}
+                          testId={`import-row-category-${r.rowIndex}`}
                           placeholder="Uncategorized" onChange={id => setRowCategory(i, id)} />
                       </div>
                     )}
@@ -259,6 +263,7 @@ export function ImportStatementModal({ onClose, bankAccounts, cashAccounts, init
               <div className="space-y-1.5">
                 <div className="flex gap-2">
                   <Button variant="gradient" onClick={handleConfirm} loading={confirming} disabled={!canConfirm}
+                    data-testid="import-statement-confirm"
                     className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 shadow-cyan-500/25">
                     <Check className="w-4 h-4" /> Import {includedCount} transaction{includedCount !== 1 ? "s" : ""}
                   </Button>
@@ -287,7 +292,7 @@ export function ImportStatementModal({ onClose, bankAccounts, cashAccounts, init
                   {result.errors.map((e, i) => <p key={i} className="text-[11px] text-muted-foreground pl-5">{e}</p>)}
                 </div>
               )}
-              <Button variant="gradient" onClick={onClose}
+              <Button variant="gradient" onClick={onClose} data-testid="import-statement-close-result"
                 className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 shadow-cyan-500/25">
                 <X className="w-4 h-4" /> Close
               </Button>
@@ -299,13 +304,14 @@ export function ImportStatementModal({ onClose, bankAccounts, cashAccounts, init
   );
 }
 
-function ColumnSelect({ label, headers, value, onChange }: {
-  label: string; headers: string[]; value?: number; onChange: (v: number | undefined) => void;
+function ColumnSelect({ label, headers, value, onChange, testId }: {
+  label: string; headers: string[]; value?: number; onChange: (v: number | undefined) => void; testId: string;
 }) {
   return (
     <div>
       <label className="block text-xs text-muted-foreground mb-1">{label}</label>
       <select value={value ?? ""} onChange={e => onChange(e.target.value === "" ? undefined : Number(e.target.value))}
+        data-testid={testId}
         className="w-full h-9 px-2 rounded-lg bg-muted/60 border border-border text-xs text-foreground">
         <option value="">—</option>
         {headers.map((h, i) => <option key={i} value={i}>{h}</option>)}

@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, ChevronUp, CheckCircle2, AlertCircle, Clock, Wallet } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import type { DebtRecord } from "@/features/debts/types/debt.types";
-import { ContactAvatar } from "./ContactAvatar";
+import {useState} from "react";
+import {AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Clock, Wallet} from "lucide-react";
+import {cn} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import type {DebtRecord} from "@/features/debts/types/debt.types";
+import {ContactAvatar} from "./ContactAvatar";
 
 // ── Status badge ──────────────────────────────────────────────────────────────
 
@@ -31,7 +31,7 @@ export function DebtCard({ debt, onEdit, onPayment }: {
   const pct       = debt.amount > 0 ? Math.min((debt.amountSettled / debt.amount) * 100, 100) : 0;
 
   return (
-    <div className={cn(
+    <div data-testid="debt-card" className={cn(
       "bg-card border rounded-2xl overflow-hidden transition-all",
       isSettled ? "border-border/50 opacity-60" : isLent ? "border-emerald-500/20" : "border-red-500/20"
     )}>
@@ -96,7 +96,7 @@ export function DebtCard({ debt, onEdit, onPayment }: {
 
       <div className="px-4 pb-4 -mt-1 space-y-2">
         {!isSettled && (
-          <button onClick={onPayment}
+          <button data-testid="debt-card-pay-button" onClick={onPayment}
             className={cn(
               "w-full h-9 rounded-xl text-xs font-semibold transition-all",
               isLent

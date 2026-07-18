@@ -1,10 +1,10 @@
 "use client";
 
-import { Wallet, Landmark, TrendingUp, CreditCard, HandCoins } from "lucide-react";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { ACCOUNT_TYPE_META } from "@/lib/accountTypeMeta";
-import { cn } from "@/lib/utils";
-import type { WalletAccount } from "@/features/accounts/types/account.types";
+import {CreditCard, HandCoins, Landmark, TrendingUp, Wallet} from "lucide-react";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {ACCOUNT_TYPE_META} from "@/lib/accountTypeMeta";
+import {cn} from "@/lib/utils";
+import type {WalletAccount} from "@/features/accounts/types/account.types";
 
 interface AccountStatStripProps {
   accounts: WalletAccount[];

@@ -1,24 +1,24 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Check, Receipt, RefreshCw } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { FormModalHeader } from "@/components/transactions/FormModalHeader";
-import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
-import { BigAmountInput } from "@/components/transactions/BigAmountInput";
-import { AccountPicker } from "@/components/transactions/AccountPicker";
-import { CategoryPicker } from "@/components/transactions/CategoryPicker";
-import { FormDatePicker } from "@/components/forms/FormDatePicker";
-import { FormInput } from "@/components/forms/FormInput";
-import { getCategoryIcon, getCategoryColor } from "@/lib/categoryMeta";
-import { useCategories } from "@/features/categories/hooks/useCategories";
-import { useAccounts } from "@/features/accounts/hooks/useAccounts";
-import { useExpenses, useCreateExpense, useUpdateExpense, useDeleteExpense } from "@/features/expenses/hooks/useExpenses";
-import type { Expense } from "@/features/expenses/types/expense.types";
+import {useEffect, useState} from "react";
+import {Check, Plus, Receipt, RefreshCw} from "lucide-react";
+import {cn} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
+import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {FormModalHeader} from "@/components/transactions/FormModalHeader";
+import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
+import {BigAmountInput} from "@/components/transactions/BigAmountInput";
+import {AccountPicker} from "@/components/transactions/AccountPicker";
+import {CategoryPicker} from "@/components/transactions/CategoryPicker";
+import {FormDatePicker} from "@/components/forms/FormDatePicker";
+import {FormInput} from "@/components/forms/FormInput";
+import {getCategoryColor, getCategoryIcon} from "@/lib/categoryMeta";
+import {useCategories} from "@/features/categories/hooks/useCategories";
+import {useAccounts} from "@/features/accounts/hooks/useAccounts";
+import {useCreateExpense, useDeleteExpense, useExpenses, useUpdateExpense} from "@/features/expenses/hooks/useExpenses";
+import type {Expense} from "@/features/expenses/types/expense.types";
 
 // ─── Recurrence rule helpers ────────────────────────────────────────────────
 
@@ -63,6 +63,21 @@ function RuleFormModal({
   const [rule,        setRule]        = useState(initial?.recurrenceRule ?? "MONTHLY");
 
   const isEdit = !!initial?.id;
+
+  // categories/accounts can still be loading (empty) the instant this modal mounts — the
+  // useState defaults above only evaluate once, so if useCategories()/useAccounts() resolve
+  // after mount the pickers would otherwise be stuck on no default forever. Sync once they
+  // arrive, but only for a fresh rule and only if nothing's been picked yet.
+  useEffect(() => {
+    if (!isEdit && !categoryId && categories[0]?.value) setCategoryId(categories[0].value);
+  }, [categories, isEdit]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!isEdit && !accountId) {
+      const fallback = cashAccounts[0]?.id ?? bankAccounts[0]?.id ?? creditAccounts[0]?.id;
+      if (fallback) setAccountId(fallback);
+    }
+  }, [cashAccounts, bankAccounts, creditAccounts, isEdit]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const valid  = categoryId && accountId && Number(amount) > 0 && expenseDate;
   const catMeta = categories.find(c => c.value === categoryId);
   const headerIcon = catMeta ? getCategoryIcon({ name: catMeta.label, icon: catMeta.icon }) : Receipt;
@@ -79,15 +94,17 @@ function RuleFormModal({
 
           <div className="space-y-4">
             <BigAmountInput label="Amount" colorClass="text-red-500 dark:text-red-400"
+              testId="recurring-expense-amount-input"
               inputProps={{
                 value: amount,
                 onChange: e => setAmount(e.target.value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1")),
               }} />
 
-            <CategoryPicker label="Category" placeholder="Select category"
+            <CategoryPicker label="Category" placeholder="Select category" testId="recurring-expense-category-picker"
               categories={categories} value={categoryId} onChange={setCategoryId} manageHref="/settings/categories" />
 
-            <AccountPicker label="Paid Via" cashAccounts={cashAccounts} bankAccounts={bankAccounts} creditAccounts={creditAccounts}
+            <AccountPicker label="Paid Via" testId="recurring-expense-account-picker"
+              cashAccounts={cashAccounts} bankAccounts={bankAccounts} creditAccounts={creditAccounts}
               value={accountId} onChange={setAccountId} />
 
             <div>
@@ -111,7 +128,7 @@ function RuleFormModal({
               value={description} onChange={e => setDescription(e.target.value)} />
 
             <div className="flex gap-2 pt-1">
-              <button type="button" disabled={saving || !valid}
+              <button type="button" disabled={saving || !valid} data-testid="recurring-expense-form-submit"
                 onClick={() => valid && onSave({ categoryId, accountId, amount: Number(amount), description, expenseDate, recurrenceRule: rule })}
                 className="flex-1 h-11 rounded-xl text-sm font-semibold bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-400 hover:to-red-500 text-white shadow-lg shadow-red-500/25 transition-all disabled:opacity-60 disabled:shadow-none flex items-center justify-center gap-1.5">
                 <Check className="w-3.5 h-3.5" />
@@ -143,7 +160,7 @@ function RuleCard({
   const color = getCategoryColor(expense.categoryName ?? "Other", expense.categoryColor);
 
   return (
-    <div onClick={onEdit} role="button" tabIndex={0}
+    <div onClick={onEdit} role="button" tabIndex={0} data-testid="recurring-expense-rule-card"
       onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEdit(); } }}
       aria-label={`Edit ${expense.categoryName ?? "expense"} recurring rule`}
       className="bg-card border border-border rounded-2xl p-4 transition-all cursor-pointer hover:border-rose-500/40 hover:shadow-sm hover:-translate-y-0.5 duration-200">
@@ -258,7 +275,7 @@ export function ExpensesTab() {
       )}
 
       <FloatingActionButton actions={[
-        { icon: RefreshCw, label: "Add Recurring Expense", color: "rose", onClick: () => setModal("create") },
+        { icon: RefreshCw, label: "Add Recurring Expense", color: "rose", onClick: () => setModal("create"), testId: "fab-add-recurring-expense" },
       ]} />
     </>
   );

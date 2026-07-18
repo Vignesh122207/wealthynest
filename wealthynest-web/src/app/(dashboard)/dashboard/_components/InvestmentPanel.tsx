@@ -1,18 +1,18 @@
 "use client";
 
-import { useMemo } from "react";
+import {useMemo} from "react";
 import Link from "next/link";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
-import { ArrowUpRight, ArrowDownRight, Wallet, TrendingUp } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { CHART_COLORS } from "@/lib/chartColors";
-import { PremiumIcon, type IconTone } from "@/components/icons/PremiumIcon";
-import { StockLogo } from "@/components/icons/StockLogo";
-import { FundLogo } from "@/components/icons/FundLogo";
-import { BankLogo } from "@/components/icons/BankLogo";
-import { INVESTMENT_TYPE_META } from "@/lib/investmentTypeMeta";
-import type { Investment, InvestmentType } from "@/features/investments/types/investment.types";
+import {Cell, Pie, PieChart, ResponsiveContainer, Tooltip} from "recharts";
+import {ArrowDownRight, ArrowUpRight, TrendingUp, Wallet} from "lucide-react";
+import {cn} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {CHART_COLORS} from "@/lib/chartColors";
+import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
+import {StockLogo} from "@/components/icons/StockLogo";
+import {FundLogo} from "@/components/icons/FundLogo";
+import {BankLogo} from "@/components/icons/BankLogo";
+import {INVESTMENT_TYPE_META} from "@/lib/investmentTypeMeta";
+import type {Investment, InvestmentType} from "@/features/investments/types/investment.types";
 
 interface InvestmentPanelProps {
   investments: Investment[];

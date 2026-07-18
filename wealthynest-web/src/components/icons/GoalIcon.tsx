@@ -1,5 +1,5 @@
-import { resolveGoalIcon, GOAL_COLORS } from "@/lib/categoryMeta";
-import { PremiumIcon, type IconStateProps, type IconSize } from "./PremiumIcon";
+import {GOAL_COLORS, resolveGoalIcon} from "@/lib/categoryMeta";
+import {type IconSize, type IconStateProps, PremiumIcon} from "./PremiumIcon";
 
 interface GoalIconProps extends IconStateProps {
   /** Goal name — drives the keyword-matched icon fallback (e.g. "Buy a car" → Car). */

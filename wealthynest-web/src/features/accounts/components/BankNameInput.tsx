@@ -1,11 +1,11 @@
 "use client";
 
-import { useRef, useState, type CSSProperties } from "react";
-import { createPortal } from "react-dom";
-import { Landmark } from "lucide-react";
-import { BankLogo } from "@/components/icons/BankLogo";
-import { getBankMonogram } from "@/lib/bankLogos";
-import { INDIAN_BANKS } from "@/lib/constants";
+import {type CSSProperties, useRef, useState} from "react";
+import {createPortal} from "react-dom";
+import {Landmark} from "lucide-react";
+import {BankLogo} from "@/components/icons/BankLogo";
+import {getBankMonogram} from "@/lib/bankLogos";
+import {INDIAN_BANKS} from "@/lib/constants";
 
 export function BankNameInput({ value, onChange, label = "Bank / Issuer Name", suggestions = INDIAN_BANKS }: {
   value: string; onChange: (v: string) => void; label?: string; suggestions?: string[];
@@ -30,7 +30,7 @@ export function BankNameInput({ value, onChange, label = "Bank / Issuer Name", s
   return (
     <div className="relative">
       <label className="block text-xs text-muted-foreground mb-1.5 font-medium">{label}</label>
-      <input ref={inputRef} value={query}
+      <input ref={inputRef} data-testid="bank-name-input" value={query}
         onChange={e => { setQuery(e.target.value); onChange(e.target.value); setOpen(true); reposition(); }}
         onFocus={() => { setOpen(true); reposition(); }}
         onBlur={() => setTimeout(() => setOpen(false), 150)}

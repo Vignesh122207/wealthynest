@@ -1,8 +1,8 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { QUERY_KEYS } from "@/lib/constants";
-import { dashboardApi } from "../api/dashboard.api";
+import {useQuery} from "@tanstack/react-query";
+import {QUERY_KEYS} from "@/lib/constants";
+import {dashboardApi} from "../api/dashboard.api";
 
 export function useDashboard(year?: number, month?: number) {
   return useQuery({

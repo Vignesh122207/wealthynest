@@ -1,13 +1,13 @@
 "use client";
 
-import { Plus, Receipt, ChevronLeft, ChevronRight } from "lucide-react";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { QueryErrorState } from "@/components/shared/QueryErrorState";
-import { TableRowSkeleton } from "@/components/shared/LoadingSkeleton";
-import { ExpenseRow } from "@/features/expenses/components/TransactionRows";
-import { Chip } from "@/features/expenses/components/Chip";
-import { formatDate } from "@/lib/utils";
-import type { Expense } from "@/features/expenses/types/expense.types";
+import {ChevronLeft, ChevronRight, Plus, Receipt} from "lucide-react";
+import {EmptyState} from "@/components/shared/EmptyState";
+import {QueryErrorState} from "@/components/shared/QueryErrorState";
+import {TableRowSkeleton} from "@/components/shared/LoadingSkeleton";
+import {ExpenseRow} from "@/features/expenses/components/TransactionRows";
+import {Chip} from "@/features/expenses/components/Chip";
+import {formatDate} from "@/lib/utils";
+import type {Expense} from "@/features/expenses/types/expense.types";
 
 interface ExpensesTabContentProps {
   chips: { label: string; clear: () => void }[];

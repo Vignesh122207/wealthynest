@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Banknote, ShieldCheck, TrendingUp } from "lucide-react";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import type { NetWorthSummary } from "@/features/networth/types/networth.types";
+import {Banknote, ShieldCheck, TrendingUp} from "lucide-react";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import type {NetWorthSummary} from "@/features/networth/types/networth.types";
 
 // ─── Auto-linked assets — pulled live from Accounts & Investments ────────────
 

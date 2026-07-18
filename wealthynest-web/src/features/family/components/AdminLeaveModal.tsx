@@ -1,12 +1,12 @@
-import { AlertTriangle, Check, LogOut } from "lucide-react";
-import { GlossyBadge } from "@/components/icons/PremiumIcon";
-import { Button } from "@/components/ui/Button";
-import { FormModalShell } from "@/components/ui/FormModalShell";
-import { FormModalHeader } from "@/components/transactions/FormModalHeader";
-import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
-import { cn, getInitials } from "@/lib/utils";
-import { MEMBER_COLORS } from "../constants";
-import type { FamilyMember } from "../types/family.types";
+import {AlertTriangle, Check, LogOut} from "lucide-react";
+import {GlossyBadge} from "@/components/icons/PremiumIcon";
+import {Button} from "@/components/ui/Button";
+import {FormModalShell} from "@/components/ui/FormModalShell";
+import {FormModalHeader} from "@/components/transactions/FormModalHeader";
+import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
+import {cn, getInitials} from "@/lib/utils";
+import {MEMBER_COLORS} from "../constants";
+import type {FamilyMember} from "../types/family.types";
 
 export function AdminLeaveModal({
   open, familyName, nonAdminMembers, memberColorMap, targetMember, setTargetMember,

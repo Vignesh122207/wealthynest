@@ -1,14 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowLeft, Loader2, Send, ShieldCheck } from "lucide-react";
+import {use, useState} from "react";
+import {ArrowLeft, Loader2, Send, ShieldCheck} from "lucide-react";
 import Link from "next/link";
-import { use } from "react";
-import { Header } from "@/components/layout/Header";
-import { PageWrapper } from "@/components/layout/PageWrapper";
-import { useTicket, useAddReply } from "@/features/support/hooks/useSupport";
-import type { TicketStatus, TicketPriority } from "@/features/support/types/support.types";
-import { cn } from "@/lib/utils";
+import {Header} from "@/components/layout/Header";
+import {PageWrapper} from "@/components/layout/PageWrapper";
+import {useAddReply, useTicket} from "@/features/support/hooks/useSupport";
+import type {TicketPriority, TicketStatus} from "@/features/support/types/support.types";
+import {cn} from "@/lib/utils";
 
 const STATUS_CONFIG: Record<TicketStatus, { label: string; color: string }> = {
   OPEN:        { label: "Open",        color: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20" },

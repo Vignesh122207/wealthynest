@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Trophy, Target } from "lucide-react";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { resolveGoalIcon, GOAL_COLORS } from "@/lib/categoryMeta";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { EmptyState } from "@/components/shared/EmptyState";
-import type { Goal } from "@/features/goals/types/goal.types";
+import {Target, Trophy} from "lucide-react";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {GOAL_COLORS, resolveGoalIcon} from "@/lib/categoryMeta";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {EmptyState} from "@/components/shared/EmptyState";
+import type {Goal} from "@/features/goals/types/goal.types";
 
 interface GoalsSummaryProps {
   goals:     Goal[];

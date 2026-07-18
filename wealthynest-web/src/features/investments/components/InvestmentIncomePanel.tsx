@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, ChevronUp, CalendarDays } from "lucide-react";
-import { cn, formatDate } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import type { IncomeHistoryRecord } from "@/features/investments/types/investment.types";
+import {useState} from "react";
+import {CalendarDays, ChevronDown, ChevronUp} from "lucide-react";
+import {cn, formatDate} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import type {IncomeHistoryRecord} from "@/features/investments/types/investment.types";
 
 export function InvestmentIncomePanel({ records, label, accentColor }: {
   records: IncomeHistoryRecord[]; label: string; accentColor: string;

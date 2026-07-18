@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import {cn} from "@/lib/utils";
 
 export function FormButtons({ onCancel, isPending, label, color }: {
   onCancel: () => void; isPending: boolean; label: string; color: string;
@@ -12,7 +12,7 @@ export function FormButtons({ onCancel, isPending, label, color }: {
   };
   return (
     <div className="flex gap-2 pt-1">
-      <button type="submit" disabled={isPending}
+      <button type="submit" data-testid="investment-form-submit" disabled={isPending}
         className={cn("flex-1 h-10 rounded-xl text-sm font-medium text-white transition-all disabled:opacity-60", bgMap[color] ?? bgMap.indigo)}>
         {isPending ? "Saving…" : label}
       </button>

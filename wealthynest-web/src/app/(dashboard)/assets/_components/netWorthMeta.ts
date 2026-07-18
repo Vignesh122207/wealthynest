@@ -1,4 +1,4 @@
-import { TrendingUp, Layers, Coins, Building2, Percent, BarChart3, type LucideIcon } from "lucide-react";
+import {BarChart3, Building2, Coins, Layers, type LucideIcon, Percent, TrendingUp} from "lucide-react";
 
 // ─── Investment type meta (for net worth breakdown) ──────────────────────────
 

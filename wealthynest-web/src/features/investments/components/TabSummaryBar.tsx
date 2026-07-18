@@ -1,17 +1,29 @@
 "use client";
 
-import { useMemo } from "react";
+import {useMemo} from "react";
 import {
-  Wallet, TrendingUp, TrendingDown, Percent, Activity, Layers, Hash,
-  Coins, Gem, Building2, Clock, BadgePercent, Banknote, CalendarDays,
-  type LucideIcon,
+    Activity,
+    BadgePercent,
+    Banknote,
+    Building2,
+    CalendarDays,
+    Clock,
+    Coins,
+    Gem,
+    Hash,
+    Layers,
+    type LucideIcon,
+    Percent,
+    TrendingDown,
+    TrendingUp,
+    Wallet,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { PremiumIcon, type IconTone } from "@/components/icons/PremiumIcon";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { useTypeXirr } from "@/features/investments/hooks/useInvestments";
-import type { Investment } from "@/features/investments/types/investment.types";
-import type { TabId } from "../constants";
+import {cn} from "@/lib/utils";
+import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {useTypeXirr} from "@/features/investments/hooks/useInvestments";
+import type {Investment} from "@/features/investments/types/investment.types";
+import type {TabId} from "../constants";
 
 interface Stat { label: string; value: string; color: string; bg: string; icon: LucideIcon; tone: IconTone; }
 

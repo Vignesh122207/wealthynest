@@ -1,6 +1,6 @@
-import { apiClient } from "@/lib/axios";
-import type { ApiResponse } from "@/types/api.types";
-import type { Liability, CreateLiabilityPayload } from "../types/liability.types";
+import {apiClient} from "@/lib/axios";
+import type {ApiResponse} from "@/types/api.types";
+import type {CreateLiabilityPayload, Liability} from "../types/liability.types";
 
 export const liabilitiesApi = {
   getAll: async (): Promise<Liability[]> =>

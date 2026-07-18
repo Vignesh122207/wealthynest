@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import type { LucideIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { getRealLogoFile, getBankMonogram, getLogoFit } from "@/lib/bankLogos";
-import { PremiumIcon, GlossyBadge, SIZE_MAP, type IconSize, type IconTone } from "./PremiumIcon";
+import {useState} from "react";
+import type {LucideIcon} from "lucide-react";
+import {cn} from "@/lib/utils";
+import {getBankMonogram, getLogoFit, getRealLogoFile} from "@/lib/bankLogos";
+import {GlossyBadge, type IconSize, type IconTone, PremiumIcon, SIZE_MAP} from "./PremiumIcon";
 
 interface BankLogoProps {
   /** Bank/broker name as typed or picked (e.g. "HDFC Bank"). Unmatched or empty falls back to the icon. */

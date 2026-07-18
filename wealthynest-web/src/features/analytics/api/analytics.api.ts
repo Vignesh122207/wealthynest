@@ -1,6 +1,6 @@
-import { apiClient } from "@/lib/axios";
-import type { ApiResponse } from "@/types/api.types";
-import type { MonthlyTrend } from "@/features/dashboard/types/dashboard.types";
+import {apiClient} from "@/lib/axios";
+import type {ApiResponse} from "@/types/api.types";
+import type {MonthlyTrend} from "@/features/dashboard/types/dashboard.types";
 
 export const analyticsApi = {
   getAnnualTrend: async (year: number): Promise<MonthlyTrend[]> => {

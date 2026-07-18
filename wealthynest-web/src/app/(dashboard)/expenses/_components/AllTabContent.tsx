@@ -1,16 +1,16 @@
 "use client";
 
-import { Receipt, ChevronLeft, ChevronRight } from "lucide-react";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { QueryErrorState } from "@/components/shared/QueryErrorState";
-import { TableRowSkeleton } from "@/components/shared/LoadingSkeleton";
-import { Chip } from "@/features/expenses/components/Chip";
-import { cn, formatDate } from "@/lib/utils";
-import type { Expense } from "@/features/expenses/types/expense.types";
-import type { IncomeEntry } from "@/features/income/types/income.types";
-import type { AccountTransfer } from "@/features/accounts/types/account.types";
-import type { TxRow } from "./types";
-import { AllTransactionRow } from "./AllTransactionRow";
+import {ChevronLeft, ChevronRight, Receipt} from "lucide-react";
+import {EmptyState} from "@/components/shared/EmptyState";
+import {QueryErrorState} from "@/components/shared/QueryErrorState";
+import {TableRowSkeleton} from "@/components/shared/LoadingSkeleton";
+import {Chip} from "@/features/expenses/components/Chip";
+import {cn, formatDate} from "@/lib/utils";
+import type {Expense} from "@/features/expenses/types/expense.types";
+import type {IncomeEntry} from "@/features/income/types/income.types";
+import type {AccountTransfer} from "@/features/accounts/types/account.types";
+import type {TxRow} from "./types";
+import {AllTransactionRow} from "./AllTransactionRow";
 
 interface AllTabContentProps {
   chips: { label: string; clear: () => void }[];

@@ -1,8 +1,8 @@
 "use client";
 
-import { Sparkles, Plus, LogIn, TrendingUp, Target, BarChart2, Info, Loader2 } from "lucide-react";
-import { PremiumIcon, GlossyBadge } from "@/components/icons/PremiumIcon";
-import { MAX_MEMBERS } from "@/features/family/constants";
+import {BarChart2, Info, Loader2, LogIn, Plus, Sparkles, Target, TrendingUp} from "lucide-react";
+import {GlossyBadge, PremiumIcon} from "@/components/icons/PremiumIcon";
+import {MAX_MEMBERS} from "@/features/family/constants";
 
 type Mode =
   | "idle" | "create" | "join" | "rename"
@@ -45,7 +45,7 @@ export function NoFamilyOnboarding({
 
           {/* Create / Join cards */}
           <div className="grid sm:grid-cols-2 gap-4">
-            <button onClick={() => setMode("create")}
+            <button onClick={() => setMode("create")} data-testid="family-create-card"
               className="flex flex-col items-center gap-3 p-7 bg-card border border-border hover:border-indigo-500/40 hover:bg-indigo-600/5 rounded-2xl transition-all group">
               <PremiumIcon icon={Plus} tone="indigo" size="lg" className="transition-transform group-hover:scale-105" />
               <div className="text-center">
@@ -53,7 +53,7 @@ export function NoFamilyOnboarding({
                 <p className="text-xs text-muted-foreground">Start a new group and invite up to {MAX_MEMBERS - 1} others</p>
               </div>
             </button>
-            <button onClick={() => setMode("join")}
+            <button onClick={() => setMode("join")} data-testid="family-join-card"
               className="flex flex-col items-center gap-3 p-7 bg-card border border-border hover:border-emerald-500/40 hover:bg-emerald-600/5 rounded-2xl transition-all group">
               <PremiumIcon icon={LogIn} tone="emerald" size="lg" className="transition-transform group-hover:scale-105" />
               <div className="text-center">
@@ -102,11 +102,12 @@ export function NoFamilyOnboarding({
             <input value={familyName} onChange={e => setFamilyName(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleCreate()}
               placeholder="e.g. The Kumars, Smith Family"
+              data-testid="family-name-input"
               className="w-full h-10 px-3 rounded-xl bg-muted border border-border text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/40 transition-colors"
               autoFocus />
           </div>
           <div className="flex gap-2 pt-1">
-            <button onClick={handleCreate} disabled={!familyName.trim() || creating}
+            <button onClick={handleCreate} disabled={!familyName.trim() || creating} data-testid="family-create-submit"
               className="flex-1 h-10 rounded-xl text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-all disabled:opacity-60 flex items-center justify-center gap-2">
               {creating ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating…</> : "Create Family"}
             </button>
@@ -129,12 +130,13 @@ export function NoFamilyOnboarding({
             <input value={inviteCode} onChange={e => setInviteCode(e.target.value.toUpperCase())}
               onKeyDown={e => e.key === "Enter" && handleJoin()}
               placeholder="e.g. AB12CD34" maxLength={8}
+              data-testid="family-invite-code-input"
               className="w-full h-10 px-3 rounded-xl bg-muted border border-border text-sm font-mono text-foreground placeholder-muted-foreground tracking-widest focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/40 transition-colors uppercase"
               autoFocus />
             <p className="text-xs text-muted-foreground">Ask your family admin for the 8-character invite code.</p>
           </div>
           <div className="flex gap-2 pt-1">
-            <button onClick={handleJoin} disabled={inviteCode.length < 4 || joining}
+            <button onClick={handleJoin} disabled={inviteCode.length < 4 || joining} data-testid="family-join-submit"
               className="flex-1 h-10 rounded-xl text-sm font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-all disabled:opacity-60 flex items-center justify-center gap-2">
               {joining ? <><Loader2 className="w-4 h-4 animate-spin" /> Joining…</> : "Join Family"}
             </button>

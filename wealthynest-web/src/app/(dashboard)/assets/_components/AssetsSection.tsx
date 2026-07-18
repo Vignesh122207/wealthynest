@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { Plus, ChevronDown, ChevronUp, TrendingUp, Building2 } from "lucide-react";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { QueryErrorState } from "@/components/shared/QueryErrorState";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { AssetRow } from "@/features/assets/components/AssetRow";
-import type { Asset } from "@/features/assets/types/asset.types";
-import type { NetWorthSummary } from "@/features/networth/types/networth.types";
-import { INV_TYPE_META } from "./netWorthMeta";
+import {Building2, ChevronDown, ChevronUp, Plus, TrendingUp} from "lucide-react";
+import {EmptyState} from "@/components/shared/EmptyState";
+import {QueryErrorState} from "@/components/shared/QueryErrorState";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {AssetRow} from "@/features/assets/components/AssetRow";
+import type {Asset} from "@/features/assets/types/asset.types";
+import type {NetWorthSummary} from "@/features/networth/types/networth.types";
+import {INV_TYPE_META} from "./netWorthMeta";
 
 const PREVIEW_COUNT = 3;
 

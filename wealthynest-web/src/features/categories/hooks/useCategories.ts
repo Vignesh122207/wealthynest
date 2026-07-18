@@ -1,10 +1,10 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { QUERY_KEYS } from "@/lib/constants";
-import { categoriesApi, type CreateCategoryPayload, type UpdateCategoryPayload } from "../api/categories.api";
-import type { Category } from "../types/category.types";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {toast} from "sonner";
+import {QUERY_KEYS} from "@/lib/constants";
+import {categoriesApi, type CreateCategoryPayload, type UpdateCategoryPayload} from "../api/categories.api";
+import type {Category} from "../types/category.types";
 
 type ApiError = { response?: { status?: number; data?: { message?: string } } };
 

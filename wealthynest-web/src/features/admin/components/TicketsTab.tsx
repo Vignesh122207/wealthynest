@@ -1,15 +1,30 @@
-import { useState } from "react";
+import {useState} from "react";
 import {
-  RefreshCw, Search, X, ArrowLeft, ChevronRight, Circle, Clock,
-  CheckCircle2, XCircle, ShieldCheck, Loader2, Send, MessageSquare, Ticket,
+    ArrowLeft,
+    CheckCircle2,
+    ChevronRight,
+    Circle,
+    Clock,
+    Loader2,
+    MessageSquare,
+    RefreshCw,
+    Search,
+    Send,
+    ShieldCheck,
+    Ticket,
+    X,
+    XCircle,
 } from "lucide-react";
-import { PaginationBar } from "./PaginationBar";
+import {PaginationBar} from "./PaginationBar";
 import {
-  useAdminTickets, useAdminTicket, useAdminReply, useAdminUpdateStatus,
+    useAdminReply,
+    useAdminTicket,
+    useAdminTickets,
+    useAdminUpdateStatus,
 } from "@/features/support/hooks/useSupport";
-import type { TicketStatus, TicketPriority, Ticket as TicketType } from "@/features/support/types/support.types";
-import { useDebounce } from "@/hooks/useDebounce";
-import { cn } from "@/lib/utils";
+import type {Ticket as TicketType, TicketPriority, TicketStatus} from "@/features/support/types/support.types";
+import {useDebounce} from "@/hooks/useDebounce";
+import {cn} from "@/lib/utils";
 
 const TICKET_STATUS_OPTIONS: TicketStatus[] = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"];
 

@@ -1,4 +1,4 @@
-import { createLucideIcon } from "lucide-react";
+import {createLucideIcon} from "lucide-react";
 
 // A three-person "family" glyph in the same stroke-icon language as the rest of
 // the nav (Home, Wallet, Target, …) — one larger figure in front with two

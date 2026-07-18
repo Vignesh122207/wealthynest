@@ -1,4 +1,4 @@
-import { z } from "zod";
+import {z} from "zod";
 
 export const stockSchema = z.object({
   units:           z.coerce.number().positive("Quantity must be > 0"),
@@ -48,7 +48,10 @@ export const bondSchema = z.object({
   totalInvested:    z.coerce.number().positive("Total invested required"),
   couponRate:       z.coerce.number().positive("Rate required").max(30),
   couponFrequency:  z.string().default("HALF_YEARLY"),
-  couponCreditDay:  z.coerce.number().min(1).max(31).optional(),
+  // Empty input on this optional field arrives as "" from the uncontrolled register; plain
+  // z.coerce.number() would turn that into 0, which fails .min(1) and silently blocks submit
+  // (BondForm doesn't render an error for this field). Preprocess "" to undefined first.
+  couponCreditDay:  z.preprocess(v => (v === "" ? undefined : v), z.coerce.number().min(1).max(31).optional()),
   tdsRate:          z.coerce.number().min(0).max(30).optional(),
   purchaseDate:     z.string().min(1, "Purchase date required"),
   maturityDate:     z.string().optional(),

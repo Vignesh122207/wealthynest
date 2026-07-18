@@ -1,6 +1,6 @@
-import { type LucideIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { PremiumIcon, type IconTone } from "@/components/icons/PremiumIcon";
+import {type LucideIcon} from "lucide-react";
+import {cn} from "@/lib/utils";
+import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
 
 interface EmptyStateProps {
   icon:        LucideIcon;

@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
-import { AlertTriangle, X } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/Button";
-import { useDialogA11y } from "@/hooks/useDialogA11y";
+import {useEffect, useId, useRef, useState} from "react";
+import {AlertTriangle, X} from "lucide-react";
+import {cn} from "@/lib/utils";
+import {Button} from "@/components/ui/Button";
+import {useDialogA11y} from "@/hooks/useDialogA11y";
 
 interface ConfirmDialogProps {
   open:          boolean;
@@ -61,7 +61,7 @@ export function ConfirmDialog({
   return (
     // lg:left-60 (not inset-0 alone): centering on the full viewport puts this left of the
     // actual content area's center once the desktop Sidebar (sticky w-60 column) appears at lg:.
-    <div className="fixed inset-0 lg:left-60 z-50 flex items-center justify-center p-4">
+    <div data-testid="modal-overlay-backdrop" className="fixed inset-0 lg:left-60 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCancel} />
       <div
         ref={containerRef}
@@ -97,10 +97,10 @@ export function ConfirmDialog({
           </div>
         )}
         <div className="flex gap-2">
-          <Button variant="secondary" className="flex-1 h-10" onClick={handleCancel} disabled={isBusy}>
+          <Button data-testid="confirm-dialog-cancel" variant="secondary" className="flex-1 h-10" onClick={handleCancel} disabled={isBusy}>
             {cancelLabel}
           </Button>
-          <Button variant={danger ? "danger" : "primary"} className="flex-1 h-10" onClick={handleConfirm} loading={isBusy} disabled={typeToConfirmBlocked}>
+          <Button data-testid="confirm-dialog-confirm" variant={danger ? "danger" : "primary"} className="flex-1 h-10" onClick={handleConfirm} loading={isBusy} disabled={typeToConfirmBlocked}>
             {isBusy ? "…" : confirmLabel}
           </Button>
         </div>

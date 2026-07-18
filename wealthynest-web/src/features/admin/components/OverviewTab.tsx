@@ -1,11 +1,9 @@
-import { Loader2, TrendingUp, Users, UserCheck, UserX, ShieldCheck, UserPlus, Ticket, ChevronRight } from "lucide-react";
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-} from "recharts";
-import { StatCard } from "@/components/shared/StatCard";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { useUserGrowth } from "@/features/admin/hooks/useAdmin";
-import type { UserGrowthPoint } from "@/features/admin/api/admin.api";
+import {ChevronRight, Loader2, ShieldCheck, Ticket, TrendingUp, UserCheck, UserPlus, Users, UserX} from "lucide-react";
+import {Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,} from "recharts";
+import {StatCard} from "@/components/shared/StatCard";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {useUserGrowth} from "@/features/admin/hooks/useAdmin";
+import type {UserGrowthPoint} from "@/features/admin/api/admin.api";
 
 type Tab = "overview" | "users" | "tickets" | "audit" | "jobs";
 

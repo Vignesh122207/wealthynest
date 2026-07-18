@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { Copy, Check, ExternalLink, Heart } from "lucide-react";
-import { QRCodeSVG } from "qrcode.react";
-import { Header } from "@/components/layout/Header";
-import { PageWrapper } from "@/components/layout/PageWrapper";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
+import {useState} from "react";
+import {Check, Copy, ExternalLink, Heart} from "lucide-react";
+import {QRCodeSVG} from "qrcode.react";
+import {Header} from "@/components/layout/Header";
+import {PageWrapper} from "@/components/layout/PageWrapper";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
 
 const UPI_ID   = "vikkysachin12-1@oksbi";
 const UPI_LINK = `upi://pay?pa=${UPI_ID}&pn=WealthyNest&cu=INR&tn=Support%20WealthyNest`;

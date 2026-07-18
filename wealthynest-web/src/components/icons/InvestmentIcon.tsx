@@ -1,6 +1,6 @@
-import type { InvestmentType } from "@/features/investments/types/investment.types";
-import { INVESTMENT_TYPE_META } from "@/lib/investmentTypeMeta";
-import { PremiumIcon, type IconStateProps, type IconSize } from "./PremiumIcon";
+import type {InvestmentType} from "@/features/investments/types/investment.types";
+import {INVESTMENT_TYPE_META} from "@/lib/investmentTypeMeta";
+import {type IconSize, type IconStateProps, PremiumIcon} from "./PremiumIcon";
 
 interface InvestmentIconProps extends IconStateProps {
   type: InvestmentType;

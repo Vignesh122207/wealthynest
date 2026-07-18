@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils";
-import { MAX_MEMBERS } from "../constants";
+import {cn} from "@/lib/utils";
+import {MAX_MEMBERS} from "../constants";
 
 export function SlotBar({ count }: { count: number }) {
   const isFull = count >= MAX_MEMBERS;

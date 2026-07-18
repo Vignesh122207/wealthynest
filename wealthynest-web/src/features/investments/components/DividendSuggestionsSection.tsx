@@ -1,11 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { Banknote, X } from "lucide-react";
-import {
-  useDividendSuggestions, useLogIncome, useDismissDividend,
-} from "@/features/investments/hooks/useInvestments";
-import { formatDate, formatCurrencyExact, getCurrencySymbol } from "@/lib/utils";
+import {useState} from "react";
+import {Banknote, X} from "lucide-react";
+import {useDismissDividend, useDividendSuggestions, useLogIncome,} from "@/features/investments/hooks/useInvestments";
+import {formatCurrencyExact, formatDate, getCurrencySymbol} from "@/lib/utils";
 
 export function DividendSuggestionsSection({ stockCount }: { stockCount: number }) {
   const { data: suggestions = [], isLoading } = useDividendSuggestions();

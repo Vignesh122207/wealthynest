@@ -1,7 +1,7 @@
-import { Plus } from "lucide-react";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { ACCOUNT_TYPE_META } from "@/lib/accountTypeMeta";
-import type { AccountType } from "../types/account.types";
+import {Plus} from "lucide-react";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {ACCOUNT_TYPE_META} from "@/lib/accountTypeMeta";
+import type {AccountType} from "../types/account.types";
 
 // Every section grid is 2 columns wide — an odd card count leaves the last row half-empty.
 // Filling that slot with an "add another" card keeps the grid full instead of lopsided,

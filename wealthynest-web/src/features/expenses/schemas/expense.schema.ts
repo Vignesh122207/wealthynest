@@ -1,4 +1,4 @@
-import { z } from "zod";
+import {z} from "zod";
 
 export const expenseSchema = z.object({
   categoryId:  z.string().uuid("Select a category"),

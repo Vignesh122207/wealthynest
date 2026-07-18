@@ -1,12 +1,10 @@
 "use client";
 
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-} from "recharts";
-import { formatCurrencyCompact } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { CHART_COLORS } from "@/lib/chartColors";
-import type { MonthlyTrend } from "@/features/dashboard/types/dashboard.types";
+import {Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis,} from "recharts";
+import {formatCurrencyCompact} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {CHART_COLORS} from "@/lib/chartColors";
+import type {MonthlyTrend} from "@/features/dashboard/types/dashboard.types";
 
 interface SixMonthTrendProps {
   trend: MonthlyTrend[];

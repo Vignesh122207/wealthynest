@@ -1,8 +1,8 @@
 "use client";
 
-import { usePrivacyStore } from "@/store/privacy.store";
-import { usePrefsStore } from "@/store/preferences.store";
-import { formatCurrency, formatCurrencyCompact, formatCurrencyExact, getCurrencySymbol } from "@/lib/utils";
+import {usePrivacyStore} from "@/store/privacy.store";
+import {usePrefsStore} from "@/store/preferences.store";
+import {formatCurrency, formatCurrencyCompact, formatCurrencyExact, getCurrencySymbol} from "@/lib/utils";
 
 // Fixed-shape placeholders (never derived from the real value, so magnitude
 // stays hidden). Uses a small interpunct (·) rather than a bullet (•) for a

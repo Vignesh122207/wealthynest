@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Search, RefreshCw, X, CheckCircle2 } from "lucide-react";
-import type { InvestmentSearchResult } from "@/features/investments/types/investment.types";
+import {useEffect, useRef, useState} from "react";
+import {CheckCircle2, RefreshCw, Search, X} from "lucide-react";
+import type {InvestmentSearchResult} from "@/features/investments/types/investment.types";
 
 interface LiveSearchProps {
   placeholder: string;

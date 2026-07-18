@@ -1,10 +1,15 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { QUERY_KEYS } from "@/lib/constants";
-import { investmentsApi } from "../api/investments.api";
-import type { CreateInvestmentPayload, CreateSipPayload, CreateStockTransactionPayload, InvestmentType } from "../types/investment.types";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {toast} from "sonner";
+import {QUERY_KEYS} from "@/lib/constants";
+import {investmentsApi} from "../api/investments.api";
+import type {
+    CreateInvestmentPayload,
+    CreateSipPayload,
+    CreateStockTransactionPayload,
+    InvestmentType
+} from "../types/investment.types";
 
 export function useInvestments() {
   return useQuery({ queryKey: QUERY_KEYS.INVESTMENTS, queryFn: investmentsApi.getInvestments });

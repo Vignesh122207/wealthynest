@@ -1,13 +1,24 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, useCallback } from "react";
-import { createPortal } from "react-dom";
+import {useCallback, useEffect, useId, useRef, useState} from "react";
+import {createPortal} from "react-dom";
 import {
-  format, parse, isValid, startOfMonth, endOfMonth, eachDayOfInterval,
-  isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek, addDays,
+  addDays,
+  addMonths,
+  eachDayOfInterval,
+  endOfMonth,
+  endOfWeek,
+  format,
+  isSameDay,
+  isSameMonth,
+  isValid,
+  parse,
+  startOfMonth,
+  startOfWeek,
+  subMonths,
 } from "date-fns";
-import { CalendarDays, ChevronLeft, ChevronRight, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import {CalendarDays, ChevronLeft, ChevronRight, X} from "lucide-react";
+import {cn} from "@/lib/utils";
 
 type View = "day" | "month" | "year";
 
@@ -22,6 +33,7 @@ interface FormDatePickerProps {
   disabled?:    boolean;
   name?:        string;
   id?:          string;
+  testId?:      string;
 }
 
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -35,7 +47,7 @@ function parseDate(v?: string): Date | null {
 
 export function FormDatePicker({
   label, error, hint, value, onChange, onBlur,
-  placeholder = "Select date", disabled, name, id,
+  placeholder = "Select date", disabled, name, id, testId,
 }: FormDatePickerProps) {
   const [open, setOpen]       = useState(false);
   const [view, setView]       = useState<View>("day");
@@ -172,7 +184,7 @@ export function FormDatePicker({
             className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-muted text-muted-foreground transition-colors">
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <button type="button" onClick={() => setView("month")}
+          <button type="button" data-testid="calendar-month-year-header" onClick={() => setView("month")}
             className="text-sm font-semibold text-foreground hover:text-primary transition-colors px-2 py-1 rounded-lg hover:bg-muted">
             {format(cursor, "MMMM yyyy")}
           </button>
@@ -196,7 +208,7 @@ export function FormDatePicker({
             const dayKey   = format(day, "yyyy-MM-dd");
             const isFocusable = isSameDay(day, focusedDate);
             return (
-              <button key={dayKey} type="button" onClick={() => selectDay(day)}
+              <button key={dayKey} type="button" data-testid={`calendar-day-${dayKey}`} onClick={() => selectDay(day)}
                 ref={el => { if (el) dayButtonRefs.current.set(dayKey, el); else dayButtonRefs.current.delete(dayKey); }}
                 tabIndex={isFocusable ? 0 : -1}
                 onKeyDown={e => handleDayKeyDown(e, day)}
@@ -230,7 +242,7 @@ export function FormDatePicker({
             className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-muted text-muted-foreground transition-colors">
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <button type="button" onClick={() => setView("year")}
+          <button type="button" data-testid="calendar-year-header" onClick={() => setView("year")}
             className="text-sm font-semibold text-foreground hover:text-primary transition-colors px-2 py-1 rounded-lg hover:bg-muted">
             {yr}
           </button>
@@ -242,7 +254,7 @@ export function FormDatePicker({
         </div>
         <div className="grid grid-cols-3 gap-1.5">
           {MONTH_NAMES.map((m, i) => (
-            <button key={m} type="button"
+            <button key={m} type="button" data-testid={`calendar-month-${yr}-${String(i + 1).padStart(2, "0")}`}
               onClick={() => { setCursor(new Date(yr, i, 1)); setView("day"); }}
               className={cn(
                 "h-9 rounded-xl text-xs font-medium transition-all",
@@ -278,7 +290,7 @@ export function FormDatePicker({
         </div>
         <div className="grid grid-cols-3 gap-1.5">
           {years.map(yr => (
-            <button key={yr} type="button"
+            <button key={yr} type="button" data-testid={`calendar-year-${yr}`}
               onClick={() => { setCursor(new Date(yr, cursor.getMonth(), 1)); setView("month"); }}
               className={cn(
                 "h-9 rounded-xl text-xs font-medium transition-all",
@@ -313,7 +325,7 @@ export function FormDatePicker({
     <div className="space-y-1.5">
       {label && <label htmlFor={inputId} className="block text-sm font-medium text-muted-foreground">{label}</label>}
       <div className="relative" ref={inputRef}>
-        <input id={inputId} ref={triggerRef} type="text" name={name} value={displayValue} readOnly placeholder={placeholder}
+        <input id={inputId} ref={triggerRef} data-testid={testId} type="text" name={name} value={displayValue} readOnly placeholder={placeholder}
           disabled={disabled}
           onClick={openCalendar}
           onKeyDown={(e) => {

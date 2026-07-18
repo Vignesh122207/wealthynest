@@ -1,25 +1,28 @@
 "use client";
 
-import { useState } from "react";
-import { Header } from "@/components/layout/Header";
-import { PageWrapper } from "@/components/layout/PageWrapper";
-import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
-import { ArrowUpRight, ArrowDownLeft, Handshake, Wallet, type LucideIcon } from "lucide-react";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { QueryErrorState } from "@/components/shared/QueryErrorState";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { cn } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
+import {useState} from "react";
+import {Header} from "@/components/layout/Header";
+import {PageWrapper} from "@/components/layout/PageWrapper";
+import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
+import {ArrowDownLeft, ArrowUpRight, Handshake, type LucideIcon, Wallet} from "lucide-react";
+import {EmptyState} from "@/components/shared/EmptyState";
+import {QueryErrorState} from "@/components/shared/QueryErrorState";
+import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
+import {cn} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {
-  useDebts, useCreateDebt, useUpdateDebt,
-  useRecordDebtPayment, useDeleteDebt,
+    useCreateDebt,
+    useDebts,
+    useDeleteDebt,
+    useRecordDebtPayment,
+    useUpdateDebt,
 } from "@/features/debts/hooks/useDebts";
-import type { DebtRecord, DebtType } from "@/features/debts/types/debt.types";
-import { useAccounts } from "@/features/accounts/hooks/useAccounts";
-import { DebtFormModal } from "./_components/DebtFormModal";
-import { PaymentModal } from "./_components/PaymentModal";
-import { DebtCard } from "./_components/DebtCard";
-import { Summary } from "./_components/Summary";
+import type {DebtRecord, DebtType} from "@/features/debts/types/debt.types";
+import {useAccounts} from "@/features/accounts/hooks/useAccounts";
+import {DebtFormModal} from "./_components/DebtFormModal";
+import {PaymentModal} from "./_components/PaymentModal";
+import {DebtCard} from "./_components/DebtCard";
+import {Summary} from "./_components/Summary";
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -73,7 +76,7 @@ export default function DebtsPage() {
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex gap-1 overflow-x-auto max-w-full" style={{ scrollbarWidth: "none" }}>
             {tabs.map(t => (
-              <button key={t.id} onClick={() => setTab(t.id)}
+              <button key={t.id} data-testid={`debt-tab-${t.id}`} onClick={() => setTab(t.id)}
                 className={cn(
                   "flex items-center gap-2 h-9 px-4 rounded-xl text-xs font-medium whitespace-nowrap transition-all shrink-0",
                   tab === t.id ? cn(TAB_ACTIVE_BG[t.id], "text-white") : "bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -203,8 +206,8 @@ export default function DebtsPage() {
 
       {/* ── Floating Action Button ── */}
       <FloatingActionButton actions={[
-        { icon: ArrowUpRight,   label: "I Lent",     color: "emerald", onClick: () => setModal({ mode: "create", defaultType: "LENT" }) },
-        { icon: ArrowDownLeft,  label: "I Borrowed",  color: "rose",    onClick: () => setModal({ mode: "create", defaultType: "BORROWED" }) },
+        { icon: ArrowUpRight,   label: "I Lent",     color: "emerald", testId: "fab-add-debt-lent",     onClick: () => setModal({ mode: "create", defaultType: "LENT" }) },
+        { icon: ArrowDownLeft,  label: "I Borrowed",  color: "rose",    testId: "fab-add-debt-borrowed", onClick: () => setModal({ mode: "create", defaultType: "BORROWED" }) },
       ]} />
     </div>
   );

@@ -1,17 +1,17 @@
 "use client";
 
-import { useEffect } from "react";
-import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Coins } from "lucide-react";
-import { FormInput } from "@/components/forms/FormInput";
-import { FormCurrencyInput } from "@/components/forms/FormCurrencyInput";
-import { FormDatePicker } from "@/components/forms/FormDatePicker";
-import { AccountPicker } from "@/components/transactions/AccountPicker";
-import { FormButtons } from "./FormButtons";
-import { goldSchema, type GoldFormValues } from "@/features/investments/schemas/investment.schema";
-import { KARAT_OPTIONS, type PickerAccountList } from "@/features/investments/constants";
-import { formatCurrency } from "@/lib/utils";
+import {useEffect} from "react";
+import {Controller, useForm} from "react-hook-form";
+import {zodResolver} from "@hookform/resolvers/zod";
+import {Coins} from "lucide-react";
+import {FormInput} from "@/components/forms/FormInput";
+import {FormCurrencyInput} from "@/components/forms/FormCurrencyInput";
+import {FormDatePicker} from "@/components/forms/FormDatePicker";
+import {AccountPicker} from "@/components/transactions/AccountPicker";
+import {FormButtons} from "./FormButtons";
+import {type GoldFormValues, goldSchema} from "@/features/investments/schemas/investment.schema";
+import {KARAT_OPTIONS, type PickerAccountList} from "@/features/investments/constants";
+import {formatCurrency} from "@/lib/utils";
 
 type GoldPrice = { price18k: number; price22k: number; price24k: number };
 
@@ -59,7 +59,7 @@ export function GoldForm({ defaultValues, onSubmit, onCancel, isPending, goldPri
         </div>
       )}
       <div className="grid sm:grid-cols-2 gap-4">
-        <FormInput label="Description" placeholder="e.g. Digital Gold, Physical Gold"
+        <FormInput label="Description" placeholder="e.g. Digital Gold, Physical Gold" data-testid="gold-description-input"
           {...form.register("companyName")} error={form.formState.errors.companyName?.message} />
         <div>
           <label className="block text-xs text-muted-foreground mb-1.5">Karat</label>
@@ -73,13 +73,13 @@ export function GoldForm({ defaultValues, onSubmit, onCancel, isPending, goldPri
             <p className="text-xs text-red-400 mt-1">{form.formState.errors.goldKarat.message}</p>
           )}
         </div>
-        <FormCurrencyInput label="Quantity (grams)" {...form.register("quantityGrams")}
+        <FormCurrencyInput label="Quantity (grams)" data-testid="gold-quantity-input" {...form.register("quantityGrams")}
           error={form.formState.errors.quantityGrams?.message} />
-        <FormCurrencyInput label="Buy Price per Gram" {...form.register("avgBuyPrice")}
+        <FormCurrencyInput label="Buy Price per Gram" data-testid="gold-buy-price-input" {...form.register("avgBuyPrice")}
           error={form.formState.errors.avgBuyPrice?.message} />
         <Controller control={form.control} name="purchaseDate" render={({ field, fieldState }) => (
           <FormDatePicker label="Purchase Date" value={field.value ?? ""} onChange={field.onChange}
-            onBlur={field.onBlur} error={fieldState.error?.message} />
+            onBlur={field.onBlur} error={fieldState.error?.message} testId="gold-purchase-date-input" />
         )} />
         {(invested != null || currentVal != null) && (
           <div className="sm:col-span-2 grid grid-cols-2 gap-2">

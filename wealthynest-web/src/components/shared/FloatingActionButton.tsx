@@ -1,18 +1,19 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
-import { Plus, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import {useEffect, useRef, useState} from "react";
+import {Plus, X} from "lucide-react";
+import {cn} from "@/lib/utils";
 
 export type FabAction = {
   icon:     React.ElementType;
   label:    string;
-  color:    "rose" | "emerald" | "indigo" | "amber" | "violet" | "sky" | "fuchsia";
+  color:    "rose" | "emerald" | "indigo" | "amber" | "violet" | "sky" | "fuchsia" | "copper";
   onClick:  () => void;
   disabled?: boolean;
   /** Shown as a native tooltip when disabled — explains why instead of leaving a dead-looking button. */
   disabledReason?: string;
   hidden?:   boolean;
+  testId?:   string;
 };
 
 const ITEM_STYLE: Record<string, { gradient: string; shadow: string }> = {
@@ -26,13 +27,17 @@ const ITEM_STYLE: Record<string, { gradient: string; shadow: string }> = {
   // nav gradient for /goals) exactly — added rather than reusing violet so the FAB action
   // matches the form it opens pixel-for-pixel, not just approximately.
   fuchsia: { gradient: "from-fuchsia-500 to-purple-600", shadow: "shadow-fuchsia-500/30" },
+  // Matches the Vault nav icon's Graphite Copper accent (Sidebar.tsx) — a deliberately dark,
+  // metallic pair, distinct from Budgets' amber→orange, to read as "vault/security" not "money".
+  copper:  { gradient: "from-[#27272a] to-[#c2703d]", shadow: "shadow-[#c2703d]/30" },
 };
 
-function FabItem({ icon: Icon, label, color, onClick, disabled, disabledReason, index }: FabAction & { index: number }) {
+function FabItem({ icon: Icon, label, color, onClick, disabled, disabledReason, index, testId }: FabAction & { index: number }) {
   const style = ITEM_STYLE[color] ?? ITEM_STYLE.indigo;
   return (
     <button
       type="button"
+      data-testid={testId}
       onClick={onClick}
       disabled={disabled}
       title={disabled ? disabledReason : undefined}
@@ -94,6 +99,7 @@ export function FloatingActionButton({ actions }: FloatingActionButtonProps) {
 
         <button
           type="button"
+          data-testid="fab-toggle"
           onClick={() => setOpen(v => !v)}
           aria-label={open ? "Close menu" : "Quick add"}
           className={cn(

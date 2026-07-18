@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import {useEffect, useRef, useState} from "react";
+import {createPortal} from "react-dom";
 
 // ─── Dropdown Panel — portals to <body> so it's never clipped by a scrolling
 // modal, and always fits on screen no matter where its trigger sits ─────────

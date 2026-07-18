@@ -1,8 +1,8 @@
-import { expensesApi } from "@/features/expenses/api/expenses.api";
-import { apiClient } from "@/lib/axios";
-import { toast } from "sonner";
-import { getCurrencySymbol } from "@/lib/utils";
-import type { WalletAccount } from "../types/account.types";
+import {expensesApi} from "@/features/expenses/api/expenses.api";
+import {apiClient} from "@/lib/axios";
+import {toast} from "sonner";
+import {getCurrencySymbol} from "@/lib/utils";
+import type {WalletAccount} from "../types/account.types";
 
 export async function downloadAccountStatement(account: WalletAccount) {
   try {

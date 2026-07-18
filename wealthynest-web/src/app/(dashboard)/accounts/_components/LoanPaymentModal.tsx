@@ -1,12 +1,12 @@
 "use client";
 
-import { HandCoins } from "lucide-react";
-import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
-import { FormModalHeader } from "@/components/transactions/FormModalHeader";
-import { FormSelect } from "@/components/forms/FormSelect";
-import { BigAmountInput } from "@/components/transactions/BigAmountInput";
-import { formatCurrencyCompact } from "@/lib/utils";
-import type { WalletAccount } from "@/features/accounts/types/account.types";
+import {HandCoins} from "lucide-react";
+import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
+import {FormModalHeader} from "@/components/transactions/FormModalHeader";
+import {FormSelect} from "@/components/forms/FormSelect";
+import {BigAmountInput} from "@/components/transactions/BigAmountInput";
+import {formatCurrencyCompact} from "@/lib/utils";
+import type {WalletAccount} from "@/features/accounts/types/account.types";
 
 interface LoanPaymentModalProps {
   payLoan: WalletAccount;

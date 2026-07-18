@@ -1,7 +1,7 @@
-import { Crown, ShieldOff, UserMinus } from "lucide-react";
-import { GlossyBadge } from "@/components/icons/PremiumIcon";
-import { getInitials } from "@/lib/utils";
-import type { FamilyMember } from "../types/family.types";
+import {Crown, ShieldOff, UserMinus} from "lucide-react";
+import {GlossyBadge} from "@/components/icons/PremiumIcon";
+import {getInitials} from "@/lib/utils";
+import type {FamilyMember} from "../types/family.types";
 
 export function MemberRow({
   member, isSelf, isCurrentUserAdmin, color, onMakeAdmin, onRevokeAdmin, onRemove,
@@ -12,7 +12,7 @@ export function MemberRow({
   const memberIsAdmin   = member.role === "FAMILY_ADMIN" || member.role === "ADMIN";
   const canRevokeAdmin  = memberIsAdmin && member.role !== "ADMIN"; // can't revoke app-level ADMIN
   return (
-    <div className="flex items-center gap-3 py-3 px-4">
+    <div className="flex items-center gap-3 py-3 px-4" data-testid="member-row">
       <GlossyBadge hex={color} size="sm" className="shrink-0">
         <span className="text-[11px] font-bold text-white">{getInitials(member.fullName)}</span>
       </GlossyBadge>

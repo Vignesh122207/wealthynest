@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
-import { usePrefsStore, CURRENCIES } from "@/store/preferences.store";
+import {useEffect, useRef, useState} from "react";
+import {cn} from "@/lib/utils";
+import {CURRENCIES, usePrefsStore} from "@/store/preferences.store";
 
 // ─── Shared form chrome — big centered amount, colored header with delete ─────
 
@@ -16,8 +16,8 @@ function fontClassFor(len: number) {
   return "text-lg";
 }
 
-export function BigAmountInput({ label = "Amount", error, colorClass, inputProps }: {
-  label?: string; error?: string; colorClass: string; inputProps: React.ComponentProps<"input">;
+export function BigAmountInput({ label = "Amount", error, colorClass, inputProps, testId }: {
+  label?: string; error?: string; colorClass: string; inputProps: React.ComponentProps<"input">; testId?: string;
 }) {
   const { currency: currCode } = usePrefsStore();
   const symbol = CURRENCIES.find(c => c.code === currCode)?.symbol ?? "₹";
@@ -49,7 +49,7 @@ export function BigAmountInput({ label = "Amount", error, colorClass, inputProps
           unit and recenters together as you type rather than drifting apart. */}
       <div className={cn("flex items-center justify-center gap-0.5 mt-1", colorClass)}>
         <span className="text-xl font-bold shrink-0">{symbol}</span>
-        <input type="text" inputMode="decimal" placeholder="0"
+        <input type="text" inputMode="decimal" placeholder="0" data-testid={testId}
           ref={(el) => {
             localRef.current = el;
             if (typeof rhfRef === "function") rhfRef(el);

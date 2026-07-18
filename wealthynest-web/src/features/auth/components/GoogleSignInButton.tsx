@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import {useEffect, useRef} from "react";
 import Script from "next/script";
-import { useGoogleLogin } from "../hooks/useAuth";
+import {useGoogleLogin} from "../hooks/useAuth";
 
 // Minimal shape of the Google Identity Services API this component actually calls —
 // https://accounts.google.com/gsi/client doesn't ship its own types, and pulling in a full
@@ -65,7 +65,7 @@ export function GoogleSignInButton({ rememberMe }: { rememberMe: boolean }) {
   return (
     <>
       <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" onLoad={handleScriptLoad} />
-      <div ref={containerRef} className="w-full">
+      <div ref={containerRef} data-testid="google-signin-container" className="w-full">
         <div ref={buttonRef} className="w-full flex justify-center" />
       </div>
     </>

@@ -1,14 +1,30 @@
 import Link from "next/link";
 import {
-  ArrowRight, IndianRupee, Landmark, Wallet, CreditCard,
-  TrendingUp, Receipt, PieChart, Target, Gem,
-  LineChart, Users, FileText, Bell, ShieldCheck, Fingerprint,
-  Lock, HeartHandshake, Sparkles, ChevronDown,
-  type LucideIcon,
+    ArrowRight,
+    Bell,
+    ChevronDown,
+    CreditCard,
+    FileText,
+    Fingerprint,
+    Gem,
+    HeartHandshake,
+    IndianRupee,
+    Landmark,
+    LineChart,
+    Lock,
+    type LucideIcon,
+    PieChart,
+    Receipt,
+    ShieldCheck,
+    Sparkles,
+    Target,
+    TrendingUp,
+    Users,
+    Wallet,
 } from "lucide-react";
-import { BrandMark } from "@/components/icons/BrandMark";
-import { PremiumIcon, type IconTone } from "@/components/icons/PremiumIcon";
-import { getCategoryIcon, getCategoryColor } from "@/lib/categoryMeta";
+import {BrandMark} from "@/components/icons/BrandMark";
+import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
+import {getCategoryColor, getCategoryIcon} from "@/lib/categoryMeta";
 
 // ─── Real demo data — same helpers/tones the actual dashboard uses, fabricated
 // numbers only. Every icon and color on this page is produced by the app's own

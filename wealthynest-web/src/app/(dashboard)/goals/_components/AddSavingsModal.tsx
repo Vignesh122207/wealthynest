@@ -1,16 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Minus } from "lucide-react";
-import { useForm } from "react-hook-form";
-import { FormCurrencyInput } from "@/components/forms/FormCurrencyInput";
-import { FormModalHeader } from "@/components/transactions/FormModalHeader";
-import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
-import { FormModalShell } from "@/components/ui/FormModalShell";
-import { resolveGoalIcon } from "@/lib/categoryMeta";
-import { useUpdateGoal } from "@/features/goals/hooks/useGoals";
-import type { Goal } from "@/features/goals/types/goal.types";
-import { formatCurrency, cn } from "@/lib/utils";
+import {useState} from "react";
+import {Minus, Plus} from "lucide-react";
+import {useForm} from "react-hook-form";
+import {FormCurrencyInput} from "@/components/forms/FormCurrencyInput";
+import {FormModalHeader} from "@/components/transactions/FormModalHeader";
+import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
+import {FormModalShell} from "@/components/ui/FormModalShell";
+import {resolveGoalIcon} from "@/lib/categoryMeta";
+import {useUpdateGoal} from "@/features/goals/hooks/useGoals";
+import type {Goal} from "@/features/goals/types/goal.types";
+import {cn, formatCurrency} from "@/lib/utils";
 
 export function AddSavingsModal({ goal, goalColor, onClose }: { goal: Goal; goalColor: string; onClose: () => void }) {
   const { mutate: updateGoal, isPending } = useUpdateGoal();
@@ -44,12 +44,12 @@ export function AddSavingsModal({ goal, goalColor, onClose }: { goal: Goal; goal
 
         {/* Mode toggle */}
         <div className="flex gap-1.5 p-1 bg-muted/60 rounded-xl mb-4">
-          <button type="button" onClick={() => { setMode("add"); setError(""); form.reset(); }}
+          <button type="button" data-testid="goal-savings-mode-add" onClick={() => { setMode("add"); setError(""); form.reset(); }}
             className={cn("flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg text-xs font-medium transition-all",
               mode === "add" ? "bg-emerald-600 text-white shadow-sm" : "text-muted-foreground hover:text-foreground")}>
             <Plus className="w-3.5 h-3.5" /> Add
           </button>
-          <button type="button" onClick={() => { setMode("withdraw"); setError(""); form.reset(); }}
+          <button type="button" data-testid="goal-savings-mode-withdraw" onClick={() => { setMode("withdraw"); setError(""); form.reset(); }}
             className={cn("flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg text-xs font-medium transition-all",
               mode === "withdraw" ? "bg-red-600 text-white shadow-sm" : "text-muted-foreground hover:text-foreground")}>
             <Minus className="w-3.5 h-3.5" /> Withdraw
@@ -68,6 +68,7 @@ export function AddSavingsModal({ goal, goalColor, onClose }: { goal: Goal; goal
 
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-3">
           <FormCurrencyInput label={mode === "add" ? "Amount to add" : "Amount to withdraw"} placeholder="0"
+            data-testid="goal-savings-amount-input"
             {...form.register("amount", { valueAsNumber: true })} />
           {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
           <div className="flex gap-2 pt-1">
@@ -77,7 +78,7 @@ export function AddSavingsModal({ goal, goalColor, onClose }: { goal: Goal; goal
                 Full ({formatCurrency(remaining)})
               </button>
             )}
-            <button type="submit" disabled={isPending}
+            <button type="submit" data-testid="goal-savings-submit" disabled={isPending}
               className={cn("flex-1 h-9 rounded-xl text-sm font-medium text-white transition-all disabled:opacity-60",
                 mode === "add" ? "bg-emerald-600 hover:bg-emerald-500" : "bg-red-600 hover:bg-red-500")}>
               {isPending ? "Saving…" : mode === "add" ? "Add to Savings" : "Withdraw"}

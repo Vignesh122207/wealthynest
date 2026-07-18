@@ -1,54 +1,55 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import {useEffect, useMemo, useState} from "react";
 import dynamic from "next/dynamic";
-import { useSearchParams } from "next/navigation";
+import {useSearchParams} from "next/navigation";
 import Link from "next/link";
+import {ArrowLeftRight, Banknote, Receipt, Wallet,} from "lucide-react";
+import {Header} from "@/components/layout/Header";
+import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
+import {type IncomeFormValues, type IncomeSourceValue} from "@/components/transactions/IncomeForm";
+import {type TransferFormValues} from "@/components/transactions/TransferFormModal";
 import {
-  Receipt, Banknote, Wallet, ArrowLeftRight,
-} from "lucide-react";
-import { Header } from "@/components/layout/Header";
-import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
-import { type IncomeFormValues, type IncomeSourceValue } from "@/components/transactions/IncomeForm";
-import { type TransferFormValues } from "@/components/transactions/TransferFormModal";
-import {
-  useExpenses, useCreateExpense, useUpdateExpense, useDeleteExpense,
+    useCreateExpense,
+    useDeleteExpense,
+    useExpenses,
+    useUpdateExpense,
 } from "@/features/expenses/hooks/useExpenses";
-import { useCategories } from "@/features/categories/hooks/useCategories";
+import {useCategories} from "@/features/categories/hooks/useCategories";
 import {
-  useAccounts, useTransfers, useTransfer, useUpdateTransfer, useDeleteTransfer,
+    useAccounts,
+    useDeleteTransfer,
+    useTransfer,
+    useTransfers,
+    useUpdateTransfer,
 } from "@/features/accounts/hooks/useAccounts";
-import {
-  useIncome, useCreateIncome, useUpdateIncome, useDeleteIncome,
-} from "@/features/income/hooks/useIncome";
-import { useDashboard } from "@/features/dashboard/hooks/useDashboard";
-import { useAuthStore } from "@/features/auth/store/auth.store";
-import { useFamilyMembers } from "@/features/family/hooks/useFamily";
-import { type ExpenseFormValues } from "@/features/expenses/schemas/expense.schema";
-import type { SplitParticipant } from "@/features/expenses/types/expense.types";
-import { exportCsv, exportIncomeCsv, exportTransfersCsv, exportAllCsv } from "@/features/expenses/utils/csvExport";
-import { pad } from "@/features/expenses/utils/filterHelpers";
-import { TypeTabs } from "@/features/expenses/components/TypeTabs";
-import { DateControls } from "@/features/expenses/components/DateControls";
-import { StatCards } from "@/features/expenses/components/StatCards";
-import { Toolbar } from "@/features/expenses/components/Toolbar";
-import { FilterPanel } from "@/features/expenses/components/FilterPanel";
-import type { TxType, DateMode, SortKey, Channel } from "@/features/expenses/types/filters.types";
-import { pctChange } from "@/lib/utils";
-import { buildUsageCounts, sortByUsage, pickSmartDefault } from "@/lib/mostUsed";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { usePrefsStore, CURRENCIES } from "@/store/preferences.store";
-import { useDebounce } from "@/hooks/useDebounce";
-import { INCOME_SOURCES } from "@/lib/constants";
-import type { Category } from "@/features/categories/types/category.types";
-import type { Expense } from "@/features/expenses/types/expense.types";
-import type { IncomeEntry } from "@/features/income/types/income.types";
-import type { AccountTransfer } from "@/features/accounts/types/account.types";
-import type { TxRow } from "./_components/types";
-import { ExpensesTabContent } from "./_components/ExpensesTabContent";
-import { IncomeTabContent } from "./_components/IncomeTabContent";
-import { TransfersTabContent } from "./_components/TransfersTabContent";
-import { AllTabContent } from "./_components/AllTabContent";
+import {useCreateIncome, useDeleteIncome, useIncome, useUpdateIncome,} from "@/features/income/hooks/useIncome";
+import {useDashboard} from "@/features/dashboard/hooks/useDashboard";
+import {useAuthStore} from "@/features/auth/store/auth.store";
+import {useFamilyMembers} from "@/features/family/hooks/useFamily";
+import {type ExpenseFormValues} from "@/features/expenses/schemas/expense.schema";
+import type {Expense, SplitParticipant} from "@/features/expenses/types/expense.types";
+import {exportAllCsv, exportCsv, exportIncomeCsv, exportTransfersCsv} from "@/features/expenses/utils/csvExport";
+import {pad} from "@/features/expenses/utils/filterHelpers";
+import {TypeTabs} from "@/features/expenses/components/TypeTabs";
+import {DateControls} from "@/features/expenses/components/DateControls";
+import {StatCards} from "@/features/expenses/components/StatCards";
+import {Toolbar} from "@/features/expenses/components/Toolbar";
+import {FilterPanel} from "@/features/expenses/components/FilterPanel";
+import type {Channel, DateMode, SortKey, TxType} from "@/features/expenses/types/filters.types";
+import {pctChange} from "@/lib/utils";
+import {buildUsageCounts, pickSmartDefault, sortByUsage} from "@/lib/mostUsed";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {CURRENCIES, usePrefsStore} from "@/store/preferences.store";
+import {useDebounce} from "@/hooks/useDebounce";
+import {INCOME_SOURCES} from "@/lib/constants";
+import type {IncomeEntry} from "@/features/income/types/income.types";
+import type {AccountTransfer} from "@/features/accounts/types/account.types";
+import type {TxRow} from "./_components/types";
+import {ExpensesTabContent} from "./_components/ExpensesTabContent";
+import {IncomeTabContent} from "./_components/IncomeTabContent";
+import {TransfersTabContent} from "./_components/TransfersTabContent";
+import {AllTabContent} from "./_components/AllTabContent";
 
 // Lazy-loaded: both are large forms only ever needed after a user opens them, never on first
 // paint — keeping them out of the page's initial bundle noticeably shrinks it on a page that's
@@ -466,7 +467,7 @@ export default function TransactionsPage() {
   }
 
   const handleCreate = (values: ExpenseFormValues, splitWith?: SplitParticipant[]) => {
-    const accountId = values.accountId || undefined;
+    const accountId = values.accountId;
     createExpense(
       { ...values, amount: Number(values.amount), accountId, paymentMethod: resolvePaymentMethod(accountId), splitWith },
       { onSuccess: () => setShowCreate(false) }
@@ -851,11 +852,11 @@ export default function TransactionsPage() {
       {/* ── Floating Action Button — hidden while the filter sheet covers the screen ── */}
       {!showFilterPanel && (
         <FloatingActionButton actions={[
-          { icon: Receipt,        label: "Add Expense", color: "rose",    onClick: () => { setShowCreate(true); setEditExpense(null); }, disabled: allAccounts.length === 0,
+          { icon: Receipt,        label: "Add Expense", color: "rose",    testId: "fab-add-expense", onClick: () => { setShowCreate(true); setEditExpense(null); }, disabled: allAccounts.length === 0,
             disabledReason: "Add an account first" },
-          { icon: Banknote,       label: "Add Income",  color: "emerald", onClick: () => { setShowAddIncome(true); setEditIncome(null); }, disabled: allAccounts.filter(a => a.accountType !== "CREDIT_CARD").length === 0,
+          { icon: Banknote,       label: "Add Income",  color: "emerald", testId: "fab-add-income", onClick: () => { setShowAddIncome(true); setEditIncome(null); }, disabled: allAccounts.filter(a => a.accountType !== "CREDIT_CARD").length === 0,
             disabledReason: "Add a bank or cash account first" },
-          { icon: ArrowLeftRight, label: "Transfer",    color: "indigo",  onClick: () => { setShowAddTransfer(true); setEditTransfer(null); }, disabled: allAccounts.length < 2,
+          { icon: ArrowLeftRight, label: "Transfer",    color: "indigo",  testId: "fab-add-transfer", onClick: () => { setShowAddTransfer(true); setEditTransfer(null); }, disabled: allAccounts.length < 2,
             disabledReason: "Add at least 2 accounts first" },
         ]} />
       )}

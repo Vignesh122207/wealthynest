@@ -1,8 +1,5 @@
-import {
-  Landmark, Wallet, ShieldCheck, CreditCard, HandCoins, TrendingUp,
-  type LucideIcon,
-} from "lucide-react";
-import type { AccountType } from "@/features/accounts/types/account.types";
+import {CreditCard, HandCoins, Landmark, type LucideIcon, ShieldCheck, TrendingUp, Wallet,} from "lucide-react";
+import type {AccountType} from "@/features/accounts/types/account.types";
 
 export interface AccountTypeMetaEntry {
   label: string;

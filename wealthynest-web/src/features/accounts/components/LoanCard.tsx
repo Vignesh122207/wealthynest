@@ -1,8 +1,8 @@
-import { memo } from "react";
-import { Download, HandCoins } from "lucide-react";
-import { formatDate } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import type { WalletAccount } from "../types/account.types";
+import {memo} from "react";
+import {Download, HandCoins} from "lucide-react";
+import {formatDate} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import type {WalletAccount} from "../types/account.types";
 
 export const LoanCard = memo(function LoanCard({ account: a, onDownload, onEdit, onRecordPayment }: {
   account: WalletAccount;

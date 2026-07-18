@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Wallet } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { ACCOUNT_TYPE_META } from "@/lib/accountTypeMeta";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import type { WalletAccount, AccountType } from "@/features/accounts/types/account.types";
+import {Wallet} from "lucide-react";
+import {cn} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {ACCOUNT_TYPE_META} from "@/lib/accountTypeMeta";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import type {AccountType, WalletAccount} from "@/features/accounts/types/account.types";
 
 interface WalletOverviewProps {
   accounts: WalletAccount[];

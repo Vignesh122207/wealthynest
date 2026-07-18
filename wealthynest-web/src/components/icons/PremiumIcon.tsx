@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils";
-import type { LucideIcon } from "lucide-react";
+import {cn} from "@/lib/utils";
+import type {LucideIcon} from "lucide-react";
 
 // ── Premium icon tones — Apple's iOS system-color palette (light + dark
 // variants), the vivid "candy" look the app is designed around. 12 families ×

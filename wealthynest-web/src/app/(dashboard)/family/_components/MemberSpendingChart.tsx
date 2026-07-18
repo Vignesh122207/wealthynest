@@ -1,12 +1,10 @@
 "use client";
 
-import { BarChart2, ChevronLeft, ChevronRight, X } from "lucide-react";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
-} from "recharts";
-import { PremiumIcon, GlossyBadge } from "@/components/icons/PremiumIcon";
-import { cn, formatCurrencyCompact, getInitials } from "@/lib/utils";
-import type { useChartTheme } from "@/hooks/useChartTheme";
+import {BarChart2, ChevronLeft, ChevronRight, X} from "lucide-react";
+import {Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis,} from "recharts";
+import {GlossyBadge, PremiumIcon} from "@/components/icons/PremiumIcon";
+import {cn, formatCurrencyCompact, getInitials} from "@/lib/utils";
+import type {useChartTheme} from "@/hooks/useChartTheme";
 
 type MemberSpendingEntry = { id: string; name: string; amount: number; color: string; fullName: string };
 type DrillMember = { id: string; fullName: string } | undefined;

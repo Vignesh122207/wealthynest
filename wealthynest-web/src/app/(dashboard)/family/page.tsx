@@ -1,32 +1,42 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Loader2 } from "lucide-react";
-import { Header } from "@/components/layout/Header";
-import { PageWrapper } from "@/components/layout/PageWrapper";
+import {useMemo, useState} from "react";
+import {Loader2} from "lucide-react";
+import {Header} from "@/components/layout/Header";
+import {PageWrapper} from "@/components/layout/PageWrapper";
 import {
-  useFamily, useFamilyMembers, useCreateFamily, useJoinFamily,
-  useRenameFamily, useLeaveFamily, useDeleteFamily, useRemoveMember,
-  useTransferAdmin, useRevokeAdmin, useFamilyExpenses, useFamilyNetWorth, useFamilyMonthlyStats,
+    useCreateFamily,
+    useDeleteFamily,
+    useFamily,
+    useFamilyExpenses,
+    useFamilyMembers,
+    useFamilyMonthlyStats,
+    useFamilyNetWorth,
+    useJoinFamily,
+    useLeaveFamily,
+    useRemoveMember,
+    useRenameFamily,
+    useRevokeAdmin,
+    useTransferAdmin,
 } from "@/features/family/hooks/useFamily";
-import { AdminLeaveModal } from "@/features/family/components/AdminLeaveModal";
-import { SplitsCard } from "@/features/expensesplits/components/SplitsCard";
-import { MAX_MEMBERS, MEMBER_COLORS } from "@/features/family/constants";
-import { useBudgets } from "@/features/budgets/hooks/useBudgets";
-import { useAuthStore } from "@/features/auth/store/auth.store";
-import { useChartTheme } from "@/hooks/useChartTheme";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { QueryErrorState } from "@/components/shared/QueryErrorState";
-import type { FamilyMember } from "@/features/family/types/family.types";
-import { DangerZone } from "./_components/DangerZone";
-import { NoFamilyOnboarding } from "./_components/NoFamilyOnboarding";
-import { FamilyOverviewStats } from "./_components/FamilyOverviewStats";
-import { FamilyHeaderCard } from "./_components/FamilyHeaderCard";
-import { MembersListCard } from "./_components/MembersListCard";
-import { BudgetOverviewCard } from "./_components/BudgetOverviewCard";
-import { MemberSpendingChart } from "./_components/MemberSpendingChart";
-import { SharedActivityFeed } from "./_components/SharedActivityFeed";
+import {AdminLeaveModal} from "@/features/family/components/AdminLeaveModal";
+import {SplitsCard} from "@/features/expensesplits/components/SplitsCard";
+import {MAX_MEMBERS, MEMBER_COLORS} from "@/features/family/constants";
+import {useBudgets} from "@/features/budgets/hooks/useBudgets";
+import {useAuthStore} from "@/features/auth/store/auth.store";
+import {useChartTheme} from "@/hooks/useChartTheme";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
+import {QueryErrorState} from "@/components/shared/QueryErrorState";
+import type {FamilyMember} from "@/features/family/types/family.types";
+import {DangerZone} from "./_components/DangerZone";
+import {NoFamilyOnboarding} from "./_components/NoFamilyOnboarding";
+import {FamilyOverviewStats} from "./_components/FamilyOverviewStats";
+import {FamilyHeaderCard} from "./_components/FamilyHeaderCard";
+import {MembersListCard} from "./_components/MembersListCard";
+import {BudgetOverviewCard} from "./_components/BudgetOverviewCard";
+import {MemberSpendingChart} from "./_components/MemberSpendingChart";
+import {SharedActivityFeed} from "./_components/SharedActivityFeed";
 
 type Mode =
   | "idle" | "create" | "join" | "rename"

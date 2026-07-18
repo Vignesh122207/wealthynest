@@ -1,27 +1,29 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { ChevronDown, Plus, Check, Power, CalendarDays, Flag } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { FormModalHeader } from "@/components/transactions/FormModalHeader";
-import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
-import { BigAmountInput } from "@/components/transactions/BigAmountInput";
-import { DropdownPanel } from "@/components/transactions/DropdownPanel";
-import { resolveGoalIcon, GOAL_COLORS } from "@/lib/categoryMeta";
-import { useGoals } from "@/features/goals/hooks/useGoals";
+import {useEffect, useRef, useState} from "react";
+import {CalendarDays, Check, ChevronDown, Flag, Plus, Power} from "lucide-react";
+import {cn} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
+import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {FormModalHeader} from "@/components/transactions/FormModalHeader";
+import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
+import {BigAmountInput} from "@/components/transactions/BigAmountInput";
+import {DropdownPanel} from "@/components/transactions/DropdownPanel";
+import {GOAL_COLORS, resolveGoalIcon} from "@/lib/categoryMeta";
+import {useGoals} from "@/features/goals/hooks/useGoals";
 import {
-  useRecurringGoalContribution,
-  useCreateRecurringGoalContribution,
-  useUpdateRecurringGoalContribution,
-  useToggleRecurringGoalContribution,
-  useDeleteRecurringGoalContribution,
+    useCreateRecurringGoalContribution,
+    useDeleteRecurringGoalContribution,
+    useRecurringGoalContribution,
+    useToggleRecurringGoalContribution,
+    useUpdateRecurringGoalContribution,
 } from "@/features/recurringGoalContribution/hooks/useRecurringGoalContribution";
-import type { RecurringGoalContribution } from "@/features/recurringGoalContribution/types/recurringGoalContribution.types";
-import type { Goal } from "@/features/goals/types/goal.types";
+import type {
+    RecurringGoalContribution
+} from "@/features/recurringGoalContribution/types/recurringGoalContribution.types";
+import type {Goal} from "@/features/goals/types/goal.types";
 
 // ─── Day helpers (same semantics as Recurring Income's Credit Day) ─────────────
 
@@ -52,7 +54,7 @@ function GoalPicker({ goals, value, onChange }: { goals: Goal[]; value: string; 
   return (
     <div>
       <label className="block text-sm font-medium text-muted-foreground mb-1.5">Goal</label>
-      <button type="button" ref={triggerRef} onClick={() => setOpen(v => !v)}
+      <button type="button" ref={triggerRef} onClick={() => setOpen(v => !v)} data-testid="recurring-goal-picker-trigger"
         className="w-full h-11 px-3 rounded-xl border flex items-center gap-2.5 text-sm text-left transition-all bg-background text-foreground border-border hover:border-indigo-500/50">
         {selected
           ? <PremiumIcon icon={resolveGoalIcon(selected)} hex={goalColorFor(selected, selectedIndex)} size="xs" />
@@ -63,9 +65,10 @@ function GoalPicker({ goals, value, onChange }: { goals: Goal[]; value: string; 
         <ChevronDown className={cn("w-4 h-4 text-muted-foreground/60 shrink-0 transition-transform", open && "rotate-180")} />
       </button>
       <DropdownPanel anchorRef={triggerRef} open={open} onClose={() => setOpen(false)}>
-        <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="flex-1 min-h-0 overflow-y-auto" data-testid="recurring-goal-picker-panel">
           {goals.map((g, i) => (
             <button key={g.id} type="button" onClick={() => { onChange(g.id); setOpen(false); }}
+              data-testid={`recurring-goal-picker-option-${g.id}`}
               className={cn("w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-left transition-colors",
                 g.id === value ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" : "text-foreground hover:bg-muted/60")}>
               <PremiumIcon icon={resolveGoalIcon(g)} hex={goalColorFor(g, i)} size="xs" />
@@ -97,6 +100,15 @@ function RuleFormModal({
   const dayTriggerRef = useRef<HTMLButtonElement>(null);
 
   const isEdit = !!initial?.id;
+
+  // goals can still be loading (empty) the instant this modal mounts — the useState default
+  // above only evaluates once, so if useGoals() resolves after mount the picker would otherwise
+  // be stuck on no default forever. Sync once goals arrive, but only for a fresh rule and only
+  // if nothing's been picked yet.
+  useEffect(() => {
+    if (!isEdit && !goalId && goals[0]?.id) setGoalId(goals[0].id);
+  }, [goals, isEdit]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const valid  = goalId && Number(amount) > 0 && Number(day) >= 0 && Number(day) <= 31;
 
   return (
@@ -110,6 +122,7 @@ function RuleFormModal({
 
           <div className="space-y-4">
             <BigAmountInput label="Monthly Contribution" colorClass="text-indigo-500 dark:text-indigo-400"
+              testId="recurring-goal-amount-input"
               inputProps={{
                 value: amount,
                 onChange: e => setAmount(e.target.value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1")),
@@ -158,7 +171,7 @@ function RuleFormModal({
             <div className="flex gap-2 pt-1">
               <button
                 onClick={() => valid && onSave({ goalId, amount: Number(amount), dayOfMonth: Number(day) })}
-                type="button" disabled={saving || !valid}
+                type="button" disabled={saving || !valid} data-testid="recurring-goal-form-submit"
                 className="flex-1 h-11 rounded-xl text-sm font-semibold bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white shadow-lg shadow-indigo-500/25 transition-all disabled:opacity-60 disabled:shadow-none flex items-center justify-center gap-1.5">
                 <Check className="w-3.5 h-3.5" />
                 {saving ? "Saving…" : isEdit ? "Save Changes" : "Create Rule"}
@@ -189,7 +202,7 @@ function RuleCard({
   const icon = resolveGoalIcon({ name: rule.goalName, icon: rule.goalIcon });
 
   return (
-    <div onClick={onEdit} role="button" tabIndex={0}
+    <div onClick={onEdit} role="button" tabIndex={0} data-testid="recurring-goal-rule-card"
       onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEdit(); } }}
       aria-label={`Edit ${rule.goalName} recurring contribution`}
       className={cn(
@@ -340,7 +353,7 @@ export function GoalsTab() {
 
       {goals.length > 0 && (
         <FloatingActionButton actions={[
-          { icon: Flag, label: "Add Recurring Contribution", color: "indigo", onClick: () => setModal("create") },
+          { icon: Flag, label: "Add Recurring Contribution", color: "indigo", onClick: () => setModal("create"), testId: "fab-add-recurring-goal" },
         ]} />
       )}
     </>

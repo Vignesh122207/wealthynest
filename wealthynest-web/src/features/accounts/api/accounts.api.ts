@@ -1,6 +1,12 @@
-import { apiClient } from "@/lib/axios";
-import type { ApiResponse, PagedResponse } from "@/types/api.types";
-import type { AccountTransfer, CreateAccountPayload, LoanPaymentResult, TransferPayload, WalletAccount } from "../types/account.types";
+import {apiClient} from "@/lib/axios";
+import type {ApiResponse, PagedResponse} from "@/types/api.types";
+import type {
+  AccountTransfer,
+  CreateAccountPayload,
+  LoanPaymentResult,
+  TransferPayload,
+  WalletAccount
+} from "../types/account.types";
 
 export const accountsApi = {
   getAccounts: async (): Promise<WalletAccount[]> =>

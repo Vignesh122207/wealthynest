@@ -1,8 +1,16 @@
 import {
-  TrendingUp, Layers, Coins, Building2, BadgePercent, PiggyBank, Landmark, Home, Package,
-  type LucideIcon,
+    BadgePercent,
+    Building2,
+    Coins,
+    Home,
+    Landmark,
+    Layers,
+    type LucideIcon,
+    Package,
+    PiggyBank,
+    TrendingUp,
 } from "lucide-react";
-import type { InvestmentType } from "@/features/investments/types/investment.types";
+import type {InvestmentType} from "@/features/investments/types/investment.types";
 
 export interface InvestmentTypeMetaEntry {
   label: string;

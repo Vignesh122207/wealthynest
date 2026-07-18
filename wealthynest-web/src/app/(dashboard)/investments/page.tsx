@@ -1,37 +1,42 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import {useCallback, useEffect, useMemo, useState} from "react";
+import {useRouter, useSearchParams} from "next/navigation";
+import {BadgePercent, Building2, Coins, Layers, Plus, Search, TrendingUp, Upload, X,} from "lucide-react";
+import {Header} from "@/components/layout/Header";
+import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
+import {EmptyState} from "@/components/shared/EmptyState";
+import {QueryErrorState} from "@/components/shared/QueryErrorState";
+import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
 import {
-  Plus, TrendingUp, Search, X,
-  Layers, Coins, Building2, BadgePercent, Upload,
-} from "lucide-react";
-import { Header } from "@/components/layout/Header";
-import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { QueryErrorState } from "@/components/shared/QueryErrorState";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import {
-  useInvestments, useCreateInvestment, useUpdateInvestment,
-  useDeleteInvestment, useGoldPrice, useGoldPriceInfo, useIncomeHistory, usePortfolioXirr,
+    useCreateInvestment,
+    useDeleteInvestment,
+    useGoldPrice,
+    useGoldPriceInfo,
+    useIncomeHistory,
+    useInvestments,
+    usePortfolioXirr,
+    useUpdateInvestment,
 } from "@/features/investments/hooks/useInvestments";
-import { useAccounts } from "@/features/accounts/hooks/useAccounts";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { INVESTMENT_TYPE_META } from "@/lib/investmentTypeMeta";
-import { FormModalHeader } from "@/components/transactions/FormModalHeader";
-import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
-import { fmtNum } from "@/features/investments/utils/formatNum";
-import {
-  TABS, TAB_TO_INVESTMENT_TYPE, SORT_OPTIONS, type TabId, type SortKey,
-} from "@/features/investments/constants";
-import { InvestmentCard } from "@/features/investments/components/InvestmentCard";
-import { DividendSuggestionsSection } from "@/features/investments/components/DividendSuggestionsSection";
-import { TabSummaryBar } from "@/features/investments/components/TabSummaryBar";
-import { OverviewTab } from "@/features/investments/components/OverviewTab";
+import {useAccounts} from "@/features/accounts/hooks/useAccounts";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {INVESTMENT_TYPE_META} from "@/lib/investmentTypeMeta";
+import {FormModalHeader} from "@/components/transactions/FormModalHeader";
+import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
+import {fmtNum} from "@/features/investments/utils/formatNum";
+import {SORT_OPTIONS, type SortKey, TAB_TO_INVESTMENT_TYPE, type TabId, TABS,} from "@/features/investments/constants";
+import {InvestmentCard} from "@/features/investments/components/InvestmentCard";
+import {DividendSuggestionsSection} from "@/features/investments/components/DividendSuggestionsSection";
+import {TabSummaryBar} from "@/features/investments/components/TabSummaryBar";
+import {OverviewTab} from "@/features/investments/components/OverviewTab";
 import dynamic from "next/dynamic";
-import type { StockFormDefaults, StockSubmitValues } from "@/features/investments/components/forms/StockForm";
-import type { MFFormDefaults, MFSubmitValues } from "@/features/investments/components/forms/MFForm";
-import type { BondSubmitValues } from "@/features/investments/components/forms/BondForm";
+import type {StockFormDefaults, StockSubmitValues} from "@/features/investments/components/forms/StockForm";
+import type {MFFormDefaults, MFSubmitValues} from "@/features/investments/components/forms/MFForm";
+import type {BondSubmitValues} from "@/features/investments/components/forms/BondForm";
+import type {BondFormValues, FDFormValues, GoldFormValues} from "@/features/investments/schemas/investment.schema";
+import type {CreateInvestmentPayload, Investment,} from "@/features/investments/types/investment.types";
+import type {WalletAccount} from "@/features/accounts/types/account.types";
+import {cn, formatCurrency} from "@/lib/utils";
 
 // Lazy-loaded: exactly one of these five ever renders at a time (the active tab, and only once
 // its add/edit modal is open) — this is the single heaviest page in the app, so keeping the
@@ -43,18 +48,12 @@ const FDForm    = dynamic(() => import("@/features/investments/components/forms/
 const BondForm  = dynamic(() => import("@/features/investments/components/forms/BondForm").then(m => m.BondForm), { ssr: false });
 const ImportCasModal = dynamic(
   () => import("@/features/casimport/components/ImportCasModal").then(m => m.ImportCasModal), { ssr: false });
-import type { GoldFormValues, FDFormValues, BondFormValues } from "@/features/investments/schemas/investment.schema";
 
 // The single shared submit handler below is wired to whichever of these 5 forms is showing for
 // the active tab — each form only ever calls it with its own shape, but there's no single static
 // type linking `tab` to `values` (they're independent params), so buildPayload still asserts the
 // specific shape per branch after switching on `currentTab`.
 type AnyInvestmentFormValues = StockSubmitValues | MFSubmitValues | GoldFormValues | FDFormValues | BondSubmitValues;
-import type {
-  Investment, CreateInvestmentPayload,
-} from "@/features/investments/types/investment.types";
-import type { WalletAccount } from "@/features/accounts/types/account.types";
-import { cn, formatCurrency } from "@/lib/utils";
 
 // Matches this page's own FAB action colors (Stock=indigo, Mutual Fund=emerald, Gold=amber,
 // Fixed Deposit=sky, Bond=violet) — the tab bar used to render every active tab in the same
@@ -458,15 +457,15 @@ const tabCounts = useMemo(() => investments.reduce((acc, i) => {
       <FloatingActionButton actions={
         tab === "overview"
           ? [
-              { icon: TrendingUp, label: "Stock",         color: "indigo",  onClick: () => { setTab("stocks"); setEditItem(null); setShowForm(true); } },
-              { icon: Layers,     label: "Mutual Fund",   color: "emerald", onClick: () => { setTab("mf");     setEditItem(null); setShowForm(true); } },
-              { icon: Coins,      label: "Gold",          color: "amber",   onClick: () => { setTab("gold");   setEditItem(null); setShowForm(true); } },
-              { icon: Building2,  label: "Fixed Deposit", color: "sky",     onClick: () => { setTab("fd");     setEditItem(null); setShowForm(true); } },
-              { icon: BadgePercent, label: "Bond",        color: "violet",  onClick: () => { setTab("bonds");  setEditItem(null); setShowForm(true); } },
-              { icon: Upload,     label: "Import from CAS", color: "rose",  onClick: () => setShowCasImport(true) },
+              { icon: TrendingUp, label: "Stock",         color: "indigo",  testId: "fab-add-stock", onClick: () => { setTab("stocks"); setEditItem(null); setShowForm(true); } },
+              { icon: Layers,     label: "Mutual Fund",   color: "emerald", testId: "fab-add-mf", onClick: () => { setTab("mf");     setEditItem(null); setShowForm(true); } },
+              { icon: Coins,      label: "Gold",          color: "amber",   testId: "fab-add-gold", onClick: () => { setTab("gold");   setEditItem(null); setShowForm(true); } },
+              { icon: Building2,  label: "Fixed Deposit", color: "sky",     testId: "fab-add-fd", onClick: () => { setTab("fd");     setEditItem(null); setShowForm(true); } },
+              { icon: BadgePercent, label: "Bond",        color: "violet",  testId: "fab-add-bond", onClick: () => { setTab("bonds");  setEditItem(null); setShowForm(true); } },
+              { icon: Upload,     label: "Import from CAS", color: "rose",  testId: "fab-import-cas", onClick: () => setShowCasImport(true) },
             ]
           : [
-              { icon: Plus, label: `Add ${TABS.find(t => t.id === tab)?.label.replace(/s$/, "") ?? "Investment"}`, color: "indigo", onClick: () => { setEditItem(null); setShowForm(true); } },
+              { icon: Plus, label: `Add ${TABS.find(t => t.id === tab)?.label.replace(/s$/, "") ?? "Investment"}`, color: "indigo", testId: "fab-add-current-tab", onClick: () => { setEditItem(null); setShowForm(true); } },
             ]
       } />
 

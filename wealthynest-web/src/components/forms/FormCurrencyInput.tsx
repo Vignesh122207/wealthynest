@@ -1,7 +1,7 @@
 "use client";
-import { forwardRef, useId, type InputHTMLAttributes } from "react";
-import { cn } from "@/lib/utils";
-import { usePrefsStore, CURRENCIES } from "@/store/preferences.store";
+import {forwardRef, type InputHTMLAttributes, useId} from "react";
+import {cn} from "@/lib/utils";
+import {CURRENCIES, usePrefsStore} from "@/store/preferences.store";
 
 interface FormCurrencyInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
   label?:    string;

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
-import { Info } from "lucide-react";
-import { cn } from "@/lib/utils";
+import {type ReactNode, useState} from "react";
+import {Info} from "lucide-react";
+import {cn} from "@/lib/utils";
 
 // A small info-icon trigger that reveals a tip on hover/focus/tap — for supplementary
 // guidance (e.g. password rules) that shouldn't cost permanent layout space next to a field.

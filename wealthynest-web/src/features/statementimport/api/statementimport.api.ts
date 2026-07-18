@@ -1,6 +1,6 @@
-import { apiClient } from "@/lib/axios";
-import type { ApiResponse } from "@/types/api.types";
-import type { ColumnMapping, ConfirmRow, ImportResult, StatementPreview } from "../types/statementimport.types";
+import {apiClient} from "@/lib/axios";
+import type {ApiResponse} from "@/types/api.types";
+import type {ColumnMapping, ConfirmRow, ImportResult, StatementPreview} from "../types/statementimport.types";
 
 export const statementImportApi = {
   preview: async (file: File, mapping?: ColumnMapping, password?: string): Promise<StatementPreview> => {

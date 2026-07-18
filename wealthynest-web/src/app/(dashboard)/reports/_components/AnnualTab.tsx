@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { FileSpreadsheet, Printer, Loader2 } from "lucide-react";
-import { toast } from "sonner";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { getCurrencySymbol } from "@/lib/utils";
-import { expensesApi } from "@/features/expenses/api/expenses.api";
-import { incomeApi } from "@/features/income/api/income.api";
-import { MONTH_NAMES, getYears, downloadCsv, openPrintWindow } from "./reportHelpers";
+import {useState} from "react";
+import {FileSpreadsheet, Loader2, Printer} from "lucide-react";
+import {toast} from "sonner";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {getCurrencySymbol} from "@/lib/utils";
+import {expensesApi} from "@/features/expenses/api/expenses.api";
+import {incomeApi} from "@/features/income/api/income.api";
+import {downloadCsv, getYears, MONTH_NAMES, openPrintWindow} from "./reportHelpers";
 
 export function AnnualTab() {
   const years   = getYears();
@@ -101,6 +101,7 @@ export function AnnualTab() {
           <select
             value={year}
             onChange={e => setYear(Number(e.target.value))}
+            data-testid="annual-report-year-select"
             className="bg-muted border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/40 min-w-[100px]"
           >
             {years.map(y => (
@@ -117,6 +118,7 @@ export function AnnualTab() {
             <button
               onClick={handleCsv}
               disabled={!!busy}
+              data-testid="annual-report-csv-button"
               className="group flex items-center gap-3 p-4 rounded-2xl border border-border bg-muted/30 hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all text-left disabled:opacity-60"
             >
               <PremiumIcon icon={FileSpreadsheet} tone="emerald" size="sm" className={busy === "csv" ? "animate-pulse" : undefined} />
@@ -130,6 +132,7 @@ export function AnnualTab() {
             <button
               onClick={handlePdf}
               disabled={!!busy}
+              data-testid="annual-report-pdf-button"
               className="group flex items-center gap-3 p-4 rounded-2xl border border-border bg-muted/30 hover:border-red-500/40 hover:bg-red-500/5 transition-all text-left disabled:opacity-60"
             >
               <PremiumIcon icon={Printer} tone="red" size="sm" className={busy === "pdf" ? "animate-pulse" : undefined} />

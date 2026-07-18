@@ -1,7 +1,7 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Zap } from "lucide-react";
-import { getGreeting, monthLabel } from "@/lib/utils";
+import {ChevronLeft, ChevronRight, Zap} from "lucide-react";
+import {getGreeting, monthLabel} from "@/lib/utils";
 
 interface GreetingBannerProps {
   firstName:      string;

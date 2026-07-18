@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
-import { Wallet, Clock, Trophy, Zap } from "lucide-react";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { resolveGoalIcon } from "@/lib/categoryMeta";
-import type { Goal } from "@/features/goals/types/goal.types";
-import { formatDate, cn } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
+import {useMemo} from "react";
+import {Clock, Trophy, Wallet, Zap} from "lucide-react";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {resolveGoalIcon} from "@/lib/categoryMeta";
+import type {Goal} from "@/features/goals/types/goal.types";
+import {cn, formatDate} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 
 // ─── Goal Card — whole card clickable to edit, "Add to Savings" stays a distinct action ──
 
@@ -46,7 +46,7 @@ export function GoalCard({ goal, goalColor, onEdit, onAddSavings }: {
     : complete ? "border-emerald-500/30" : "border-border";
 
   return (
-    <div className={cn("bg-card border rounded-2xl transition-all shadow-sm overflow-hidden",
+    <div data-testid="goal-card" className={cn("bg-card border rounded-2xl transition-all shadow-sm overflow-hidden",
       complete ? "border-emerald-500/30 ring-2 ring-emerald-500/20" : borderClass,
       goal.paused && !complete ? "opacity-70 border-border" : "")}>
       <button type="button" onClick={onEdit}

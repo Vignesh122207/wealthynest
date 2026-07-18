@@ -1,27 +1,27 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { ChevronDown, Plus, Check, Power, CalendarDays, ArrowLeftRight } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { FloatingActionButton } from "@/components/shared/FloatingActionButton";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { FormModalHeader } from "@/components/transactions/FormModalHeader";
-import { TransactionModalOverlay } from "@/components/transactions/TransactionModalOverlay";
-import { BigAmountInput } from "@/components/transactions/BigAmountInput";
-import { AccountPicker } from "@/components/transactions/AccountPicker";
-import { DropdownPanel } from "@/components/transactions/DropdownPanel";
-import { useAccounts } from "@/features/accounts/hooks/useAccounts";
+import {useEffect, useRef, useState} from "react";
+import {ArrowLeftRight, CalendarDays, Check, ChevronDown, Plus, Power} from "lucide-react";
+import {cn} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
+import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {FormModalHeader} from "@/components/transactions/FormModalHeader";
+import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
+import {BigAmountInput} from "@/components/transactions/BigAmountInput";
+import {AccountPicker} from "@/components/transactions/AccountPicker";
+import {DropdownPanel} from "@/components/transactions/DropdownPanel";
+import {useAccounts} from "@/features/accounts/hooks/useAccounts";
 import {
-  useRecurringTransfer,
-  useCreateRecurringTransfer,
-  useUpdateRecurringTransfer,
-  useToggleRecurringTransfer,
-  useDeleteRecurringTransfer,
+    useCreateRecurringTransfer,
+    useDeleteRecurringTransfer,
+    useRecurringTransfer,
+    useToggleRecurringTransfer,
+    useUpdateRecurringTransfer,
 } from "@/features/recurringTransfer/hooks/useRecurringTransfer";
-import type { RecurringTransfer } from "@/features/recurringTransfer/types/recurringTransfer.types";
-import type { WalletAccount } from "@/features/accounts/types/account.types";
+import type {RecurringTransfer} from "@/features/recurringTransfer/types/recurringTransfer.types";
+import type {WalletAccount} from "@/features/accounts/types/account.types";
 
 // ─── Day helpers (same semantics as Recurring Income's Credit Day) ─────────────
 
@@ -61,6 +61,15 @@ function RuleFormModal({
   const dayTriggerRef = useRef<HTMLButtonElement>(null);
 
   const isEdit = !!initial?.id;
+
+  // accounts can still be loading (empty) the instant this modal mounts — the useState default
+  // above only evaluates once, so if useAccounts() resolves after mount "From Account" would
+  // otherwise be stuck on no default forever. Sync once accounts arrive, but only for a fresh
+  // rule and only if nothing's been picked yet.
+  useEffect(() => {
+    if (!isEdit && !fromAccountId && accounts[0]?.id) setFromAccountId(accounts[0].id);
+  }, [accounts, isEdit]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const valid  = fromAccountId && toAccountId && fromAccountId !== toAccountId
     && Number(amount) > 0 && Number(day) >= 0 && Number(day) <= 31;
 
@@ -78,12 +87,13 @@ function RuleFormModal({
 
           <div className="space-y-4">
             <BigAmountInput label="Monthly Amount" colorClass="text-indigo-500 dark:text-indigo-400"
+              testId="recurring-transfer-amount-input"
               inputProps={{
                 value: amount,
                 onChange: e => setAmount(e.target.value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1")),
               }} />
 
-            <AccountPicker label="From Account"
+            <AccountPicker label="From Account" testId="recurring-transfer-from-account-picker"
               cashAccounts={byType(fromChoices, "CASH_WALLET")}
               bankAccounts={byType(fromChoices, "BANK_ACCOUNT")}
               creditAccounts={byType(fromChoices, "CREDIT_CARD")}
@@ -91,7 +101,7 @@ function RuleFormModal({
               investmentAccounts={byType(fromChoices, "INVESTMENT")}
               value={fromAccountId} onChange={setFromAccountId} />
 
-            <AccountPicker label="To Account"
+            <AccountPicker label="To Account" testId="recurring-transfer-to-account-picker"
               cashAccounts={byType(toChoices, "CASH_WALLET")}
               bankAccounts={byType(toChoices, "BANK_ACCOUNT")}
               creditAccounts={byType(toChoices, "CREDIT_CARD")}
@@ -142,14 +152,14 @@ function RuleFormModal({
                 Note <span className="text-muted-foreground/40">(optional)</span>
               </label>
               <input value={description} onChange={e => setDescription(e.target.value)}
-                placeholder="e.g. Move to savings"
+                placeholder="e.g. Move to savings" data-testid="recurring-transfer-description-input"
                 className="w-full h-10 px-3 rounded-xl text-sm bg-background border border-border text-foreground placeholder-muted-foreground/40 outline-none focus:border-indigo-500 transition-all" />
             </div>
 
             <div className="flex gap-2 pt-1">
               <button
                 onClick={() => valid && onSave({ fromAccountId, toAccountId, amount: Number(amount), description, dayOfMonth: Number(day) })}
-                type="button" disabled={saving || !valid}
+                type="button" disabled={saving || !valid} data-testid="recurring-transfer-form-submit"
                 className="flex-1 h-11 rounded-xl text-sm font-semibold bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white shadow-lg shadow-indigo-500/25 transition-all disabled:opacity-60 disabled:shadow-none flex items-center justify-center gap-1.5">
                 <Check className="w-3.5 h-3.5" />
                 {saving ? "Saving…" : isEdit ? "Save Changes" : "Create Rule"}
@@ -179,7 +189,7 @@ function RuleCard({
   const { fmt } = useAmountFormatter();
 
   return (
-    <div onClick={onEdit} role="button" tabIndex={0}
+    <div onClick={onEdit} role="button" tabIndex={0} data-testid="recurring-transfer-rule-card"
       onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEdit(); } }}
       aria-label={`Edit ${rule.fromAccountName} to ${rule.toAccountName} recurring transfer`}
       className={cn(
@@ -324,7 +334,7 @@ export function TransfersTab() {
       )}
 
       <FloatingActionButton actions={[
-        { icon: ArrowLeftRight, label: "Add Recurring Transfer", color: "indigo", onClick: () => setModal("create") },
+        { icon: ArrowLeftRight, label: "Add Recurring Transfer", color: "indigo", onClick: () => setModal("create"), testId: "fab-add-recurring-transfer" },
       ]} />
     </>
   );

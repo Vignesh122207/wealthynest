@@ -1,18 +1,18 @@
 "use client";
 
-import { Archive, ChevronDown, X } from "lucide-react";
-import { Controller, type UseFormReturn } from "react-hook-form";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { AccountPicker } from "@/components/transactions/AccountPicker";
-import { BigAmountInput } from "@/components/transactions/BigAmountInput";
-import { FormCurrencyInput } from "@/components/forms/FormCurrencyInput";
-import { FormSelect } from "@/components/forms/FormSelect";
-import { BankNameInput } from "@/features/accounts/components/BankNameInput";
-import { ACCOUNT_TYPE_META } from "@/lib/accountTypeMeta";
-import { LOAN_TYPE_OPTIONS, LOAN_TYPE_LABELS, type CreateAccountForm } from "@/features/accounts/schemas/account.schema";
-import { INDIAN_BANKS, STOCK_BROKERS } from "@/lib/constants";
-import { formatCurrency, cn } from "@/lib/utils";
-import type { AccountType, WalletAccount } from "@/features/accounts/types/account.types";
+import {Archive, ChevronDown, X} from "lucide-react";
+import {Controller, type UseFormReturn} from "react-hook-form";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {AccountPicker} from "@/components/transactions/AccountPicker";
+import {BigAmountInput} from "@/components/transactions/BigAmountInput";
+import {FormCurrencyInput} from "@/components/forms/FormCurrencyInput";
+import {FormSelect} from "@/components/forms/FormSelect";
+import {BankNameInput} from "@/features/accounts/components/BankNameInput";
+import {ACCOUNT_TYPE_META} from "@/lib/accountTypeMeta";
+import {type CreateAccountForm, LOAN_TYPE_LABELS, LOAN_TYPE_OPTIONS} from "@/features/accounts/schemas/account.schema";
+import {INDIAN_BANKS, STOCK_BROKERS} from "@/lib/constants";
+import {cn, formatCurrency} from "@/lib/utils";
+import type {AccountType, WalletAccount} from "@/features/accounts/types/account.types";
 
 type ModalType = "none" | "create" | "addMoney" | "addExpense" | "transfer" | "edit" | "import";
 
@@ -67,7 +67,7 @@ export function AccountFormModal({
   const creditLimitField = createForm.register("creditLimit");
 
   return (
-    <div className="fixed inset-0 lg:left-60 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+    <div data-testid="modal-overlay-backdrop" className="fixed inset-0 lg:left-60 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
       {/* Same rounded-3xl / gradient-bar / p-5 chrome as ExpenseForm and the other shared
           transaction forms, so creating/editing an account matches the rest of the app. */}
       <div className="rounded-3xl overflow-hidden border border-border shadow-2xl animate-scale-in bg-card w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
@@ -107,7 +107,7 @@ export function AccountFormModal({
                   const alreadyExists = singleton && accounts.some(a => a.accountType === t);
                   const selected = watchedType === t && !alreadyExists;
                   return (
-                    <button key={t} type="button" disabled={alreadyExists}
+                    <button key={t} type="button" data-testid={`account-type-${t}`} disabled={alreadyExists}
                       onClick={() => {
                         // Full reset (not setValue) — clears every type-specific field
                         // (apr, creditLimit, loanType, etc.) left over from whichever type
@@ -214,7 +214,8 @@ export function AccountFormModal({
                 label={isCCForm || isLoanForm ? "Current Outstanding Balance" : "Opening Balance"}
                 colorClass="text-foreground"
                 inputProps={createForm.register("openingBalance")}
-                error={createForm.formState.errors.openingBalance?.message} />
+                error={createForm.formState.errors.openingBalance?.message}
+                testId="account-opening-balance-input" />
             ) : (
               <div className="space-y-2">
                 <BigAmountInput
@@ -223,7 +224,8 @@ export function AccountFormModal({
                   inputProps={{
                     value: actualBalance,
                     onChange: e => setActualBalance(e.target.value),
-                  }} />
+                  }}
+                  testId="account-actual-balance-input" />
                 <p className="text-[11px] text-muted-foreground/70 text-center">
                   Prefilled from the app — change it to match your {isCCForm || isLoanForm ? "statement" : "bank"} if they&apos;ve drifted apart.
                 </p>
@@ -327,7 +329,7 @@ export function AccountFormModal({
             )}
 
             <div className="flex gap-2 pt-1">
-              <button type="submit" disabled={creating || updating || adjusting}
+              <button type="submit" data-testid="account-form-submit" disabled={creating || updating || adjusting}
                 className="flex-1 h-10 rounded-xl text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-all disabled:opacity-60">
                 {creating || updating || adjusting ? "Saving…" : modal === "edit" ? "Save Changes" : "Create Account"}
               </button>

@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
-import { useAuthStore } from "@/features/auth/store/auth.store";
-import { PublicNav, PublicFooter } from "@/components/layout/PublicNav";
+import {ArrowLeft} from "lucide-react";
+import {useAuthStore} from "@/features/auth/store/auth.store";
+import {PublicFooter, PublicNav} from "@/components/layout/PublicNav";
 
 // Privacy/Terms are reachable both from the marketing site (logged-out visitor) and from inside
 // Settings (already-signed-in user). Always showing the full marketing PublicNav made the page

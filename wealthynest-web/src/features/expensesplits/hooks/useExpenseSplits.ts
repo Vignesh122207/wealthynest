@@ -1,8 +1,8 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { expenseSplitsApi } from "../api/expensesplits.api";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {toast} from "sonner";
+import {expenseSplitsApi} from "../api/expensesplits.api";
 
 const KEY = ["expense-splits", "my-splits"];
 

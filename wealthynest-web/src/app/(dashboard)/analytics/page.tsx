@@ -1,28 +1,52 @@
 "use client";
 
-import { useState } from "react";
+import {useState} from "react";
 import Link from "next/link";
 import {
-  BarChart2, ChevronLeft, ChevronRight, Target, TrendingUp, TrendingDown,
-  Activity, Layers, Banknote, Receipt, PiggyBank, Percent, Wallet, Gem,
-  PieChart as PieChartIcon,
+    Activity,
+    Banknote,
+    BarChart2,
+    ChevronLeft,
+    ChevronRight,
+    Gem,
+    Layers,
+    Percent,
+    PieChart as PieChartIcon,
+    PiggyBank,
+    Receipt,
+    Target,
+    TrendingDown,
+    TrendingUp,
+    Wallet,
 } from "lucide-react";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell, LineChart, Line, ReferenceLine,
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Cell,
+    Legend,
+    Line,
+    LineChart,
+    Pie,
+    PieChart,
+    ReferenceLine,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
 } from "recharts";
-import { Header } from "@/components/layout/Header";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { QueryErrorState } from "@/components/shared/QueryErrorState";
-import { Button } from "@/components/ui/Button";
-import { PremiumIcon, type IconTone } from "@/components/icons/PremiumIcon";
-import { useAnnualTrend } from "@/features/analytics/hooks/useAnalytics";
-import { useDashboard } from "@/features/dashboard/hooks/useDashboard";
-import { useChartTheme } from "@/hooks/useChartTheme";
-import { formatCurrencyCompact, formatChartTickINR, cn } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
-import { getCategoryColor } from "@/lib/categoryMeta";
-import { CHART_COLORS } from "@/lib/chartColors";
+import {Header} from "@/components/layout/Header";
+import {EmptyState} from "@/components/shared/EmptyState";
+import {QueryErrorState} from "@/components/shared/QueryErrorState";
+import {Button} from "@/components/ui/Button";
+import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
+import {useAnnualTrend} from "@/features/analytics/hooks/useAnalytics";
+import {useDashboard} from "@/features/dashboard/hooks/useDashboard";
+import {useChartTheme} from "@/hooks/useChartTheme";
+import {cn, formatChartTickINR, formatCurrencyCompact} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {getCategoryColor} from "@/lib/categoryMeta";
+import {CHART_COLORS} from "@/lib/chartColors";
 
 function monthLabel(year: number, month: number) {
   return new Date(year, month - 1).toLocaleString("en-IN", { month: "short", year: "numeric" });
@@ -187,12 +211,12 @@ export default function AnalyticsPage() {
             <p className="text-xs text-muted-foreground/60">Navigating shifts the 6-month window</p>
           </div>
           <div className="flex items-center gap-1.5">
-            <button onClick={() => navigate(-1)}
+            <button onClick={() => navigate(-1)} data-testid="analytics-month-prev"
               className="w-8 h-8 rounded-lg bg-muted border border-border hover:bg-muted/80 flex items-center justify-center transition-all">
               <ChevronLeft className="w-4 h-4 text-muted-foreground" />
             </button>
-            <span className="text-sm font-semibold text-foreground min-w-24 text-center">{monthLabel(year, month)}</span>
-            <button onClick={() => navigate(1)} disabled={isCurrentMonth}
+            <span className="text-sm font-semibold text-foreground min-w-24 text-center" data-testid="analytics-month-label">{monthLabel(year, month)}</span>
+            <button onClick={() => navigate(1)} disabled={isCurrentMonth} data-testid="analytics-month-next"
               className="w-8 h-8 rounded-lg bg-muted border border-border hover:bg-muted/80 flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed">
               <ChevronRight className="w-4 h-4 text-muted-foreground" />
             </button>

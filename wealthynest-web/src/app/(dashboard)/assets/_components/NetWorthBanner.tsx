@@ -1,7 +1,7 @@
-import { TrendingUp, TrendingDown } from "lucide-react";
-import { PremiumIcon } from "@/components/icons/PremiumIcon";
-import { cn } from "@/lib/utils";
-import type { NetWorthSummary } from "@/features/networth/types/networth.types";
+import {TrendingDown, TrendingUp} from "lucide-react";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {cn} from "@/lib/utils";
+import type {NetWorthSummary} from "@/features/networth/types/networth.types";
 
 // ─── Net Worth Banner ─────────────────────────────────────────────────────────
 

@@ -1,19 +1,21 @@
 "use client";
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { ChevronDown, ChevronUp, CalendarDays, Trash2, Plus } from "lucide-react";
-import { FormDatePicker } from "@/components/forms/FormDatePicker";
-import { FormCurrencyInput } from "@/components/forms/FormCurrencyInput";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import {useState} from "react";
+import {useForm} from "react-hook-form";
+import {zodResolver} from "@hookform/resolvers/zod";
+import {CalendarDays, ChevronDown, ChevronUp, Plus, Trash2} from "lucide-react";
+import {FormDatePicker} from "@/components/forms/FormDatePicker";
+import {FormCurrencyInput} from "@/components/forms/FormCurrencyInput";
+import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
 import {
-  useSipTransactions, useAddSipTransaction, useDeleteSipTransaction,
+    useAddSipTransaction,
+    useDeleteSipTransaction,
+    useSipTransactions,
 } from "@/features/investments/hooks/useInvestments";
-import { sipSchema } from "@/features/investments/schemas/investment.schema";
-import type { SipTransaction } from "@/features/investments/types/investment.types";
-import { cn, formatDate } from "@/lib/utils";
-import { useAmountFormatter } from "@/hooks/useAmountFormatter";
+import {sipSchema} from "@/features/investments/schemas/investment.schema";
+import type {SipTransaction} from "@/features/investments/types/investment.types";
+import {cn, formatDate} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 
 export function SipSection({ investmentId }: { investmentId: string }) {
   const { fmt } = useAmountFormatter();

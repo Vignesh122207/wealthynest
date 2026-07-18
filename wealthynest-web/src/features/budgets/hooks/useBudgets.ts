@@ -1,10 +1,10 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { QUERY_KEYS } from "@/lib/constants";
-import { budgetsApi } from "../api/budgets.api";
-import type { CreateBudgetPayload, UpdateBudgetPayload } from "../types/budget.types";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {toast} from "sonner";
+import {QUERY_KEYS} from "@/lib/constants";
+import {budgetsApi} from "../api/budgets.api";
+import type {CreateBudgetPayload, UpdateBudgetPayload} from "../types/budget.types";
 
 export function useBudgets(year?: number, month?: number) {
   return useQuery({

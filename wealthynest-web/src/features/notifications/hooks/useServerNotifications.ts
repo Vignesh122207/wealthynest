@@ -1,9 +1,9 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { notificationsApi, type ServerNotification } from "../api/notifications.api";
-import { useNotifications, type AppNotification, type NotifSeverity } from "@/hooks/useNotifications";
-import { useNotificationStore } from "@/store/notification.store";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {notificationsApi, type ServerNotification} from "../api/notifications.api";
+import {type AppNotification, type NotifSeverity, useNotifications} from "@/hooks/useNotifications";
+import {useNotificationStore} from "@/store/notification.store";
 
 function mapServerType(type: string): AppNotification["type"] {
   if (type.includes("LOW_BALANCE"))   return "lowBalance";

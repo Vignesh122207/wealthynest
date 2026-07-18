@@ -1,13 +1,13 @@
 "use client";
 
-import { Plus, ArrowUpRight } from "lucide-react";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { QueryErrorState } from "@/components/shared/QueryErrorState";
-import { TableRowSkeleton } from "@/components/shared/LoadingSkeleton";
-import { IncomeRow } from "@/features/expenses/components/TransactionRows";
-import { Chip } from "@/features/expenses/components/Chip";
-import { formatDate } from "@/lib/utils";
-import type { IncomeEntry } from "@/features/income/types/income.types";
+import {ArrowUpRight, Plus} from "lucide-react";
+import {EmptyState} from "@/components/shared/EmptyState";
+import {QueryErrorState} from "@/components/shared/QueryErrorState";
+import {TableRowSkeleton} from "@/components/shared/LoadingSkeleton";
+import {IncomeRow} from "@/features/expenses/components/TransactionRows";
+import {Chip} from "@/features/expenses/components/Chip";
+import {formatDate} from "@/lib/utils";
+import type {IncomeEntry} from "@/features/income/types/income.types";
 
 interface IncomeTabContentProps {
   chips: { label: string; clear: () => void }[];

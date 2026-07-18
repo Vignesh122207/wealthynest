@@ -1,6 +1,6 @@
-import { forwardRef, useId, type SelectHTMLAttributes } from "react";
-import { cn } from "@/lib/utils";
-import type { SelectOption } from "@/types/common.types";
+import {forwardRef, type SelectHTMLAttributes, useId} from "react";
+import {cn} from "@/lib/utils";
+import type {SelectOption} from "@/types/common.types";
 
 export interface SelectOptionGroup {
   label:   string;

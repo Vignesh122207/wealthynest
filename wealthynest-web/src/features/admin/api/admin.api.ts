@@ -1,6 +1,6 @@
-import { apiClient } from "@/lib/axios";
-import type { ApiResponse, PagedResponse } from "@/types/api.types";
-import type { User } from "@/features/auth/types/auth.types";
+import {apiClient} from "@/lib/axios";
+import type {ApiResponse, PagedResponse} from "@/types/api.types";
+import type {User} from "@/features/auth/types/auth.types";
 
 export interface JobScheduleConfig {
   jobName:         string;

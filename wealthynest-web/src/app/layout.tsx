@@ -1,8 +1,8 @@
-import type { Metadata, Viewport } from "next";
-import { Inter, Plus_Jakarta_Sans } from "next/font/google";
-import { ThemeProvider } from "next-themes";
-import { ThemedToaster } from "@/components/ui/ThemedToaster";
-import { Providers } from "./providers";
+import type {Metadata, Viewport} from "next";
+import {Inter, Plus_Jakarta_Sans} from "next/font/google";
+import {ThemeProvider} from "next-themes";
+import {ThemedToaster} from "@/components/ui/ThemedToaster";
+import {Providers} from "./providers";
 import "./globals.css";
 
 const inter    = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });

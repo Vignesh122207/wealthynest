@@ -1,11 +1,11 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {toast} from "sonner";
 import {
-  recurringTransferApi,
-  type CreateRecurringTransferPayload,
-  type UpdateRecurringTransferPayload,
+    type CreateRecurringTransferPayload,
+    recurringTransferApi,
+    type UpdateRecurringTransferPayload,
 } from "../api/recurringTransfer.api";
 
 const KEY = ["recurring-transfer"] as const;

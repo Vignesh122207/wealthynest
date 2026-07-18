@@ -1,5 +1,5 @@
-import { AlertTriangle } from "lucide-react";
-import { EmptyState } from "./EmptyState";
+import {AlertTriangle} from "lucide-react";
+import {EmptyState} from "./EmptyState";
 
 interface QueryErrorStateProps {
   onRetry:      () => void;
