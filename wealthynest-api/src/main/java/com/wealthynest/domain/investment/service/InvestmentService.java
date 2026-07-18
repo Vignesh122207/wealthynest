@@ -1,16 +1,7 @@
 package com.wealthynest.domain.investment.service;
 
-import com.wealthynest.domain.investment.dto.request.CreateInvestmentRequest;
-import com.wealthynest.domain.investment.dto.request.CreateSipTransactionRequest;
-import com.wealthynest.domain.investment.dto.request.CreateStockTransactionRequest;
-import com.wealthynest.domain.investment.dto.request.DismissDividendRequest;
-import com.wealthynest.domain.investment.dto.request.LogIncomeRequest;
-import com.wealthynest.domain.investment.dto.response.DividendSuggestionResponse;
-import com.wealthynest.domain.investment.dto.response.IncomeHistoryResponse;
-import com.wealthynest.domain.investment.dto.response.InvestmentResponse;
-import com.wealthynest.domain.investment.dto.response.InvestmentSearchResult;
-import com.wealthynest.domain.investment.dto.response.SipTransactionResponse;
-import com.wealthynest.domain.investment.dto.response.StockTransactionResponse;
+import com.wealthynest.domain.investment.dto.request.*;
+import com.wealthynest.domain.investment.dto.response.*;
 import com.wealthynest.domain.investment.entity.InvestmentType;
 
 import java.math.BigDecimal;

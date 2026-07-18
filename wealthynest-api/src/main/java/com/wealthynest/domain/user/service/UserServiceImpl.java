@@ -5,12 +5,12 @@ import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.common.security.TokenRevocationService;
 import com.wealthynest.common.security.UserPrincipal;
+import com.wealthynest.domain.auth.repository.RefreshTokenRepository;
 import com.wealthynest.domain.user.dto.request.ChangePasswordRequest;
 import com.wealthynest.domain.user.dto.request.UpdateProfileRequest;
 import com.wealthynest.domain.user.dto.response.UserResponse;
 import com.wealthynest.domain.user.entity.User;
 import com.wealthynest.domain.user.mapper.UserMapper;
-import com.wealthynest.domain.auth.repository.RefreshTokenRepository;
 import com.wealthynest.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +20,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.time.Instant;
 import java.util.UUID;
 

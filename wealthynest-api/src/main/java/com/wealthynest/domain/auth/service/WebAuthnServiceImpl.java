@@ -2,6 +2,16 @@ package com.wealthynest.domain.auth.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wealthynest.common.exception.AccessDeniedException;
+import com.wealthynest.common.exception.BusinessException;
+import com.wealthynest.common.exception.ResourceNotFoundException;
+import com.wealthynest.config.WebAuthnConfig;
+import com.wealthynest.domain.auth.dto.response.AuthResponse;
+import com.wealthynest.domain.auth.dto.response.PasskeyResponse;
+import com.wealthynest.domain.auth.entity.WebAuthnCredential;
+import com.wealthynest.domain.auth.repository.WebAuthnCredentialRepository;
+import com.wealthynest.domain.user.entity.User;
+import com.wealthynest.domain.user.repository.UserRepository;
 import com.webauthn4j.WebAuthnManager;
 import com.webauthn4j.converter.util.ObjectConverter;
 import com.webauthn4j.credential.CredentialRecord;
@@ -17,16 +27,6 @@ import com.webauthn4j.data.client.challenge.DefaultChallenge;
 import com.webauthn4j.data.extension.authenticator.AuthenticationExtensionsAuthenticatorOutputs;
 import com.webauthn4j.data.extension.authenticator.RegistrationExtensionAuthenticatorOutput;
 import com.webauthn4j.server.ServerProperty;
-import com.wealthynest.common.exception.AccessDeniedException;
-import com.wealthynest.common.exception.BusinessException;
-import com.wealthynest.common.exception.ResourceNotFoundException;
-import com.wealthynest.config.WebAuthnConfig;
-import com.wealthynest.domain.auth.dto.response.AuthResponse;
-import com.wealthynest.domain.auth.dto.response.PasskeyResponse;
-import com.wealthynest.domain.auth.entity.WebAuthnCredential;
-import com.wealthynest.domain.auth.repository.WebAuthnCredentialRepository;
-import com.wealthynest.domain.user.entity.User;
-import com.wealthynest.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -38,7 +38,10 @@ import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.*;
+import java.util.Base64;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * WebAuthn (passkey) registration and login ceremonies. Built directly against webauthn4j-core

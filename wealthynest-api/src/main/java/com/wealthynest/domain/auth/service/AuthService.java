@@ -1,15 +1,8 @@
 package com.wealthynest.domain.auth.service;
 
-import com.wealthynest.domain.auth.dto.request.ChangeEmailRequest;
-import com.wealthynest.domain.auth.dto.request.EnablePinRequest;
-import com.wealthynest.domain.auth.dto.request.ForgotPasswordRequest;
-import com.wealthynest.domain.auth.dto.request.GoogleLoginRequest;
-import com.wealthynest.domain.auth.dto.request.LoginRequest;
-import com.wealthynest.domain.auth.dto.request.PinLoginRequest;
-import com.wealthynest.domain.auth.dto.request.RefreshTokenRequest;
-import com.wealthynest.domain.auth.dto.request.RegisterRequest;
-import com.wealthynest.domain.auth.dto.request.ResetPasswordRequest;
+import com.wealthynest.domain.auth.dto.request.*;
 import com.wealthynest.domain.auth.dto.response.AuthResponse;
+
 import java.util.UUID;
 
 public interface AuthService {

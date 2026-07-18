@@ -1,14 +1,7 @@
 package com.wealthynest.domain.auth.controller;
 
 import com.wealthynest.common.response.ApiResponse;
-import com.wealthynest.domain.auth.dto.request.AuthOptionsRequest;
-import com.wealthynest.domain.auth.dto.request.ForgotPasswordRequest;
-import com.wealthynest.domain.auth.dto.request.GoogleLoginRequest;
-import com.wealthynest.domain.auth.dto.request.LoginRequest;
-import com.wealthynest.domain.auth.dto.request.PinLoginRequest;
-import com.wealthynest.domain.auth.dto.request.RefreshTokenRequest;
-import com.wealthynest.domain.auth.dto.request.RegisterRequest;
-import com.wealthynest.domain.auth.dto.request.ResetPasswordRequest;
+import com.wealthynest.domain.auth.dto.request.*;
 import com.wealthynest.domain.auth.dto.response.AuthResponse;
 import com.wealthynest.domain.auth.service.AuthService;
 import com.wealthynest.domain.auth.service.WebAuthnService;

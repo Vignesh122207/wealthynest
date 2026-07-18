@@ -1,7 +1,10 @@
 package com.wealthynest.infra.scheduler;
 
-import com.wealthynest.domain.investment.entity.*;
-import com.wealthynest.domain.investment.repository.*;
+import com.wealthynest.domain.investment.entity.GoldPriceCache;
+import com.wealthynest.domain.investment.entity.MFNavCache;
+import com.wealthynest.domain.investment.repository.GoldPriceCacheRepository;
+import com.wealthynest.domain.investment.repository.InvestmentRepository;
+import com.wealthynest.domain.investment.repository.MFNavCacheRepository;
 import com.wealthynest.infra.external.ExternalPriceService;
 import com.wealthynest.infra.external.ExternalPriceService.GoldPriceData;
 import com.wealthynest.infra.external.ExternalPriceService.MFNavData;

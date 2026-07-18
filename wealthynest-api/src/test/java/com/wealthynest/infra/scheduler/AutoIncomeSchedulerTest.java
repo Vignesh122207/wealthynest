@@ -2,11 +2,7 @@ package com.wealthynest.infra.scheduler;
 
 import com.wealthynest.domain.income.entity.IncomeEntry;
 import com.wealthynest.domain.income.repository.IncomeRepository;
-import com.wealthynest.domain.investment.entity.Investment;
-import com.wealthynest.domain.investment.entity.InvestmentIncomeLog;
-import com.wealthynest.domain.investment.entity.InvestmentType;
-import com.wealthynest.domain.investment.entity.NseCorporateAction;
-import com.wealthynest.domain.investment.entity.StockPriceCache;
+import com.wealthynest.domain.investment.entity.*;
 import com.wealthynest.domain.investment.repository.InvestmentIncomeLogRepository;
 import com.wealthynest.domain.investment.repository.InvestmentRepository;
 import com.wealthynest.domain.investment.repository.NseCorporateActionRepository;
@@ -20,29 +16,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AutoIncomeSchedulerTest {

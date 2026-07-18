@@ -2,8 +2,12 @@ package com.wealthynest.domain.income.dto.request;
 
 import com.wealthynest.domain.income.entity.IncomePaymentMode;
 import com.wealthynest.domain.income.entity.IncomeSource;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;

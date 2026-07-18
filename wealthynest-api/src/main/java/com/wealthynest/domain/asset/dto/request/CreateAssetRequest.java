@@ -1,8 +1,12 @@
 package com.wealthynest.domain.asset.dto.request;
 
 import com.wealthynest.domain.asset.entity.AssetType;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 

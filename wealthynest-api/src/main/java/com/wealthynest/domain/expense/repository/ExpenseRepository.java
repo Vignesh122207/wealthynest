@@ -1,14 +1,13 @@
 package com.wealthynest.domain.expense.repository;
 
 import com.wealthynest.domain.expense.entity.Expense;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -63,7 +62,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID>, JpaSpec
         LocalDate start = yearStart(year);
         return sumByUserCategoryAndDateRangeAll(userId, categoryId, start, start.plusYears(1));
     }
-    @Query("SELECT COALESCE(SUM(e.amount),0) FROM Expense e WHERE e.userId = :userId AND e.categoryId = :categoryId AND e.expenseDate >= :start AND e.expenseDate < :end")
+    @Query("SELECT COALESCE(SUM(e.amount),0) FROM Expense e WHERE e.userId = :userId AND e.categoryId = :categoryId AND e.expenseDate >= :start AND e.expenseDate < :end AND e.debt = false")
     BigDecimal sumByUserCategoryAndDateRangeAll(@Param("userId") UUID userId, @Param("categoryId") UUID categoryId,
                                                  @Param("start") LocalDate start, @Param("end") LocalDate end);
 
@@ -71,7 +70,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID>, JpaSpec
         LocalDate start = yearStart(year);
         return sumByFamilyCategoryAndDateRangeAll(familyId, categoryId, start, start.plusYears(1));
     }
-    @Query("SELECT COALESCE(SUM(e.amount),0) FROM Expense e WHERE e.familyId = :familyId AND e.categoryId = :categoryId AND e.expenseDate >= :start AND e.expenseDate < :end")
+    @Query("SELECT COALESCE(SUM(e.amount),0) FROM Expense e WHERE e.familyId = :familyId AND e.categoryId = :categoryId AND e.expenseDate >= :start AND e.expenseDate < :end AND e.debt = false")
     BigDecimal sumByFamilyCategoryAndDateRangeAll(@Param("familyId") UUID familyId, @Param("categoryId") UUID categoryId,
                                                    @Param("start") LocalDate start, @Param("end") LocalDate end);
 

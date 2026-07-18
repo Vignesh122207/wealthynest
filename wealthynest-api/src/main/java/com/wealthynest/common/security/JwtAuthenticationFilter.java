@@ -1,5 +1,6 @@
 package com.wealthynest.common.security;
 
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,7 +17,7 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
-import io.jsonwebtoken.Claims;
+
 import java.io.IOException;
 import java.util.Optional;
 import java.util.UUID;
@@ -58,7 +59,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                 response.sendError(HttpServletResponse.SC_FORBIDDEN, "Account is disabled");
                                 return;
                             }
-                            UUID userId = UUID.fromString(claims.getId());
+                            UUID userId = UUID.fromString(claims.get("uid", String.class));
                             if (tokenRevocationService.isRevoked(userId, claims.getIssuedAt())) {
                                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Session expired, please log in again");
                                 return;

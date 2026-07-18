@@ -20,11 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -49,8 +45,10 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class CasImportServiceImpl implements CasImportService {
 
-    // "Folio No: 12345678 / 0" or "Folio No. : 12345678"
-    private static final Pattern FOLIO_PATTERN = Pattern.compile("(?i)Folio\\s+No\\.?\\s*:?\\s*([\\w/]+)");
+    // "Folio No: 12345678 / 0" or "Folio No. : 12345678" — the sub-account suffix after the slash
+    // is optional, and CAMS/KFintech statements commonly pad the slash with spaces, so the
+    // capture group allows (and the caller normalizes away) whitespace around it.
+    private static final Pattern FOLIO_PATTERN = Pattern.compile("(?i)Folio\\s+No\\.?\\s*:?\\s*([\\w]+(?:\\s*/\\s*[\\w]+)*)");
     // "ISIN: INF179K01158" — Indian MF ISINs start with IN, standard 12-char format
     private static final Pattern ISIN_PATTERN = Pattern.compile("(?i)ISIN\\s*:?\\s*([A-Z]{2}[A-Z0-9]{9}[0-9])");
     // "Closing Unit Balance: 1,234.567" / "Closing Balance: 1234.567 Units"
@@ -108,12 +106,15 @@ public class CasImportServiceImpl implements CasImportService {
             if (line.isEmpty()) continue;
 
             Matcher folioM = FOLIO_PATTERN.matcher(line);
-            if (folioM.find()) { currentFolio = folioM.group(1); continue; }
+            if (folioM.find()) { currentFolio = folioM.group(1).replaceAll("\\s*/\\s*", "/"); continue; }
 
             if (ISIN_PATTERN.matcher(line).find() || NAV_PATTERN.matcher(line).find()
-                    || VALUE_PATTERN.matcher(line).find() || COST_PATTERN.matcher(line).find()) {
+                    || VALUE_PATTERN.matcher(line).find() || COST_PATTERN.matcher(line).find()
+                    || UNITS_PATTERN.matcher(line).find()) {
                 // A "field" line, not a name — falls through to the units check below rather
-                // than being considered as a scheme-name candidate.
+                // than being considered as a scheme-name candidate. UNITS_PATTERN must be checked
+                // here too (not just below), otherwise the closing-balance line itself passes
+                // isPlausibleSchemeName and overwrites the real fund name parsed one line earlier.
             } else if (isPlausibleSchemeName(line)) {
                 candidateSchemeName = line;
             }

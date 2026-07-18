@@ -1,0 +1,583 @@
+package com.wealthynest.domain.account.service;
+
+import com.wealthynest.common.exception.AccessDeniedException;
+import com.wealthynest.common.exception.BusinessException;
+import com.wealthynest.common.exception.ResourceNotFoundException;
+import com.wealthynest.domain.account.dto.request.CreateAccountRequest;
+import com.wealthynest.domain.account.dto.request.TransferRequest;
+import com.wealthynest.domain.account.dto.response.AccountResponse;
+import com.wealthynest.domain.account.dto.response.TransferResponse;
+import com.wealthynest.domain.account.entity.AccountTransfer;
+import com.wealthynest.domain.account.entity.AccountType;
+import com.wealthynest.domain.account.entity.WalletAccount;
+import com.wealthynest.domain.account.repository.AccountTransferRepository;
+import com.wealthynest.domain.account.repository.WalletAccountRepository;
+import com.wealthynest.domain.category.repository.CategoryRepository;
+import com.wealthynest.domain.expense.repository.ExpenseRepository;
+import com.wealthynest.domain.goal.repository.GoalRepository;
+import com.wealthynest.domain.income.repository.IncomeRepository;
+import com.wealthynest.domain.investment.repository.InvestmentRepository;
+import com.wealthynest.domain.notification.service.NotificationService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class WalletAccountServiceImplTest {
+
+    @Mock private WalletAccountRepository   accountRepository;
+    @Mock private AccountTransferRepository transferRepository;
+    @Mock private IncomeRepository          incomeRepository;
+    @Mock private ExpenseRepository         expenseRepository;
+    @Mock private CategoryRepository        categoryRepository;
+    @Mock private InvestmentRepository      investmentRepository;
+    @Mock private GoalRepository            goalRepository;
+    @Mock private AccountBalanceGuard       accountBalanceGuard;
+    @Mock private NotificationService       notificationService;
+
+    @InjectMocks
+    private WalletAccountServiceImpl service;
+
+    private final UUID userId    = UUID.randomUUID();
+    private final UUID accountId = UUID.randomUUID();
+
+    private WalletAccount.WalletAccountBuilder baseAccount(AccountType type) {
+        return WalletAccount.builder().userId(userId).accountType(type).name("Test Account")
+                .openingBalance(new BigDecimal("1000"));
+    }
+
+    private WalletAccount withId(WalletAccount a) {
+        ReflectionTestUtils.setField(a, "id", accountId);
+        return a;
+    }
+
+    /** Stubs every enrich()-touched repository call to a harmless zero/empty default. */
+    @BeforeEach
+    void stubEnrichmentDefaults() {
+        lenient().when(incomeRepository.sumByAccountId(any())).thenReturn(BigDecimal.ZERO);
+        lenient().when(expenseRepository.sumByAccountId(any())).thenReturn(BigDecimal.ZERO);
+        lenient().when(transferRepository.sumTransfersIn(any())).thenReturn(BigDecimal.ZERO);
+        lenient().when(transferRepository.sumTransfersOut(any())).thenReturn(BigDecimal.ZERO);
+        lenient().when(transferRepository.sumRegularTransfersIn(any())).thenReturn(BigDecimal.ZERO);
+        lenient().when(transferRepository.sumRegularTransfersOut(any())).thenReturn(BigDecimal.ZERO);
+        lenient().when(incomeRepository.sumRegularByAccountId(any())).thenReturn(BigDecimal.ZERO);
+        lenient().when(expenseRepository.sumRegularByAccountId(any())).thenReturn(BigDecimal.ZERO);
+        lenient().when(incomeRepository.findTop5ByAccountIdAndDebtFalseOrderByIncomeDateDesc(any())).thenReturn(List.of());
+        lenient().when(expenseRepository.findTop5ByAccountIdAndDebtFalseOrderByExpenseDateDesc(any())).thenReturn(List.of());
+        lenient().when(categoryRepository.findAllById(any())).thenReturn(List.of());
+        lenient().when(transferRepository.findTop5ByAccountId(any())).thenReturn(List.of());
+    }
+
+    private CreateAccountRequest createRequest(AccountType type, BigDecimal opening) {
+        CreateAccountRequest req = mock(CreateAccountRequest.class);
+        lenient().when(req.getAccountType()).thenReturn(type);
+        lenient().when(req.getName()).thenReturn("My Account");
+        lenient().when(req.getOpeningBalance()).thenReturn(opening);
+        lenient().when(req.getBankName()).thenReturn(null);
+        lenient().when(req.getAccountNumber()).thenReturn(null);
+        lenient().when(req.getLowBalanceThreshold()).thenReturn(null);
+        lenient().when(req.getCreditLimit()).thenReturn(null);
+        lenient().when(req.getStatementDay()).thenReturn(null);
+        lenient().when(req.getPaymentDueDay()).thenReturn(null);
+        lenient().when(req.getApr()).thenReturn(null);
+        lenient().when(req.getLoanType()).thenReturn(null);
+        lenient().when(req.getPrincipalAmount()).thenReturn(null);
+        lenient().when(req.getEmiAmount()).thenReturn(null);
+        lenient().when(req.getEmiDay()).thenReturn(null);
+        lenient().when(req.getAutopayAccountId()).thenReturn(null);
+        lenient().when(req.getLoanEndDate()).thenReturn(null);
+        return req;
+    }
+
+    // ─── enrich() balance formula (via createAccount, which returns the enriched response) ─
+
+    @Nested
+    @DisplayName("balance calculation (asset vs liability formula)")
+    class BalanceCalculationTests {
+
+        @Test
+        @DisplayName("asset account: balance = opening + income + transfersIn - expense - transfersOut")
+        void assetBalanceFormula() {
+            when(accountRepository.save(any(WalletAccount.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
+            when(incomeRepository.sumByAccountId(accountId)).thenReturn(new BigDecimal("500"));
+            when(expenseRepository.sumByAccountId(accountId)).thenReturn(new BigDecimal("200"));
+            when(transferRepository.sumTransfersIn(accountId)).thenReturn(new BigDecimal("100"));
+            when(transferRepository.sumTransfersOut(accountId)).thenReturn(new BigDecimal("50"));
+            CreateAccountRequest req = createRequest(AccountType.BANK_ACCOUNT, new BigDecimal("1000"));
+
+            AccountResponse response = service.createAccount(userId, req);
+
+            // 1000 + 500 + 100 - 200 - 50 = 1350
+            assertThat(response.getCurrentBalance()).isEqualByComparingTo("1350");
+        }
+
+        @Test
+        @DisplayName("liability account: balance = opening + expense + transfersOut - income - transfersIn (mirror image)")
+        void liabilityBalanceFormula() {
+            when(accountRepository.save(any(WalletAccount.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
+            when(incomeRepository.sumByAccountId(accountId)).thenReturn(new BigDecimal("500")); // a payment in
+            when(expenseRepository.sumByAccountId(accountId)).thenReturn(new BigDecimal("200")); // a spend on the card
+            when(transferRepository.sumTransfersIn(accountId)).thenReturn(BigDecimal.ZERO);
+            when(transferRepository.sumTransfersOut(accountId)).thenReturn(BigDecimal.ZERO);
+            CreateAccountRequest req = createRequest(AccountType.CREDIT_CARD, new BigDecimal("1000"));
+
+            AccountResponse response = service.createAccount(userId, req);
+
+            // 1000 + 200(spend) - 500(payment) = 700 outstanding — a payment IN reduces the debt
+            assertThat(response.getCurrentBalance()).isEqualByComparingTo("700");
+        }
+
+        @Test
+        @DisplayName("belowLowBalanceThreshold is never flagged for credit card or loan accounts")
+        void belowThresholdExcludesLiabilityTypes() {
+            when(accountRepository.save(any(WalletAccount.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
+            CreateAccountRequest req = createRequest(AccountType.CREDIT_CARD, BigDecimal.ZERO);
+            when(req.getLowBalanceThreshold()).thenReturn(new BigDecimal("100"));
+
+            AccountResponse response = service.createAccount(userId, req);
+
+            assertThat(response.isBelowLowBalanceThreshold()).isFalse();
+        }
+
+        @Test
+        @DisplayName("belowLowBalanceThreshold flags true once balance drops to or below the threshold, for asset accounts")
+        void belowThresholdFlaggedForAssetAccounts() {
+            when(accountRepository.save(any(WalletAccount.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
+            when(expenseRepository.sumByAccountId(accountId)).thenReturn(new BigDecimal("950")); // 1000 - 950 = 50
+            CreateAccountRequest req = createRequest(AccountType.BANK_ACCOUNT, new BigDecimal("1000"));
+            when(req.getLowBalanceThreshold()).thenReturn(new BigDecimal("50"));
+
+            AccountResponse response = service.createAccount(userId, req);
+
+            assertThat(response.getCurrentBalance()).isEqualByComparingTo("50");
+            assertThat(response.isBelowLowBalanceThreshold()).isTrue();
+        }
+    }
+
+    // ─── createAccount ───────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("createAccount")
+    class CreateAccountTests {
+
+        @Test
+        @DisplayName("blocks a second active CASH_WALLET (singleton type)")
+        void blocksSecondActiveSingletonType() {
+            when(accountRepository.existsByUserIdAndAccountTypeAndArchivedFalse(userId, AccountType.CASH_WALLET)).thenReturn(true);
+            CreateAccountRequest req = createRequest(AccountType.CASH_WALLET, BigDecimal.ZERO);
+
+            assertThatThrownBy(() -> service.createAccount(userId, req)).isInstanceOf(BusinessException.class);
+            verify(accountRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("blocks creating a singleton type when an archived one already exists (must restore instead)")
+        void blocksWhenArchivedSingletonExists() {
+            when(accountRepository.existsByUserIdAndAccountTypeAndArchivedFalse(userId, AccountType.EMERGENCY_FUND)).thenReturn(false);
+            when(accountRepository.existsByUserIdAndAccountType(userId, AccountType.EMERGENCY_FUND)).thenReturn(true);
+            CreateAccountRequest req = createRequest(AccountType.EMERGENCY_FUND, BigDecimal.ZERO);
+
+            assertThatThrownBy(() -> service.createAccount(userId, req)).isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("credit-card-only fields are ignored when creating a non-credit-card account")
+        void nonCreditCardFieldsIgnored() {
+            when(accountRepository.save(any(WalletAccount.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
+            CreateAccountRequest req = createRequest(AccountType.BANK_ACCOUNT, BigDecimal.ZERO);
+            // Never actually read: isCC ? req.getCreditLimit() : null short-circuits before the
+            // getter is even called for a non-credit-card type — that's exactly what's under test.
+            lenient().when(req.getCreditLimit()).thenReturn(new BigDecimal("50000"));
+
+            service.createAccount(userId, req);
+
+            ArgumentCaptor<WalletAccount> captor = ArgumentCaptor.forClass(WalletAccount.class);
+            verify(accountRepository).save(captor.capture());
+            assertThat(captor.getValue().getCreditLimit()).isNull();
+        }
+
+        @Test
+        @DisplayName("a LOAN account's principalAmount defaults to the opening (outstanding) balance when omitted")
+        void loanPrincipalDefaultsToOpeningBalance() {
+            when(accountRepository.save(any(WalletAccount.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
+            CreateAccountRequest req = createRequest(AccountType.LOAN, new BigDecimal("250000"));
+
+            service.createAccount(userId, req);
+
+            ArgumentCaptor<WalletAccount> captor = ArgumentCaptor.forClass(WalletAccount.class);
+            verify(accountRepository).save(captor.capture());
+            assertThat(captor.getValue().getPrincipalAmount()).isEqualByComparingTo("250000");
+        }
+
+        @Test
+        @DisplayName("a loan's autopay account must be a spendable (non-liability, non-investment) account")
+        void rejectsLiabilityAutopayAccount() {
+            UUID autopayId = UUID.randomUUID();
+            WalletAccount liabilityAccount = WalletAccount.builder().userId(userId).accountType(AccountType.CREDIT_CARD).build();
+            ReflectionTestUtils.setField(liabilityAccount, "id", autopayId);
+            when(accountRepository.findByIdAndUserId(autopayId, userId)).thenReturn(Optional.of(liabilityAccount));
+            CreateAccountRequest req = createRequest(AccountType.LOAN, new BigDecimal("100000"));
+            when(req.getAutopayAccountId()).thenReturn(autopayId);
+
+            assertThatThrownBy(() -> service.createAccount(userId, req)).isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("the first bank account is automatically made primary; a later one is not")
+        void firstBankAccountBecomesPrimary() {
+            when(accountRepository.save(any(WalletAccount.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
+            when(accountRepository.existsByUserIdAndAccountTypeAndArchivedFalse(userId, AccountType.BANK_ACCOUNT))
+                    .thenReturn(false); // no existing bank account yet
+            CreateAccountRequest req = createRequest(AccountType.BANK_ACCOUNT, BigDecimal.ZERO);
+
+            service.createAccount(userId, req);
+
+            ArgumentCaptor<WalletAccount> captor = ArgumentCaptor.forClass(WalletAccount.class);
+            verify(accountRepository).save(captor.capture());
+            assertThat(captor.getValue().isPrimary()).isTrue();
+        }
+
+        @Test
+        @DisplayName("a second bank account is NOT automatically made primary")
+        void secondBankAccountNotAutoPrimary() {
+            when(accountRepository.save(any(WalletAccount.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
+            when(accountRepository.existsByUserIdAndAccountTypeAndArchivedFalse(userId, AccountType.BANK_ACCOUNT))
+                    .thenReturn(true); // already has one
+            CreateAccountRequest req = createRequest(AccountType.BANK_ACCOUNT, BigDecimal.ZERO);
+
+            service.createAccount(userId, req);
+
+            ArgumentCaptor<WalletAccount> captor = ArgumentCaptor.forClass(WalletAccount.class);
+            verify(accountRepository).save(captor.capture());
+            assertThat(captor.getValue().isPrimary()).isFalse();
+        }
+    }
+
+    // ─── archiveAccount / unarchiveAccount ───────────────────────────────────────
+
+    @Nested
+    @DisplayName("archiveAccount / unarchiveAccount")
+    class ArchiveTests {
+
+        @Test
+        @DisplayName("archiving sets archived=true")
+        void archiveSetsFlag() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+            when(accountRepository.save(any(WalletAccount.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            service.archiveAccount(accountId, userId);
+
+            assertThat(account.isArchived()).isTrue();
+        }
+
+        @Test
+        @DisplayName("unarchiving a singleton type is blocked while another active one of the same type exists")
+        void unarchiveBlockedBySingletonConflict() {
+            WalletAccount account = withId(baseAccount(AccountType.CASH_WALLET).archived(true).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+            when(accountRepository.existsByUserIdAndAccountTypeAndArchivedFalse(userId, AccountType.CASH_WALLET)).thenReturn(true);
+
+            assertThatThrownBy(() -> service.unarchiveAccount(accountId, userId)).isInstanceOf(BusinessException.class);
+            assertThat(account.isArchived()).isTrue(); // unchanged
+        }
+
+        @Test
+        @DisplayName("unarchiving succeeds when no conflicting active singleton exists")
+        void unarchiveSucceedsWithoutConflict() {
+            WalletAccount account = withId(baseAccount(AccountType.CASH_WALLET).archived(true).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+            when(accountRepository.existsByUserIdAndAccountTypeAndArchivedFalse(userId, AccountType.CASH_WALLET)).thenReturn(false);
+            when(accountRepository.save(any(WalletAccount.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            service.unarchiveAccount(accountId, userId);
+
+            assertThat(account.isArchived()).isFalse();
+        }
+    }
+
+    // ─── transfer ────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("transfer")
+    class TransferTests {
+
+        private TransferRequest req(UUID from, UUID to, BigDecimal amount) {
+            TransferRequest r = mock(TransferRequest.class);
+            lenient().when(r.getFromAccountId()).thenReturn(from);
+            lenient().when(r.getToAccountId()).thenReturn(to);
+            lenient().when(r.getAmount()).thenReturn(amount);
+            lenient().when(r.getDescription()).thenReturn("Test transfer");
+            lenient().when(r.getTransferDate()).thenReturn(LocalDate.now());
+            return r;
+        }
+
+        @Test
+        @DisplayName("rejects a transfer to the same account")
+        void rejectsSameAccountTransfer() {
+            TransferRequest r = req(accountId, accountId, new BigDecimal("100"));
+            assertThatThrownBy(() -> service.transfer(userId, r)).isInstanceOf(BusinessException.class);
+            verifyNoInteractions(accountBalanceGuard);
+        }
+
+        @Test
+        @DisplayName("validates sufficient balance on the source account before transferring")
+        void validatesSourceBalance() {
+            UUID toId = UUID.randomUUID();
+            WalletAccount from = withId(baseAccount(AccountType.BANK_ACCOUNT).build());
+            WalletAccount to = baseAccount(AccountType.BANK_ACCOUNT).build();
+            ReflectionTestUtils.setField(to, "id", toId);
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(from));
+            when(accountRepository.findById(toId)).thenReturn(Optional.of(to));
+            when(transferRepository.save(any(AccountTransfer.class))).thenAnswer(inv -> {
+                AccountTransfer t = inv.getArgument(0);
+                ReflectionTestUtils.setField(t, "id", UUID.randomUUID());
+                return t;
+            });
+
+            TransferResponse response = service.transfer(userId, req(accountId, toId, new BigDecimal("200")));
+
+            verify(accountBalanceGuard).validateSufficientBalance(accountId, userId, new BigDecimal("200"), BigDecimal.ZERO);
+            assertThat(response.getAmount()).isEqualByComparingTo("200");
+        }
+
+        @Test
+        @DisplayName("triggers a low-balance check on the source account after a successful transfer")
+        void triggersLowBalanceCheckAfterTransfer() {
+            UUID toId = UUID.randomUUID();
+            WalletAccount from = withId(baseAccount(AccountType.BANK_ACCOUNT)
+                    .lowBalanceThreshold(new BigDecimal("500")).openingBalance(new BigDecimal("100")).build());
+            WalletAccount to = baseAccount(AccountType.BANK_ACCOUNT).build();
+            ReflectionTestUtils.setField(to, "id", toId);
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(from));
+            when(accountRepository.findById(toId)).thenReturn(Optional.of(to));
+            when(transferRepository.save(any(AccountTransfer.class))).thenAnswer(inv -> {
+                AccountTransfer t = inv.getArgument(0);
+                ReflectionTestUtils.setField(t, "id", UUID.randomUUID());
+                return t;
+            });
+
+            service.transfer(userId, req(accountId, toId, new BigDecimal("50")));
+
+            verify(notificationService).createLowBalanceNotification(eq(userId), eq("Test Account"), any(), eq(new BigDecimal("500")));
+        }
+    }
+
+    // ─── adjustBalance ───────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("adjustBalance")
+    class AdjustBalanceTests {
+
+        @Test
+        @DisplayName("rejects a negative target balance for a non-liability (asset) account")
+        void rejectsNegativeForAssetAccount() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+            assertThatThrownBy(() -> service.adjustBalance(accountId, userId, new BigDecimal("-10")))
+                    .isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("allows a negative target balance for a liability account (it's normal to still owe money)")
+        void allowsNegativeForLiabilityAccount() {
+            WalletAccount account = withId(baseAccount(AccountType.CREDIT_CARD).openingBalance(BigDecimal.ZERO).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+            // current balance is 0 (no activity); target -10 means diff=-10, should not throw
+            service.adjustBalance(accountId, userId, new BigDecimal("-10"));
+
+            verify(transferRepository).save(any(AccountTransfer.class));
+        }
+
+        @Test
+        @DisplayName("is a no-op (no transfer created) when the target already equals the current balance")
+        void noOpWhenTargetEqualsCurrent() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).openingBalance(new BigDecimal("1000")).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+            service.adjustBalance(accountId, userId, new BigDecimal("1000"));
+
+            verify(transferRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("raising an ASSET account's balance routes as an incoming transfer (toAccountId = this account)")
+        void assetIncreaseRoutesAsIncomingTransfer() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).openingBalance(new BigDecimal("1000")).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+            service.adjustBalance(accountId, userId, new BigDecimal("1500")); // +500
+
+            ArgumentCaptor<AccountTransfer> captor = ArgumentCaptor.forClass(AccountTransfer.class);
+            verify(transferRepository).save(captor.capture());
+            assertThat(captor.getValue().getToAccountId()).isEqualTo(accountId);
+            assertThat(captor.getValue().getFromAccountId()).isNull();
+            assertThat(captor.getValue().getAmount()).isEqualByComparingTo("500");
+        }
+
+        @Test
+        @DisplayName("lowering an ASSET account's balance routes as an outgoing transfer (fromAccountId = this account)")
+        void assetDecreaseRoutesAsOutgoingTransfer() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).openingBalance(new BigDecimal("1000")).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+            service.adjustBalance(accountId, userId, new BigDecimal("700")); // -300
+
+            ArgumentCaptor<AccountTransfer> captor = ArgumentCaptor.forClass(AccountTransfer.class);
+            verify(transferRepository).save(captor.capture());
+            assertThat(captor.getValue().getFromAccountId()).isEqualTo(accountId);
+            assertThat(captor.getValue().getToAccountId()).isNull();
+        }
+
+        @Test
+        @DisplayName("raising a LIABILITY account's outstanding routes as an OUTGOING transfer (mirror image of asset)")
+        void liabilityIncreaseRoutesAsOutgoingTransfer() {
+            WalletAccount account = withId(baseAccount(AccountType.CREDIT_CARD).openingBalance(new BigDecimal("1000")).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+            service.adjustBalance(accountId, userId, new BigDecimal("1500")); // outstanding +500
+
+            ArgumentCaptor<AccountTransfer> captor = ArgumentCaptor.forClass(AccountTransfer.class);
+            verify(transferRepository).save(captor.capture());
+            assertThat(captor.getValue().getFromAccountId()).isEqualTo(accountId);
+            assertThat(captor.getValue().getToAccountId()).isNull();
+        }
+
+        @Test
+        @DisplayName("lowering a LIABILITY account's outstanding (an unlogged payment) routes as an INCOMING transfer")
+        void liabilityDecreaseRoutesAsIncomingTransfer() {
+            WalletAccount account = withId(baseAccount(AccountType.CREDIT_CARD).openingBalance(new BigDecimal("1000")).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+            service.adjustBalance(accountId, userId, new BigDecimal("600")); // outstanding -400
+
+            ArgumentCaptor<AccountTransfer> captor = ArgumentCaptor.forClass(AccountTransfer.class);
+            verify(transferRepository).save(captor.capture());
+            assertThat(captor.getValue().getToAccountId()).isEqualTo(accountId);
+            assertThat(captor.getValue().getFromAccountId()).isNull();
+        }
+    }
+
+    // ─── setPrimary ──────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("setPrimary")
+    class SetPrimaryTests {
+
+        @Test
+        @DisplayName("rejects non-bank-account types")
+        void rejectsNonBankAccount() {
+            WalletAccount account = withId(baseAccount(AccountType.CASH_WALLET).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+            assertThatThrownBy(() -> service.setPrimary(accountId, userId)).isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("clears any existing primary bank account before setting the new one")
+        void clearsExistingPrimaryFirst() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).primary(false).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+            when(accountRepository.save(any(WalletAccount.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            service.setPrimary(accountId, userId);
+
+            verify(accountRepository).clearPrimaryForType(userId, AccountType.BANK_ACCOUNT);
+            assertThat(account.isPrimary()).isTrue();
+        }
+    }
+
+    // ─── checkLowBalance ─────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("checkLowBalance")
+    class CheckLowBalanceTests {
+
+        @Test
+        @DisplayName("does nothing when no threshold is configured")
+        void noOpWithoutThreshold() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).lowBalanceThreshold(null).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+            service.checkLowBalance(accountId, userId);
+
+            verifyNoInteractions(notificationService);
+        }
+
+        @Test
+        @DisplayName("does nothing for liability accounts even with a threshold set")
+        void noOpForLiabilityAccounts() {
+            WalletAccount account = withId(baseAccount(AccountType.CREDIT_CARD).lowBalanceThreshold(new BigDecimal("100")).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+            service.checkLowBalance(accountId, userId);
+
+            verifyNoInteractions(notificationService);
+        }
+
+        @Test
+        @DisplayName("silently swallows any exception rather than propagating it to the caller")
+        void swallowsExceptions() {
+            when(accountRepository.findById(accountId)).thenThrow(new RuntimeException("DB blip"));
+
+            service.checkLowBalance(accountId, userId); // must not throw
+        }
+
+        @Test
+        @DisplayName("does nothing when the account belongs to a different user (defense in depth)")
+        void noOpForForeignAccount() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).userId(UUID.randomUUID())
+                    .lowBalanceThreshold(new BigDecimal("100")).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+            service.checkLowBalance(accountId, userId);
+
+            verifyNoInteractions(notificationService);
+        }
+    }
+
+    // ─── findAndValidate ownership (via getCurrentBalance) ──────────────────────
+
+    @Nested
+    @DisplayName("ownership validation")
+    class OwnershipTests {
+
+        @Test
+        @DisplayName("throws ResourceNotFoundException for an unknown account")
+        void throwsWhenNotFound() {
+            when(accountRepository.findById(accountId)).thenReturn(Optional.empty());
+            assertThatThrownBy(() -> service.getCurrentBalance(accountId, userId))
+                    .isInstanceOf(ResourceNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("throws AccessDeniedException for another user's account")
+        void throwsWhenNotOwned() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).userId(UUID.randomUUID()).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+            assertThatThrownBy(() -> service.getCurrentBalance(accountId, userId))
+                    .isInstanceOf(AccessDeniedException.class);
+        }
+    }
+}

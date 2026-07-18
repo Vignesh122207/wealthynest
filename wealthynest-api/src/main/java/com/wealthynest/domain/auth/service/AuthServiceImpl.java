@@ -1,23 +1,15 @@
 package com.wealthynest.domain.auth.service;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
 import com.wealthynest.common.audit.AuditService;
 import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.security.JwtTokenProvider;
 import com.wealthynest.common.security.TokenRevocationService;
 import com.wealthynest.config.JwtProperties;
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.gson.GsonFactory;
-import com.wealthynest.domain.auth.dto.request.ChangeEmailRequest;
-import com.wealthynest.domain.auth.dto.request.EnablePinRequest;
-import com.wealthynest.domain.auth.dto.request.ForgotPasswordRequest;
-import com.wealthynest.domain.auth.dto.request.GoogleLoginRequest;
-import com.wealthynest.domain.auth.dto.request.LoginRequest;
-import com.wealthynest.domain.auth.dto.request.PinLoginRequest;
-import com.wealthynest.domain.auth.dto.request.RefreshTokenRequest;
-import com.wealthynest.domain.auth.dto.request.RegisterRequest;
-import com.wealthynest.domain.auth.dto.request.ResetPasswordRequest;
+import com.wealthynest.domain.auth.dto.request.*;
 import com.wealthynest.domain.auth.dto.response.AuthResponse;
 import com.wealthynest.domain.auth.entity.EmailVerificationToken;
 import com.wealthynest.domain.auth.entity.PasswordResetToken;
@@ -39,6 +31,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -117,7 +110,11 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    @Transactional
+    // registerFailedLogin() below persists the failed-attempt counter/lockout before this method
+    // re-throws BadCredentialsException — without noRollbackFor, Spring's default
+    // rollback-on-unchecked-exception rule would undo that save along with everything else in
+    // this transaction, silently disabling the brute-force lockout.
+    @Transactional(noRollbackFor = BadCredentialsException.class)
     public AuthResponse login(LoginRequest request, String ipAddress, String userAgent) {
         String email = request.getEmail().toLowerCase();
         try {

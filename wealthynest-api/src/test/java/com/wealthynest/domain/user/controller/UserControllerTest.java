@@ -1,0 +1,145 @@
+package com.wealthynest.domain.user.controller;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wealthynest.config.RateLimitConfig;
+import com.wealthynest.config.SecurityConfig;
+import com.wealthynest.domain.auth.service.AuthService;
+import com.wealthynest.domain.user.dto.request.ChangePasswordRequest;
+import com.wealthynest.domain.user.dto.request.UpdateProfileRequest;
+import com.wealthynest.domain.user.dto.response.UserResponse;
+import com.wealthynest.domain.user.service.UserService;
+import com.wealthynest.testsupport.SecurityTestConfig;
+import com.wealthynest.testsupport.SecurityTestUtils;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.UUID;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@WebMvcTest(controllers = UserController.class,
+        excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = RateLimitConfig.RateLimitFilter.class))
+@Import({SecurityConfig.class, SecurityTestConfig.class})
+class UserControllerTest {
+
+    @Autowired private MockMvc mockMvc;
+    @Autowired private ObjectMapper objectMapper;
+    @MockBean private UserService userService;
+    @MockBean private AuthService authService;
+
+    private final UUID userId = UUID.randomUUID();
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityTestUtils.clearAuthentication();
+    }
+
+    @Test
+    @DisplayName("an unauthenticated request is rejected before the service is called")
+    void unauthenticatedIsRejected() throws Exception {
+        mockMvc.perform(get("/api/v1/users/me"))
+                .andExpect(status().isUnauthorized());
+
+        org.mockito.Mockito.verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("GET /me delegates the authenticated userId")
+    void getProfileDelegatesUserId() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null);
+        when(userService.getProfile(userId)).thenReturn(UserResponse.builder().id(userId).build());
+
+        mockMvc.perform(get("/api/v1/users/me"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(userId.toString()));
+    }
+
+    @Nested
+    @DisplayName("request validation")
+    class ValidationTests {
+
+        @Test
+        @DisplayName("a fullName shorter than 2 chars fails @Size validation")
+        void tooShortFullNameFailsValidation() throws Exception {
+            SecurityTestUtils.authenticateAs(userId, null);
+
+            mockMvc.perform(patch("/api/v1/users/me")
+                            .contentType("application/json")
+                            .content("""
+                                    {"fullName": "A"}
+                                    """))
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.fieldErrors.fullName").exists());
+        }
+
+        @Test
+        @DisplayName("a weak new password fails @Pattern validation before the service is called")
+        void weakNewPasswordFailsValidation() throws Exception {
+            SecurityTestUtils.authenticateAs(userId, null);
+            ChangePasswordRequest req = new ChangePasswordRequest();
+            ReflectionTestUtils.setField(req, "currentPassword", "OldPass1");
+            ReflectionTestUtils.setField(req, "newPassword", "alllowercase");
+
+            mockMvc.perform(post("/api/v1/users/me/change-password")
+                            .contentType("application/json")
+                            .content(objectMapper.writeValueAsString(req)))
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.fieldErrors.newPassword").exists());
+
+            verify(userService, never()).changePassword(any(), any(), any(), any());
+        }
+    }
+
+    @Test
+    @DisplayName("DELETE /me delegates the authenticated userId to closeAccount")
+    void closeAccountDelegatesUserId() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null);
+
+        mockMvc.perform(delete("/api/v1/users/me"))
+                .andExpect(status().isOk());
+
+        verify(userService).closeAccount(userId);
+    }
+
+    @Test
+    @DisplayName("POST /me/pin/disable delegates to authService, not userService")
+    void disablePinDelegatesToAuthService() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null);
+
+        mockMvc.perform(post("/api/v1/users/me/pin/disable"))
+                .andExpect(status().isOk());
+
+        verify(authService).disablePin(userId);
+        org.mockito.Mockito.verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("PATCH /me passes valid updates through to the service")
+    void updateProfileDelegatesToService() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null);
+        UpdateProfileRequest req = new UpdateProfileRequest();
+        ReflectionTestUtils.setField(req, "fullName", "New Name");
+        when(userService.updateProfile(eq(userId), any())).thenReturn(UserResponse.builder().id(userId).fullName("New Name").build());
+
+        mockMvc.perform(patch("/api/v1/users/me")
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.fullName").value("New Name"));
+    }
+}

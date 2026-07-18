@@ -1,7 +1,11 @@
 package com.wealthynest.domain.recurringgoalcontribution.dto.request;
 
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import lombok.Getter;
+
 import java.math.BigDecimal;
 import java.util.UUID;
 

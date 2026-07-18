@@ -3,9 +3,12 @@ package com.wealthynest.domain.expense.dto.request;
 import com.wealthynest.domain.expense.entity.PaymentMethod;
 import com.wealthynest.domain.expensesplit.dto.request.SplitParticipantRequest;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;

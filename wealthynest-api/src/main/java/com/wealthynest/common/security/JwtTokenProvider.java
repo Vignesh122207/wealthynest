@@ -1,11 +1,14 @@
 package com.wealthynest.common.security;
 
 import com.wealthynest.config.JwtProperties;
-import io.jsonwebtoken.*;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
@@ -20,10 +23,10 @@ public class JwtTokenProvider {
     private final JwtProperties jwtProperties;
 
     public String generateAccessToken(UUID userId, String email, String role) {
-        return buildToken(Map.of("role", role, "type", "ACCESS"), email, userId.toString(), jwtProperties.getAccessTokenExpiryMs());
+        return buildToken(Map.of("role", role, "type", "ACCESS", "uid", userId.toString()), email, jwtProperties.getAccessTokenExpiryMs());
     }
     public String generateRefreshToken(UUID userId, String email) {
-        return buildToken(Map.of("type", "REFRESH"), email, userId.toString(), jwtProperties.getRefreshTokenExpiryMs());
+        return buildToken(Map.of("type", "REFRESH", "uid", userId.toString()), email, jwtProperties.getRefreshTokenExpiryMs());
     }
     public Claims extractAllClaims(String token) {
         return Jwts.parser().verifyWith(getSigningKey()).build().parseSignedClaims(token).getPayload();
@@ -57,9 +60,13 @@ public class JwtTokenProvider {
         }
     }
 
-    private String buildToken(Map<String, Object> claims, String subject, String jwtId, long expiryMs) {
+    // "jti" must be unique per token, not per user — two tokens minted for the same user within
+    // the same second (iat/exp truncate to second precision) would otherwise be byte-identical
+    // and collide on refresh_tokens' unique token_hash. The user id itself travels in the "uid"
+    // claim instead (see JwtAuthenticationFilter).
+    private String buildToken(Map<String, Object> claims, String subject, long expiryMs) {
         Date now = new Date();
-        return Jwts.builder().claims(claims).subject(subject).id(jwtId)
+        return Jwts.builder().claims(claims).subject(subject).id(UUID.randomUUID().toString())
                 .issuedAt(now).expiration(new Date(now.getTime() + expiryMs))
                 .signWith(getSigningKey()).compact();
     }

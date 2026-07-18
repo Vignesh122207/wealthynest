@@ -2,11 +2,7 @@ package com.wealthynest.domain.investment.controller;
 
 import com.wealthynest.common.response.ApiResponse;
 import com.wealthynest.common.security.SecurityUtils;
-import com.wealthynest.domain.investment.dto.request.CreateInvestmentRequest;
-import com.wealthynest.domain.investment.dto.request.CreateSipTransactionRequest;
-import com.wealthynest.domain.investment.dto.request.CreateStockTransactionRequest;
-import com.wealthynest.domain.investment.dto.request.DismissDividendRequest;
-import com.wealthynest.domain.investment.dto.request.LogIncomeRequest;
+import com.wealthynest.domain.investment.dto.request.*;
 import com.wealthynest.domain.investment.dto.response.*;
 import com.wealthynest.domain.investment.entity.InvestmentType;
 import com.wealthynest.domain.investment.service.InvestmentService;
@@ -17,7 +13,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
