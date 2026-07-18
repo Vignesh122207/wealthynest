@@ -96,4 +96,17 @@ public class RestClientConfig {
             .defaultHeader("User-Agent", "WealthyNest/1.0")
             .build();
     }
+
+    /** Have I Been Pwned "Pwned Passwords" range API — k-anonymity breach check for Vault Health.
+     * Only a 5-char SHA-1 prefix is ever sent; short timeouts + caller-side fail-open since a
+     * save must never block on this being reachable. */
+    @Bean("hibpClient")
+    public RestClient hibpClient() {
+        return RestClient.builder()
+            .requestFactory(timeoutFactory(Duration.ofSeconds(3), Duration.ofSeconds(5)))
+            .baseUrl("https://api.pwnedpasswords.com")
+            .defaultHeader("Accept", "text/plain")
+            .defaultHeader("User-Agent", "WealthyNest/1.0")
+            .build();
+    }
 }

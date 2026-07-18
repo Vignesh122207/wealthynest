@@ -14,6 +14,8 @@ export const QUERY_KEYS = {
   NOTIFICATIONS:  ["notifications"]          as const,
   FAMILY:         ["family"]                 as const,
   GOALS:          ["goals"]                  as const,
+  VAULT:          ["vault", "items"]         as const,
+  VAULT_HEALTH:   ["vault", "health"]        as const,
 } as const;
 
 // Every RBI-scheduled commercial bank (public + private), small finance bank, and payments
@@ -112,6 +114,11 @@ export const ASSET_TYPES = [
   { value: "BUSINESS_EQUITY",label: "Business Equity" },
   { value: "RECEIVABLES",    label: "Receivables" },
   { value: "OTHER",          label: "Other" },
+];
+
+export const VAULT_ITEM_TYPES = [
+  { value: "LOGIN",       label: "Login" },
+  { value: "SECURE_NOTE", label: "Secure Note" },
 ];
 
 export const LIABILITY_TYPES = [

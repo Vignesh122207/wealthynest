@@ -24,5 +24,8 @@ wealthynest:
       secret: test-secret-key-for-testing-only-min-256-bits-long-enough
       access-token-expiry-ms: 900000
       refresh-token-expiry-ms: 2592000000
+    vault:
+      encryption-key: PdFeO5Ey1ku6QFnhkGIKas40BEDmfNhjjexyMC6Yx3A=
+      hash-pepper: test-vault-hash-pepper-not-for-production
     cors:
       allowed-origins: http://localhost:3000

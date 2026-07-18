@@ -87,6 +87,9 @@ wealthynest:
       secret: ${JWT_SECRET:change-this-secret-in-production-min-256-bits-long}
       access-token-expiry-ms: ${JWT_ACCESS_EXPIRY:7200000}
       refresh-token-expiry-ms: ${JWT_REFRESH_EXPIRY:2592000000}
+    vault:
+      encryption-key: ${VAULT_ENCRYPTION_KEY:change-this-key-in-production-must-be-32-byte-base64}
+      hash-pepper: ${VAULT_HASH_PEPPER:change-this-pepper-in-production}
     cors:
       allowed-origins: ${CORS_ORIGINS:http://localhost:3000}
     rate-limit:
