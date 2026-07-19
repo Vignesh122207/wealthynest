@@ -12,7 +12,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
@@ -40,8 +40,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AdminControllerTest {
 
     @Autowired private MockMvc mockMvc;
-    @MockBean private AdminService adminService;
-    @MockBean private JobSchedulerService jobSchedulerService;
+    @MockitoBean private AdminService adminService;
+    @MockitoBean private JobSchedulerService jobSchedulerService;
 
     private final UUID userId = UUID.randomUUID();
 

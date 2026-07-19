@@ -15,7 +15,7 @@ Frontend (run from `wealthynest-web/`):
 - `npm run build` — production build
 - `npm run lint` — ESLint
 - `npm run type-check` — `tsc --noEmit`
-- No `npm test` script exists yet — don't assume a test runner is wired up.
+- `npm test` — Vitest unit suite (single pass); `npm run test:watch` for watch mode; `npm run test:coverage` for a coverage report
 
 Full stack: `docker compose up -d` (all services); `docker compose up -d --build <service>` to rebuild one.
 
@@ -47,6 +47,7 @@ Full stack: `docker compose up -d` (all services); `docker compose up -d --build
 - **No dead code.** Delete unused params, imports, methods, and commented-out blocks rather than leaving them "just in case."
 - **Fail loud at boundaries, trust internals.** Validate/sanitize at API boundaries (controller input, external responses). Don't re-validate data that's already guaranteed by the type system or a prior layer.
 - **Comments explain why, not what.** Skip comments that restate the code. Only comment non-obvious constraints, workarounds, or invariants.
+- **Don't propagate deprecated APIs.** Before copying an existing pattern in this repo, check whether it's marked `@Deprecated` (IDE strikethrough is the fast signal) — an existing usage isn't proof it's still current, just proof it hasn't been migrated yet. Use the replacement instead of extending the deprecated one to a new call site. See the testing sections below for the two migrations already done in this repo (`@MockitoBean`, native Vite tsconfig-paths resolution) as the reference pattern for what "current" means here.
 
 ## wealthynest-api (Spring Boot / Java 21)
 
@@ -59,6 +60,7 @@ Full stack: `docker compose up -d` (all services); `docker compose up -d --build
 - **Repositories**: prefer derived query methods or `@Query` with named params over building queries in Java strings. Avoid N+1s — use fetch joins or `@EntityGraph` where a list endpoint touches associations.
 - **Exceptions**: throw the project's existing custom exceptions (`BusinessException`, `ResourceNotFoundException`, `AccessDeniedException` in `common/exception/`) — not generic `RuntimeException` — so `GlobalExceptionHandler` can map them to proper HTTP responses. Add a new exception type only if none of the existing ones fit.
 - **Migrations**: schema changes go through Flyway/Liquibase migration files (whichever this repo uses) — never rely on Hibernate `ddl-auto` for anything beyond local dev.
+- **Testing (Spring Boot 3.4+/6.2)**: use `@MockitoBean`/`@MockitoSpyBean` (`org.springframework.test.context.bean.override.mockito`) in `@WebMvcTest`/`@SpringBootTest` classes — **not** `@MockBean`/`@SpyBean` (`org.springframework.boot.test.mock.mockito`), deprecated since Boot 3.4 and removed in a future major. Plain Mockito unit tests (`@ExtendWith(MockitoExtension.class)`, `@Mock`/`@InjectMocks`) are unaffected — this only applies to Spring-context-integrated mocks. See `testsupport/` for the established `@WebMvcTest` + real-`SecurityConfig` pattern and `integration/` for full `@SpringBootTest` + Testcontainers flows; both already use current APIs — copy from there, not from an older controller test that predates this migration.
 
 ## wealthynest-web (Next.js 15 / React 19 / TypeScript)
 
@@ -71,6 +73,7 @@ Full stack: `docker compose up -d` (all services); `docker compose up -d --build
 - **State**: local component state first, Zustand only for state genuinely shared across distant components. Don't add a new store for something one component tree needs.
 - **Components**: keep presentational components free of data-fetching; fetch in a parent/page and pass props, or use a query hook — don't fetch inside deeply nested leaf components.
 - **Error/loading states**: every query/mutation that hits the API must handle loading and error states in the UI — no silent failures.
+- **Testing**: Vitest + React Testing Library, config in `vitest.config.ts`/`vitest.setup.ts`. Path aliases (`@/*`) resolve via Vite's **native** `resolve.tsconfigPaths: true` — don't add the separate `vite-tsconfig-paths` plugin back, Vite's own tooling flags it as redundant now. Co-locate test files (`Foo.ts` → `Foo.test.ts`). For a zod schema, test it as a pure function (`schema.safeParse(input)`) — no component render needed. For a TanStack Query hook, mock the feature's `*.api.ts` module (not `@/lib/axios` — that has real interceptor logic out of scope for a hook test) and `sonner`, then use `createQueryClientWrapper()` from `src/test-utils/queryClientWrapper.tsx` with `renderHook`; assert exactly which `QUERY_KEYS` a mutation invalidates on success (and none on failure) — that's the most valuable thing a mutation-hook test checks.
 
 ## Before considering a change done
 
@@ -78,7 +81,7 @@ A task is not complete until the affected app has been rebuilt and restarted via
 
 - **Backend changes** (`wealthynest-api`): run `mvn compile` (or `mvn -pl wealthynest-api compile`) to catch errors fast, then rebuild and restart only that service:
   `docker compose up -d --build wealthynest-api`
-- **Frontend changes** (`wealthynest-web`): run `npm run type-check` and `npm run lint` inside `wealthynest-web` first, then rebuild and restart only that service:
+- **Frontend changes** (`wealthynest-web`): run `npm run type-check`, `npm run lint`, and `npm test` inside `wealthynest-web` first, then rebuild and restart only that service:
   `docker compose up -d --build wealthynest-web`
 - **Changes touching both**: rebuild and restart both services (`docker compose up -d --build wealthynest-api wealthynest-web`).
 - Don't rebuild/restart services you didn't touch — e.g. don't restart `wealthynest-web` for an API-only change, and don't touch `postgres`/`redis`/`tunnel` unless the task specifically changed them.

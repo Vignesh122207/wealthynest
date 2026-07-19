@@ -367,7 +367,11 @@ public class AuthServiceImpl implements AuthService {
      * 4-6 digit PIN alone (from a device that never logged in here) gets nowhere.
      */
     @Override
-    @Transactional
+    // Same rollback pitfall as login() above: registerFailedPin() persists the failed-attempt
+    // counter/lockout before this method re-throws BusinessException — without noRollbackFor,
+    // Spring's default rollback-on-unchecked-exception rule would undo that save, silently
+    // disabling the PIN brute-force lockout.
+    @Transactional(noRollbackFor = BusinessException.class)
     public AuthResponse pinLogin(PinLoginRequest request, String ipAddress, String userAgent) {
         String tokenHash = hashToken(request.getRefreshToken());
         RefreshToken stored = refreshTokenRepository.findByTokenHash(tokenHash)

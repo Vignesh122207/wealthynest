@@ -111,7 +111,9 @@ export function formatCurrencyCompact(amount: number, currency?: string): string
 /** Chart axis tick label: always ₹, always L (lakh) or K (thousand) — distinct from
  * formatCurrencyCompact, which respects the user's stored currency preference. */
 export function formatChartTickINR(value: number): string {
-  return `₹${Math.abs(value) >= 100000 ? `${(value / 100000).toFixed(1)}L` : `${(value / 1000).toFixed(0)}K`}`;
+  const sign = value < 0 ? "-" : "";
+  const abs = Math.abs(value);
+  return `${sign}₹${abs >= 100000 ? `${(abs / 100000).toFixed(1)}L` : `${(abs / 1000).toFixed(0)}K`}`;
 }
 
 export function formatDate(date: string | Date): string {

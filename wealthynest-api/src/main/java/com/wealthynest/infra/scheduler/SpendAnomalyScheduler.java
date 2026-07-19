@@ -35,7 +35,9 @@ public class SpendAnomalyScheduler {
     private final CategoryRepository  categoryRepository;
     private final NotificationService notificationService;
 
-    @Transactional(readOnly = true)
+    // Not read-only: checkOne() writes a notification when it flags an anomaly, and
+    // readOnly=true would put Hibernate in manual-flush mode, silently dropping that write on commit.
+    @Transactional
     public void checkRecentExpenses() {
         Instant since = Instant.now().minus(1, ChronoUnit.DAYS);
         List<Expense> candidates = expenseRepository.findByCreatedAtAfterAndDebtFalse(since);
@@ -58,7 +60,9 @@ public class SpendAnomalyScheduler {
         List<Object[]> rows = expenseRepository.avgAndCountByUserCategoryAndDateRangeExcluding(
                 e.getUserId(), e.getCategoryId(), start, end, e.getId());
         if (rows.isEmpty()) return false;
-        BigDecimal average = (BigDecimal) rows.get(0)[0];
+        // JPQL's AVG() always promotes to Double per the JPA spec even over a BigDecimal column,
+        // so this can't be cast directly — go through Number the same way count already does.
+        BigDecimal average = BigDecimal.valueOf(((Number) rows.get(0)[0]).doubleValue());
         long count = ((Number) rows.get(0)[1]).longValue();
         if (count < MIN_SAMPLE_SIZE || average.compareTo(BigDecimal.ZERO) <= 0) return false;
 

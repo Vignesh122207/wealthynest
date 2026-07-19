@@ -127,15 +127,23 @@ class WalletAccountRepositoryTest extends AbstractRepositoryTest {
     @Test
     @DisplayName("findByArchivedFalseAndLowBalanceThresholdIsNotNull only returns active accounts with a configured threshold")
     void findLowBalanceCandidatesFiltersCorrectly() {
-        persistAccount(AccountType.BANK_ACCOUNT, false, false, new BigDecimal("1000")); // candidate
+        // Unscoped by design (LowBalanceScheduler sweeps every account system-wide), so a
+        // full-suite run sharing one Testcontainers Postgres with other tests that create real
+        // thresholded accounts means this can't assert an absolute count — assert the delta caused
+        // by this test's own inserts instead (see feedback_test_infra_patterns.md).
+        long before = walletAccountRepository.findByArchivedFalseAndLowBalanceThresholdIsNotNull().size();
+
+        WalletAccount candidate = persistAccount(AccountType.BANK_ACCOUNT, false, false, new BigDecimal("1000")); // candidate
         persistAccount(AccountType.BANK_ACCOUNT, false, false, null); // no threshold — excluded
         persistAccount(AccountType.BANK_ACCOUNT, true, false, new BigDecimal("500")); // archived — excluded
         entityManager.flush();
 
         List<WalletAccount> result = walletAccountRepository.findByArchivedFalseAndLowBalanceThresholdIsNotNull();
 
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).getLowBalanceThreshold()).isEqualByComparingTo("1000");
+        assertThat(result).hasSize((int) before + 1);
+        assertThat(result).extracting(WalletAccount::getId).contains(candidate.getId());
+        assertThat(result.stream().filter(a -> a.getId().equals(candidate.getId())).findFirst().orElseThrow()
+                .getLowBalanceThreshold()).isEqualByComparingTo("1000");
     }
 
     @Test

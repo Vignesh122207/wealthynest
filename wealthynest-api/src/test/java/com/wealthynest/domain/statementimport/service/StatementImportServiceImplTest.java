@@ -228,6 +228,112 @@ class StatementImportServiceImplTest {
         }
     }
 
+    // ─── preview: PDF text-extraction parsing (exercises parsePdfLines/PdfLineParse) ─────────
+
+    @Nested
+    @DisplayName("preview: PDF statement parsing")
+    class PdfParsingTests {
+
+        @org.junit.jupiter.api.BeforeEach
+        void stubNoCategories() {
+            lenient().when(categoryRepository.findByUserIdOrSystem(userId)).thenReturn(List.of());
+        }
+
+        /** Renders each string as its own line in a real single-page PDF via PDFBox, so
+         * PDFTextStripper (used by previewPdf) round-trips real extracted text rather than a mock. */
+        private MultipartFile pdfFile(List<String> lines) throws java.io.IOException {
+            try (org.apache.pdfbox.pdmodel.PDDocument document = new org.apache.pdfbox.pdmodel.PDDocument()) {
+                org.apache.pdfbox.pdmodel.PDPage page = new org.apache.pdfbox.pdmodel.PDPage(
+                        org.apache.pdfbox.pdmodel.common.PDRectangle.A4);
+                document.addPage(page);
+                try (org.apache.pdfbox.pdmodel.PDPageContentStream cs =
+                             new org.apache.pdfbox.pdmodel.PDPageContentStream(document, page)) {
+                    org.apache.pdfbox.pdmodel.font.PDType1Font font = new org.apache.pdfbox.pdmodel.font.PDType1Font(
+                            org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA);
+                    cs.setFont(font, 10);
+                    cs.beginText();
+                    cs.newLineAtOffset(50, 750);
+                    for (String line : lines) {
+                        cs.showText(line);
+                        cs.newLineAtOffset(0, -14);
+                    }
+                    cs.endText();
+                }
+                java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+                document.save(out);
+                return new MockMultipartFile("file", "statement.pdf", "application/pdf", out.toByteArray());
+            }
+        }
+
+        @Test
+        @DisplayName("reconstructs transactions from real extracted PDF text: repeated headers/page " +
+                "footers are skipped, narration wraps both after (Std Chartered-style) and before " +
+                "(Canara-style, via a Chq: line), amount direction is inferred from the running " +
+                "balance delta or a Dr/Cr marker, an all-zero debit/credit row is flagged invalid, " +
+                "and a Closing Balance line ends parsing")
+        void parsesMultiLineBankStatement() throws Exception {
+            MultipartFile pdf = pdfFile(List.of(
+                    "Date Particulars Withdrawal Deposit Balance",
+                    "Opening Balance 10000.00",
+                    "01/06/2026 UPI/SWIGGY/order432 450.00 9550.00",
+                    "Ref:123456XYZ",
+                    "Page 2",
+                    "02/06/2026 SALARY JUN26 0.00 20000.00 29550.00",
+                    "Chq:",
+                    "ATM CASH WITHDRAWAL",
+                    "03/06/2026 500.00 29050.00",
+                    "04/06/2026 CASH DEPOSIT Cr 2000.00 32050.00",
+                    "05/06/2026 BANK CHARGES 0.00 0.00 32050.00",
+                    "Closing Balance"
+            ));
+
+            StatementPreviewResponse response = service.preview(pdf, null, null, userId, null);
+            List<ParsedRow> rows = response.getRows();
+
+            assertThat(rows).hasSize(5);
+
+            ParsedRow row0 = rows.get(0);
+            assertThat(row0.getDate()).isEqualTo(LocalDate.of(2026, 6, 1));
+            assertThat(row0.getType()).isEqualTo("DEBIT");
+            assertThat(row0.getAmount()).isEqualByComparingTo("450.00");
+            assertThat(row0.getDescription()).contains("UPI/SWIGGY/order432").contains("Ref:123456XYZ");
+            assertThat(row0.isValid()).isTrue();
+
+            ParsedRow row1 = rows.get(1);
+            assertThat(row1.getDate()).isEqualTo(LocalDate.of(2026, 6, 2));
+            assertThat(row1.getType()).isEqualTo("CREDIT");
+            assertThat(row1.getAmount()).isEqualByComparingTo("20000.00");
+            assertThat(row1.getDescription()).contains("SALARY");
+
+            ParsedRow row2 = rows.get(2);
+            assertThat(row2.getDate()).isEqualTo(LocalDate.of(2026, 6, 3));
+            assertThat(row2.getType()).isEqualTo("DEBIT");
+            assertThat(row2.getAmount()).isEqualByComparingTo("500.00");
+            assertThat(row2.getDescription()).contains("ATM CASH WITHDRAWAL");
+
+            ParsedRow row3 = rows.get(3);
+            assertThat(row3.getDate()).isEqualTo(LocalDate.of(2026, 6, 4));
+            assertThat(row3.getType()).isEqualTo("CREDIT");
+            assertThat(row3.getAmount()).isEqualByComparingTo("2000.00");
+
+            ParsedRow row4 = rows.get(4);
+            assertThat(row4.getDate()).isEqualTo(LocalDate.of(2026, 6, 5));
+            assertThat(row4.isValid()).isFalse();
+            assertThat(row4.getError()).isNotBlank();
+            assertThat(row4.getAmount()).isNull();
+        }
+
+        @Test
+        @DisplayName("a PDF with no detectable transaction lines is rejected rather than silently returning nothing")
+        void rejectsPdfWithNoTransactions() throws Exception {
+            MultipartFile pdf = pdfFile(List.of("Just a disclaimer page.", "No transactions here."));
+
+            assertThatThrownBy(() -> service.preview(pdf, null, null, userId, null))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("Could not detect any transactions");
+        }
+    }
+
     // ─── confirm ─────────────────────────────────────────────────────────────────
 
     @Nested

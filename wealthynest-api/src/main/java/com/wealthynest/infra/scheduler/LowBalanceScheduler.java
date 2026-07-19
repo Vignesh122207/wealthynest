@@ -20,8 +20,10 @@ public class LowBalanceScheduler {
      * Catches accounts that drifted below their threshold without a triggering expense/transfer
      * in this app (e.g. external interest/fee changes never entered here) — the same-day dedup on
      * the notification itself means this is a no-op for accounts already alerted today.
+     * Not read-only: checkLowBalance() writes a notification when it fires, and readOnly=true
+     * would put Hibernate in manual-flush mode, silently dropping that write on commit.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public void checkAllAccounts() {
         int checked = 0;
         for (WalletAccount account : accountRepository.findByArchivedFalseAndLowBalanceThresholdIsNotNull()) {

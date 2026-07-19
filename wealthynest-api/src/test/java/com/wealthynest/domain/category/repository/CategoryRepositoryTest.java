@@ -56,32 +56,45 @@ class CategoryRepositoryTest extends AbstractRepositoryTest {
     @DisplayName("visibility scoping: own categories plus system categories, excluding archived")
     class VisibilityTests {
 
+        // Every query in this @Nested class deliberately folds in system categories (`OR c.system
+        // = true`) unscoped by owner — so in a full-suite run sharing one Testcontainers Postgres
+        // with tests that create real system categories (e.g. the "Other" fallback category an
+        // integration test seeds for statement-import confirm()), an exact-list assertion here
+        // would break on pollution that has nothing to do with this test. Using unique random
+        // names for this test's own rows and asserting containment/order rather than exact
+        // contents keeps these tests correct regardless of what else exists in system scope.
+
         @Test
         @DisplayName("findByFamilyIdOrSystem returns the family's own categories plus system ones, sorted by name")
         void familyOrSystemIncludesBothSortedByName() {
             Family otherFamily = Family.builder().name("Other").inviteCode("CODE" + UUID.randomUUID().toString().substring(0, 6)).build();
             entityManager.persist(otherFamily);
 
-            persistCategory("Zebra", null, familyId, false, false);
-            persistCategory("Apple", null, familyId, false, false);
-            persistCategory("Utilities", null, null, true, false); // system
-            persistCategory("Other Family's", null, otherFamily.getId(), false, false); // different family — excluded
+            String suffix = UUID.randomUUID().toString().substring(0, 8);
+            String zebra = "Zzq-Zebra-" + suffix, apple = "Zzq-Apple-" + suffix, utilities = "Zzq-Utilities-" + suffix;
+            persistCategory(zebra, null, familyId, false, false);
+            persistCategory(apple, null, familyId, false, false);
+            persistCategory(utilities, null, null, true, false); // system
+            persistCategory("Other Family's " + suffix, null, otherFamily.getId(), false, false); // different family — excluded
+
             entityManager.flush();
 
             List<Category> result = categoryRepository.findByFamilyIdOrSystem(familyId);
 
-            assertThat(result).extracting(Category::getName).containsExactly("Apple", "Utilities", "Zebra");
+            assertThat(result).extracting(Category::getName).containsSubsequence(apple, utilities, zebra);
+            assertThat(result).extracting(Category::getName).doesNotContain("Other Family's " + suffix);
         }
 
         @Test
         @DisplayName("findByFamilyIdOrSystem excludes archived rows even if they'd otherwise match")
         void familyOrSystemExcludesArchived() {
-            persistCategory("Old", null, familyId, false, true); // archived — excluded
+            String name = "Zzq-Old-" + UUID.randomUUID();
+            persistCategory(name, null, familyId, false, true); // archived — excluded
             entityManager.flush();
 
             List<Category> result = categoryRepository.findByFamilyIdOrSystem(familyId);
 
-            assertThat(result).isEmpty();
+            assertThat(result).extracting(Category::getName).doesNotContain(name);
         }
 
         @Test
@@ -91,37 +104,45 @@ class CategoryRepositoryTest extends AbstractRepositoryTest {
                     .passwordHash("hash").build();
             entityManager.persist(otherUser);
 
-            persistCategory("Groceries", userId, null, false, false);
-            persistCategory("Utilities", null, null, true, false); // system
-            persistCategory("Someone Else's", otherUser.getId(), null, false, false); // excluded
+            String suffix = UUID.randomUUID().toString().substring(0, 8);
+            String groceries = "Zzq-Groceries-" + suffix, utilities = "Zzq-Utilities-" + suffix;
+            persistCategory(groceries, userId, null, false, false);
+            persistCategory(utilities, null, null, true, false); // system
+            persistCategory("Zzq-Someone-Else's-" + suffix, otherUser.getId(), null, false, false); // excluded
+
             entityManager.flush();
 
             List<Category> result = categoryRepository.findByUserIdOrSystem(userId);
 
-            assertThat(result).extracting(Category::getName).containsExactlyInAnyOrder("Groceries", "Utilities");
+            assertThat(result).extracting(Category::getName).contains(groceries, utilities);
+            assertThat(result).extracting(Category::getName).doesNotContain("Zzq-Someone-Else's-" + suffix);
         }
 
         @Test
         @DisplayName("findByUserIdOrSystemIncludingArchived includes archived rows unlike its sibling")
         void includingArchivedVariantKeepsArchivedRows() {
-            persistCategory("Old Category", userId, null, false, true);
+            String name = "Zzq-Old-Category-" + UUID.randomUUID();
+            persistCategory(name, userId, null, false, true);
             entityManager.flush();
 
             List<Category> result = categoryRepository.findByUserIdOrSystemIncludingArchived(userId);
 
-            assertThat(result).extracting(Category::getName).containsExactly("Old Category");
+            assertThat(result).extracting(Category::getName).contains(name);
         }
 
         @Test
         @DisplayName("findBySystemTrue returns only system categories regardless of owner")
         void findBySystemTrueOnlySystemRows() {
-            persistCategory("Groceries", userId, null, false, false);
-            persistCategory("Other", null, null, true, false);
+            String groceries = "Zzq-Groceries-" + UUID.randomUUID();
+            String system = "Zzq-System-" + UUID.randomUUID();
+            persistCategory(groceries, userId, null, false, false);
+            persistCategory(system, null, null, true, false);
             entityManager.flush();
 
             List<Category> result = categoryRepository.findBySystemTrue();
 
-            assertThat(result).extracting(Category::getName).containsExactly("Other");
+            assertThat(result).extracting(Category::getName).contains(system);
+            assertThat(result).extracting(Category::getName).doesNotContain(groceries);
         }
     }
 

@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
@@ -51,12 +51,12 @@ class FamilyControllerTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
-    @MockBean private FamilyService familyService;
-    @MockBean private ExpenseService expenseService;
-    @MockBean private NetWorthService netWorthService;
-    @MockBean private IncomeRepository incomeRepository;
-    @MockBean private ExpenseRepository expenseRepository;
-    @MockBean private UserRepository userRepository;
+    @MockitoBean private FamilyService familyService;
+    @MockitoBean private ExpenseService expenseService;
+    @MockitoBean private NetWorthService netWorthService;
+    @MockitoBean private IncomeRepository incomeRepository;
+    @MockitoBean private ExpenseRepository expenseRepository;
+    @MockitoBean private UserRepository userRepository;
 
     private final UUID userId = UUID.randomUUID();
     private final UUID familyId = UUID.randomUUID();
