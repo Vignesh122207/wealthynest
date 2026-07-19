@@ -5,6 +5,7 @@ import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.domain.account.dto.request.CreateAccountRequest;
 import com.wealthynest.domain.account.dto.request.TransferRequest;
+import com.wealthynest.domain.account.dto.request.UpdateTransferRequest;
 import com.wealthynest.domain.account.dto.response.AccountResponse;
 import com.wealthynest.domain.account.dto.response.TransferResponse;
 import com.wealthynest.domain.account.entity.AccountTransfer;
@@ -578,6 +579,409 @@ class WalletAccountServiceImplTest {
             when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
             assertThatThrownBy(() -> service.getCurrentBalance(accountId, userId))
                     .isInstanceOf(AccessDeniedException.class);
+        }
+    }
+
+    // ─── updateAccount ──────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("updateAccount")
+    class UpdateAccountTests {
+
+        @Test
+        @DisplayName("null optional fields on the request leave the existing values untouched")
+        void nullFieldsLeaveExistingValuesUntouched() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT)
+                    .bankName("HDFC").accountNumber("1234").lowBalanceThreshold(new BigDecimal("500")).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+            when(accountRepository.save(any())).thenAnswer(a -> a.getArgument(0));
+            CreateAccountRequest req = createRequest(AccountType.BANK_ACCOUNT, null);
+            when(req.getName()).thenReturn("Renamed");
+
+            AccountResponse response = service.updateAccount(accountId, userId, req);
+
+            assertThat(response.getName()).isEqualTo("Renamed");
+            assertThat(account.getBankName()).isEqualTo("HDFC");
+            assertThat(account.getAccountNumber()).isEqualTo("1234");
+            assertThat(account.getLowBalanceThreshold()).isEqualByComparingTo("500");
+        }
+
+        @Test
+        @DisplayName("credit-card fields are only applied when the account is actually a credit card")
+        void creditCardFieldsIgnoredForNonCreditCardAccount() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+            when(accountRepository.save(any())).thenAnswer(a -> a.getArgument(0));
+            CreateAccountRequest req = createRequest(AccountType.BANK_ACCOUNT, null);
+            // isCC is false for a bank account, so updateAccount short-circuits before ever reading
+            // these getters — lenient because the point of this test is that they're never called.
+            lenient().when(req.getCreditLimit()).thenReturn(new BigDecimal("50000"));
+            lenient().when(req.getStatementDay()).thenReturn(5);
+            lenient().when(req.getPaymentDueDay()).thenReturn(20);
+            lenient().when(req.getApr()).thenReturn(new BigDecimal("18"));
+
+            service.updateAccount(accountId, userId, req);
+
+            assertThat(account.getCreditLimit()).isNull();
+            assertThat(account.getStatementDay()).isNull();
+            assertThat(account.getPaymentDueDay()).isNull();
+            assertThat(account.getApr()).isNull();
+        }
+
+        @Test
+        @DisplayName("credit-card fields (including shared APR) are applied when the account is a credit card")
+        void creditCardFieldsAppliedForCreditCardAccount() {
+            WalletAccount account = withId(baseAccount(AccountType.CREDIT_CARD).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+            when(accountRepository.save(any())).thenAnswer(a -> a.getArgument(0));
+            CreateAccountRequest req = createRequest(AccountType.CREDIT_CARD, null);
+            when(req.getCreditLimit()).thenReturn(new BigDecimal("50000"));
+            when(req.getStatementDay()).thenReturn(5);
+            when(req.getPaymentDueDay()).thenReturn(20);
+            when(req.getApr()).thenReturn(new BigDecimal("18"));
+
+            service.updateAccount(accountId, userId, req);
+
+            assertThat(account.getCreditLimit()).isEqualByComparingTo("50000");
+            assertThat(account.getStatementDay()).isEqualTo(5);
+            assertThat(account.getPaymentDueDay()).isEqualTo(20);
+            assertThat(account.getApr()).isEqualByComparingTo("18");
+        }
+
+        @Test
+        @DisplayName("loan fields (including shared APR) are applied when the account is a loan, and a bad autopay account is rejected")
+        void loanFieldsAppliedAndAutopayValidated() {
+            WalletAccount account = withId(baseAccount(AccountType.LOAN).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+            CreateAccountRequest req = createRequest(AccountType.LOAN, null);
+            when(req.getApr()).thenReturn(new BigDecimal("9.5"));
+            UUID autopayId = UUID.randomUUID();
+            when(req.getAutopayAccountId()).thenReturn(autopayId);
+            WalletAccount investmentAccount = WalletAccount.builder()
+                    .userId(userId).accountType(AccountType.INVESTMENT).build();
+            ReflectionTestUtils.setField(investmentAccount, "id", autopayId);
+            when(accountRepository.findByIdAndUserId(autopayId, userId)).thenReturn(Optional.of(investmentAccount));
+
+            assertThatThrownBy(() -> service.updateAccount(accountId, userId, req))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("cash or bank account");
+        }
+
+        @Test
+        @DisplayName("a valid autopay account is applied and the loan's APR is set")
+        void validAutopayAccountApplied() {
+            WalletAccount account = withId(baseAccount(AccountType.LOAN).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+            when(accountRepository.save(any())).thenAnswer(a -> a.getArgument(0));
+            CreateAccountRequest req = createRequest(AccountType.LOAN, null);
+            when(req.getApr()).thenReturn(new BigDecimal("9.5"));
+            UUID autopayId = UUID.randomUUID();
+            when(req.getAutopayAccountId()).thenReturn(autopayId);
+            WalletAccount bankAccount = WalletAccount.builder()
+                    .userId(userId).accountType(AccountType.BANK_ACCOUNT).build();
+            ReflectionTestUtils.setField(bankAccount, "id", autopayId);
+            when(accountRepository.findByIdAndUserId(autopayId, userId)).thenReturn(Optional.of(bankAccount));
+
+            service.updateAccount(accountId, userId, req);
+
+            assertThat(account.getApr()).isEqualByComparingTo("9.5");
+            assertThat(account.getAutopayAccountId()).isEqualTo(autopayId);
+        }
+    }
+
+    // ─── deleteAccount ──────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("deleteAccount")
+    class DeleteAccountTests {
+
+        @Test
+        @DisplayName("alsoDeleteTransactions=true purges expense/income rows instead of detaching them")
+        void purgesTransactionsWhenRequested() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+            when(transferRepository.findByAccountId(accountId)).thenReturn(List.of());
+
+            service.deleteAccount(accountId, userId, true);
+
+            verify(expenseRepository).deleteByAccountId(accountId);
+            verify(incomeRepository).deleteByAccountId(accountId);
+            verify(expenseRepository, never()).clearAccountId(any());
+            verify(incomeRepository, never()).clearAccountId(any());
+        }
+
+        @Test
+        @DisplayName("alsoDeleteTransactions=false detaches expense/income rows instead of deleting them")
+        void detachesTransactionsByDefault() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+            when(transferRepository.findByAccountId(accountId)).thenReturn(List.of());
+
+            service.deleteAccount(accountId, userId, false);
+
+            verify(expenseRepository).clearAccountId(accountId);
+            verify(incomeRepository).clearAccountId(accountId);
+            verify(expenseRepository, never()).deleteByAccountId(any());
+            verify(accountRepository).delete(account);
+        }
+    }
+
+    // ─── updateTransfer ─────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("updateTransfer")
+    class UpdateTransferTests {
+
+        @Test
+        @DisplayName("re-validates sufficient balance only when the amount actually changes")
+        void revalidatesBalanceOnlyWhenAmountChanges() {
+            UUID transferId = UUID.randomUUID();
+            UUID fromId = UUID.randomUUID(), toId = UUID.randomUUID();
+            AccountTransfer t = AccountTransfer.builder().userId(userId).fromAccountId(fromId).toAccountId(toId)
+                    .amount(new BigDecimal("100")).build();
+            ReflectionTestUtils.setField(t, "id", transferId);
+            when(transferRepository.findById(transferId)).thenReturn(Optional.of(t));
+            when(transferRepository.save(any())).thenAnswer(a -> a.getArgument(0));
+            when(accountRepository.findByUserIdOrderByCreatedAtAsc(userId)).thenReturn(List.of());
+            UpdateTransferRequest req = mock(UpdateTransferRequest.class);
+            when(req.getAmount()).thenReturn(new BigDecimal("200"));
+            lenient().when(req.getTransferDate()).thenReturn(null);
+            lenient().when(req.getDescription()).thenReturn(null);
+
+            service.updateTransfer(transferId, userId, req);
+
+            verify(accountBalanceGuard).validateSufficientBalance(fromId, userId, new BigDecimal("200"), new BigDecimal("100"));
+        }
+
+        @Test
+        @DisplayName("skips balance revalidation when only the description/date change, not the amount")
+        void skipsRevalidationWhenAmountUnchanged() {
+            UUID transferId = UUID.randomUUID();
+            AccountTransfer t = AccountTransfer.builder().userId(userId)
+                    .fromAccountId(UUID.randomUUID()).toAccountId(UUID.randomUUID())
+                    .amount(new BigDecimal("100")).build();
+            ReflectionTestUtils.setField(t, "id", transferId);
+            when(transferRepository.findById(transferId)).thenReturn(Optional.of(t));
+            when(transferRepository.save(any())).thenAnswer(a -> a.getArgument(0));
+            when(accountRepository.findByUserIdOrderByCreatedAtAsc(userId)).thenReturn(List.of());
+            UpdateTransferRequest req = mock(UpdateTransferRequest.class);
+            lenient().when(req.getAmount()).thenReturn(null);
+            lenient().when(req.getDescription()).thenReturn("Updated note");
+            lenient().when(req.getTransferDate()).thenReturn(null);
+
+            service.updateTransfer(transferId, userId, req);
+
+            verifyNoInteractions(accountBalanceGuard);
+            assertThat(t.getDescription()).isEqualTo("Updated note");
+        }
+
+        @Test
+        @DisplayName("resolves account names from a fresh lookup, falling back to \"Unknown\" for a deleted account")
+        void resolvesNamesWithUnknownFallback() {
+            UUID transferId = UUID.randomUUID();
+            UUID fromId = UUID.randomUUID();
+            UUID deletedToId = UUID.randomUUID(); // a real id, but absent from the current accounts list
+            AccountTransfer t = AccountTransfer.builder().userId(userId)
+                    .fromAccountId(fromId).toAccountId(deletedToId)
+                    .amount(new BigDecimal("100")).build();
+            ReflectionTestUtils.setField(t, "id", transferId);
+            when(transferRepository.findById(transferId)).thenReturn(Optional.of(t));
+            when(transferRepository.save(any())).thenAnswer(a -> a.getArgument(0));
+            WalletAccount from = WalletAccount.builder().userId(userId).name("Checking").build();
+            ReflectionTestUtils.setField(from, "id", fromId);
+            when(accountRepository.findByUserIdOrderByCreatedAtAsc(userId)).thenReturn(List.of(from));
+            UpdateTransferRequest req = mock(UpdateTransferRequest.class);
+            lenient().when(req.getAmount()).thenReturn(null);
+            lenient().when(req.getDescription()).thenReturn(null);
+            lenient().when(req.getTransferDate()).thenReturn(null);
+
+            TransferResponse response = service.updateTransfer(transferId, userId, req);
+
+            assertThat(response.getFromAccountName()).isEqualTo("Checking");
+            assertThat(response.getToAccountName()).isEqualTo("Unknown");
+        }
+    }
+
+    // ─── getAccountsForUsers ────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("getAccountsForUsers")
+    class GetAccountsForUsersTests {
+
+        @Test
+        @DisplayName("returns an empty list without querying the repository when userIds is empty")
+        void emptyUserIdsShortCircuits() {
+            assertThat(service.getAccountsForUsers(List.of())).isEmpty();
+            verifyNoInteractions(accountRepository);
+        }
+
+        @Test
+        @DisplayName("delegates to findByUserIdInAndArchivedFalse and enriches the batch")
+        void delegatesAndEnriches() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).build());
+            when(accountRepository.findByUserIdInAndArchivedFalse(List.of(userId))).thenReturn(List.of(account));
+            when(incomeRepository.sumByAccountIdsGrouped(any())).thenReturn(List.of());
+            when(expenseRepository.sumByAccountIdsGrouped(any())).thenReturn(List.of());
+            when(transferRepository.sumTransfersInGrouped(any())).thenReturn(List.of());
+            when(transferRepository.sumTransfersOutGrouped(any())).thenReturn(List.of());
+            when(transferRepository.sumRegularTransfersInGrouped(any())).thenReturn(List.of());
+            when(transferRepository.sumRegularTransfersOutGrouped(any())).thenReturn(List.of());
+            when(incomeRepository.sumRegularByAccountIdsGrouped(any())).thenReturn(List.of());
+            when(expenseRepository.sumRegularByAccountIdsGrouped(any())).thenReturn(List.of());
+
+            List<AccountResponse> result = service.getAccountsForUsers(List.of(userId));
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getId()).isEqualTo(accountId);
+        }
+    }
+
+    // ─── enrich(): credit-card and loan date computations (via getAccounts) ─────
+
+    @Nested
+    @DisplayName("enrich: credit-card and loan next-date computations")
+    class EnrichDateComputationTests {
+
+        @Test
+        @DisplayName("credit card: nextStatementDate uses this month when today is before the statement day")
+        void creditCardStatementDateThisMonthWhenBeforeDay() {
+            LocalDate today = LocalDate.now();
+            int futureDay = today.lengthOfMonth(); // last day of month is always >= today's day
+            org.junit.jupiter.api.Assumptions.assumeTrue(futureDay > today.getDayOfMonth());
+            WalletAccount card = withId(baseAccount(AccountType.CREDIT_CARD)
+                    .statementDay(futureDay).paymentDueDay(5).creditLimit(new BigDecimal("100000")).build());
+            when(accountRepository.findByUserIdOrderByCreatedAtAsc(userId)).thenReturn(List.of(card));
+
+            AccountResponse response = service.getAccounts(userId).get(0);
+
+            assertThat(response.getNextStatementDate()).isEqualTo(today.withDayOfMonth(futureDay));
+            assertThat(response.getNextDueDate()).isEqualTo(today.withDayOfMonth(futureDay).plusMonths(1).withDayOfMonth(5));
+            assertThat(response.getAvailableCredit()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("credit card: nextStatementDate rolls to next month when today is on/after the statement day")
+        void creditCardStatementDateRollsToNextMonth() {
+            WalletAccount card = withId(baseAccount(AccountType.CREDIT_CARD)
+                    .statementDay(1).creditLimit(new BigDecimal("100000")).build());
+            when(accountRepository.findByUserIdOrderByCreatedAtAsc(userId)).thenReturn(List.of(card));
+
+            AccountResponse response = service.getAccounts(userId).get(0);
+
+            LocalDate today = LocalDate.now();
+            LocalDate expected = today.getDayOfMonth() < 1 ? today.withDayOfMonth(1) : today.plusMonths(1).withDayOfMonth(1);
+            assertThat(response.getNextStatementDate()).isEqualTo(expected);
+        }
+
+        @Test
+        @DisplayName("credit card: availableCredit is null when no creditLimit is configured")
+        void creditCardAvailableCreditNullWithoutLimit() {
+            WalletAccount card = withId(baseAccount(AccountType.CREDIT_CARD).creditLimit(null).build());
+            when(accountRepository.findByUserIdOrderByCreatedAtAsc(userId)).thenReturn(List.of(card));
+
+            AccountResponse response = service.getAccounts(userId).get(0);
+
+            assertThat(response.getAvailableCredit()).isNull();
+        }
+
+        @Test
+        @DisplayName("loan: nextEmiDate is null once the outstanding balance reaches zero, even with an emiDay set")
+        void loanNextEmiDateNullWhenPaidOff() {
+            WalletAccount loan = withId(baseAccount(AccountType.LOAN).openingBalance(BigDecimal.ZERO).emiDay(5).build());
+            when(accountRepository.findByUserIdOrderByCreatedAtAsc(userId)).thenReturn(List.of(loan));
+
+            AccountResponse response = service.getAccounts(userId).get(0);
+
+            assertThat(response.getNextEmiDate()).isNull();
+        }
+
+        @Test
+        @DisplayName("loan: resolves the autopay account's name when one is linked")
+        void loanResolvesAutopayAccountName() {
+            UUID autopayId = UUID.randomUUID();
+            WalletAccount loan = withId(baseAccount(AccountType.LOAN).emiDay(5).autopayAccountId(autopayId).build());
+            when(accountRepository.findByUserIdOrderByCreatedAtAsc(userId)).thenReturn(List.of(loan));
+            WalletAccount autopay = WalletAccount.builder().userId(userId).name("Salary Account").build();
+            when(accountRepository.findById(autopayId)).thenReturn(Optional.of(autopay));
+
+            AccountResponse response = service.getAccounts(userId).get(0);
+
+            assertThat(response.getAutopayAccountName()).isEqualTo("Salary Account");
+            assertThat(response.getNextEmiDate()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("loan: autopayAccountName is null when no autopay account is linked")
+        void loanAutopayNameNullWithoutLink() {
+            WalletAccount loan = withId(baseAccount(AccountType.LOAN).emiDay(5).autopayAccountId(null).build());
+            when(accountRepository.findByUserIdOrderByCreatedAtAsc(userId)).thenReturn(List.of(loan));
+
+            AccountResponse response = service.getAccounts(userId).get(0);
+
+            assertThat(response.getAutopayAccountName()).isNull();
+        }
+    }
+
+    // ─── generateStatementCsv / escape ──────────────────────────────────────────
+
+    @Nested
+    @DisplayName("generateStatementCsv")
+    class GenerateStatementCsvTests {
+
+        @Test
+        @DisplayName("produces a CSV with income (+), expense (-) and transfer rows, escaping commas/quotes in free text")
+        void producesCsvWithSignedAmountsAndEscaping() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+            com.wealthynest.domain.income.entity.IncomeEntry income =
+                    com.wealthynest.domain.income.entity.IncomeEntry.builder()
+                            .source(com.wealthynest.domain.income.entity.IncomeSource.SALARY)
+                            .amount(new BigDecimal("5000")).incomeDate(LocalDate.of(2025, 1, 1))
+                            .description("Jan salary, bonus").build();
+            ReflectionTestUtils.setField(income, "id", UUID.randomUUID());
+            when(incomeRepository.findAllByAccountIdOrderByIncomeDateDesc(accountId)).thenReturn(List.of(income));
+
+            com.wealthynest.domain.expense.entity.Expense expense =
+                    com.wealthynest.domain.expense.entity.Expense.builder()
+                            .categoryId(UUID.randomUUID()).amount(new BigDecimal("200"))
+                            .expenseDate(LocalDate.of(2025, 1, 2)).description("Groceries \"weekly\"").build();
+            ReflectionTestUtils.setField(expense, "id", UUID.randomUUID());
+            when(expenseRepository.findAllByAccountIdOrderByExpenseDateDesc(accountId)).thenReturn(List.of(expense));
+            when(categoryRepository.findAllById(any())).thenReturn(List.of());
+
+            AccountTransfer transferOut = AccountTransfer.builder()
+                    .userId(userId).fromAccountId(accountId).toAccountId(UUID.randomUUID())
+                    .amount(new BigDecimal("300")).transferDate(LocalDate.of(2025, 1, 3)).build();
+            ReflectionTestUtils.setField(transferOut, "id", UUID.randomUUID());
+            when(transferRepository.findByAccountId(accountId)).thenReturn(List.of(transferOut));
+
+            byte[] csv = service.generateStatementCsv(accountId, userId);
+            String content = new String(csv, java.nio.charset.StandardCharsets.UTF_8);
+
+            assertThat(content).contains("Date,Type,Description,Label,Amount (INR)");
+            assertThat(content).contains("+5000");
+            assertThat(content).contains("-200");
+            assertThat(content).contains("\"Jan salary, bonus\"");
+            assertThat(content).contains("\"Groceries \"\"weekly\"\"\"");
+            assertThat(content).contains("TRANSFER_OUT");
+            assertThat(content).contains("-300");
+        }
+
+        @Test
+        @DisplayName("plain description text with no comma or quote is left unescaped")
+        void plainTextLeftUnescaped() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+            when(incomeRepository.findAllByAccountIdOrderByIncomeDateDesc(accountId)).thenReturn(List.of());
+            when(expenseRepository.findAllByAccountIdOrderByExpenseDateDesc(accountId)).thenReturn(List.of());
+            when(categoryRepository.findAllById(any())).thenReturn(List.of());
+            when(transferRepository.findByAccountId(accountId)).thenReturn(List.of());
+
+            byte[] csv = service.generateStatementCsv(accountId, userId);
+
+            assertThat(new String(csv, java.nio.charset.StandardCharsets.UTF_8))
+                    .isEqualTo("Date,Type,Description,Label,Amount (INR)\n");
         }
     }
 }

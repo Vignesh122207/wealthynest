@@ -106,7 +106,8 @@ class WebAuthnIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("login options for an unknown email 404, and for a real account with no registered passkeys are rejected with a clear message")
+    @DisplayName("login options for an unknown email and for a real account with no registered passkeys" +
+            " both return the same 200 with an empty allowCredentials — enumeration guard")
     void loginOptionsForUnknownEmailAndNoPasskeys() throws Exception {
         String email = "webauthn-login-" + UUID.randomUUID() + "@example.com";
         IntegrationAuthHelper.registerVerifyAndLogin(mockMvc, objectMapper, userRepository, email, "Passw0rd1");
@@ -116,14 +117,15 @@ class WebAuthnIntegrationTest extends AbstractIntegrationTest {
                         .content("""
                                 {"email":"nobody-%s@example.com"}
                                 """.formatted(UUID.randomUUID())))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.allowCredentials").isEmpty());
 
         mockMvc.perform(post("/api/v1/auth/webauthn/login/options")
                         .contentType("application/json")
                         .content("""
                                 {"email":"%s"}
                                 """.formatted(email)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("No passkeys")));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.allowCredentials").isEmpty());
     }
 }

@@ -10,8 +10,10 @@ test.describe("Auth — Login", () => {
   test("Google sign-in button renders when a client ID is configured", async ({ page, loginPage }) => {
     await loginPage.goto();
     // Google Identity Services renders its own iframe — this only proves the boundary (our own
-    // container mounts and the GIS script is requested), not the OAuth round trip itself, which
-    // can't be driven end-to-end without a real Google account.
+    // container mounts and the GIS script is requested). The full round trip is covered
+    // separately in tests/oauth/google-oauth.spec.ts, which mocks the GIS script itself and drives
+    // the real callback against a backend test double, since doing that here would need the same
+    // e2e-oauth-test API profile this file's default run doesn't have active.
     const googleScript = page.waitForResponse((res) => res.url().includes("accounts.google.com/gsi/client"), { timeout: 5000 }).catch(() => null);
     await googleScript;
     await expect(loginPage.googleContainer).toBeVisible();

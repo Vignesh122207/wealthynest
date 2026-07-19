@@ -19,6 +19,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** Exercises DebtServiceImpl.recordPayment over the real HTTP/security/DB stack: a partial
@@ -119,17 +120,15 @@ class DebtPaymentIntegrationTest extends AbstractIntegrationTest {
         assertThat(finalData.get("status").asText()).isEqualTo("SETTLED");
         assertThat(finalData.get("amountRemaining").asDouble()).isEqualTo(0.0);
 
-        // A settled debt rejects further payments — DebtServiceImpl guards this with a bare
-        // IllegalStateException, which GlobalExceptionHandler has no specific mapping for and so
-        // falls through to the generic 500 handler rather than a real 409/400; asserting the
-        // actual (not ideal) behavior here rather than silently masking it.
+        // A settled debt rejects further payments with a proper 409 CONFLICT.
         mockMvc.perform(post("/api/v1/debts/" + debtId + "/payments")
                         .header("Authorization", auth(auth.accessToken()))
                         .contentType("application/json")
                         .content("""
                                 {"amount":100}
                                 """))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("BUSINESS_ERROR"));
     }
 
     @Test

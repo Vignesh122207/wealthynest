@@ -31,30 +31,34 @@ public class VaultEncryptionService {
     private final VaultProperties vaultProperties;
     private final SecureRandom    secureRandom = new SecureRandom();
 
-    public record EncryptedSecret(String ciphertext, String iv) {}
+    public record EncryptedSecret(String ciphertext, String iv, int keyVersion) {}
 
     public EncryptedSecret encrypt(String plaintext) {
         try {
             byte[] iv = new byte[IV_LENGTH_BYTES];
             secureRandom.nextBytes(iv);
+            int version = vaultProperties.getCurrentKeyVersion();
 
             Cipher cipher = Cipher.getInstance(ALGORITHM);
-            cipher.init(Cipher.ENCRYPT_MODE, secretKey(), new GCMParameterSpec(TAG_LENGTH_BITS, iv));
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey(version), new GCMParameterSpec(TAG_LENGTH_BITS, iv));
             byte[] ciphertext = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
 
             return new EncryptedSecret(
                     Base64.getEncoder().encodeToString(ciphertext),
-                    Base64.getEncoder().encodeToString(iv));
+                    Base64.getEncoder().encodeToString(iv),
+                    version);
         } catch (GeneralSecurityException e) {
             throw new IllegalStateException("Failed to encrypt vault secret", e);
         }
     }
 
-    public String decrypt(String ciphertextB64, String ivB64) {
+    /** {@code keyVersion} must be the version the ciphertext was actually encrypted under (the
+     * row's stored {@code key_version}) — not necessarily {@link VaultProperties#getCurrentKeyVersion()}. */
+    public String decrypt(String ciphertextB64, String ivB64, int keyVersion) {
         try {
             Cipher cipher = Cipher.getInstance(ALGORITHM);
             byte[] iv = Base64.getDecoder().decode(ivB64);
-            cipher.init(Cipher.DECRYPT_MODE, secretKey(), new GCMParameterSpec(TAG_LENGTH_BITS, iv));
+            cipher.init(Cipher.DECRYPT_MODE, secretKey(keyVersion), new GCMParameterSpec(TAG_LENGTH_BITS, iv));
             byte[] plaintext = cipher.doFinal(Base64.getDecoder().decode(ciphertextB64));
             return new String(plaintext, StandardCharsets.UTF_8);
         } catch (GeneralSecurityException e) {
@@ -62,7 +66,17 @@ public class VaultEncryptionService {
         }
     }
 
-    private SecretKeySpec secretKey() {
-        return new SecretKeySpec(Base64.getDecoder().decode(vaultProperties.getEncryptionKey()), "AES");
+    public int currentKeyVersion() {
+        return vaultProperties.getCurrentKeyVersion();
+    }
+
+    private SecretKeySpec secretKey(int version) {
+        String keyB64 = version == vaultProperties.getCurrentKeyVersion()
+                ? vaultProperties.getEncryptionKey()
+                : vaultProperties.getPreviousEncryptionKeys().get(version);
+        if (keyB64 == null) {
+            throw new IllegalStateException("No encryption key configured for vault key version " + version);
+        }
+        return new SecretKeySpec(Base64.getDecoder().decode(keyB64), "AES");
     }
 }

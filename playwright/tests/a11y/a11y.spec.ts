@@ -42,6 +42,15 @@ test.describe("Accessibility (axe)", () => {
     ["transactions", ROUTES.transactions],
     ["investments", ROUTES.investments],
     ["budgets", ROUTES.budgets],
+    ["goals", ROUTES.goals],
+    ["debts", ROUTES.debts],
+    ["family", ROUTES.family],
+    ["reports", ROUTES.reports],
+    ["notifications", ROUTES.notifications],
+    ["settings", ROUTES.settings],
+    ["vault", ROUTES.vault],
+    ["analytics", ROUTES.analytics],
+    ["net worth", ROUTES.netWorth],
   ] as const) {
     test(`${name} page has no a11y violations @a11y`, async ({ accountsPage }) => {
       await accountsPage.goto(route);

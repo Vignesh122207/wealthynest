@@ -41,6 +41,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -178,17 +179,25 @@ public class WebAuthnServiceImpl implements WebAuthnService {
     @Override
     public Map<String, Object> getAuthenticationOptions(String email) {
         String normalizedEmail = email.toLowerCase();
-        User user = userRepository.findByEmail(normalizedEmail)
-                .orElseThrow(() -> new BusinessException("No account found for that email.", HttpStatus.NOT_FOUND));
-        List<WebAuthnCredential> credentials = credentialRepository.findByUserId(user.getId());
-        if (credentials.isEmpty()) {
-            throw new BusinessException("No passkeys are registered for this account.", HttpStatus.BAD_REQUEST);
-        }
+        // Deliberately never distinguishes "no such account" from "account has no passkeys" via
+        // status code or message — either would let a caller enumerate registered emails, the same
+        // enumeration AuthServiceImpl.forgotPassword()/resendVerification() already guard against.
+        // A nonexistent (or passkey-less) account just gets an empty allowCredentials list, so the
+        // browser reports "no passkey available" the same way it would for a real account with none.
+        Optional<User> user = userRepository.findByEmail(normalizedEmail);
+        List<WebAuthnCredential> credentials = user
+                .map(u -> credentialRepository.findByUserId(u.getId()))
+                .orElseGet(List::of);
 
         byte[] challengeBytes = new byte[32];
         SECURE_RANDOM.nextBytes(challengeBytes);
-        redisTemplate.opsForValue().set(loginChallengeKey(normalizedEmail),
-                Base64.getEncoder().encodeToString(challengeBytes), CHALLENGE_TTL);
+        // Only store a verifiable challenge when there's something real to authenticate against —
+        // otherwise verifyAuthentication() naturally falls through to its existing generic
+        // "Passkey sign-in expired" error (challenge lookup miss) without a separate throw here.
+        if (!credentials.isEmpty()) {
+            redisTemplate.opsForValue().set(loginChallengeKey(normalizedEmail),
+                    Base64.getEncoder().encodeToString(challengeBytes), CHALLENGE_TTL);
+        }
 
         List<PublicKeyCredentialDescriptor> allowCredentials = credentials.stream()
                 .map(c -> new PublicKeyCredentialDescriptor(PublicKeyCredentialType.PUBLIC_KEY, c.getCredentialId(), null))

@@ -47,6 +47,16 @@ export class DebtsPage extends BasePage {
     await this.page.getByTestId("debt-form-submit").click();
   }
 
+  /** debtSchema's own superRefine rejects a due date before the debt date (which defaults to
+   * today) — no network wait, since the invalid submission never fires the POST. */
+  async attemptCreateWithDueDateBeforeDebtDate(type: "LENT" | "BORROWED", contactName: string, amount: number, dueDateIso: string): Promise<void> {
+    await this.openCreateModal(type);
+    await this.page.getByTestId("debt-amount-input").fill(String(amount));
+    await this.page.getByTestId("debt-contact-name-input").fill(contactName);
+    await pickDate(this.page, "debt-due-date-input", dueDateIso);
+    await this.page.getByTestId("debt-form-submit").click();
+  }
+
   async recordPayment(contactName: string, amount: number, note?: string): Promise<void> {
     await this.card(contactName).getByTestId("debt-card-pay-button").click();
     await this.page.getByTestId("debt-payment-amount-input").fill(String(amount));

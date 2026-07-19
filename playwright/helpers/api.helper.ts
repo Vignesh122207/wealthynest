@@ -54,6 +54,11 @@ export const api = {
     return data.data;
   },
 
+  async googleLogin(idToken: string): Promise<AuthResponse> {
+    const { data } = await client().post("/auth/google-login", { idToken, rememberMe: false });
+    return data.data;
+  },
+
   async createCategory(
     accessToken: string,
     input: { name: string; icon?: string; color?: string; type: "EXPENSE" | "INCOME" | "TRANSFER" }
@@ -125,6 +130,31 @@ export const api = {
    * second member. */
   async closeAccount(accessToken: string): Promise<void> {
     await client().delete("/users/me", { headers: { Authorization: `Bearer ${accessToken}` } });
+  },
+
+  /** Mints a Google-ID-token-shaped JWT via the backend's `e2e-oauth-test`-profile-only test
+   * double (see TestGoogleAuthController) — only reachable when the API is running with that
+   * profile active. Used by google-oauth.spec.ts to drive a real Google Sign-In round trip
+   * without a live Google test account; see that file's own comment for the full design. */
+  async issueTestGoogleIdToken(input: { email: string; name?: string; emailVerified?: boolean }): Promise<string> {
+    const { data } = await client().post("/auth/test/google-issue-token", input);
+    return data.data.idToken;
+  },
+
+  /** True only when the API is running with the `e2e-oauth-test` profile active. Checks for an
+   * actual well-formed token back, not just "not an error" — TestGoogleAuthController isn't
+   * registered as a bean in the default profile, so the request falls through to
+   * GlobalExceptionHandler's catch-all and comes back as a generic 500, not a clean 404; a
+   * non-2xx status alone isn't a reliable "inactive" signal, but a real idToken in the body is a
+   * reliable "active" one. Used to skip google-oauth.spec.ts cleanly rather than fail confusingly
+   * against a normally-configured API. */
+  async isOAuthTestModeActive(): Promise<boolean> {
+    try {
+      const { data } = await client().post("/auth/test/google-issue-token", { email: "oauth-test-mode-check@wealthynest.test" });
+      return typeof data?.data?.idToken === "string" && data.data.idToken.length > 0;
+    } catch {
+      return false;
+    }
   },
 
   /** Used to assert exact per-participant shareAmount values after a split (custom-amount UI

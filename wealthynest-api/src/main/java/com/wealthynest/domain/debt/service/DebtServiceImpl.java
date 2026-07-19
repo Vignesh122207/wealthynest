@@ -145,7 +145,7 @@ public class DebtServiceImpl implements DebtService {
     public DebtRecordResponse recordPayment(UUID id, UUID userId, RecordPaymentRequest request) {
         DebtRecord record = findOwned(id, userId);
         if (record.getStatus() == DebtStatus.SETTLED)
-            throw new IllegalStateException("Debt is already fully settled");
+            throw new BusinessException("Debt is already fully settled", HttpStatus.CONFLICT);
 
         BigDecimal remaining = record.getAmount().subtract(record.getAmountSettled());
         if (request.getAmount().compareTo(remaining) > 0) {

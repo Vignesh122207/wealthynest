@@ -28,7 +28,7 @@ export function GreetingBanner({
   })();
 
   return (
-    <div className="animate-fade-in-up flex flex-row items-start justify-between gap-3">
+    <div data-testid="greeting-banner" className="animate-fade-in-up flex flex-row items-start justify-between gap-3">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 mb-1">
           <span className="text-xl" aria-hidden>

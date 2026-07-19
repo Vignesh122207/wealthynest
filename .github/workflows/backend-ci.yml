@@ -1,0 +1,61 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "wealthynest-api/**"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "wealthynest-api/**"
+      - ".github/workflows/backend-ci.yml"
+
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: wealthynest-api
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Compile (fast fail)
+        run: mvn -B compile
+
+      # Full suite includes @SpringBootTest + Testcontainers integration tests — ubuntu-latest
+      # runners have Docker preinstalled, so Testcontainers works with no extra service setup.
+      # The test/itest Spring profiles already bake in dummy JWT/vault secrets, so no repo
+      # secrets are needed here.
+      - name: Run tests
+        run: mvn -B test
+
+      - name: Upload JaCoCo coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jacoco-report
+          path: wealthynest-api/target/site/jacoco/
+          retention-days: 14
+
+      - name: Upload surefire reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-surefire-reports
+          path: wealthynest-api/target/surefire-reports/
+          retention-days: 14

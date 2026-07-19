@@ -39,6 +39,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -72,6 +73,11 @@ class VaultServiceImplTest {
             VaultItem item = inv.getArgument(0);
             return VaultItemResponse.builder().id(item.getId()).title(item.getTitle()).favorite(item.isFavorite()).build();
         });
+        // Every VaultItem built via VaultItem.builder() in this file defaults to keyVersion=1
+        // (the entity's @Builder.Default) — matching this as "current" means normalizeKeyVersion()
+        // (called by updateItem/revealSecret) is a no-op for every test here except the dedicated
+        // key-rotation tests below, which override this stub locally.
+        lenient().when(vaultEncryptionService.currentKeyVersion()).thenReturn(1);
     }
 
     private VaultItem withId(VaultItem item) {
@@ -101,7 +107,7 @@ class VaultServiceImplTest {
     @Test
     @DisplayName("createItem encrypts the secret and saves with the caller's userId")
     void createItemEncryptsAndSaves() {
-        when(vaultEncryptionService.encrypt("s3cret")).thenReturn(new VaultEncryptionService.EncryptedSecret("ct", "iv"));
+        when(vaultEncryptionService.encrypt("s3cret")).thenReturn(new VaultEncryptionService.EncryptedSecret("ct", "iv", 1));
         when(vaultItemRepository.save(any(VaultItem.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
 
         service.createItem(userId, request("s3cret"));
@@ -118,7 +124,7 @@ class VaultServiceImplTest {
     @Test
     @DisplayName("createItem persists the keyed secret hash and a computed strength level for Vault Health")
     void createItemComputesHealthFields() {
-        when(vaultEncryptionService.encrypt(anyString())).thenReturn(new VaultEncryptionService.EncryptedSecret("ct", "iv"));
+        when(vaultEncryptionService.encrypt(anyString())).thenReturn(new VaultEncryptionService.EncryptedSecret("ct", "iv", 1));
         when(vaultSecretHasher.hash("s3cret")).thenReturn("deadbeef");
         when(vaultItemRepository.save(any(VaultItem.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
 
@@ -133,7 +139,7 @@ class VaultServiceImplTest {
     @Test
     @DisplayName("createItem still saves when the HIBP breach check is unreachable, leaving breachCount null")
     void createItemFailsOpenWhenBreachCheckUnreachable() {
-        when(vaultEncryptionService.encrypt(anyString())).thenReturn(new VaultEncryptionService.EncryptedSecret("ct", "iv"));
+        when(vaultEncryptionService.encrypt(anyString())).thenReturn(new VaultEncryptionService.EncryptedSecret("ct", "iv", 1));
         when(hibpClient.get().uri(anyString(), any(Object[].class)).retrieve().body(String.class))
                 .thenThrow(new RuntimeException("connection refused"));
         when(vaultItemRepository.save(any(VaultItem.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
@@ -180,7 +186,10 @@ class VaultServiceImplTest {
 
             assertThat(item.getSecretCiphertext()).isEqualTo("old-ct");
             assertThat(item.getSecretIv()).isEqualTo("old-iv");
-            verifyNoInteractions(vaultEncryptionService);
+            // normalizeKeyVersion() always checks currentKeyVersion() (a cheap no-op here since the
+            // item is already on it) — what must NOT happen is an actual re-encrypt of untouched data.
+            verify(vaultEncryptionService, never()).encrypt(any());
+            verify(vaultEncryptionService, never()).decrypt(any(), any(), anyInt());
         }
 
         @Test
@@ -190,7 +199,7 @@ class VaultServiceImplTest {
                     .secretCiphertext("old-ct").secretIv("old-iv").build());
             when(vaultItemRepository.findById(itemId)).thenReturn(Optional.of(item));
             when(vaultItemRepository.save(any(VaultItem.class))).thenAnswer(inv -> inv.getArgument(0));
-            when(vaultEncryptionService.encrypt("new-secret")).thenReturn(new VaultEncryptionService.EncryptedSecret("new-ct", "new-iv"));
+            when(vaultEncryptionService.encrypt("new-secret")).thenReturn(new VaultEncryptionService.EncryptedSecret("new-ct", "new-iv", 1));
 
             service.updateItem(itemId, userId, request("new-secret"));
 
@@ -234,7 +243,7 @@ class VaultServiceImplTest {
             when(vaultItemRepository.findById(itemId)).thenReturn(Optional.of(item));
             when(vaultItemRepository.save(any(VaultItem.class))).thenAnswer(inv -> inv.getArgument(0));
             when(vaultEncryptionService.encrypt("JBSWY3DPEHPK3PXP"))
-                    .thenReturn(new VaultEncryptionService.EncryptedSecret("totp-ct", "totp-iv"));
+                    .thenReturn(new VaultEncryptionService.EncryptedSecret("totp-ct", "totp-iv", 1));
 
             VaultItemRequest req = request(null);
             ReflectionTestUtils.setField(req, "totpSecret", "JBSWY3DPEHPK3PXP");
@@ -312,7 +321,7 @@ class VaultServiceImplTest {
             when(valueOperations.get(anyString())).thenReturn(null);
             when(userRepository.findById(userId)).thenReturn(Optional.of(user));
             when(passwordEncoder.matches("correct", "hashed-pw")).thenReturn(true);
-            when(vaultEncryptionService.decrypt("ct", "iv")).thenReturn("plaintext-secret");
+            when(vaultEncryptionService.decrypt("ct", "iv", 1)).thenReturn("plaintext-secret");
             when(vaultItemRepository.save(any(VaultItem.class))).thenAnswer(inv -> inv.getArgument(0));
 
             VaultItemSecretResponse response = service.revealSecret(itemId, userId, revealRequest("correct"), "1.2.3.4", "ua");
@@ -339,7 +348,7 @@ class VaultServiceImplTest {
             RevealVaultItemRequest req = new RevealVaultItemRequest();
             ReflectionTestUtils.setField(req, "stepUpToken", "trusted-token");
             when(valueOperations.get("vault-stepup:" + userId)).thenReturn("trusted-token");
-            when(vaultEncryptionService.decrypt("ct", "iv")).thenReturn("plaintext-secret");
+            when(vaultEncryptionService.decrypt("ct", "iv", 1)).thenReturn("plaintext-secret");
             when(vaultItemRepository.save(any(VaultItem.class))).thenAnswer(inv -> inv.getArgument(0));
 
             VaultItemSecretResponse response = service.revealSecret(itemId, userId, req, "1.2.3.4", "ua");
@@ -356,8 +365,8 @@ class VaultServiceImplTest {
             when(valueOperations.get(anyString())).thenReturn(null);
             when(userRepository.findById(userId)).thenReturn(Optional.of(user));
             when(passwordEncoder.matches("correct", "hashed-pw")).thenReturn(true);
-            when(vaultEncryptionService.decrypt("ct", "iv")).thenReturn("plaintext-secret");
-            when(vaultEncryptionService.decrypt("totp-ct", "totp-iv")).thenReturn("JBSWY3DPEHPK3PXP");
+            when(vaultEncryptionService.decrypt("ct", "iv", 1)).thenReturn("plaintext-secret");
+            when(vaultEncryptionService.decrypt("totp-ct", "totp-iv", 1)).thenReturn("JBSWY3DPEHPK3PXP");
             when(vaultItemRepository.save(any(VaultItem.class))).thenAnswer(inv -> inv.getArgument(0));
 
             VaultItemSecretResponse response = service.revealSecret(itemId, userId, revealRequest("correct"), "1.2.3.4", "ua");
@@ -438,7 +447,7 @@ class VaultServiceImplTest {
             when(userRepository.findById(userId)).thenReturn(Optional.of(User.builder().passwordHash("hashed-pw").build()));
             when(passwordEncoder.matches("correct", "hashed-pw")).thenReturn(true);
             when(vaultItemRepository.findByUserIdOrderByFavoriteDescTitleAsc(userId)).thenReturn(List.of(item));
-            when(vaultEncryptionService.decrypt("ct", "iv")).thenReturn("s3cret");
+            when(vaultEncryptionService.decrypt("ct", "iv", 1)).thenReturn("s3cret");
 
             String csv = service.exportCsv(userId, exportRequest("correct"), "1.2.3.4", "ua");
 

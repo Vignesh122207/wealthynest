@@ -25,8 +25,12 @@ public class JwtTokenProvider {
     public String generateAccessToken(UUID userId, String email, String role) {
         return buildToken(Map.of("role", role, "type", "ACCESS", "uid", userId.toString()), email, jwtProperties.getAccessTokenExpiryMs());
     }
-    public String generateRefreshToken(UUID userId, String email) {
-        return buildToken(Map.of("type", "REFRESH", "uid", userId.toString()), email, jwtProperties.getRefreshTokenExpiryMs());
+    /** {@code expiryMs} is caller-supplied (not always {@link JwtProperties#getRefreshTokenExpiryMs()})
+     * so a non-"remember me" session's token actually expires in as many milliseconds as its backing
+     * RefreshToken DB row does, instead of always claiming the full 30-day window internally while
+     * the real enforcement point (the DB row) silently uses a shorter one. */
+    public String generateRefreshToken(UUID userId, String email, long expiryMs) {
+        return buildToken(Map.of("type", "REFRESH", "uid", userId.toString()), email, expiryMs);
     }
     public Claims extractAllClaims(String token) {
         return Jwts.parser().verifyWith(getSigningKey()).build().parseSignedClaims(token).getPayload();

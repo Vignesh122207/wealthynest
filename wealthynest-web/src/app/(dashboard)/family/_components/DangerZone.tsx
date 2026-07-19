@@ -80,7 +80,7 @@ export function DangerZone({
   // idle — show buttons
   return (
     <div className="space-y-2">
-      <p className="text-[11px] font-semibold text-red-500/70 uppercase tracking-widest px-0.5">Danger Zone</p>
+      <p className="text-[11px] font-semibold text-red-600 dark:text-red-400 uppercase tracking-widest px-0.5">Danger Zone</p>
       <div className="bg-card border border-red-500/20 rounded-2xl p-4 flex flex-wrap gap-2">
         {isAdmin ? (
           <>

@@ -208,15 +208,15 @@ export default function AnalyticsPage() {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <p className="text-sm font-medium text-foreground">6-Month Trend Window</p>
-            <p className="text-xs text-muted-foreground/60">Navigating shifts the 6-month window</p>
+            <p className="text-xs text-muted-foreground">Navigating shifts the 6-month window</p>
           </div>
           <div className="flex items-center gap-1.5">
-            <button onClick={() => navigate(-1)} data-testid="analytics-month-prev"
+            <button onClick={() => navigate(-1)} data-testid="analytics-month-prev" aria-label="Previous month"
               className="w-8 h-8 rounded-lg bg-muted border border-border hover:bg-muted/80 flex items-center justify-center transition-all">
               <ChevronLeft className="w-4 h-4 text-muted-foreground" />
             </button>
             <span className="text-sm font-semibold text-foreground min-w-24 text-center" data-testid="analytics-month-label">{monthLabel(year, month)}</span>
-            <button onClick={() => navigate(1)} disabled={isCurrentMonth} data-testid="analytics-month-next"
+            <button onClick={() => navigate(1)} disabled={isCurrentMonth} data-testid="analytics-month-next" aria-label="Next month"
               className="w-8 h-8 rounded-lg bg-muted border border-border hover:bg-muted/80 flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed">
               <ChevronRight className="w-4 h-4 text-muted-foreground" />
             </button>
@@ -234,7 +234,7 @@ export default function AnalyticsPage() {
               {trendLoading
                 ? <div className="h-7 w-24 bg-muted/60 rounded-lg animate-pulse mb-1" />
                 : <p className={cn("text-xl font-bold tabular-nums", color)}>{text}</p>}
-              <p className="text-xs text-muted-foreground/60 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 {activeMonths < 6 ? `${activeMonths}-month average` : "6-month average"}
               </p>
             </div>
@@ -245,7 +245,7 @@ export default function AnalyticsPage() {
         <div className="bg-card border border-border rounded-2xl p-5">
           <div className="flex items-center gap-2 mb-1">
             <PremiumIcon icon={Activity} tone="indigo" size="xs" />
-            <h3 className="font-semibold text-foreground text-sm">Income vs Expenses — Last 6 Months</h3>
+            <h2 className="font-semibold text-foreground text-sm">Income vs Expenses — Last 6 Months</h2>
           </div>
           <p className="text-xs text-muted-foreground/70 mt-0.5">Last 6 months</p>
           <p className="text-xs text-muted-foreground mb-4 mt-1">
@@ -279,7 +279,7 @@ export default function AnalyticsPage() {
           <div className="bg-card border border-border rounded-2xl p-5">
             <div className="flex items-center gap-2 mb-1">
               <PremiumIcon icon={TrendingUp} tone="violet" size="xs" />
-              <h3 className="font-semibold text-foreground text-sm">Savings Rate Trend</h3>
+              <h2 className="font-semibold text-foreground text-sm">Savings Rate Trend</h2>
             </div>
             <p className="text-xs text-muted-foreground/70 mt-0.5">Last 6 months</p>
             <p className="text-xs text-muted-foreground mb-4 mt-1">
@@ -306,7 +306,7 @@ export default function AnalyticsPage() {
           <div className="bg-card border border-border rounded-2xl p-5">
             <div className="flex items-center gap-2 mb-1">
               <PremiumIcon icon={PieChartIcon} tone="pink" size="xs" />
-              <h3 className="font-semibold text-foreground text-sm">Spending by Category</h3>
+              <h2 className="font-semibold text-foreground text-sm">Spending by Category</h2>
             </div>
             <p className="text-xs text-muted-foreground/70 mt-0.5 mb-4">{monthLabel(year, month)} only</p>
             {categoryData.length ? (
@@ -333,7 +333,7 @@ export default function AnalyticsPage() {
                       </div>
                       <div className="text-right shrink-0">
                         <span className="text-[11px] font-semibold text-foreground tabular-nums">{c.percentage.toFixed(0)}%</span>
-                        <span className="text-[10px] text-muted-foreground/60 tabular-nums ml-1">{fmtC(c.amount)}</span>
+                        <span className="text-[10px] text-muted-foreground tabular-nums ml-1">{fmtC(c.amount)}</span>
                       </div>
                     </div>
                   ))}
@@ -356,7 +356,7 @@ export default function AnalyticsPage() {
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
               <PremiumIcon icon={Target} tone="orange" size="xs" />
-              <h3 className="font-semibold text-foreground text-sm">Budget Adherence</h3>
+              <h2 className="font-semibold text-foreground text-sm">Budget Adherence</h2>
             </div>
             {budgetData.some(b => b.isOver) && (
               <span className="text-[10px] font-semibold text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-full">
@@ -373,7 +373,7 @@ export default function AnalyticsPage() {
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <Target className="w-8 h-8 text-muted mb-2" />
               <p className="text-sm font-medium text-foreground">No budgets set for this month</p>
-              <p className="text-xs text-muted-foreground/60 mt-1 mb-3">
+              <p className="text-xs text-muted-foreground mt-1 mb-3">
                 Set spending limits per category to track budget adherence here
               </p>
               <Link href="/budgets"
@@ -408,12 +408,12 @@ export default function AnalyticsPage() {
           <div className="mb-1">
             <div className="flex items-center gap-2">
               <PremiumIcon icon={BarChart2} tone="cyan" size="xs" />
-              <h3 className="font-semibold text-foreground text-sm">Year-over-Year Comparison</h3>
+              <h2 className="font-semibold text-foreground text-sm">Year-over-Year Comparison</h2>
             </div>
             <p className="text-xs text-muted-foreground mt-1.5">
               Monthly expenses: {year} vs {year - 1}
               {year === now.getFullYear() && (
-                <span className="ml-1 text-muted-foreground/50">· {now.toLocaleString("en-IN", { month: "short" })} onwards not yet available</span>
+                <span className="ml-1 text-muted-foreground">· {now.toLocaleString("en-IN", { month: "short" })} onwards not yet available</span>
               )}
             </p>
           </div>
@@ -438,7 +438,7 @@ export default function AnalyticsPage() {
           <div className="bg-card border border-border rounded-2xl p-5">
             <div className="flex items-center gap-2 mb-4">
               <PremiumIcon icon={Layers} tone="emerald" size="xs" />
-              <h3 className="font-semibold text-foreground text-sm">Investment Performance</h3>
+              <h2 className="font-semibold text-foreground text-sm">Investment Performance</h2>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-5">
               {[
@@ -499,7 +499,7 @@ export default function AnalyticsPage() {
           <div className="bg-card border border-border rounded-2xl p-5 flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-semibold text-foreground">No investments tracked yet</p>
-              <p className="text-xs text-muted-foreground/60 mt-0.5">
+              <p className="text-xs text-muted-foreground mt-0.5">
                 Add stocks, mutual funds, FDs, and gold to see your investment performance here.
               </p>
             </div>

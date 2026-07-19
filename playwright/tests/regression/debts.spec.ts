@@ -51,6 +51,20 @@ test.describe("Debts", () => {
     await debtsPage.expectValidationError("Name is required");
   });
 
+  // ─── Validation depth (debt.schema.ts) ──────────────────────────────────────
+
+  test("a due date before the debt date is rejected client-side @regression", async ({ debtsPage }) => {
+    const name = faker.person.fullName();
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    await debtsPage.gotoDebts();
+    // debtDate defaults to today (DebtFormModal.tsx) — a due date of yesterday is always earlier
+    // regardless of what day the suite runs, no need to also set an explicit debtDate.
+    await debtsPage.attemptCreateWithDueDateBeforeDebtDate("LENT", name, 1000, yesterday);
+
+    await debtsPage.expectValidationError("Due date can't be before the debt date");
+    await debtsPage.expectDebtNotVisible(name);
+  });
+
   test("Lent/Borrowed tabs filter the list @regression", async ({ debtsPage }) => {
     const lentName = faker.person.fullName();
     const borrowedName = faker.person.fullName();

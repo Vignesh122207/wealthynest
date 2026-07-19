@@ -56,6 +56,7 @@ class AuthServiceImplTest {
     @Mock private EmailService                      emailService;
     @Mock private AuditService                      auditService;
     @Mock private TokenRevocationService             tokenRevocationService;
+    @Mock private com.wealthynest.domain.auth.service.GoogleIdTokenValidator googleIdTokenValidator;
 
     @InjectMocks
     private AuthServiceImpl service;
@@ -83,7 +84,7 @@ class AuthServiceImplTest {
 
     private void stubAuthResponseBuilding() {
         lenient().when(jwtTokenProvider.generateAccessToken(any(), any(), any())).thenReturn("access-token");
-        lenient().when(jwtTokenProvider.generateRefreshToken(any(), any())).thenReturn("refresh-token");
+        lenient().when(jwtTokenProvider.generateRefreshToken(any(), any(), anyLong())).thenReturn("refresh-token");
         lenient().when(jwtProperties.getRefreshTokenExpiryMs()).thenReturn(2592000000L);
         lenient().when(jwtProperties.getAccessTokenExpiryMs()).thenReturn(7200000L);
         lenient().when(userMapper.toResponse(any(User.class))).thenReturn(UserResponse.builder().build());
@@ -467,10 +468,20 @@ class AuthServiceImplTest {
         }
 
         @Test
-        @DisplayName("throws when the token is already used or expired")
+        @DisplayName("throws when the token has already been used")
         void throwsWhenUsedOrExpired() {
             PasswordResetToken prt = PasswordResetToken.builder().email("alice@example.com")
                     .used(true).expiresAt(Instant.now().plusSeconds(60)).build();
+            when(passwordResetTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(prt));
+            assertThatThrownBy(() -> service.resetPassword(req("t", "NewPass1"), ip, ua))
+                    .isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("throws when the token is unused but has expired")
+        void throwsWhenExpiredButUnused() {
+            PasswordResetToken prt = PasswordResetToken.builder().email("alice@example.com")
+                    .used(false).expiresAt(Instant.now().minusSeconds(60)).build();
             when(passwordResetTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(prt));
             assertThatThrownBy(() -> service.resetPassword(req("t", "NewPass1"), ip, ua))
                     .isInstanceOf(BusinessException.class);
@@ -558,9 +569,17 @@ class AuthServiceImplTest {
         }
 
         @Test
-        @DisplayName("throws when the backing refresh token is invalid or revoked/expired")
+        @DisplayName("throws when the backing refresh token doesn't exist")
         void throwsWhenRefreshTokenInvalid() {
             when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.empty());
+            assertThatThrownBy(() -> service.pinLogin(req("t", "1234"), ip, ua)).isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("throws when the backing refresh token has been revoked")
+        void throwsWhenRefreshTokenRevoked() {
+            RefreshToken stored = RefreshToken.builder().userId(userId).revoked(true).expiresAt(Instant.now().plusSeconds(60)).build();
+            when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(stored));
             assertThatThrownBy(() -> service.pinLogin(req("t", "1234"), ip, ua)).isInstanceOf(BusinessException.class);
         }
 
@@ -622,14 +641,98 @@ class AuthServiceImplTest {
 
     // ─── googleLogin ─────────────────────────────────────────────────────────────
 
-    @Test
-    @DisplayName("googleLogin throws SERVICE_UNAVAILABLE when Google Sign-In isn't configured")
-    void googleLoginThrowsWhenNotConfigured() {
-        ReflectionTestUtils.setField(service, "googleClientId", "");
-        GoogleLoginRequest req = mock(GoogleLoginRequest.class);
+    @Nested
+    @DisplayName("googleLogin")
+    class GoogleLoginTests {
 
-        assertThatThrownBy(() -> service.googleLogin(req, ip, ua)).isInstanceOf(BusinessException.class);
-        verifyNoInteractions(userRepository);
+        @org.mockito.Mock private com.google.api.client.googleapis.auth.oauth2.GoogleIdToken.Payload payload;
+
+        private GoogleLoginRequest req() {
+            GoogleLoginRequest r = mock(GoogleLoginRequest.class);
+            lenient().when(r.getIdToken()).thenReturn("raw-id-token");
+            lenient().when(r.isRememberMe()).thenReturn(false);
+            return r;
+        }
+
+        @BeforeEach
+        void wireGoogle() {
+            ReflectionTestUtils.setField(service, "googleClientId", "test-client-id");
+        }
+
+        @Test
+        @DisplayName("throws SERVICE_UNAVAILABLE when Google Sign-In isn't configured")
+        void throwsWhenNotConfigured() {
+            ReflectionTestUtils.setField(service, "googleClientId", "");
+            GoogleLoginRequest req = mock(GoogleLoginRequest.class);
+
+            assertThatThrownBy(() -> service.googleLogin(req, ip, ua)).isInstanceOf(BusinessException.class);
+            verifyNoInteractions(userRepository);
+        }
+
+        @Test
+        @DisplayName("throws UNAUTHORIZED when the validator returns a null payload (invalid signature)")
+        void throwsWhenTokenInvalid() throws Exception {
+            when(googleIdTokenValidator.verify("raw-id-token")).thenReturn(null);
+
+            assertThatThrownBy(() -> service.googleLogin(req(), ip, ua)).isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("throws UNAUTHORIZED when verification itself throws (network/parsing failure)")
+        void throwsWhenVerifyThrows() throws Exception {
+            when(googleIdTokenValidator.verify("raw-id-token")).thenThrow(new java.security.GeneralSecurityException("boom"));
+
+            assertThatThrownBy(() -> service.googleLogin(req(), ip, ua)).isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("throws BAD_REQUEST when the Google account's email isn't verified")
+        void throwsWhenEmailNotVerified() throws Exception {
+            when(googleIdTokenValidator.verify("raw-id-token")).thenReturn(payload);
+            when(payload.getEmailVerified()).thenReturn(false);
+
+            assertThatThrownBy(() -> service.googleLogin(req(), ip, ua)).isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("an existing user signs in via Google without creating a duplicate account")
+        void existingUserSignsIn() throws Exception {
+            when(googleIdTokenValidator.verify("raw-id-token")).thenReturn(payload);
+            when(payload.getEmailVerified()).thenReturn(true);
+            when(payload.getEmail()).thenReturn("alice@example.com");
+            User existing = withId(baseUser().build());
+            when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(existing));
+            stubAuthResponseBuilding();
+
+            AuthResponse response = service.googleLogin(req(), ip, ua);
+
+            assertThat(response.getAccessToken()).isEqualTo("access-token");
+            verify(userRepository, never()).save(argThat(u -> "GOOGLE".equals(u.getAuthProvider())));
+            verify(auditService).log(eq(userId), eq("GOOGLE_LOGIN_SUCCESS"), any(), any(), any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("a first-time Google sign-in registers a new account with a random local password")
+        void newUserIsRegistered() throws Exception {
+            when(googleIdTokenValidator.verify("raw-id-token")).thenReturn(payload);
+            when(payload.getEmailVerified()).thenReturn(true);
+            when(payload.getEmail()).thenReturn("newperson@example.com");
+            when(payload.get("name")).thenReturn("New Person");
+            when(userRepository.findByEmail("newperson@example.com")).thenReturn(Optional.empty());
+            when(passwordEncoder.encode(anyString())).thenReturn("random-hash");
+            when(userRepository.save(any(User.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
+            stubAuthResponseBuilding();
+
+            service.googleLogin(req(), ip, ua);
+
+            ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+            verify(userRepository, atLeastOnce()).save(captor.capture());
+            User saved = captor.getAllValues().get(0);
+            assertThat(saved.getAuthProvider()).isEqualTo("GOOGLE");
+            assertThat(saved.getFullName()).isEqualTo("New Person");
+            assertThat(saved.isEmailVerified()).isTrue();
+            verify(auditService).log(eq(userId), eq("GOOGLE_SIGNUP"), any(), any(), any(), any(), any(), any());
+        }
     }
 
     // ─── issueTokensForVerifiedUser ──────────────────────────────────────────────

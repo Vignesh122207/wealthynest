@@ -1,9 +1,6 @@
 package com.wealthynest.domain.auth.service;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.gson.GsonFactory;
 import com.wealthynest.common.audit.AuditService;
 import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.security.JwtTokenProvider;
@@ -57,6 +54,7 @@ public class AuthServiceImpl implements AuthService {
     private final EmailService                     emailService;
     private final AuditService                     auditService;
     private final TokenRevocationService           tokenRevocationService;
+    private final GoogleIdTokenValidator            googleIdTokenValidator;
 
     @Value("${wealthynest.mail.frontend-url}")
     private String frontendUrl;
@@ -66,8 +64,6 @@ public class AuthServiceImpl implements AuthService {
 
     @Value("${wealthynest.google.client-id:}")
     private String googleClientId;
-
-    private volatile GoogleIdTokenVerifier googleIdTokenVerifier;
 
     /** Short session TTL when "remember me" is NOT checked (1 day). */
     private static final long SHORT_REFRESH_TTL_MS = 24L * 60 * 60 * 1000;
@@ -449,11 +445,10 @@ public class AuthServiceImpl implements AuthService {
         }
         GoogleIdToken.Payload payload;
         try {
-            GoogleIdToken idToken = getGoogleIdTokenVerifier().verify(request.getIdToken());
-            if (idToken == null) {
+            payload = googleIdTokenValidator.verify(request.getIdToken());
+            if (payload == null) {
                 throw new BusinessException("Invalid Google sign-in token.", HttpStatus.UNAUTHORIZED);
             }
-            payload = idToken.getPayload();
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
@@ -487,22 +482,6 @@ public class AuthServiceImpl implements AuthService {
         return buildAuthResponse(user, request.isRememberMe());
     }
 
-    private GoogleIdTokenVerifier getGoogleIdTokenVerifier() {
-        GoogleIdTokenVerifier verifier = googleIdTokenVerifier;
-        if (verifier == null) {
-            synchronized (this) {
-                verifier = googleIdTokenVerifier;
-                if (verifier == null) {
-                    verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), GsonFactory.getDefaultInstance())
-                            .setAudience(java.util.Collections.singletonList(googleClientId))
-                            .build();
-                    googleIdTokenVerifier = verifier;
-                }
-            }
-        }
-        return verifier;
-    }
-
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
     private void sendVerificationEmail(User user) {
@@ -521,8 +500,8 @@ public class AuthServiceImpl implements AuthService {
 
     private AuthResponse buildAuthResponse(User user, boolean rememberMe) {
         String accessToken  = jwtTokenProvider.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name());
-        String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), user.getEmail());
         long refreshTtlMs   = rememberMe ? jwtProperties.getRefreshTokenExpiryMs() : SHORT_REFRESH_TTL_MS;
+        String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), user.getEmail(), refreshTtlMs);
         refreshTokenRepository.save(RefreshToken.builder()
                 .userId(user.getId())
                 .tokenHash(hashToken(refreshToken))

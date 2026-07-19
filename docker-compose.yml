@@ -56,7 +56,11 @@ services:
     ports:
       - "8080:8080"
     environment:
-      APP_ENV:      prod
+      # Overridable so the Google OAuth E2E test can opt into the `e2e-oauth-test` profile
+      # (`APP_ENV=prod,e2e-oauth-test docker compose up -d --build wealthynest-api`) without
+      # changing default behavior for a normal `docker compose up -d` — see playwright/README.md's
+      # Google OAuth section.
+      APP_ENV:      ${APP_ENV:-prod}
       DB_URL:       jdbc:postgresql://postgres:5432/wealthynest
       DB_USERNAME:  wealthynest
       DB_PASSWORD:  ${DB_PASSWORD}

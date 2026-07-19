@@ -40,5 +40,15 @@ export default defineConfig({
     // overlay) at a narrower-than-typical desktop width, distinct from mobile-chrome's phone-width
     // coverage. See tests/responsive/tablet.spec.ts.
     { name: "tablet", use: { ...devices["iPad (gen 7) landscape"] } },
+    // 810x1080 — iPad's own portrait dimensions, *below* the `lg` breakpoint (unlike the landscape
+    // "tablet" project above), so this exercises the mobile nav overlay at a materially wider,
+    // taller viewport than mobile-chrome's phone width — a genuinely different aspect ratio/DPI
+    // combination, not a duplicate of either existing project. See tests/responsive/tablet-portrait.spec.ts.
+    { name: "tablet-portrait", use: { ...devices["iPad (gen 7)"] } },
+    // 1152x720 — a plain desktop UA (not a touch device, unlike the two tablet projects), just above
+    // `lg` but well below a typical full-size monitor — proves the desktop layout doesn't just work
+    // at "tablet" width but also at a genuinely narrow desktop/laptop width. See
+    // tests/responsive/narrow-desktop.spec.ts.
+    { name: "narrow-desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1152, height: 720 } } },
   ],
 });

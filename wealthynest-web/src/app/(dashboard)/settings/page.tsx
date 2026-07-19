@@ -176,7 +176,7 @@ export default function SettingsPage() {
 
           {/* ── Danger zone (full-width) ──────────────────────────── */}
           <div>
-            <p className="text-[11px] font-semibold text-red-600/70 dark:text-red-400/70 uppercase tracking-widest px-1 mb-1.5">Danger Zone</p>
+            <p className="text-[11px] font-semibold text-red-600 dark:text-red-400 uppercase tracking-widest px-1 mb-1.5">Danger Zone</p>
             <div className="bg-card border border-red-500/20 rounded-2xl overflow-hidden divide-y divide-border/60">
               <button
                 onClick={() => setShowLogout(true)}
@@ -201,7 +201,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <p className="text-[11px] text-muted-foreground/50 text-center pb-4">
+          <p className="text-[11px] text-muted-foreground text-center pb-4">
             WealthyNest · v1.0 · Free forever · No ads · Built for Indian families
           </p>
 

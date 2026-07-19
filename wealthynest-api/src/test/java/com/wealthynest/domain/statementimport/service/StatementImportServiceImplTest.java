@@ -423,4 +423,194 @@ class StatementImportServiceImplTest {
             assertThat(result.getErrors()).hasSize(1);
         }
     }
+
+    // ─── autoDetect (pure private helper, exercised via reflection) ─────────────
+
+    @Nested
+    @DisplayName("autoDetect")
+    class AutoDetectTests {
+
+        @SuppressWarnings("unchecked")
+        private Object autoDetect(List<String> headers) {
+            return ReflectionTestUtils.invokeMethod(service, "autoDetect", headers);
+        }
+
+        @Test
+        @DisplayName("detects separate Debit/Credit columns")
+        void detectsDebitCreditColumns() {
+            Object mapping = autoDetect(List.of("Date", "Narration", "Debit", "Credit"));
+            assertThat(mapping).isNotNull();
+        }
+
+        @Test
+        @DisplayName("detects a single signed Amount column when there's no separate Debit/Credit pair")
+        void detectsSingleAmountColumn() {
+            Object mapping = autoDetect(List.of("Date", "Description", "Amount"));
+            assertThat(mapping).isNotNull();
+        }
+
+        @Test
+        @DisplayName("is not confident when only a Debit column exists without a matching Credit column or Amount fallback")
+        void notConfidentWithOnlyDebitColumn() {
+            Object mapping = autoDetect(List.of("Date", "Description", "Debit"));
+            assertThat(mapping).isNull();
+        }
+
+        @Test
+        @DisplayName("is not confident when the description column can't be identified")
+        void notConfidentWithoutDescriptionColumn() {
+            Object mapping = autoDetect(List.of("Date", "Debit", "Credit"));
+            assertThat(mapping).isNull();
+        }
+
+        @Test
+        @DisplayName("the first matching header wins when duplicate alias columns appear")
+        void firstMatchingHeaderWins() {
+            Object mapping = autoDetect(List.of("Date", "Value Date", "Narration", "Debit", "Credit"));
+            assertThat(mapping).isNotNull();
+            assertThat(ReflectionTestUtils.getField(mapping, "dateColumn")).isEqualTo(0);
+        }
+    }
+
+    // ─── isNonNarrationLine (pure private static helper) ────────────────────────
+
+    @Nested
+    @DisplayName("isNonNarrationLine")
+    class IsNonNarrationLineTests {
+
+        private boolean isNonNarrationLine(String line) {
+            return (boolean) ReflectionTestUtils.invokeMethod(StatementImportServiceImpl.class, "isNonNarrationLine", line);
+        }
+
+        @Test
+        @DisplayName("a blank line is non-narration")
+        void blankLineIsNonNarration() {
+            assertThat(isNonNarrationLine("   ")).isTrue();
+        }
+
+        @Test
+        @DisplayName("a bare \"Date\" or \"Value\" column-header fragment is non-narration")
+        void bareColumnFragmentsAreNonNarration() {
+            assertThat(isNonNarrationLine("Date")).isTrue();
+            assertThat(isNonNarrationLine("Value")).isTrue();
+        }
+
+        @Test
+        @DisplayName("a repeated table header row (Withdrawal/Deposit/Balance + Description) is non-narration")
+        void repeatedTableHeaderIsNonNarration() {
+            assertThat(isNonNarrationLine("Date Description Withdrawal Deposit Balance")).isTrue();
+        }
+
+        @Test
+        @DisplayName("a header-like line missing one of the three required column words is treated as narration")
+        void partialHeaderIsTreatedAsNarration() {
+            assertThat(isNonNarrationLine("Withdrawal Deposit")).isFalse();
+        }
+
+        @Test
+        @DisplayName("a \"Page N\" footer line is non-narration")
+        void pageFooterIsNonNarration() {
+            assertThat(isNonNarrationLine("Page 3")).isTrue();
+        }
+
+        @Test
+        @DisplayName("ordinary narration text is not flagged as non-narration")
+        void ordinaryNarrationIsNotFlagged() {
+            assertThat(isNonNarrationLine("UPI/mmid/12345/Swiggy order")).isFalse();
+        }
+    }
+
+    // ─── parseAmount / parseDate / parseIncomeSource (pure private helpers) ─────
+
+    @Nested
+    @DisplayName("parseAmount")
+    class ParseAmountTests {
+
+        private BigDecimal parseAmount(String raw) {
+            return (BigDecimal) ReflectionTestUtils.invokeMethod(service, "parseAmount", raw);
+        }
+
+        @Test
+        @DisplayName("null or blank input returns null")
+        void blankReturnsNull() {
+            assertThat(parseAmount(null)).isNull();
+            assertThat(parseAmount("  ")).isNull();
+        }
+
+        @Test
+        @DisplayName("a lone \"-\" placeholder (empty cell) returns null")
+        void loneDashReturnsNull() {
+            assertThat(parseAmount("-")).isNull();
+        }
+
+        @Test
+        @DisplayName("strips currency symbols, the Rs./Rs prefix, and thousands separators")
+        void stripsFormattingCharacters() {
+            assertThat(parseAmount("₹1,234.50")).isEqualByComparingTo("1234.50");
+            assertThat(parseAmount("Rs. 500")).isEqualByComparingTo("500");
+            assertThat(parseAmount("Rs99")).isEqualByComparingTo("99");
+        }
+
+        @Test
+        @DisplayName("an implausibly large value (extraction artifact) is rejected as null")
+        void implausiblyLargeValueRejected() {
+            assertThat(parseAmount("999999999999")).isNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("parseDate")
+    class ParseDateTests {
+
+        private LocalDate parseDate(String raw) {
+            return (LocalDate) ReflectionTestUtils.invokeMethod(service, "parseDate", raw);
+        }
+
+        @Test
+        @DisplayName("throws for a blank date string")
+        void throwsForBlank() {
+            assertThatThrownBy(() -> parseDate("")).isInstanceOf(java.time.format.DateTimeParseException.class);
+        }
+
+        @Test
+        @DisplayName("throws for a completely unrecognizable date format")
+        void throwsForUnrecognizedFormat() {
+            assertThatThrownBy(() -> parseDate("not-a-date")).isInstanceOf(java.time.format.DateTimeParseException.class);
+        }
+
+        @Test
+        @DisplayName("falls through multiple candidate formats until one parses")
+        void fallsThroughFormats() {
+            assertThat(parseDate("2025-01-15")).isEqualTo(LocalDate.of(2025, 1, 15));
+        }
+    }
+
+    @Nested
+    @DisplayName("parseIncomeSource")
+    class ParseIncomeSourceTests {
+
+        private com.wealthynest.domain.income.entity.IncomeSource parseIncomeSource(String raw) {
+            return (com.wealthynest.domain.income.entity.IncomeSource)
+                    ReflectionTestUtils.invokeMethod(service, "parseIncomeSource", raw);
+        }
+
+        @Test
+        @DisplayName("null or blank input defaults to OTHER")
+        void blankDefaultsToOther() {
+            assertThat(parseIncomeSource(null)).isEqualTo(com.wealthynest.domain.income.entity.IncomeSource.OTHER);
+            assertThat(parseIncomeSource("")).isEqualTo(com.wealthynest.domain.income.entity.IncomeSource.OTHER);
+        }
+
+        @Test
+        @DisplayName("an unrecognized value defaults to OTHER instead of throwing")
+        void unrecognizedValueDefaultsToOther() {
+            assertThat(parseIncomeSource("not-a-real-source")).isEqualTo(com.wealthynest.domain.income.entity.IncomeSource.OTHER);
+        }
+
+        @Test
+        @DisplayName("a matching enum name (case-insensitive) is parsed directly")
+        void matchingNameIsParsed() {
+            assertThat(parseIncomeSource("salary")).isEqualTo(com.wealthynest.domain.income.entity.IncomeSource.SALARY);
+        }
+    }
 }

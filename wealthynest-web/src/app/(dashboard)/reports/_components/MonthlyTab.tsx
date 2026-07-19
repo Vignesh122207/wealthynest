@@ -109,6 +109,7 @@ export function MonthlyTab() {
               value={year}
               onChange={e => setYear(Number(e.target.value))}
               data-testid="monthly-report-year-select"
+              aria-label="Report year"
               className="bg-muted border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/40 min-w-[100px]"
             >
               {years.map(y => <option key={y} value={y}>{y}</option>)}
@@ -117,6 +118,7 @@ export function MonthlyTab() {
               value={month}
               onChange={e => setMonth(Number(e.target.value))}
               data-testid="monthly-report-month-select"
+              aria-label="Report month"
               className="bg-muted border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/40 min-w-[140px]"
             >
               {MONTH_NAMES.map((name, i) => <option key={i + 1} value={i + 1}>{name}</option>)}

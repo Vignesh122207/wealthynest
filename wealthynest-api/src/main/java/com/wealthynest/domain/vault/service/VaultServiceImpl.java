@@ -84,6 +84,7 @@ public class VaultServiceImpl implements VaultService {
                 .icon(request.getIcon())
                 .secretCiphertext(encrypted.ciphertext())
                 .secretIv(encrypted.iv())
+                .keyVersion(encrypted.keyVersion())
                 .build();
         applySecretHealth(item, request.getSecret());
         applyTotpSecret(item, request.getTotpSecret());
@@ -97,6 +98,11 @@ public class VaultServiceImpl implements VaultService {
     @Transactional
     public VaultItemResponse updateItem(UUID itemId, UUID userId, VaultItemRequest request) {
         VaultItem item = findAndValidate(itemId, userId);
+        // Bring any pre-existing fields left on an older key version up to current BEFORE applying
+        // this call's own edits, so a call that only touches TOTP (leaving the password untouched)
+        // can't end up with the two fields on different key versions under the shared key_version
+        // column (see V40__vault_items.sql).
+        normalizeKeyVersion(item);
         item.setItemType(request.getItemType());
         item.setTitle(request.getTitle());
         item.setUsername(request.getUsername());
@@ -107,6 +113,7 @@ public class VaultServiceImpl implements VaultService {
             VaultEncryptionService.EncryptedSecret encrypted = vaultEncryptionService.encrypt(request.getSecret());
             item.setSecretCiphertext(encrypted.ciphertext());
             item.setSecretIv(encrypted.iv());
+            item.setKeyVersion(encrypted.keyVersion());
             applySecretHealth(item, request.getSecret());
         }
         applyTotpSecret(item, request.getTotpSecret());
@@ -153,15 +160,19 @@ public class VaultServiceImpl implements VaultService {
         VaultItem item = findAndValidate(itemId, userId);
         requireStepUp("reveal", userId, request, ipAddress, userAgent);
 
+        // Opportunistic self-healing migration: every reveal is already a write (lastRevealedAt),
+        // so a row still on a retired key version gets upgraded to current here at no extra cost —
+        // no separate rotation/migration job needed.
+        normalizeKeyVersion(item);
         item.setLastRevealedAt(Instant.now());
         vaultItemRepository.save(item);
 
         auditService.log(userId, "VAULT_ITEM_REVEALED", "VAULT_ITEM", item.getId(), null, null, ipAddress, userAgent);
         return VaultItemSecretResponse.builder()
                 .id(item.getId())
-                .secret(vaultEncryptionService.decrypt(item.getSecretCiphertext(), item.getSecretIv()))
+                .secret(vaultEncryptionService.decrypt(item.getSecretCiphertext(), item.getSecretIv(), item.getKeyVersion()))
                 .totpSecret(item.getTotpCiphertext() == null ? null
-                        : vaultEncryptionService.decrypt(item.getTotpCiphertext(), item.getTotpIv()))
+                        : vaultEncryptionService.decrypt(item.getTotpCiphertext(), item.getTotpIv(), item.getKeyVersion()))
                 .stepUpToken(issueStepUpToken(userId))
                 .build();
     }
@@ -183,9 +194,9 @@ public class VaultServiceImpl implements VaultService {
                         item.getUsername(),
                         item.getUrl(),
                         item.getCategory(),
-                        vaultEncryptionService.decrypt(item.getSecretCiphertext(), item.getSecretIv()),
+                        vaultEncryptionService.decrypt(item.getSecretCiphertext(), item.getSecretIv(), item.getKeyVersion()),
                         item.getTotpCiphertext() == null ? ""
-                                : vaultEncryptionService.decrypt(item.getTotpCiphertext(), item.getTotpIv()));
+                                : vaultEncryptionService.decrypt(item.getTotpCiphertext(), item.getTotpIv(), item.getKeyVersion()));
             }
         } catch (IOException e) {
             // StringWriter never throws IOException in practice — CSVPrinter's signature requires it.
@@ -285,6 +296,26 @@ public class VaultServiceImpl implements VaultService {
         }
     }
 
+    /** Re-encrypts both encrypted fields on {@code item} under the current key version if either
+     * is left on a retired one, keeping the shared {@code key_version} column (see
+     * V40__vault_items.sql) truthful for both fields at once. No-op — and no decrypt call at all —
+     * on the common path where nothing has ever been rotated. Caller is responsible for persisting. */
+    private void normalizeKeyVersion(VaultItem item) {
+        if (item.getKeyVersion() == vaultEncryptionService.currentKeyVersion()) return;
+        int staleVersion = item.getKeyVersion();
+        String secret = vaultEncryptionService.decrypt(item.getSecretCiphertext(), item.getSecretIv(), staleVersion);
+        VaultEncryptionService.EncryptedSecret secretEncrypted = vaultEncryptionService.encrypt(secret);
+        item.setSecretCiphertext(secretEncrypted.ciphertext());
+        item.setSecretIv(secretEncrypted.iv());
+        if (item.getTotpCiphertext() != null) {
+            String totp = vaultEncryptionService.decrypt(item.getTotpCiphertext(), item.getTotpIv(), staleVersion);
+            VaultEncryptionService.EncryptedSecret totpEncrypted = vaultEncryptionService.encrypt(totp);
+            item.setTotpCiphertext(totpEncrypted.ciphertext());
+            item.setTotpIv(totpEncrypted.iv());
+        }
+        item.setKeyVersion(secretEncrypted.keyVersion());
+    }
+
     private VaultItem findAndValidate(UUID itemId, UUID userId) {
         VaultItem item = vaultItemRepository.findById(itemId)
                 .orElseThrow(() -> new ResourceNotFoundException("VaultItem", "id", itemId));
@@ -376,7 +407,10 @@ public class VaultServiceImpl implements VaultService {
     private boolean isValidStepUpToken(UUID userId, String token) {
         try {
             String stored = redisTemplate.opsForValue().get(stepUpTokenKey(userId));
-            return stored != null && stored.equals(token);
+            // Constant-time compare — this is a bearer secret, so guard against a timing side
+            // channel even though the token's 122 bits of entropy make it infeasible in practice.
+            return stored != null && MessageDigest.isEqual(
+                    stored.getBytes(StandardCharsets.UTF_8), token.getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
             log.warn("Vault step-up token check failed for user {}, falling back to password: {}", userId, e.getMessage());
             return false;

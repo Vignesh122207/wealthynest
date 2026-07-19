@@ -42,16 +42,16 @@ export const STORAGE_STATE_PATH = path.resolve(__dirname, "../.auth/user.json");
 // RateLimitConfig) once several workers all started up within the same minute.
 export const REGRESSION_STORAGE_STATE_PATH = path.resolve(__dirname, "../.auth/regression-user.json");
 
-// "chromium", "mobile-chrome", and "tablet" all share the one original unsuffixed storageState
-// file — this was already true before per-project provisioning existed (test:responsive's
-// mobile-chrome project has always reused chromium's regressionUser storageState) and stays true:
-// none of these three ever run tests/regression/'s *mutating* specs concurrently with each other
-// (mobile-chrome/tablet only run the read-only responsive/a11y/performance/visual suites), so the
-// backend-singleton collision (Cash Wallet, Emergency Fund — see README's "chromium only, on
-// purpose") that per-project isolation exists for never applies to them. Only a project that might
-// actually run tests/regression/'s mutating specs — firefox, webkit, or any future addition, via
-// E2E_PROJECTS — gets its own suffixed file.
-const SHARED_STORAGE_PROJECTS = new Set(["chromium", "mobile-chrome", "tablet"]);
+// "chromium", "mobile-chrome", "tablet", "tablet-portrait", and "narrow-desktop" all share the one
+// original unsuffixed storageState file — this was already true before per-project provisioning
+// existed (test:responsive's mobile-chrome project has always reused chromium's regressionUser
+// storageState) and stays true: none of these ever run tests/regression/'s *mutating* specs
+// concurrently with each other (they only run the read-only responsive/a11y/performance/visual
+// suites), so the backend-singleton collision (Cash Wallet, Emergency Fund — see README's
+// "chromium only, on purpose") that per-project isolation exists for never applies to them. Only a
+// project that might actually run tests/regression/'s mutating specs — firefox, webkit, or any
+// future addition, via E2E_PROJECTS — gets its own suffixed file.
+const SHARED_STORAGE_PROJECTS = new Set(["chromium", "mobile-chrome", "tablet", "tablet-portrait", "narrow-desktop"]);
 
 export function storageStatePathFor(project: string): string {
   return SHARED_STORAGE_PROJECTS.has(project) ? STORAGE_STATE_PATH : path.resolve(__dirname, `../.auth/user.${project}.json`);

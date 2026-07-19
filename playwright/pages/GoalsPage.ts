@@ -30,6 +30,20 @@ export class GoalsPage extends BasePage {
     await waitForDialogClosed(this.page);
   }
 
+  /** Opens the create modal, fills a target (and optionally saved) amount that goalSchema's own
+   * validation should reject, then submits — no network wait, since a genuinely invalid submission
+   * never fires the POST (client-side zod validation blocks it before any request goes out). */
+  async attemptCreateInvalid(input: { name: string; targetAmount: number; savedAmount?: number }): Promise<void> {
+    await this.page.getByTestId(TEST_IDS.fab.toggle).click();
+    await this.page.getByTestId(TEST_IDS.fab.addGoal).click();
+    await this.page.getByTestId("goal-name-input").fill(input.name);
+    await this.page.getByTestId("goal-target-amount-input").fill(String(input.targetAmount));
+    if (input.savedAmount !== undefined) {
+      await this.page.getByLabel("Amount Already Saved").fill(String(input.savedAmount));
+    }
+    await this.page.getByTestId(TEST_IDS.goalForm.submit).click();
+  }
+
   /** GoalCard gives every card an accessible `aria-label="Edit <name> goal, <pct>% saved"` — no
    * dedicated testid needed to open it. */
   async openEditByName(name: string): Promise<void> {

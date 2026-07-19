@@ -30,9 +30,26 @@ tablet-landscape responsive project (3 tests), distinct from Phase 9's phone-wid
 each phase's own section below for what broke, what got fixed, and the real rate-limit/environment
 lessons found along the way.
 
+Phase 24 closed out everything the "Known gaps" section still listed, including two items — Google
+OAuth and cross-browser file-by-file confirmation — earlier phases had flagged as needing either
+infra this suite didn't have or a bigger investment than that pass's scope: Accessibility breadth (5
+pages → all 14, six more real findings fixed), Responsive breadth (two new breakpoint projects —
+tablet-portrait and narrow-desktop — 6 tests, no regressions found), Visual regression on the three
+dynamic pages Phase 9 always excluded (Dashboard/Accounts/Transactions, 3 tests, via a dedicated
+empty-state user rather than masking a populated one), Cross-browser confirmation (the 20 regression
+files Phase 21 left individually unverified under firefox, on top of the 2 — `accounts`, `debts` — it
+already did, now all confirmed: every regression file except `webauthn.spec.ts`, which stays
+Chromium-only by necessity), and a real Google OAuth round trip (2 tests) via a new backend test
+double — see Phase 24's own section for what broke, what got fixed, a real orchestration lesson about
+`E2E_PROJECTS`, and the OAuth test-double design in detail. What's left (Expense Split's missing UI,
+a real performance budget) needs a product or infra decision this suite genuinely can't make on its
+own — see "Known gaps" below.
+
 That's **107 `test:regression`-family tests** (auth 10 + smoke 1 + regression 96 across 24 files)
-**plus 21 more** across the four standalone suites (Responsive now includes the tablet project) —
-**128 tests total**, all reusing the same scaffold.
+**plus 45 more** across the standalone suites — Responsive (13: mobile-chrome, tablet, tablet-portrait,
+narrow-desktop), Accessibility (15: all 14 dashboard pages + login), Performance (8: loadEventEnd +
+real Core Web Vitals per page), Visual (7: 4 static + 3 dynamic-empty-state), and the new standalone
+`tests/oauth/` suite (2) — **152 tests total**, all reusing the same scaffold.
 
 Every one of Phase 3-5's 24 new regression tests has been individually confirmed green in
 isolation, as has auth (10/10) and smoke (1/1). A single simultaneous `npm run test:regression`
@@ -65,10 +82,14 @@ npm test                 # everything, all projects
 npm run test:auth        # tests/auth only
 npm run test:smoke       # tests/smoke only (the critical business flow)
 npm run test:regression  # tests/regression only, one worker (see "Two provisioned users" below)
-npm run test:responsive  # tests/responsive only, --project=mobile-chrome (see Phase 9)
-npm run test:a11y        # tests/a11y only, axe-core scans (see Phase 9)
+npm run test:responsive       # tests/responsive/responsive.spec.ts, --project=mobile-chrome (Phase 9)
+npm run test:tablet           # tests/responsive/tablet.spec.ts, --project=tablet (Phase 23)
+npm run test:tablet-portrait  # tests/responsive/tablet-portrait.spec.ts, --project=tablet-portrait (Phase 24)
+npm run test:narrow-desktop   # tests/responsive/narrow-desktop.spec.ts, --project=narrow-desktop (Phase 24)
+npm run test:a11y        # tests/a11y only, axe-core scans across all 14 dashboard pages (Phase 9 + 24)
 npm run test:performance # tests/performance only, generous load-time smoke thresholds (see Phase 9)
-npm run test:visual      # tests/visual only, screenshot diffs on static pages (see Phase 9)
+npm run test:visual      # tests/visual only, screenshot diffs on static + empty-state dynamic pages (Phase 9 + 24)
+npm run test:oauth       # tests/oauth only — requires the API running with e2e-oauth-test active (Phase 24, see its own README section)
 npm run test:headed      # any of the above with --headed
 npm run test:ui          # Playwright's UI mode
 npm run report           # open the last HTML report
@@ -896,38 +917,222 @@ Two independent, small additions:
   pattern as `responsive.spec.ts` (`test.skip(testInfo.project.name !== "tablet", ...)`) so it's
   inert if picked up by an unscoped run.
 
+## Phase 24: Accessibility/Responsive/Visual breadth + cross-browser confirmation
+
+Closed out every item the "Known gaps" section listed as pure test-suite work — the three that
+remain (Google OAuth, Expense Split's missing settle/pending-list UI, a real performance budget)
+need a product or infra decision this suite can't make on its own, and stay listed below unchanged.
+
+**Accessibility breadth**: `a11y.spec.ts`'s route loop grew from 5 pages to all 14 (`goals`, `debts`,
+`family`, `reports`, `notifications`, `settings`, `vault`, `analytics`, `netWorth` added — all
+routes already existed in `constants/routes.ts`, no new plumbing needed). Six real, previously
+unscanned findings surfaced and got fixed, not asserted around:
+
+- **Reports** (`critical`, `select-name`): the Monthly tab's year and month `<select>`s had no
+  accessible name at all — `aria-label="Report year"`/`"Report month"` added.
+- **Settings** and **Family** (`serious`, `color-contrast`): both pages' "Danger Zone" section label
+  used a `/70`-opacity red (`text-red-600/70 dark:text-red-400/70` on Settings, `text-red-500/70` on
+  Family) that measured 3.82:1 against the dark theme's background — under the 4.5:1 AA minimum for
+  normal-size text. Fixed by dropping the opacity modifier to the same solid `text-red-600
+  dark:text-red-400` Settings already used elsewhere; Family's identical pattern was fixed
+  proactively in the same pass rather than waiting for its own page to be scanned and file a
+  duplicate finding for the exact same class combination. Settings' own footer byline
+  (`text-muted-foreground/50`) measured 3:1 for the same reason — opacity modifier dropped there too.
+- **Analytics** (`moderate`, `heading-order` ×6 + `serious`, `color-contrast` ×3 + `critical`,
+  `button-has-visible-text`): every one of its six card titles was an `<h3>` directly under the
+  page's only `<h1>`, the exact same skipped-`<h2>` pattern Phase 22 fixed elsewhere on this page's
+  own dashboard/transactions siblings but never on Analytics itself — promoted all six to `<h2>`.
+  Three separate `text-muted-foreground/60` instances (the "Navigating shifts the 6-month window"
+  caption, the "N-month average" caption, and one measured directly at 3.78:1) and the month
+  navigator's icon-only prev/next `<button>`s (no `aria-label`, same `button-has-visible-text` rule
+  Phase 9 already found and fixed on Budgets — Analytics just wasn't in that pass) got the same
+  fixes: opacity dropped, `aria-label="Previous/Next month"` added.
+- **Net Worth** (`moderate`, `heading-order`): `AutoLinkedAssets`' own `<h2>`-worthy heading was an
+  `<h3>` rendered first on the page (before `AssetsSection`/`LiabilitiesSection`/
+  `NetWorthHistoryChart`, all already correctly `<h2>`), so it skipped straight from the page's `<h1>`
+  — promoted to `<h2>`; the sibling `AssetAllocationChart` heading stays `<h3>` correctly nested under
+  it, which is why axe only ever flagged the first one.
+
+`a11y.spec.ts` now has 15 tests total (up from 6), all passing clean at every severity tier. **A large number of
+similar low-opacity `text-muted-foreground/NN` instances exist elsewhere in the app** (grepped, not
+guessed) that axe never actually scanned or flagged — resisted the urge to blanket-fix all of them,
+since contrast depends on the exact color/font-size combination and several *did* pass when checked
+(e.g. Analytics' own `/70` and `/40` instances survived the same scan clean); only fixed what axe
+measured and failed on a page this suite actually scans.
+
+**Responsive breadth**: two new Playwright projects, each with its own spec file mirroring
+`tablet.spec.ts`'s exact structure (skip-guard, sidebar assertion, overflow check, FAB check) — 6
+new tests, both passing clean on first run with no real regressions found:
+
+- **`tablet-portrait`** (`devices["iPad (gen 7)"]`, 810×1080) — *below* `lg`, unlike the existing
+  landscape `tablet` project, so this proves the mobile nav overlay holds up at a materially
+  wider/taller viewport than `mobile-chrome`'s phone width, not just phones.
+- **`narrow-desktop`** (plain `Desktop Chrome` UA, custom 1152×720 viewport) — just above `lg` but
+  well below a typical monitor, proving the desktop layout doesn't only work at full monitor width
+  or `tablet`'s 1080px, but at a genuinely narrow laptop width too.
+
+Both new projects were added to `config/env.ts`'s `SHARED_STORAGE_PROJECTS` alongside `mobile-chrome`
+and `tablet` — same reasoning as those two: neither ever runs `tests/regression/`'s mutating specs,
+so the per-project storageState isolation Phase 21 built for firefox/webkit doesn't need to apply.
+
+**Visual regression on the three dynamic pages** (`tests/visual/visual-dynamic.spec.ts`, new file, 3
+tests): Dashboard/Accounts/Transactions were excluded from `visual.spec.ts` since Phase 9 because
+`regressionUser`'s real, ever-growing transaction history would diff on every run. Rather than mask
+a populated page, this uses a dedicated, disposable user (`provisionE2EUser({ fullName: "Visual Test
+User" })`, closed in `afterAll` — same pattern as `security.spec.ts`) that's never mutated after
+setup, so it stays at zero accounts/transactions/goals permanently. Confirmed by **reading**, not
+assuming, that a genuinely empty-state dashboard is almost entirely static: `SixMonthTrend`,
+`NetWorthTrend`, `GoalsSummary`, and `SmartAlerts` all only interpolate a date into visible text on
+their *non-empty* branch — with zero data they render a fixed placeholder string instead. The one
+exception is `GreetingBanner`, which always renders a time-of-day greeting ("Good
+morning/afternoon/evening") and a month label regardless of data — given its own new
+`data-testid="greeting-banner"` and masked via Playwright's `mask` option rather than skipped, since
+pinning the rest of the dashboard is still worth doing. Transactions defaults to a "Month" filter
+that shows the current month's label even with zero transactions in it — switched to "All" mode via
+Phase 12's existing `showAllDates()` helper before screenshotting instead of adding a second masked
+region, since a one-click mode switch already avoids it. All three baselines generated clean and were
+independently re-verified stable on a second run (a fresh provisioned user each time) before trusting
+them as a real regression gate.
+
+**Cross-browser confirmation**: the 20 regression files Phase 21 left structurally-safe-but-
+unverified under firefox (every file except `accounts.spec.ts`/`debts.spec.ts`, already confirmed in
+Phase 21, and `webauthn.spec.ts`, excluded below) were each run individually and now all confirmed
+green — `admin`, `analytics`, `budgets`, `cas-import`, `categories`, `dividend`, `expense-split`,
+`family`, `goals`, `investments`, `networth`, `notifications`, `recurring-rules`, `reports`,
+`security`, `settings`, `statement-import`, `support`, `transactions`, `vault`. `webauthn.spec.ts`
+stays Chromium-only, not from a gap in this pass but a hard platform limit: its virtual authenticator
+is a Chrome DevTools Protocol feature (`WebAuthn.enable`/`addVirtualAuthenticator`, see Phase 20)
+that Firefox/WebKit have no equivalent for — there's nothing to "make cross-browser safe" here.
+
+**A real, reusable orchestration lesson surfaced doing this**: `E2E_PROJECTS=chromium,firefox` (the
+pattern `test:regression:firefox` used, and the obvious thing to reach for when verifying "firefox
+specifically") makes global-setup provision **both** projects' user pairs even when the actual test
+run only targets `--project=firefox` — paying for a chromium pair this invocation never touches,
+and halving the auth-endpoint budget genuinely available before the API's 10 req/min `/auth` limit
+(see "Real rate limits" above) kicks in. This wasn't just a theoretical waste: `admin.spec.ts` (which
+provisions its own dedicated admin *and* target user on top of global-setup's pair) reliably 429'd
+partway through `beforeAll` under `chromium,firefox`, every time, and passed clean on the very next
+try under `E2E_PROJECTS=firefox` alone — a reproducible, structural collision, not timing noise.
+Fixed at the source: `test:regression:firefox`/`test:regression:webkit` now set `E2E_PROJECTS=firefox`
+/`E2E_PROJECTS=webkit` respectively (each project only ever needs its own pair when it's the only
+one being exercised); use `chromium,firefox` (or more) only when a single invocation genuinely needs
+both projects' users available at once.
+
+**Google OAuth full round trip** (`tests/oauth/google-oauth.spec.ts`, new file/folder, 2 tests):
+closes the one item every earlier phase (9, 20) named as needing either a live test Google account
+or backend test doubles. Went with test doubles — a live account was ruled out as flaky and subject
+to Google's own bot-detection on real sign-in attempts, the same reasoning WebAuthn's own comment
+already gave for preferring a virtual authenticator over a real device.
+
+WealthyNest's Google Sign-In is the Identity Services *button* flow (a client-side ID token from
+Google's JS widget, verified server-side), not the redirect authorization-code flow — confirmed by
+reading `GoogleSignInButton.tsx` and `AuthServiceImpl.googleLogin()` directly. That verification used
+`GoogleIdTokenVerifier`/`GooglePublicKeysManager`, whose `getPublicKeys()` is `final` and always
+fetches+parses real Google certs over HTTP — no supported extension point for swapping in a test key.
+Rather than force that shape (which would've meant generating a self-signed X.509 certificate and
+serving it from a JWKS-shaped endpoint, plus a new crypto dependency this repo doesn't already have),
+`AuthServiceImpl` was refactored to depend on a small `GoogleIdTokenValidator` interface instead of
+constructing a verifier inline. Two beans implement it:
+
+- **`GoogleAuthConfig`** (production, `@Profile("!e2e-oauth-test")`) — the exact same
+  `GoogleIdTokenVerifier`/real-Google-certs construction `AuthServiceImpl` used to build lazily
+  inline, just moved into a proper Spring bean. Unconditional default; unchanged behavior.
+- **`TestGoogleIdentityService`** (`domain/auth/testsupport/`, `@Profile("e2e-oauth-test")`) —
+  generates its own in-memory RSA key pair once per app start, mints Google-ID-token-shaped JWTs
+  with it (`issueToken`), and verifies against that same key pair directly via
+  `JsonWebSignature`/`GoogleIdToken.parse` (both already-vendored classes from the existing
+  `google-api-client` dependency — no new crypto library needed) plus the same audience/issuer/expiry
+  checks the real verifier would do. A `TestGoogleAuthController` (same profile) exposes
+  `POST /api/v1/auth/test/google-issue-token`, mapped under the already-`permitAll`
+  `/api/v1/auth/**` prefix so **no `SecurityConfig` change was needed** to reach it.
+
+Both beans and the controller only exist when `e2e-oauth-test` is an active Spring profile — in the
+default deployment, `TestGoogleIdentityService`'s constructor never runs, so there's no test key pair
+and no code path that could ever accept a non-Google-signed token as valid. Confirmed empirically,
+not just by code inspection: hitting the test-issue-token route against a normally-configured API
+returns a generic 500 (`GlobalExceptionHandler`'s catch-all for the unmapped route — not a clean 404,
+which is why `api.isOAuthTestModeActive()` checks for a real `idToken` in the response body rather
+than treating "not an error" as the signal), while the *default* `googleLogin()` path — verified via
+the existing `tests/auth/login.spec.ts` boundary test plus the full `AuthServiceImplTest` suite,
+both passing unchanged — behaves exactly as it did before this refactor.
+
+`docker-compose.yml`'s `APP_ENV` changed from a hardcoded `prod` to `${APP_ENV:-prod}` so this
+profile is reachable without a permanent compose edit: run
+`APP_ENV=prod,e2e-oauth-test docker compose up -d --build wealthynest-api`, run
+`npm run test:oauth`, then restore the default (`docker compose up -d --build wealthynest-api` with
+`APP_ENV` unset) before running anything else against that same API container — this file's own
+`beforeEach` skip-guard makes forgetting that restore a clean skip, not a confusing failure, the same
+shape as `responsive.spec.ts`'s project-name skip-guard.
+
+The test itself drives the **real** frontend code path — `GoogleSignInButton.tsx`'s
+`initialize`/callback wiring, the real `POST /auth/google-login` request, the real backend
+verification (against the test key, not a stub that bypasses verification) — with only Google's own
+third-party `accounts.google.com/gsi/client` script replaced by a minimal `page.route()` stand-in
+that renders a clickable test button and invokes the app's own registered callback with a
+test-minted token. This is the same "mock the network boundary, keep everything else real" approach
+Phase 18 already uses for NSE/BSE LiveSearch, applied to a different third-party surface. Covers: a
+first-time Google sign-in creates a real account and reaches the dashboard (plus a second mint +
+direct API call proving the "existing Google-linked user signs in again" find-or-create path), and a
+garbage token is rejected rather than silently accepted.
+
+**Performance depth** (`tests/performance/performance.spec.ts`, 4 more tests, 8 total): the existing
+`loadEventEnd` smoke check now runs alongside a real Core Web Vitals capture per page — LCP, CLS, and
+an INP approximation — using `PerformanceObserver` directly (`largest-contentful-paint`,
+`layout-shift`, and `event` entry types), installed via `page.addInitScript()` so early-firing
+entries (LCP in particular) aren't missed by only reading `performance.getEntriesByType()` after the
+page settles. No new dependency — this doesn't use the `web-vitals` npm package, just the same
+browser-native Performance Observer API it wraps. Each page's test also fires one real click (the FAB
+toggle, present on every page already covered) so the INP approximation has at least one real
+interaction sample to measure, rather than reporting a meaningless "0ms" for a page nobody
+interacted with. Verified the values are real, not vacuous zeros from a silently-unsupported
+observer type, by inspecting actual captured numbers directly (LCP ~150ms, CLS ~0.0001, INP ~32ms on
+this dev box) before trusting the assertions.
+
+This is still explicitly **not** a real performance budget — thresholds stay deliberately above the
+official "Poor" Core Web Vitals cutoffs (not the "Good" ones), for the same reason Phase 9's
+`loadEventEnd` thresholds already were: a local Docker Compose stack on whatever hardware runs it has
+no fixed baseline to hold a tight number against, and tightening these needs a dedicated, controlled
+benchmark environment (fixed hardware class, warm caches, no other containers competing for CPU) that
+building doesn't belong to this Playwright suite. What changed is *what's measured*, not the rigor of
+the gate — these tests now catch a real LCP/CLS/INP regression (a render-blocking resource, a
+layout-shifting element with no reserved space, a synchronous long task on click) that
+`loadEventEnd` alone couldn't see, at the same generous, environment-variance-tolerant threshold
+philosophy as before.
+
 ## Known gaps
 
 Most of what this section used to list (Vault Health/TOTP/export, Stock/MF investments, Dividend,
-Statement/CAS Import depth, WebAuthn, cross-browser, a11y severity, visual/tablet breadth) was
-closed out in Phases 15-23 above. What's genuinely left:
+Statement/CAS Import depth, WebAuthn round-trip, Google OAuth round-trip, cross-browser confirmation,
+a11y severity/breadth, visual/responsive breadth) was closed out in Phases 15-24 above. What's left
+needs a product or infra decision this suite can't make on its own, not more Playwright code:
 
-- **Google OAuth** is covered only at the boundary (the button renders, the correct request fires)
-  — see Phase 20 for why a full round trip isn't realistically achievable in this suite (no
-  CDP-level virtual OAuth provider the way WebAuthn has a virtual authenticator; would need a live
-  test Google account or backend test doubles).
-- **Cross-browser** (Phase 21) is now correct when run, but still opt-in — `test:regression` and
-  the other default scripts stay pinned to `--project=chromium` (see "chromium only, on purpose").
-  `test:auth`/`test:smoke`/`test:regression`'s own specs were verified via `accounts.spec.ts` and
-  `debts.spec.ts` under firefox; the other 22 regression files haven't each been individually run
-  under firefox/webkit, just made structurally safe to (per-project storageState + the six direct
-  `readRegressionUser()` callers threaded through — see Phase 21).
-- **Accessibility** (Phase 22) now asserts every severity tier, but still only the same five pages
-  (login, dashboard, accounts, transactions, investments, budgets) — goals, debts, family, reports,
-  notifications, settings, vault, analytics, and net worth aren't scanned at all.
-- **Responsive**: covers layout mechanics (mobile nav, FAB reachability, no horizontal overflow) on
-  four pages across two breakpoints now (`mobile-chrome` phone-width, `tablet` landscape-above-`lg`
-  — Phase 23) — not a full per-page mobile/tablet UX pass, and no portrait-tablet or narrow-desktop
-  (below typical monitor width but above `lg`) breakpoint either.
-- **Visual regression**: four static pages now (login, signup, FAQ, contact — Phase 23) — still
-  excludes every page with real per-run-dynamic content (dashboard, accounts, transactions, etc.),
-  which would need masking or a fully-seeded deterministic empty state to screenshot safely.
-  Baselines are pinned to macOS — see Phase 9's note on regenerating them per platform before
-  trusting a cross-platform failure.
+- **Cross-browser** (Phases 21 + 24) is now both structurally correct *and* individually verified
+  for every regression file except `webauthn.spec.ts` (Chromium-only by hard platform limit, not a
+  gap — see Phase 24). Still opt-in, by design — `test:regression` and the other default scripts
+  stay pinned to `--project=chromium` (see "chromium only, on purpose"); webkit hasn't had the same
+  file-by-file confirmation pass firefox just got.
+- **Accessibility** (Phases 22 + 24) now asserts every severity tier across all 14 dashboard pages —
+  genuinely closed as a suite; any residual gap is only in *other* apps' pages this suite doesn't
+  render (there are none left in the app's own nav).
+- **Responsive** (Phases 9 + 23 + 24): four breakpoints now (`mobile-chrome` phone-width, `tablet`
+  landscape-above-`lg`, `tablet-portrait` iPad-portrait-below-`lg`, `narrow-desktop` 1152px-above-
+  `lg`) across the same four pages — not yet a full per-page UX pass at every breakpoint, and no
+  portrait-*desktop*/ultra-wide breakpoint (unlikely to be worth adding without a concrete bug report
+  motivating it).
+- **Visual regression** (Phases 9 + 23 + 24): four static pages (login, signup, FAQ, contact) plus
+  three dynamic pages via a dedicated empty-state user (dashboard, accounts, transactions — Phase
+  24). Still excludes any page with content that's dynamic *even for a fresh user* in a way neither
+  masking nor an empty state fixes cleanly (e.g. a chart that only renders once months of history
+  exist) — none of the app's current pages hit that case, but a future one might. Baselines are
+  pinned to macOS — see Phase 9's note on regenerating them per platform before trusting a
+  cross-platform failure.
 - **Expense Split**: covered as of Phase 14 (multi-participant, custom amounts, the per-split
   `settle` endpoint). Not covered: a participant declining/removing themselves from a split, and
   the `pending` list's own display (only `balances` — the aggregated-by-counterpart view on
   `SplitsCard` — has UI coverage; there's no UI surface for the per-split list at all, same gap the
   per-split `settle` endpoint has).
-- **Performance**: `loadEventEnd` against a generous fixed ceiling on four pages — not Core Web
-  Vitals (LCP/CLS/INP), and not a real budget (see Phase 9's reasoning on environment variance).
+- **Performance** (Phases 9 + 24): now captures real Core Web Vitals (LCP/CLS/INP) alongside
+  `loadEventEnd`, on the same four pages — but still generous smoke thresholds, not a real budget;
+  that needs a dedicated, controlled benchmark environment (fixed hardware class, warm caches, no
+  other containers competing for CPU) this local Docker Compose stack can't provide, deliberately
+  not attempted here (see Phase 24's own reasoning).

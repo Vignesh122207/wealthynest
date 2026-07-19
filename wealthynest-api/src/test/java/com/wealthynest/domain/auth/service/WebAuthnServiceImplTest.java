@@ -187,22 +187,31 @@ class WebAuthnServiceImplTest {
     class GetAuthenticationOptionsTests {
 
         @Test
-        @DisplayName("throws NOT_FOUND for an unregistered email")
-        void throwsForUnknownEmail() {
+        @DisplayName("an unregistered email gets a normal-looking (empty-allowCredentials) options response, not a distinguishing error — enumeration guard, matching forgotPassword()/resendVerification()'s existing pattern")
+        void unknownEmailReturnsEmptyOptionsInsteadOfThrowing() {
             when(userRepository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
-            assertThatThrownBy(() -> service.getAuthenticationOptions("nobody@example.com"))
-                    .isInstanceOf(BusinessException.class);
+
+            Map<String, Object> options = service.getAuthenticationOptions("nobody@example.com");
+
+            assertThat(options).containsKey("challenge");
+            assertThat((List<?>) options.get("allowCredentials")).isEmpty();
+            verifyNoInteractions(credentialRepository);
+            // No verifiable challenge is stored for a nonexistent account — there's nothing to reveal.
+            verify(valueOperations, never()).set(eq("webauthn-login-challenge:nobody@example.com"), anyString(), any(Duration.class));
         }
 
         @Test
-        @DisplayName("throws when the account has no registered passkeys")
-        void throwsWhenNoPasskeysRegistered() {
+        @DisplayName("an account with no registered passkeys gets the same empty-allowCredentials response as an unregistered email")
+        void noPasskeysReturnsEmptyOptionsInsteadOfThrowing() {
             User user = User.builder().email("a@x.com").build();
             ReflectionTestUtils.setField(user, "id", userId);
             when(userRepository.findByEmail("a@x.com")).thenReturn(Optional.of(user));
             when(credentialRepository.findByUserId(userId)).thenReturn(List.of());
 
-            assertThatThrownBy(() -> service.getAuthenticationOptions("a@x.com")).isInstanceOf(BusinessException.class);
+            Map<String, Object> options = service.getAuthenticationOptions("a@x.com");
+
+            assertThat((List<?>) options.get("allowCredentials")).isEmpty();
+            verify(valueOperations, never()).set(eq("webauthn-login-challenge:a@x.com"), anyString(), any(Duration.class));
         }
 
         @Test

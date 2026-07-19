@@ -1,5 +1,6 @@
 package com.wealthynest.domain.admin.service;
 
+import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.domain.admin.entity.JobScheduleConfig;
 import com.wealthynest.domain.admin.repository.JobScheduleConfigRepository;
 import com.wealthynest.infra.external.StockDataService;
@@ -77,7 +78,7 @@ public class JobSchedulerService {
     @Transactional
     public JobScheduleConfig updateSchedule(String jobName, String cronExpression) {
         JobScheduleConfig cfg = configRepo.findById(jobName)
-            .orElseThrow(() -> new IllegalArgumentException("Unknown job: " + jobName));
+            .orElseThrow(() -> new ResourceNotFoundException("Job", "name", jobName));
         cfg.setCronExpression(cronExpression);
         configRepo.save(cfg);
         schedule(cfg);
@@ -93,7 +94,7 @@ public class JobSchedulerService {
     public void triggerNow(String jobName) {
         // Validate job name before submitting
         if (!configRepo.existsById(jobName)) {
-            throw new IllegalArgumentException("Unknown job: " + jobName);
+            throw new ResourceNotFoundException("Job", "name", jobName);
         }
         log.info("Manual trigger (async): {}", jobName);
         markRunning(jobName);
@@ -189,7 +190,7 @@ public class JobSchedulerService {
             case "LOAN_EMI_REMINDER"    -> emiReminderScheduler.checkUpcomingEmis();
             case "RECURRING_TRANSFER"   -> recurringTransferScheduler.processRecurringTransfers();
             case "RECURRING_GOAL_CONTRIBUTION" -> recurringGoalContributionScheduler.processRecurringGoalContributions();
-            default -> throw new IllegalArgumentException("Unknown job: " + jobName);
+            default -> throw new ResourceNotFoundException("Job", "name", jobName);
         }
     }
 

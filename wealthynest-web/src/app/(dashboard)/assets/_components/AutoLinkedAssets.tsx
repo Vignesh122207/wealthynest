@@ -12,7 +12,7 @@ export function AutoLinkedAssets({ summary, loadingSum, fmt }: {
 }) {
   return (
     <div className="lg:col-span-2 bg-card border border-border rounded-2xl p-5">
-      <h3 className="font-semibold text-foreground text-sm mb-1">Auto-Linked Assets</h3>
+      <h2 className="font-semibold text-foreground text-sm mb-1">Auto-Linked Assets</h2>
       <p className="text-xs text-muted-foreground/80 mb-4">Pulled live from your Accounts &amp; Investments — no manual entry needed.</p>
       <div className="space-y-2">
         {/* Cash & Bank — excludes Emergency Fund, which gets its own row below even

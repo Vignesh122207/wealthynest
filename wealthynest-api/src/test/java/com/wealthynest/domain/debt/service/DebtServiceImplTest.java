@@ -303,7 +303,7 @@ class DebtServiceImplTest {
         }
 
         @Test
-        @DisplayName("throws IllegalStateException when the debt is already SETTLED")
+        @DisplayName("throws a CONFLICT BusinessException when the debt is already SETTLED")
         void throwsWhenAlreadySettled() {
             DebtRecord record = withId(baseRecord().status(DebtStatus.SETTLED).build());
             when(debtRecordRepository.findByIdAndUserId(debtId, userId)).thenReturn(Optional.of(record));
@@ -311,7 +311,9 @@ class DebtServiceImplTest {
             lenient().when(req.getAmount()).thenReturn(new BigDecimal("100"));
 
             assertThatThrownBy(() -> service.recordPayment(debtId, userId, req))
-                    .isInstanceOf(IllegalStateException.class);
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(ex -> ((BusinessException) ex).getStatus())
+                    .isEqualTo(org.springframework.http.HttpStatus.CONFLICT);
         }
 
         @Test

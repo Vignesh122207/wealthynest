@@ -2,6 +2,7 @@ package com.wealthynest.domain.admin.controller;
 
 import com.wealthynest.config.RateLimitConfig;
 import com.wealthynest.config.SecurityConfig;
+import com.wealthynest.domain.admin.entity.JobScheduleConfig;
 import com.wealthynest.domain.admin.service.AdminService;
 import com.wealthynest.domain.admin.service.JobSchedulerService;
 import com.wealthynest.domain.user.entity.UserRole;
@@ -18,12 +19,17 @@ import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -120,6 +126,99 @@ class AdminControllerTest {
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                         .patch("/api/v1/admin/users/{id}/toggle-active", targetId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(targetId.toString()));
+    }
+
+    // ── Jobs ──────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("listJobs returns the job scheduler's configs wrapped in ApiResponse")
+    void listJobsReturnsConfigs() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null, UserRole.ADMIN);
+        JobScheduleConfig cfg = JobScheduleConfig.builder()
+                .jobName("AUTO_INCOME").displayName("Auto Income").cronExpression("0 0 2 * * *")
+                .timezone("Asia/Kolkata").enabled(true).build();
+        when(jobSchedulerService.getAllConfigs()).thenReturn(List.of(cfg));
+
+        mockMvc.perform(get("/api/v1/admin/jobs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].jobName").value("AUTO_INCOME"));
+    }
+
+    @Test
+    @DisplayName("triggerJob delegates the path-variable job name to the scheduler and confirms success")
+    void triggerJobDelegatesToScheduler() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null, UserRole.ADMIN);
+
+        mockMvc.perform(post("/api/v1/admin/jobs/{jobName}/trigger", "AUTO_INCOME"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("Job AUTO_INCOME triggered successfully"));
+
+        org.mockito.Mockito.verify(jobSchedulerService).triggerNow("AUTO_INCOME");
+    }
+
+    @Test
+    @DisplayName("triggerJob for an unknown job returns a proper 404 NOT_FOUND")
+    void triggerJobUnknownJobReturns404() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null, UserRole.ADMIN);
+        doThrow(new com.wealthynest.common.exception.ResourceNotFoundException("Job", "name", "BOGUS"))
+                .when(jobSchedulerService).triggerNow("BOGUS");
+
+        mockMvc.perform(post("/api/v1/admin/jobs/{jobName}/trigger", "BOGUS"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("updateSchedule passes the jobName and cron query param through and returns the updated config")
+    void updateScheduleDelegatesToScheduler() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null, UserRole.ADMIN);
+        JobScheduleConfig updated = JobScheduleConfig.builder()
+                .jobName("AUTO_INCOME").displayName("Auto Income").cronExpression("0 15 3 * * *")
+                .timezone("Asia/Kolkata").enabled(true).build();
+        when(jobSchedulerService.updateSchedule("AUTO_INCOME", "0 15 3 * * *")).thenReturn(updated);
+
+        mockMvc.perform(put("/api/v1/admin/jobs/{jobName}/schedule", "AUTO_INCOME")
+                        .param("cron", "0 15 3 * * *"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.cronExpression").value("0 15 3 * * *"));
+    }
+
+    // ── Remaining admin endpoints ────────────────────────────────────────────
+
+    @Test
+    @DisplayName("getUserGrowth returns the admin service's growth series")
+    void getUserGrowthReturnsSeries() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null, UserRole.ADMIN);
+        when(adminService.getUserGrowth()).thenReturn(List.of(Map.of("month", "2025-01", "count", 5)));
+
+        mockMvc.perform(get("/api/v1/admin/user-growth"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].count").value(5));
+    }
+
+    @Test
+    @DisplayName("resetPassword returns a confirmation message including the target user's email")
+    void resetPasswordReturnsConfirmation() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null, UserRole.ADMIN);
+        UUID targetId = UUID.randomUUID();
+        when(adminService.resetPassword(eq(targetId), eq(userId), any(), any())).thenReturn("user@example.com");
+
+        mockMvc.perform(post("/api/v1/admin/users/{id}/reset-password", targetId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("Password reset email sent to user@example.com"));
+    }
+
+    @Test
+    @DisplayName("anonymizeUser delegates to the service and returns the anonymized user")
+    void anonymizeUserDelegates() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null, UserRole.ADMIN);
+        UUID targetId = UUID.randomUUID();
+        when(adminService.anonymizeUser(eq(targetId), eq(userId), any(), any()))
+                .thenReturn(com.wealthynest.domain.user.dto.response.UserResponse.builder().id(targetId).build());
+
+        mockMvc.perform(post("/api/v1/admin/users/{id}/anonymize", targetId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(targetId.toString()));
     }

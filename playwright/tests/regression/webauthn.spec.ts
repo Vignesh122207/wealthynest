@@ -11,13 +11,12 @@ import {SettingsPage} from "../../pages/SettingsPage";
 // it reliably stay under the 10 req/min limit; combined with another file's own auth traffic in
 // the same ~30-60s window, it wasn't.
 //
-// Google OAuth's full round trip stays boundary-only (button renders, correct request fires) —
-// unlike WebAuthn, there's no CDP-level "virtual OAuth provider" Chromium exposes; a real round
-// trip would need either a live test Google account (flaky, account-management overhead, and
-// arguably out of scope for a local E2E suite) or backend test doubles for Google's token
-// endpoint, which is a bigger infra project than this pass. WebAuthn's virtual authenticator is a
-// first-class, purpose-built Chromium testing feature, which is exactly why this one — and not
-// OAuth — gets real coverage here.
+// Google OAuth also now gets a real round trip (see tests/oauth/google-oauth.spec.ts) — unlike
+// WebAuthn, there's no CDP-level "virtual OAuth provider" Chromium exposes, so that suite takes a
+// different path: a backend test double (TestGoogleIdentityService, e2e-oauth-test profile) mints
+// and verifies ID tokens against a local key pair instead of Google's real certs, letting the real
+// frontend GoogleSignInButton flow run end to end without a live Google account. WebAuthn's virtual
+// authenticator remains the simpler, first-class Chromium feature for this file's own flow.
 //
 // Deliberately its own context pointed at TUNNEL_BASE_URL, not localhost like every other test in
 // this suite: WebAuthn is origin-bound — the browser rejects

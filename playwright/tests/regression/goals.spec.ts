@@ -1,4 +1,4 @@
-import {test} from "../../fixtures";
+import {expect, test} from "../../fixtures";
 import {randomGoal} from "../../test-data/factory";
 
 // Serial — see debts.spec.ts's comment: shares the regressionUser with every other file in
@@ -62,6 +62,26 @@ test.describe("Goals", () => {
     await goalsPage.expectGoalVisible(goal.name);
 
     await goalsPage.deleteGoal(goal.name);
+    await goalsPage.expectGoalNotVisible(goal.name);
+  });
+
+  // ─── Validation depth (goalSchema.ts) ───────────────────────────────────────
+
+  test("a zero target amount is rejected client-side @regression", async ({ goalsPage }) => {
+    const goal = randomGoal();
+    await goalsPage.gotoGoals();
+    await goalsPage.attemptCreateInvalid({ name: goal.name, targetAmount: 0 });
+
+    await expect(goalsPage.rawPage.getByText("Must be a positive amount")).toBeVisible();
+    await goalsPage.expectGoalNotVisible(goal.name);
+  });
+
+  test("a saved amount greater than the target amount is rejected client-side @regression", async ({ goalsPage }) => {
+    const goal = randomGoal();
+    await goalsPage.gotoGoals();
+    await goalsPage.attemptCreateInvalid({ name: goal.name, targetAmount: 1000, savedAmount: 2000 });
+
+    await expect(goalsPage.rawPage.getByText("Saved amount cannot exceed the target amount")).toBeVisible();
     await goalsPage.expectGoalNotVisible(goal.name);
   });
 });
