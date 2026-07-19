@@ -204,4 +204,57 @@ class RecurringGoalContributionServiceImplTest {
         service.delete(ruleId, userId);
         verify(recurringGoalContributionRepository).delete(rule);
     }
+
+    // ─── getAll / create happy path ─────────────────────────────────────────────
+
+    @Test
+    @DisplayName("getAll maps each rule to a response, resolving the goal's name/icon/color")
+    void getAllMapsRulesResolvingGoal() {
+        RecurringGoalContribution rule = withId(baseRule().build());
+        Goal goal = Goal.builder().name("Emergency Fund").icon("shield").color("#FF0000")
+                .targetAmount(new BigDecimal("100000")).savedAmount(new BigDecimal("20000")).build();
+        when(recurringGoalContributionRepository.findByUserIdOrderByCreatedAtDesc(userId)).thenReturn(List.of(rule));
+        when(goalRepository.findById(goalId)).thenReturn(Optional.of(goal));
+
+        var result = service.getAll(userId);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getGoalName()).isEqualTo("Emergency Fund");
+        assertThat(result.get(0).getGoalIcon()).isEqualTo("shield");
+    }
+
+    @Test
+    @DisplayName("getAll: goal has been deleted -> goalName falls back to \"Unknown Goal\", icon/color null")
+    void getAllMissingGoal_fallsBackToUnknownGoal() {
+        RecurringGoalContribution rule = withId(baseRule().build());
+        when(recurringGoalContributionRepository.findByUserIdOrderByCreatedAtDesc(userId)).thenReturn(List.of(rule));
+        when(goalRepository.findById(goalId)).thenReturn(Optional.empty());
+
+        var result = service.getAll(userId);
+
+        assertThat(result.get(0).getGoalName()).isEqualTo("Unknown Goal");
+        assertThat(result.get(0).getGoalIcon()).isNull();
+    }
+
+    @Test
+    @DisplayName("create validates goal ownership then saves a new active rule")
+    void create_validatesOwnershipAndSaves() {
+        Goal goal = Goal.builder().userId(userId).name("Vacation")
+                .targetAmount(new BigDecimal("50000")).savedAmount(BigDecimal.ZERO).build();
+        when(goalRepository.findById(goalId)).thenReturn(Optional.of(goal));
+        when(recurringGoalContributionRepository.save(any(RecurringGoalContribution.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        CreateRecurringGoalContributionRequest req = new CreateRecurringGoalContributionRequest();
+        ReflectionTestUtils.setField(req, "goalId", goalId);
+        ReflectionTestUtils.setField(req, "amount", new BigDecimal("1000"));
+        ReflectionTestUtils.setField(req, "dayOfMonth", 1);
+
+        var result = service.create(userId, req);
+
+        ArgumentCaptor<RecurringGoalContribution> captor = ArgumentCaptor.forClass(RecurringGoalContribution.class);
+        verify(recurringGoalContributionRepository).save(captor.capture());
+        assertThat(captor.getValue().isActive()).isTrue();
+        assertThat(result.getAmount()).isEqualByComparingTo("1000");
+    }
 }

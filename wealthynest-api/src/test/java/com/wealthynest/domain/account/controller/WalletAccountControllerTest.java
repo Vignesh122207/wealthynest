@@ -196,6 +196,138 @@ class WalletAccountControllerTest {
                     .andExpect(header().string("Content-Type", "text/csv"))
                     .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("attachment")));
         }
+
+        @Test
+        @DisplayName("GET /accounts/archived delegates the authenticated userId")
+        void getArchivedDelegatesToService() throws Exception {
+            SecurityTestUtils.authenticateAs(userId, null);
+            when(accountService.getArchivedAccounts(userId)).thenReturn(List.of(sampleAccount()));
+
+            mockMvc.perform(get("/api/v1/accounts/archived"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.length()").value(1));
+        }
+
+        @Test
+        @DisplayName("PUT /accounts/{id} passes the path id and authenticated userId through")
+        void updateDelegatesToService() throws Exception {
+            SecurityTestUtils.authenticateAs(userId, null);
+            UUID accountId = UUID.randomUUID();
+            when(accountService.updateAccount(eq(accountId), eq(userId), org.mockito.ArgumentMatchers.any()))
+                    .thenReturn(sampleAccount());
+
+            mockMvc.perform(put("/api/v1/accounts/{id}", accountId)
+                            .contentType("application/json")
+                            .content(objectMapper.writeValueAsString(validCreateRequest())))
+                    .andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("PATCH /accounts/{id}/archive delegates the path id and authenticated userId")
+        void archiveDelegatesToService() throws Exception {
+            SecurityTestUtils.authenticateAs(userId, null);
+            UUID accountId = UUID.randomUUID();
+            when(accountService.archiveAccount(accountId, userId)).thenReturn(sampleAccount());
+
+            mockMvc.perform(patch("/api/v1/accounts/{id}/archive", accountId))
+                    .andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("PATCH /accounts/{id}/unarchive delegates the path id and authenticated userId")
+        void unarchiveDelegatesToService() throws Exception {
+            SecurityTestUtils.authenticateAs(userId, null);
+            UUID accountId = UUID.randomUUID();
+            when(accountService.unarchiveAccount(accountId, userId)).thenReturn(sampleAccount());
+
+            mockMvc.perform(patch("/api/v1/accounts/{id}/unarchive", accountId))
+                    .andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("PATCH /accounts/{id}/set-primary delegates the path id and authenticated userId")
+        void setPrimaryDelegatesToService() throws Exception {
+            SecurityTestUtils.authenticateAs(userId, null);
+            UUID accountId = UUID.randomUUID();
+            when(accountService.setPrimary(accountId, userId)).thenReturn(sampleAccount());
+
+            mockMvc.perform(patch("/api/v1/accounts/{id}/set-primary", accountId))
+                    .andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("GET /accounts/transfers builds a transferDate-descending pageable and returns the service's page")
+        void getTransfersDelegatesToService() throws Exception {
+            SecurityTestUtils.authenticateAs(userId, null);
+            var page = new org.springframework.data.domain.PageImpl<>(
+                    List.of(TransferResponse.builder().id(UUID.randomUUID()).build()));
+            when(accountService.getTransfers(eq(userId), org.mockito.ArgumentMatchers.any()))
+                    .thenReturn(com.wealthynest.common.response.PagedResponse.of(page));
+
+            mockMvc.perform(get("/api/v1/accounts/transfers"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.length()").value(1));
+        }
+
+        @Test
+        @DisplayName("PUT /accounts/transfer/{id} passes the path id and authenticated userId through")
+        void updateTransferDelegatesToService() throws Exception {
+            SecurityTestUtils.authenticateAs(userId, null);
+            UUID transferId = UUID.randomUUID();
+            com.wealthynest.domain.account.dto.request.UpdateTransferRequest req =
+                    new com.wealthynest.domain.account.dto.request.UpdateTransferRequest();
+            ReflectionTestUtils.setField(req, "amount", new BigDecimal("250"));
+            when(accountService.updateTransfer(eq(transferId), eq(userId), org.mockito.ArgumentMatchers.any()))
+                    .thenReturn(TransferResponse.builder().id(transferId).build());
+
+            mockMvc.perform(put("/api/v1/accounts/transfer/{id}", transferId)
+                            .contentType("application/json")
+                            .content(objectMapper.writeValueAsString(req)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.id").value(transferId.toString()));
+        }
+
+        @Test
+        @DisplayName("DELETE /accounts/transfer/{id} delegates the authenticated userId and returns 204")
+        void deleteTransferDelegatesToService() throws Exception {
+            SecurityTestUtils.authenticateAs(userId, null);
+            UUID transferId = UUID.randomUUID();
+
+            mockMvc.perform(delete("/api/v1/accounts/transfer/{id}", transferId))
+                    .andExpect(status().isNoContent());
+
+            org.mockito.Mockito.verify(accountService).deleteTransfer(transferId, userId);
+        }
+
+        @Test
+        @DisplayName("POST /accounts/{id}/loan-payment passes amount and fromAccountId through to LoanPaymentService")
+        void recordLoanPaymentDelegatesToService() throws Exception {
+            SecurityTestUtils.authenticateAs(userId, null);
+            UUID accountId = UUID.randomUUID();
+            UUID fromAccountId = UUID.randomUUID();
+
+            mockMvc.perform(post("/api/v1/accounts/{id}/loan-payment", accountId)
+                            .contentType("application/json")
+                            .content("{\"amount\": 500, \"fromAccountId\": \"" + fromAccountId + "\"}"))
+                    .andExpect(status().isOk());
+
+            org.mockito.Mockito.verify(loanPaymentService)
+                    .recordPayment(accountId, userId, new BigDecimal("500"), fromAccountId);
+        }
+
+        @Test
+        @DisplayName("POST /accounts/{id}/adjust-balance extracts targetBalance from the body and delegates")
+        void adjustBalanceDelegatesToService() throws Exception {
+            SecurityTestUtils.authenticateAs(userId, null);
+            UUID accountId = UUID.randomUUID();
+            when(accountService.adjustBalance(eq(accountId), eq(userId), eq(new BigDecimal("1500"))))
+                    .thenReturn(sampleAccount());
+
+            mockMvc.perform(post("/api/v1/accounts/{id}/adjust-balance", accountId)
+                            .contentType("application/json")
+                            .content("{\"targetBalance\": 1500}"))
+                    .andExpect(status().isOk());
+        }
     }
 
     @Test

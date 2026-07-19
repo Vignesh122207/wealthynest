@@ -110,4 +110,46 @@ class RecurringGoalContributionControllerTest {
 
         verify(service).toggleActive(id, userId);
     }
+
+    @Test
+    @DisplayName("GET /recurring-goal-contribution delegates the authenticated userId and returns the service's list")
+    void getAllDelegatesToService() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null);
+        when(service.getAll(userId)).thenReturn(java.util.List.of(
+                RecurringGoalContributionResponse.builder().id(UUID.randomUUID()).build()));
+
+        mockMvc.perform(get("/api/v1/recurring-goal-contribution"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1));
+    }
+
+    @Test
+    @DisplayName("PUT /{id} passes the path id and authenticated userId through")
+    void updateDelegatesToService() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null);
+        UUID id = UUID.randomUUID();
+        com.wealthynest.domain.recurringgoalcontribution.dto.request.UpdateRecurringGoalContributionRequest req =
+                new com.wealthynest.domain.recurringgoalcontribution.dto.request.UpdateRecurringGoalContributionRequest();
+        ReflectionTestUtils.setField(req, "amount", new BigDecimal("2000"));
+        when(service.update(eq(id), eq(userId), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(RecurringGoalContributionResponse.builder().id(id).build());
+
+        mockMvc.perform(put("/api/v1/recurring-goal-contribution/{id}", id)
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(id.toString()));
+    }
+
+    @Test
+    @DisplayName("DELETE /{id} delegates the authenticated userId")
+    void deleteDelegatesUserId() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null);
+        UUID id = UUID.randomUUID();
+
+        mockMvc.perform(delete("/api/v1/recurring-goal-contribution/{id}", id))
+                .andExpect(status().isOk());
+
+        verify(service).delete(id, userId);
+    }
 }

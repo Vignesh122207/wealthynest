@@ -123,4 +123,46 @@ class RecurringTransferControllerTest {
 
         verify(service).toggleActive(id, userId);
     }
+
+    @Test
+    @DisplayName("GET /recurring-transfer delegates the authenticated userId and returns the service's list")
+    void getAllDelegatesToService() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null);
+        when(service.getAll(userId)).thenReturn(java.util.List.of(
+                RecurringTransferResponse.builder().id(UUID.randomUUID()).build()));
+
+        mockMvc.perform(get("/api/v1/recurring-transfer"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1));
+    }
+
+    @Test
+    @DisplayName("PUT /{id} passes the path id and authenticated userId through")
+    void updateDelegatesToService() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null);
+        UUID id = UUID.randomUUID();
+        com.wealthynest.domain.recurringtransfer.dto.request.UpdateRecurringTransferRequest req =
+                new com.wealthynest.domain.recurringtransfer.dto.request.UpdateRecurringTransferRequest();
+        ReflectionTestUtils.setField(req, "amount", new BigDecimal("3000"));
+        when(service.update(eq(id), eq(userId), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(RecurringTransferResponse.builder().id(id).build());
+
+        mockMvc.perform(put("/api/v1/recurring-transfer/{id}", id)
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(id.toString()));
+    }
+
+    @Test
+    @DisplayName("DELETE /{id} delegates the authenticated userId")
+    void deleteDelegatesUserId() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null);
+        UUID id = UUID.randomUUID();
+
+        mockMvc.perform(delete("/api/v1/recurring-transfer/{id}", id))
+                .andExpect(status().isOk());
+
+        verify(service).delete(id, userId);
+    }
 }

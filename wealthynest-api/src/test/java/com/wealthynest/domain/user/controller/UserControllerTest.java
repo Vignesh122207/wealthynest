@@ -142,4 +142,55 @@ class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.fullName").value("New Name"));
     }
+
+    @Test
+    @DisplayName("POST /me/change-password with a valid request delegates userId + client metadata to the service")
+    void changePasswordDelegatesToService() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null);
+        ChangePasswordRequest req = new ChangePasswordRequest();
+        ReflectionTestUtils.setField(req, "currentPassword", "OldPass1");
+        ReflectionTestUtils.setField(req, "newPassword", "NewPass123");
+
+        mockMvc.perform(post("/api/v1/users/me/change-password")
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk());
+
+        verify(userService).changePassword(eq(userId), any(ChangePasswordRequest.class), any(), any());
+    }
+
+    @Test
+    @DisplayName("POST /me/change-email delegates to authService, not userService")
+    void changeEmailDelegatesToAuthService() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null);
+        com.wealthynest.domain.auth.dto.request.ChangeEmailRequest req =
+                new com.wealthynest.domain.auth.dto.request.ChangeEmailRequest();
+        ReflectionTestUtils.setField(req, "newEmail", "new@example.com");
+        ReflectionTestUtils.setField(req, "currentPassword", "CurrentPass1");
+
+        mockMvc.perform(post("/api/v1/users/me/change-email")
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk());
+
+        verify(authService).changeEmail(eq(userId), any(), any(), any());
+        org.mockito.Mockito.verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("POST /me/pin/enable with a valid PIN delegates to authService")
+    void enablePinDelegatesToAuthService() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null);
+        com.wealthynest.domain.auth.dto.request.EnablePinRequest req =
+                new com.wealthynest.domain.auth.dto.request.EnablePinRequest();
+        ReflectionTestUtils.setField(req, "currentPassword", "CurrentPass1");
+        ReflectionTestUtils.setField(req, "pin", "1234");
+
+        mockMvc.perform(post("/api/v1/users/me/pin/enable")
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk());
+
+        verify(authService).enablePin(eq(userId), any());
+    }
 }

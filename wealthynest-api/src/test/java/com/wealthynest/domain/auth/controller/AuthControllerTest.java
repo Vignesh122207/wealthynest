@@ -26,8 +26,14 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.Map;
+
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -179,5 +185,135 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.fieldErrors.email").exists());
 
         org.mockito.Mockito.verify(authService, org.mockito.Mockito.never()).resendVerification(any());
+    }
+
+    @Test
+    @DisplayName("login success returns 200 with the service's AuthResponse")
+    void loginSuccessReturnsAuthResponse() throws Exception {
+        LoginRequest req = new LoginRequest();
+        ReflectionTestUtils.setField(req, "email", "jane@example.com");
+        ReflectionTestUtils.setField(req, "password", "Passw0rd1");
+        when(authService.login(any(), any(), any())).thenReturn(sampleAuthResponse());
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accessToken").value("access"));
+    }
+
+    @Test
+    @DisplayName("refresh delegates the request and returns the new AuthResponse")
+    void refreshDelegatesToService() throws Exception {
+        when(authService.refresh(any())).thenReturn(sampleAuthResponse());
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType("application/json")
+                        .content("{\"refreshToken\":\"some-token\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accessToken").value("access"));
+    }
+
+    @Test
+    @DisplayName("logout delegates the raw refresh token and client metadata to the service")
+    void logoutDelegatesToService() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .contentType("application/json")
+                        .content("{\"refreshToken\":\"some-token\"}"))
+                .andExpect(status().isOk());
+
+        verify(authService).logout(eq("some-token"), any(), any());
+    }
+
+    @Test
+    @DisplayName("forgotPassword delegates to the service and always returns 200 regardless of whether the email exists")
+    void forgotPasswordDelegatesToService() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/forgot-password")
+                        .contentType("application/json")
+                        .content("{\"email\":\"jane@example.com\"}"))
+                .andExpect(status().isOk());
+
+        verify(authService).forgotPassword(any());
+    }
+
+    @Test
+    @DisplayName("resetPassword delegates the request and client metadata to the service")
+    void resetPasswordDelegatesToService() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/reset-password")
+                        .contentType("application/json")
+                        .content("{\"token\":\"raw-token\",\"newPassword\":\"NewPassw0rd1\"}"))
+                .andExpect(status().isOk());
+
+        verify(authService).resetPassword(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("verifyEmail delegates the token query param and client metadata to the service")
+    void verifyEmailDelegatesToService() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/verify-email").param("token", "raw-token"))
+                .andExpect(status().isOk());
+
+        verify(authService).verifyEmail(eq("raw-token"), any(), any());
+    }
+
+    @Test
+    @DisplayName("resendVerification with a valid email delegates to the service")
+    void resendVerificationSuccessDelegatesToService() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/resend-verification").param("email", "jane@example.com"))
+                .andExpect(status().isOk());
+
+        verify(authService).resendVerification("jane@example.com");
+    }
+
+    @Test
+    @DisplayName("googleLogin delegates the request and client metadata to the service")
+    void googleLoginDelegatesToService() throws Exception {
+        when(authService.googleLogin(any(), any(), any())).thenReturn(sampleAuthResponse());
+
+        mockMvc.perform(post("/api/v1/auth/google-login")
+                        .contentType("application/json")
+                        .content("{\"idToken\":\"raw-id-token\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accessToken").value("access"));
+    }
+
+    @Test
+    @DisplayName("pinLogin delegates the request and client metadata to the service")
+    void pinLoginDelegatesToService() throws Exception {
+        when(authService.pinLogin(any(), any(), any())).thenReturn(sampleAuthResponse());
+
+        mockMvc.perform(post("/api/v1/auth/pin-login")
+                        .contentType("application/json")
+                        .content("{\"refreshToken\":\"some-token\",\"pin\":\"1234\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accessToken").value("access"));
+    }
+
+    @Test
+    @DisplayName("webAuthnLoginOptions delegates the email to WebAuthnService")
+    void webAuthnLoginOptionsDelegatesToService() throws Exception {
+        when(webAuthnService.getAuthenticationOptions("jane@example.com"))
+                .thenReturn(Map.of("challenge", "abc123"));
+
+        mockMvc.perform(post("/api/v1/auth/webauthn/login/options")
+                        .contentType("application/json")
+                        .content("{\"email\":\"jane@example.com\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.challenge").value("abc123"));
+    }
+
+    @Test
+    @DisplayName("webAuthnLoginVerify extracts email/credential/rememberMe from the raw body and delegates to WebAuthnService")
+    void webAuthnLoginVerifyDelegatesToService() throws Exception {
+        when(webAuthnService.verifyAuthentication(eq("jane@example.com"), any(), eq(true), any(), any()))
+                .thenReturn(sampleAuthResponse());
+
+        mockMvc.perform(post("/api/v1/auth/webauthn/login/verify")
+                        .contentType("application/json")
+                        .content("{\"email\":\"jane@example.com\",\"rememberMe\":true,\"credential\":{\"id\":\"cred-1\"}}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accessToken").value("access"));
+
+        verify(webAuthnService).verifyAuthentication(eq("jane@example.com"), any(), eq(true), any(), any());
     }
 }
