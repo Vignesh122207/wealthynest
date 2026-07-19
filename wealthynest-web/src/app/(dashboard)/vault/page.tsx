@@ -26,7 +26,7 @@ const VaultItemForm     = dynamic(() => import("@/features/vault/components/Vaul
 const RevealSecretModal = dynamic(() => import("@/features/vault/components/RevealSecretModal").then(m => m.RevealSecretModal), { ssr: false });
 const ExportVaultModal  = dynamic(() => import("@/features/vault/components/ExportVaultModal").then(m => m.ExportVaultModal), { ssr: false });
 
-const VAULT_COPPER = "#c2703d";
+const VAULT_SLATE = "#64748b";
 
 export default function VaultPage() {
   useVaultAutoLock();
@@ -92,7 +92,7 @@ export default function VaultPage() {
       )}
 
       {showCreate && (
-        <VaultItemForm isCreate accentColor={VAULT_COPPER}
+        <VaultItemForm isCreate accentColor={VAULT_SLATE}
           onSubmit={onCreateSubmit} onCancel={() => setShowCreate(false)} isPending={creating} />
       )}
 
@@ -128,17 +128,17 @@ export default function VaultPage() {
           {items.length > 0 && (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               <Card className="p-4">
-                <PremiumIcon icon={KeyRound} hex={VAULT_COPPER} size="xs" className="mb-2" />
+                <PremiumIcon icon={KeyRound} hex={VAULT_SLATE} size="xs" className="mb-2" />
                 <p className="text-xs text-muted-foreground mb-1">Total Items</p>
                 <p className="text-lg font-bold text-foreground tabular-nums">{items.length}</p>
               </Card>
               <Card className="p-4">
-                <PremiumIcon icon={KeyRound} hex={VAULT_COPPER} size="xs" className="mb-2" />
+                <PremiumIcon icon={KeyRound} hex={VAULT_SLATE} size="xs" className="mb-2" />
                 <p className="text-xs text-muted-foreground mb-1">Logins</p>
                 <p className="text-lg font-bold text-foreground tabular-nums">{loginCount}</p>
               </Card>
               <Card className="p-4">
-                <PremiumIcon icon={FileText} hex={VAULT_COPPER} size="xs" className="mb-2" />
+                <PremiumIcon icon={FileText} hex={VAULT_SLATE} size="xs" className="mb-2" />
                 <p className="text-xs text-muted-foreground mb-1">Secure Notes</p>
                 <p className="text-lg font-bold text-foreground tabular-nums">{noteCount}</p>
               </Card>
@@ -153,7 +153,7 @@ export default function VaultPage() {
           <Card className="overflow-hidden">
             {items.length > 0 && (
               <div className="px-5 py-3 border-b border-border flex items-center gap-3 flex-wrap">
-                <PremiumIcon icon={KeyRound} hex={VAULT_COPPER} size="xs" />
+                <PremiumIcon icon={KeyRound} hex={VAULT_SLATE} size="xs" />
                 <span className="font-semibold text-foreground text-sm">Vault Items</span>
                 <span className="text-xs text-muted-foreground">{filtered.length}</span>
                 <div className="ml-auto flex items-center gap-3 w-full sm:w-auto">
@@ -182,7 +182,7 @@ export default function VaultPage() {
                 action={
                   <button onClick={() => setShowCreate(true)}
                     className="flex items-center gap-2 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all"
-                    style={{ backgroundColor: VAULT_COPPER }}>
+                    style={{ backgroundColor: VAULT_SLATE }}>
                     <KeyRound className="w-4 h-4" /> Add First Item
                   </button>
                 } />
@@ -203,7 +203,7 @@ export default function VaultPage() {
       </main>
 
       <FloatingActionButton actions={[
-        { icon: KeyRound, label: "Add to Vault", color: "copper", testId: "fab-add-vault-item",
+        { icon: KeyRound, label: "Add to Vault", color: "slate", testId: "fab-add-vault-item",
           onClick: () => { setShowCreate(true); setEditItem(null); } },
       ]} />
     </div>

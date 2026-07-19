@@ -9,7 +9,7 @@ import {cn} from "@/lib/utils";
 import {useVaultHealth} from "../hooks/useVault";
 import type {VaultHealthItemSummary, VaultItem} from "../types/vault.types";
 
-const VAULT_COPPER = "#c2703d";
+const VAULT_SLATE = "#64748b";
 
 const TILES = [
   { key: "reused" as const,   label: "Reused",   icon: Copy,        tone: "orange" as const },
@@ -32,7 +32,7 @@ export function VaultHealthCard({ items, onEditItem }: { items: VaultItem[]; onE
   if (health.reusedCount === 0 && health.weakCount === 0 && health.breachedCount === 0) {
     return (
       <Card className="p-4 flex items-center gap-3" data-testid="vault-health-all-clear">
-        <PremiumIcon icon={ShieldCheck} hex={VAULT_COPPER} size="xs" />
+        <PremiumIcon icon={ShieldCheck} hex={VAULT_SLATE} size="xs" />
         <div>
           <p className="text-sm font-semibold text-foreground">Vault Health: All clear</p>
           <p className="text-xs text-muted-foreground">No reused, weak, or breached passwords found.</p>
@@ -72,7 +72,7 @@ export function VaultHealthCard({ items, onEditItem }: { items: VaultItem[]; onE
               <button key={summary.id} type="button" disabled={!item} data-testid="vault-health-item-row"
                 onClick={() => item && onEditItem(item)}
                 className="w-full flex items-center gap-3 px-5 py-2.5 hover:bg-muted/20 transition-colors text-left">
-                <PremiumIcon icon={resolveVaultIcon(summary)} hex={VAULT_COPPER} size="xs" />
+                <PremiumIcon icon={resolveVaultIcon(summary)} hex={VAULT_SLATE} size="xs" />
                 <span className="text-sm text-foreground truncate">{summary.title}</span>
               </button>
             );

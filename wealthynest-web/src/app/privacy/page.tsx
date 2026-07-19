@@ -20,8 +20,8 @@ export default function PrivacyPage() {
 
         {/* Header */}
         <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-violet-500/10 mb-5">
-            <Shield className="w-6 h-6 text-violet-500" />
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[#935a35]/10 mb-5">
+            <Shield className="w-6 h-6 text-[#935a35]" />
           </div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Privacy Policy</h1>
           <p className="text-xs text-muted-foreground">Last updated: June 2026</p>
@@ -33,7 +33,7 @@ export default function PrivacyPage() {
             <p>
               WealthyNest (&quot;we&quot;, &quot;our&quot;, &quot;us&quot;) is a personal finance application built for Indian families.
               We are operated as an independent product. For questions, contact us at{" "}
-              <a href="mailto:support@wealthynest.in" className="text-indigo-500 hover:underline">
+              <a href="mailto:support@wealthynest.in" className="text-[#c2703d] hover:underline">
                 support@wealthynest.in
               </a>.
             </p>
@@ -122,7 +122,7 @@ export default function PrivacyPage() {
           <div className="pt-4 border-t border-border">
             <p className="text-sm text-muted-foreground">
               Questions about this policy?{" "}
-              <a href="mailto:support@wealthynest.in" className="text-indigo-500 hover:underline">
+              <a href="mailto:support@wealthynest.in" className="text-[#c2703d] hover:underline">
                 support@wealthynest.in
               </a>
             </p>

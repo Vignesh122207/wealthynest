@@ -14,7 +14,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 // different accent), so "gradient"/"danger" callers still supply their own from-/to-/shadow-
 // classes via `className`; twMerge lets those win over the variant's own bg-* default.
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary:   "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/30 font-semibold",
+  primary:   "bg-[#c2703d] hover:bg-[#d98a52] text-white shadow-lg shadow-[#c2703d]/30 font-semibold",
   gradient:  "text-white shadow-lg font-semibold",
   secondary: "bg-muted hover:bg-muted/80 text-muted-foreground",
   danger:    "bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-500/25 font-semibold",

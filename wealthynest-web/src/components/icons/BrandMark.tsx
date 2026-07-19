@@ -6,10 +6,11 @@ import {cn} from "@/lib/utils";
 // hand-mitring the join geometry while still reading as one continuous
 // ribbon. Kept in sync with the source SVGs at public/icons/icon-192.svg /
 // icon-maskable.svg so the app/PWA icon and the in-app logo render
-// identically. "duo" is the real two-tone indigo→violet ribbon — the app's
-// existing brand color, so this mark needed no app-wide repaint to stay
-// consistent; "mono" is a flat currentColor version for contexts (the glass
-// variant, monochrome icons) where a two-color gradient glyph doesn't apply.
+// identically. "duo" is the real two-tone copper ribbon — copper was chosen
+// specifically because nothing else in the fintech-icon category uses it
+// (unlike the indigo/violet this replaced); "mono" is a flat currentColor
+// version for contexts (the glass variant, monochrome icons) where a
+// two-color gradient glyph doesn't apply.
 const W_LEGS = [
   {tx: 63, ty: 114, rot: 71.9, len: 122.07, id: "a"},
   {tx: 91, ty: 134, rot: -76.7, len: 78.1, id: "b"},
@@ -18,10 +19,10 @@ const W_LEGS = [
 ] as const;
 
 const W_STOPS: Record<(typeof W_LEGS)[number]["id"], [string, string]> = {
-  a: ["#818cf8", "#4f46e5"],
-  b: ["#4f46e5", "#818cf8"],
-  c: ["#a78bfa", "#6d28d9"],
-  d: ["#6d28d9", "#7c3aed"],
+  a: ["#e8935f", "#c2703d"],
+  b: ["#c2703d", "#e8935f"],
+  c: ["#935a35", "#52341f"],
+  d: ["#52341f", "#6b4526"],
 };
 
 function RibbonWMark({ className, tone = "duo" }: { className?: string; tone?: "duo" | "mono" }) {
@@ -51,10 +52,10 @@ function RibbonWMark({ className, tone = "duo" }: { className?: string; tone?: "
   );
 }
 
-// The WealthyNest brand mark — a two-tone indigo→violet ribbon W on a
-// near-black tile, matching the PWA icon (public/icons/icon-192.svg) and the
-// in-app Sidebar so the logo reads identically everywhere.
-// "glass" exists for placing the mark directly on the app's own indigo/violet
+// The WealthyNest brand mark — a two-tone copper ribbon W on a graphite
+// tile, matching the PWA icon (public/icons/icon-192.svg) and the in-app
+// Sidebar so the logo reads identically everywhere.
+// "glass" exists for placing the mark directly on the app's own colored
 // gradient panels (the auth-page brand column) — a colored badge would nearly
 // vanish against a same-hue backdrop there, so it falls back to the
 // translucent white chip already used by the nearby perk icons in that panel,
@@ -78,8 +79,8 @@ export function BrandMark({ variant = "gradient", boxClassName, iconClassName, r
   }
   return (
     <div
-      className={cn(roundedClassName, "relative overflow-hidden flex items-center justify-center shadow-lg shadow-indigo-500/25 shrink-0", boxClassName)}
-      style={{background: "radial-gradient(120% 120% at 30% 20%, #161616 0%, #000000 70%)"}}
+      className={cn(roundedClassName, "relative overflow-hidden flex items-center justify-center shadow-lg shadow-[#c2703d]/25 shrink-0", boxClassName)}
+      style={{background: "radial-gradient(120% 120% at 30% 20%, #27272a 0%, #0a0a0a 70%)"}}
     >
       <RibbonWMark tone="duo" className={cn("relative", iconClassName)} />
     </div>

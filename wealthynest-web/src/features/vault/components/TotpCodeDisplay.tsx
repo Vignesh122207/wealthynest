@@ -5,7 +5,7 @@ import {TOTP, Secret} from "otpauth";
 import {Copy} from "lucide-react";
 import {toast} from "sonner";
 
-const VAULT_COPPER = "#c2703d";
+const VAULT_SLATE = "#64748b";
 const PERIOD_SECONDS = 30;
 
 /** Renders a rotating 6-digit TOTP code with a countdown ring. The base32 secret only ever
@@ -54,7 +54,7 @@ export function TotpCodeDisplay({ base32Secret }: { base32Secret: string }) {
       <div className="flex items-center gap-2">
         <svg width="24" height="24" viewBox="0 0 24 24" className="shrink-0 -rotate-90">
           <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted-foreground/20" />
-          <circle cx="12" cy="12" r="9" fill="none" stroke={VAULT_COPPER} strokeWidth="2"
+          <circle cx="12" cy="12" r="9" fill="none" stroke={VAULT_SLATE} strokeWidth="2"
             strokeDasharray={circumference} strokeDashoffset={circumference * (1 - progress)}
             strokeLinecap="round" style={{ transition: "stroke-dashoffset 1s linear" }} />
         </svg>

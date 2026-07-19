@@ -7,7 +7,7 @@ import {cn} from "@/lib/utils";
 export type FabAction = {
   icon:     React.ElementType;
   label:    string;
-  color:    "rose" | "emerald" | "indigo" | "amber" | "violet" | "sky" | "fuchsia" | "copper";
+  color:    "rose" | "emerald" | "indigo" | "amber" | "violet" | "sky" | "fuchsia" | "slate";
   onClick:  () => void;
   disabled?: boolean;
   /** Shown as a native tooltip when disabled — explains why instead of leaving a dead-looking button. */
@@ -27,9 +27,11 @@ const ITEM_STYLE: Record<string, { gradient: string; shadow: string }> = {
   // nav gradient for /goals) exactly — added rather than reusing violet so the FAB action
   // matches the form it opens pixel-for-pixel, not just approximately.
   fuchsia: { gradient: "from-fuchsia-500 to-purple-600", shadow: "shadow-fuchsia-500/30" },
-  // Matches the Vault nav icon's Graphite Copper accent (Sidebar.tsx) — a deliberately dark,
-  // metallic pair, distinct from Budgets' amber→orange, to read as "vault/security" not "money".
-  copper:  { gradient: "from-[#27272a] to-[#c2703d]", shadow: "shadow-[#c2703d]/30" },
+  // Matches the Vault nav icon's Graphite Slate accent (Sidebar.tsx) — a deliberately dark,
+  // steely pair, distinct from Budgets' amber→orange, to read as "vault/security" not "money".
+  // Was copper until copper became the app's brand color — reassigned here to avoid the two
+  // meaning the same thing.
+  slate:   { gradient: "from-[#334155] to-[#64748b]", shadow: "shadow-[#64748b]/30" },
 };
 
 function FabItem({ icon: Icon, label, color, onClick, disabled, disabledReason, index, testId }: FabAction & { index: number }) {
@@ -108,9 +110,9 @@ export function FloatingActionButton({ actions }: FloatingActionButtonProps) {
             open
               ? "bg-slate-700/90 dark:bg-slate-600/90 shadow-lg backdrop-blur-sm"
               : [
-                  "bg-gradient-to-br from-indigo-500 to-violet-600",
-                  "shadow-[0_6px_24px_rgba(99,102,241,0.50)]",
-                  "hover:shadow-[0_8px_30px_rgba(99,102,241,0.65)] hover:scale-105",
+                  "bg-gradient-to-br from-[#c2703d] to-[#27272a]",
+                  "shadow-[0_6px_24px_rgba(194,112,61,0.50)]",
+                  "hover:shadow-[0_8px_30px_rgba(194,112,61,0.65)] hover:scale-105",
                   "active:scale-95",
                 ].join(" ")
           )}>

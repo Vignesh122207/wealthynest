@@ -112,7 +112,7 @@ export default function SupportPage() {
           </div>
           <a
             href="mailto:support@wealthynest.in"
-            className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
+            className="text-sm text-[#a85f30] dark:text-[#d98a52] hover:underline font-medium"
           >
             support@wealthynest.in
           </a>

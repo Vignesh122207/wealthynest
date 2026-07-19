@@ -17,7 +17,7 @@ import {type VaultItemFormValues, vaultItemSchema} from "../schemas/vault.schema
 import {estimatePasswordStrength} from "../lib/passwordStrength";
 import {PasswordGeneratorPanel} from "./PasswordGeneratorPanel";
 
-const VAULT_TO = "#c2703d";
+const VAULT_TO = "#64748b";
 
 const TYPE_TABS = [
   { key: "LOGIN" as const,       label: "Login",       icon: KeyRound },
@@ -74,7 +74,7 @@ export function VaultItemForm({ isCreate, accentColor, defaultValues, hasExistin
 
   return (
     <TransactionModalOverlay onDismiss={onCancel}>
-      <FormModalShell accent="from-[#27272a] to-[#c2703d]">
+      <FormModalShell accent="from-[#334155] to-[#64748b]">
         <FormModalHeader icon={previewIcon} hex={accentColor} title={isCreate ? "Add to Vault" : "Edit Item"}
           onDelete={onDelete} onClose={onCancel} />
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -87,7 +87,7 @@ export function VaultItemForm({ isCreate, accentColor, defaultValues, hasExistin
                 className={cn(
                   "flex-1 flex items-center justify-center gap-2 h-10 rounded-xl text-sm font-medium transition-all",
                   itemType === t.key
-                    ? "bg-gradient-to-r from-[#27272a] to-[#c2703d] text-white shadow-lg shadow-[#c2703d]/25"
+                    ? "bg-gradient-to-r from-[#334155] to-[#64748b] text-white shadow-lg shadow-[#64748b]/25"
                     : "bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}>
                 <t.icon className="w-4 h-4" /> {t.label}
@@ -100,11 +100,11 @@ export function VaultItemForm({ isCreate, accentColor, defaultValues, hasExistin
             <label className="block text-sm font-medium text-muted-foreground mb-1.5">Title</label>
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => setShowIconPicker(v => !v)} title="Change icon"
-                className="shrink-0 rounded-2xl transition-all hover:ring-2 hover:ring-[#c2703d]/40">
+                className="shrink-0 rounded-2xl transition-all hover:ring-2 hover:ring-[#64748b]/40">
                 <PremiumIcon icon={previewIcon} hex={accentColor} size="sm" />
               </button>
               <input placeholder="e.g. Gmail, HDFC NetBanking" data-testid="vault-title-input"
-                className="flex-1 h-10 px-3 rounded-xl bg-muted/60 border border-border text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:border-[#c2703d] transition-colors"
+                className="flex-1 h-10 px-3 rounded-xl bg-muted/60 border border-border text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:border-[#64748b] transition-colors"
                 {...form.register("title")} />
             </div>
             {form.formState.errors.title && (
@@ -247,7 +247,7 @@ export function VaultItemForm({ isCreate, accentColor, defaultValues, hasExistin
                 <textarea id="vault-note-body" rows={5} placeholder="Secure note content…"
                   className="w-full px-3 py-2 rounded-xl text-sm transition-all outline-none resize-none
                     bg-background border border-border text-foreground placeholder:text-muted-foreground
-                    focus:border-[#c2703d] focus:ring-2 focus:ring-[#c2703d]/20"
+                    focus:border-[#64748b] focus:ring-2 focus:ring-[#64748b]/20"
                   value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} />
               )} />
               {form.formState.errors.secret?.message && (
@@ -258,7 +258,7 @@ export function VaultItemForm({ isCreate, accentColor, defaultValues, hasExistin
 
           <div className="flex gap-2 pt-1">
             <Button type="submit" variant="gradient" loading={isPending} data-testid="vault-form-submit"
-              className="flex-1 bg-gradient-to-r from-[#27272a] to-[#c2703d] hover:opacity-90 shadow-[#c2703d]/25 disabled:shadow-none">
+              className="flex-1 bg-gradient-to-r from-[#334155] to-[#64748b] hover:opacity-90 shadow-[#64748b]/25 disabled:shadow-none">
               <Check className="w-4 h-4" /> {isPending ? "Saving…" : "Save"}
             </Button>
             <Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button>

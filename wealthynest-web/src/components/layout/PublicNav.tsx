@@ -43,7 +43,7 @@ export function PublicNav() {
       <div className="flex items-center gap-3">
         {user ? (
           <Link href="/dashboard"
-            className="text-sm bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl transition-colors font-medium shadow-sm">
+            className="text-sm bg-[#a85f30] hover:bg-[#c2703d] text-white px-4 py-2 rounded-xl transition-colors font-medium shadow-sm">
             Go to Dashboard
           </Link>
         ) : (
@@ -53,7 +53,7 @@ export function PublicNav() {
               Sign in
             </Link>
             <Link href="/signup"
-              className="text-sm bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl transition-colors font-medium shadow-sm">
+              className="text-sm bg-[#a85f30] hover:bg-[#c2703d] text-white px-4 py-2 rounded-xl transition-colors font-medium shadow-sm">
               Get started
             </Link>
           </>

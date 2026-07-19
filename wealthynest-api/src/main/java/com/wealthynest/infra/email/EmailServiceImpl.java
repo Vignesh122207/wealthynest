@@ -64,7 +64,7 @@ public class EmailServiceImpl implements EmailService {
                 <tr><td align="center">
                   <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
                     <tr>
-                      <td style="background:linear-gradient(135deg,#4f46e5 0%%,#7c3aed 100%%);padding:36px 40px;text-align:center;">
+                      <td style="background:linear-gradient(135deg,#27272a 0%%,#c2703d 100%%);padding:36px 40px;text-align:center;">
                         <table cellpadding="0" cellspacing="0" align="center">
                           <tr>
                             <td style="background:rgba(255,255,255,0.15);border-radius:12px;width:44px;height:44px;text-align:center;vertical-align:middle;">
@@ -87,7 +87,7 @@ public class EmailServiceImpl implements EmailService {
                         <table cellpadding="0" cellspacing="0" width="100%%">
                           <tr>
                             <td align="center" style="padding:8px 0 32px;">
-                              <a href="%s" style="display:inline-block;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 36px;border-radius:10px;letter-spacing:0.2px;">
+                              <a href="%s" style="display:inline-block;background:linear-gradient(135deg,#27272a,#c2703d);color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 36px;border-radius:10px;letter-spacing:0.2px;">
                                 Reset Password
                               </a>
                             </td>
@@ -95,7 +95,7 @@ public class EmailServiceImpl implements EmailService {
                         </table>
                         <div style="background:#f8fafc;border-radius:10px;padding:16px 20px;border:1px solid #e2e8f0;margin-bottom:24px;">
                           <p style="margin:0 0 6px;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Or copy this link</p>
-                          <p style="margin:0;font-size:12px;color:#6366f1;word-break:break-all;">%s</p>
+                          <p style="margin:0;font-size:12px;color:#c2703d;word-break:break-all;">%s</p>
                         </div>
                         <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">
                           If you did not request a password reset, you can safely ignore this email — your password will remain unchanged.
@@ -131,7 +131,7 @@ public class EmailServiceImpl implements EmailService {
                 <tr><td align="center">
                   <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
                     <tr>
-                      <td style="background:linear-gradient(135deg,#4f46e5 0%%,#7c3aed 100%%);padding:36px 40px;text-align:center;">
+                      <td style="background:linear-gradient(135deg,#27272a 0%%,#c2703d 100%%);padding:36px 40px;text-align:center;">
                         <table cellpadding="0" cellspacing="0" align="center">
                           <tr>
                             <td style="background:rgba(255,255,255,0.15);border-radius:12px;width:44px;height:44px;text-align:center;vertical-align:middle;">
@@ -162,7 +162,7 @@ public class EmailServiceImpl implements EmailService {
                         </table>
                         <div style="background:#f8fafc;border-radius:10px;padding:16px 20px;border:1px solid #e2e8f0;margin-bottom:24px;">
                           <p style="margin:0 0 6px;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Or copy this link</p>
-                          <p style="margin:0;font-size:12px;color:#6366f1;word-break:break-all;">%s</p>
+                          <p style="margin:0;font-size:12px;color:#c2703d;word-break:break-all;">%s</p>
                         </div>
                         <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">
                           If you did not create a WealthyNest account, you can safely ignore this email.

@@ -9,7 +9,7 @@ import {
   type PasswordGeneratorOptions, generatePassphrase, generatePassword,
 } from "../lib/passwordGenerator";
 
-const VAULT_TO = "#c2703d";
+const VAULT_TO = "#64748b";
 
 type Mode = "random" | "passphrase";
 
@@ -62,7 +62,7 @@ export function PasswordGeneratorPanel({ onGenerate }: { onGenerate: (value: str
           </div>
           <input type="range" min={GENERATOR_LENGTH_MIN} max={GENERATOR_LENGTH_MAX} value={options.length}
             onChange={(e) => setOptions_({ length: Number(e.target.value) })}
-            className="w-full accent-[#c2703d]" style={{ accentColor: VAULT_TO }} />
+            className="w-full accent-[#64748b]" style={{ accentColor: VAULT_TO }} />
           <div className="flex flex-wrap gap-3">
             {([
               ["upper", "A-Z"], ["digits", "0-9"], ["symbols", "!@#"],

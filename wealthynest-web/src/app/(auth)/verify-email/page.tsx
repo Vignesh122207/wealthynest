@@ -45,7 +45,7 @@ function VerifyEmailContent() {
       {/* Verifying state */}
       {status === "verifying" && (
         <div className="space-y-4">
-          <Loader2 className="w-12 h-12 text-indigo-600 dark:text-indigo-400 animate-spin mx-auto" />
+          <Loader2 className="w-12 h-12 text-[#a85f30] dark:text-[#d98a52] animate-spin mx-auto" />
           <p className="text-foreground font-semibold text-lg">Verifying your email…</p>
           <p className="text-muted-foreground text-sm">This will only take a moment.</p>
         </div>
@@ -63,7 +63,7 @@ function VerifyEmailContent() {
           </p>
           <Link
             href="/login"
-            className="inline-block mt-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm transition-colors"
+            className="inline-block mt-2 px-6 py-3 rounded-xl bg-[#a85f30] hover:bg-[#c2703d] text-white font-semibold text-sm transition-colors"
           >
             Sign in
           </Link>
@@ -99,8 +99,8 @@ function VerifyEmailContent() {
       {/* Idle state — no token, just showing "check your email" */}
       {status === "idle" && (
         <div className="space-y-4">
-          <div className="w-16 h-16 rounded-full bg-indigo-500/15 flex items-center justify-center mx-auto">
-            <Mail className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
+          <div className="w-16 h-16 rounded-full bg-[#c2703d]/15 flex items-center justify-center mx-auto">
+            <Mail className="w-8 h-8 text-[#a85f30] dark:text-[#d98a52]" />
           </div>
           <h1 className="text-foreground font-bold text-2xl">Check your inbox</h1>
           <p className="text-muted-foreground text-sm leading-relaxed">
@@ -114,12 +114,12 @@ function VerifyEmailContent() {
               <button
                 onClick={() => resend(email)}
                 disabled={resending}
-                className="underline text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 disabled:opacity-60"
+                className="underline text-[#a85f30] dark:text-[#d98a52] hover:text-[#c2703d] dark:hover:text-[#e2a877] disabled:opacity-60"
               >
                 {resending ? "sending…" : "resend the email"}
               </button>
             ) : (
-              <Link href="/login" className="underline text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300">
+              <Link href="/login" className="underline text-[#a85f30] dark:text-[#d98a52] hover:text-[#c2703d] dark:hover:text-[#e2a877]">
                 go back to sign in
               </Link>
             )}
@@ -135,7 +135,7 @@ export default function VerifyEmailPage() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4">
       <Suspense fallback={
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-10 h-10 text-indigo-600 dark:text-indigo-400 animate-spin" />
+          <Loader2 className="w-10 h-10 text-[#a85f30] dark:text-[#d98a52] animate-spin" />
           <p className="text-muted-foreground text-sm">Loading…</p>
         </div>
       }>

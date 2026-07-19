@@ -42,8 +42,8 @@ function PinLoginStep({ name, onUsePassword }: { name: string; onUsePassword: ()
   return (
     <div className="w-full max-w-sm">
       <div className="mb-7 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 flex items-center justify-center mx-auto mb-4">
-          <KeyRound className="w-6 h-6 text-indigo-500" />
+        <div className="w-14 h-14 rounded-2xl bg-[#c2703d]/10 flex items-center justify-center mx-auto mb-4">
+          <KeyRound className="w-6 h-6 text-[#c2703d]" />
         </div>
         <h2 className="text-2xl font-bold text-foreground mb-1">Welcome back, {name.split(" ")[0]}</h2>
         <p className="text-muted-foreground text-sm">Enter your PIN to continue</p>
@@ -60,11 +60,11 @@ function PinLoginStep({ name, onUsePassword }: { name: string; onUsePassword: ()
           placeholder="••••"
           className="w-full h-14 px-4 rounded-xl text-center text-2xl tracking-[0.5em] outline-none transition-all
             bg-background border border-border text-foreground placeholder:text-muted-foreground
-            focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/25"
+            focus:border-[#c2703d] focus:ring-2 focus:ring-[#c2703d]/25"
         />
         <button data-testid="login-pin-submit" type="submit" disabled={isPending || pin.length < 4}
           className="w-full h-11 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2
-            bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/30
+            bg-[#a85f30] hover:bg-[#c2703d] text-white shadow-lg shadow-[#c2703d]/30
             disabled:opacity-60 disabled:cursor-not-allowed">
           {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
           {isPending ? "Verifying…" : "Continue"}
@@ -93,8 +93,8 @@ function PasswordLoginStep({ form, onSubmit, isPending, emailNotVerified, onBack
   return (
     <div className="w-full max-w-sm">
       <div className="mb-7 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 flex items-center justify-center mx-auto mb-4">
-          <Lock className="w-6 h-6 text-indigo-500" />
+        <div className="w-14 h-14 rounded-2xl bg-[#c2703d]/10 flex items-center justify-center mx-auto mb-4">
+          <Lock className="w-6 h-6 text-[#c2703d]" />
         </div>
         <h2 className="text-2xl font-bold text-foreground mb-1">Sign in with password</h2>
         <p className="text-muted-foreground text-sm">Enter your email and password to continue</p>
@@ -130,7 +130,7 @@ function PasswordLoginStep({ form, onSubmit, isPending, emailNotVerified, onBack
             className={cn(
               "w-full h-12 px-4 rounded-xl text-sm outline-none transition-all",
               "bg-background border border-border text-foreground placeholder:text-muted-foreground",
-              "focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/25",
+              "focus:border-[#c2703d] focus:ring-2 focus:ring-[#c2703d]/25",
               form.formState.errors.email && "border-red-500/60"
             )}
           />
@@ -142,7 +142,7 @@ function PasswordLoginStep({ form, onSubmit, isPending, emailNotVerified, onBack
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <label className="text-xs font-medium text-muted-foreground">Password</label>
-            <Link href="/forgot-password" className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors">
+            <Link href="/forgot-password" className="text-xs text-[#a85f30] dark:text-[#d98a52] hover:text-[#c2703d] dark:hover:text-[#e2a877] transition-colors">
               Forgot password?
             </Link>
           </div>
@@ -155,7 +155,7 @@ function PasswordLoginStep({ form, onSubmit, isPending, emailNotVerified, onBack
               className={cn(
                 "w-full h-12 px-4 pr-10 rounded-xl text-sm outline-none transition-all",
                 "bg-background border border-border text-foreground placeholder:text-muted-foreground",
-                "focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/25",
+                "focus:border-[#c2703d] focus:ring-2 focus:ring-[#c2703d]/25",
                 form.formState.errors.password && "border-red-500/60"
               )}
             />
@@ -175,7 +175,7 @@ function PasswordLoginStep({ form, onSubmit, isPending, emailNotVerified, onBack
             type="checkbox"
             id="rememberMe"
             {...form.register("rememberMe")}
-            className="w-4 h-4 rounded border-border bg-background accent-indigo-500 cursor-pointer"
+            className="w-4 h-4 rounded border-border bg-background accent-[#c2703d] cursor-pointer"
           />
           <label htmlFor="rememberMe" className="text-xs text-muted-foreground cursor-pointer select-none">
             Keep me signed in for 30 days
@@ -185,7 +185,7 @@ function PasswordLoginStep({ form, onSubmit, isPending, emailNotVerified, onBack
         <button data-testid="login-password-submit" type="submit" disabled={isPending}
           className={cn(
             "w-full h-12 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2",
-            "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/30",
+            "bg-[#a85f30] hover:bg-[#c2703d] text-white shadow-lg shadow-[#c2703d]/30",
             "disabled:opacity-60 disabled:cursor-not-allowed"
           )}>
           {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -259,11 +259,11 @@ export function LoginForm() {
 
       {/* ── Left panel — brand ──────────────────────────────── */}
       <aside aria-label="WealthyNest" className="hidden lg:flex flex-col justify-between w-[44%] shrink-0 relative overflow-hidden
-        bg-gradient-to-br from-indigo-600 via-[#4338ca] to-violet-700 p-12">
+        bg-gradient-to-br from-[#a85f30] via-[#8a4a26] to-[#52341f] p-12">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-20 -left-20 w-72 h-72 rounded-full bg-white/5 blur-3xl" />
-          <div className="absolute bottom-10 right-0 w-80 h-80 rounded-full bg-violet-400/10 blur-3xl" />
-          <div className="absolute top-1/2 left-1/3 w-48 h-48 rounded-full bg-indigo-300/5 blur-2xl" />
+          <div className="absolute bottom-10 right-0 w-80 h-80 rounded-full bg-[#a8794f]/10 blur-3xl" />
+          <div className="absolute top-1/2 left-1/3 w-48 h-48 rounded-full bg-[#e2a877]/5 blur-2xl" />
         </div>
 
         <div className="relative flex items-center gap-2.5">
@@ -275,12 +275,12 @@ export function LoginForm() {
           <h1 className="text-3xl font-bold text-white leading-snug">
             Take charge of<br />your financial life
           </h1>
-          <p className="text-indigo-200 text-sm leading-relaxed max-w-xs">
+          <p className="text-[#ecc9a3] text-sm leading-relaxed max-w-xs">
             Everything you need to track, plan and grow your wealth — built for Indian families.
           </p>
           <ul className="space-y-3">
             {PERKS.map(({ icon: Icon, text }) => (
-              <li key={text} className="flex items-center gap-3 text-sm text-indigo-100">
+              <li key={text} className="flex items-center gap-3 text-sm text-[#f5e3d3]">
                 <div className="w-6 h-6 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
                   <Icon className="w-3.5 h-3.5 text-white" />
                 </div>
@@ -290,7 +290,7 @@ export function LoginForm() {
           </ul>
         </div>
 
-        <p className="relative text-xs text-indigo-300">
+        <p className="relative text-xs text-[#e2a877]">
           © {new Date().getFullYear()} WealthyNest · Built with ♥
         </p>
       </aside>
@@ -315,7 +315,7 @@ export function LoginForm() {
             <p className="text-muted-foreground text-sm">Sign in to continue to WealthyNest</p>
           </div>
 
-          <div className="bg-card border border-border/80 rounded-2xl shadow-xl shadow-indigo-950/[0.03] dark:shadow-black/40 p-6">
+          <div className="bg-card border border-border/80 rounded-2xl shadow-xl shadow-[#2a1608]/[0.03] dark:shadow-black/40 p-6">
             <div className="space-y-4">
               {/* Email — used by the passkey flow below */}
               <div className="space-y-1.5">
@@ -331,7 +331,7 @@ export function LoginForm() {
                   className={cn(
                     "w-full h-12 px-4 rounded-xl text-sm outline-none transition-all",
                     "bg-background border border-border text-foreground placeholder:text-muted-foreground",
-                    "focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/25",
+                    "focus:border-[#c2703d] focus:ring-2 focus:ring-[#c2703d]/25",
                     form.formState.errors.email && "border-red-500/60"
                   )}
                 />
@@ -347,7 +347,7 @@ export function LoginForm() {
                   type="checkbox"
                   id="rememberMe"
                   {...form.register("rememberMe")}
-                  className="w-4 h-4 rounded border-border bg-background accent-indigo-500 cursor-pointer"
+                  className="w-4 h-4 rounded border-border bg-background accent-[#c2703d] cursor-pointer"
                 />
                 <label htmlFor="rememberMe" className="text-xs text-muted-foreground cursor-pointer select-none">
                   Keep me signed in for 30 days
@@ -378,7 +378,7 @@ export function LoginForm() {
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}
-            <Link href="/signup" className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 font-semibold transition-colors">
+            <Link href="/signup" className="text-[#a85f30] dark:text-[#d98a52] hover:text-[#c2703d] dark:hover:text-[#e2a877] font-semibold transition-colors">
               Create one
             </Link>
           </p>

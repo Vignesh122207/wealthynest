@@ -11,7 +11,7 @@ import {TransactionModalOverlay} from "@/components/transactions/TransactionModa
 import {useExportVault} from "../hooks/useVault";
 import {type RevealFormValues, revealSchema} from "../schemas/vault.schema";
 
-const VAULT_COPPER = "#c2703d";
+const VAULT_SLATE = "#64748b";
 
 type ApiError = { response?: { status?: number; data?: { message?: string } } };
 
@@ -43,8 +43,8 @@ export function ExportVaultModal({ onClose }: { onClose: () => void }) {
 
   return (
     <TransactionModalOverlay onDismiss={onClose} maxWidth="max-w-sm">
-      <FormModalShell accent="from-[#27272a] to-[#c2703d]">
-        <FormModalHeader icon={Download} hex={VAULT_COPPER} title="Export Vault" onClose={onClose} />
+      <FormModalShell accent="from-[#334155] to-[#64748b]">
+        <FormModalHeader icon={Download} hex={VAULT_SLATE} title="Export Vault" onClose={onClose} />
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="flex gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
             <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
@@ -62,7 +62,7 @@ export function ExportVaultModal({ onClose }: { onClose: () => void }) {
             {...form.register("currentPassword")} />
           <div className="flex gap-2 pt-1">
             <Button type="submit" variant="gradient" loading={isPending} data-testid="vault-export-submit"
-              className="flex-1 bg-gradient-to-r from-[#27272a] to-[#c2703d] hover:opacity-90 shadow-[#c2703d]/25">
+              className="flex-1 bg-gradient-to-r from-[#334155] to-[#64748b] hover:opacity-90 shadow-[#64748b]/25">
               {isPending ? "Exporting…" : "Export CSV"}
             </Button>
             <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>

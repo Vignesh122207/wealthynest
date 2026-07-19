@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
   <defs>
     <radialGradient id="bg" cx="30%" cy="20%" r="85%">
-      <stop offset="0%" stop-color="#161616"/>
-      <stop offset="70%" stop-color="#000000"/>
+      <stop offset="0%" stop-color="#27272a"/>
+      <stop offset="70%" stop-color="#0a0a0a"/>
     </radialGradient>
-    <linearGradient id="wa" x1="-61.03" y1="0" x2="61.03" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#818cf8"/><stop offset="100%" stop-color="#4f46e5"/></linearGradient>
-    <linearGradient id="wb" x1="-39.06" y1="0" x2="39.06" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#4f46e5"/><stop offset="100%" stop-color="#818cf8"/></linearGradient>
-    <linearGradient id="wc" x1="-39.06" y1="0" x2="39.06" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#a78bfa"/><stop offset="100%" stop-color="#6d28d9"/></linearGradient>
-    <linearGradient id="wd" x1="-61.03" y1="0" x2="61.03" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#6d28d9"/><stop offset="100%" stop-color="#7c3aed"/></linearGradient>
+    <linearGradient id="wa" x1="-61.03" y1="0" x2="61.03" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#e8935f"/><stop offset="100%" stop-color="#c2703d"/></linearGradient>
+    <linearGradient id="wb" x1="-39.06" y1="0" x2="39.06" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#c2703d"/><stop offset="100%" stop-color="#e8935f"/></linearGradient>
+    <linearGradient id="wc" x1="-39.06" y1="0" x2="39.06" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#935a35"/><stop offset="100%" stop-color="#52341f"/></linearGradient>
+    <linearGradient id="wd" x1="-61.03" y1="0" x2="61.03" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#52341f"/><stop offset="100%" stop-color="#6b4526"/></linearGradient>
     <filter id="soft" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="6"/></filter>
   </defs>
   <rect width="192" height="192" fill="url(#bg)"/>

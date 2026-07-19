@@ -31,10 +31,10 @@ export function ForgotPasswordForm() {
 
       {/* Left panel */}
       <div className="hidden lg:flex flex-col justify-between w-[44%] shrink-0 relative overflow-hidden
-        bg-gradient-to-br from-indigo-600 via-[#4338ca] to-violet-700 p-12">
+        bg-gradient-to-br from-[#a85f30] via-[#8a4a26] to-[#52341f] p-12">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-20 -left-20 w-72 h-72 rounded-full bg-white/5 blur-3xl" />
-          <div className="absolute bottom-10 right-0 w-80 h-80 rounded-full bg-violet-400/10 blur-3xl" />
+          <div className="absolute bottom-10 right-0 w-80 h-80 rounded-full bg-[#a8794f]/10 blur-3xl" />
         </div>
         <div className="relative flex items-center gap-2.5">
           <BrandMark variant="glass" boxClassName="w-9 h-9" iconClassName="w-5 h-5" />
@@ -42,11 +42,11 @@ export function ForgotPasswordForm() {
         </div>
         <div className="relative space-y-4">
           <h1 className="text-3xl font-bold text-white leading-snug">Forgot your<br />password?</h1>
-          <p className="text-indigo-200 text-sm leading-relaxed max-w-xs">
+          <p className="text-[#ecc9a3] text-sm leading-relaxed max-w-xs">
             No worries — it happens. We&apos;ll send you a secure link to reset it in seconds.
           </p>
         </div>
-        <p className="relative text-xs text-indigo-300">
+        <p className="relative text-xs text-[#e2a877]">
           © {new Date().getFullYear()} WealthyNest · Built with ♥
         </p>
       </div>
@@ -79,7 +79,7 @@ export function ForgotPasswordForm() {
                 <button
                   type="button"
                   onClick={() => { setSent(false); form.reset(); }}
-                  className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 font-medium transition-colors"
+                  className="text-xs text-[#a85f30] dark:text-[#d98a52] hover:text-[#c2703d] dark:hover:text-[#e2a877] font-medium transition-colors"
                 >
                   try again with a different address
                 </button>
@@ -112,7 +112,7 @@ export function ForgotPasswordForm() {
                       className={cn(
                         "w-full h-11 pl-10 pr-4 rounded-xl text-sm outline-none transition-all",
                         "bg-background border border-border text-foreground placeholder:text-muted-foreground",
-                        "focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/25",
+                        "focus:border-[#c2703d] focus:ring-2 focus:ring-[#c2703d]/25",
                         form.formState.errors.email && "border-red-500/60"
                       )}
                     />
@@ -125,7 +125,7 @@ export function ForgotPasswordForm() {
                 <button type="submit" disabled={isPending}
                   className={cn(
                     "w-full h-11 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 mt-2",
-                    "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/30",
+                    "bg-[#a85f30] hover:bg-[#c2703d] text-white shadow-lg shadow-[#c2703d]/30",
                     "disabled:opacity-60 disabled:cursor-not-allowed"
                   )}>
                   {isPending && <Loader2 className="w-4 h-4 animate-spin" />}

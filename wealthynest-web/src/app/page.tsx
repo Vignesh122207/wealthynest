@@ -125,7 +125,7 @@ export default function LandingPage() {
             Sign in
           </Link>
           <Link href="/signup"
-            className="text-sm bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl transition-colors font-semibold shadow-lg shadow-indigo-500/25">
+            className="text-sm bg-[#a85f30] hover:bg-[#c2703d] text-white px-4 py-2 rounded-xl transition-colors font-semibold shadow-lg shadow-[#c2703d]/25">
             Get started
           </Link>
         </div>
@@ -135,21 +135,21 @@ export default function LandingPage() {
       <section className="relative px-6 lg:px-12 pt-16 pb-24 lg:pt-24 lg:pb-32 overflow-hidden">
         {/* Ambient brand glow — same indigo/violet family as .hero-gradient, low opacity so it reads in both themes */}
         <div className="absolute inset-0 pointer-events-none" aria-hidden>
-          <div className="absolute -top-32 -left-24 w-[28rem] h-[28rem] rounded-full bg-indigo-500/10 blur-3xl" />
-          <div className="absolute top-20 -right-32 w-[24rem] h-[24rem] rounded-full bg-violet-500/10 blur-3xl" />
+          <div className="absolute -top-32 -left-24 w-[28rem] h-[28rem] rounded-full bg-[#c2703d]/10 blur-3xl" />
+          <div className="absolute top-20 -right-32 w-[24rem] h-[24rem] rounded-full bg-[#935a35]/10 blur-3xl" />
         </div>
 
         <div className="relative max-w-6xl mx-auto grid lg:grid-cols-[1.05fr_1fr] gap-12 lg:gap-8 items-center">
 
           {/* Left — copy */}
           <div className="animate-fade-in-up">
-            <div className="inline-flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/25 text-indigo-600 dark:text-indigo-400 text-xs font-semibold px-4 py-1.5 rounded-full mb-7 shadow-sm">
+            <div className="inline-flex items-center gap-2 bg-[#c2703d]/10 border border-[#c2703d]/25 text-[#a85f30] dark:text-[#d98a52] text-xs font-semibold px-4 py-1.5 rounded-full mb-7 shadow-sm">
               <IndianRupee className="w-3.5 h-3.5" />
               Built for Indian families
             </div>
 
             <h1 className="text-4xl lg:text-[3.4rem] font-extrabold tracking-tight leading-[1.08] mb-6 text-foreground text-balance">
-              <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-500 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-[#a85f30] via-[#6b4526] to-[#c2703d] bg-clip-text text-transparent">
                 One nest
               </span>{" "}
               for your entire financial life.
@@ -163,7 +163,7 @@ export default function LandingPage() {
 
             <div className="flex flex-col sm:flex-row gap-3 mb-10">
               <Link href="/signup"
-                className="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3.5 rounded-xl font-semibold text-sm transition-all shadow-[0_6px_24px_rgba(99,102,241,0.35)] hover:shadow-[0_8px_30px_rgba(99,102,241,0.5)] hover:-translate-y-0.5">
+                className="inline-flex items-center justify-center gap-2 bg-[#a85f30] hover:bg-[#c2703d] text-white px-6 py-3.5 rounded-xl font-semibold text-sm transition-all shadow-[0_6px_24px_rgba(194,112,61,0.35)] hover:shadow-[0_8px_30px_rgba(194,112,61,0.5)] hover:-translate-y-0.5">
                 Start free — takes 2 minutes <ArrowRight className="w-4 h-4" />
               </Link>
               <a href="#features"
@@ -198,7 +198,7 @@ export default function LandingPage() {
             </div>
 
             {/* Main card */}
-            <div className="relative bg-card border border-border/80 rounded-3xl shadow-2xl shadow-indigo-950/10 dark:shadow-black/40 p-5 sm:p-6">
+            <div className="relative bg-card border border-border/80 rounded-3xl shadow-2xl shadow-[#2a1608]/10 dark:shadow-black/40 p-5 sm:p-6">
               <div className="flex items-center justify-between mb-5">
                 <div>
                   <p className="text-xs text-muted-foreground">Good evening, Aditi</p>
@@ -243,7 +243,7 @@ export default function LandingPage() {
       {/* ── Features — the 4 real product groups, alternating layout ──────── */}
       <section id="features" className="px-6 lg:px-12 py-20 lg:py-24 max-w-6xl mx-auto w-full scroll-mt-16">
         <div className="text-center mb-16">
-          <p className="text-xs font-bold text-indigo-500 uppercase tracking-widest mb-3">What&rsquo;s inside</p>
+          <p className="text-xs font-bold text-[#c2703d] uppercase tracking-widest mb-3">What&rsquo;s inside</p>
           <h2 className="text-2xl lg:text-3xl font-extrabold text-foreground mb-3 tracking-tight">
             Four ways WealthyNest keeps you ahead
           </h2>
@@ -380,7 +380,7 @@ export default function LandingPage() {
                       <div className="flex items-center gap-3 bg-muted/40 rounded-2xl px-4 py-3">
                         <PremiumIcon icon={FileText} tone="indigo" size="xs" />
                         <p className="text-xs text-foreground flex-1">Monthly-Report-July.pdf</p>
-                        <span className="text-[10px] font-semibold text-indigo-500">Ready</span>
+                        <span className="text-[10px] font-semibold text-[#c2703d]">Ready</span>
                       </div>
                     </div>
                   )}
@@ -401,7 +401,7 @@ export default function LandingPage() {
 
         <div className="relative max-w-6xl mx-auto">
           <div className="text-center mb-14">
-            <p className="text-xs font-bold text-indigo-200 uppercase tracking-widest mb-3">Why trust us with your money</p>
+            <p className="text-xs font-bold text-[#ecc9a3] uppercase tracking-widest mb-3">Why trust us with your money</p>
             <h2 className="text-2xl lg:text-3xl font-extrabold text-white mb-3 tracking-tight">
               Private by default, not by promise
             </h2>
@@ -414,7 +414,7 @@ export default function LandingPage() {
                   <Icon className="w-5 h-5 text-white" />
                 </div>
                 <h3 className="font-semibold text-white mb-1.5 text-sm">{title}</h3>
-                <p className="text-xs text-indigo-100 leading-relaxed" style={{ fontFamily: "var(--font-inter)" }}>{body}</p>
+                <p className="text-xs text-[#f5e3d3] leading-relaxed" style={{ fontFamily: "var(--font-inter)" }}>{body}</p>
               </div>
             ))}
           </div>
@@ -423,7 +423,7 @@ export default function LandingPage() {
 
       {/* ── Closing CTA ──────────────────────────────────────── */}
       <section className="px-6 pb-20 lg:pb-24 pt-16 max-w-6xl mx-auto w-full text-center">
-        <Sparkles className="w-6 h-6 text-indigo-500 mx-auto mb-5" />
+        <Sparkles className="w-6 h-6 text-[#c2703d] mx-auto mb-5" />
         <h2 className="text-3xl lg:text-4xl font-extrabold text-foreground mb-4 tracking-tight text-balance">
           Give your money a home.
         </h2>
@@ -431,7 +431,7 @@ export default function LandingPage() {
           Join the families already tracking their whole financial life in one place — free, forever.
         </p>
         <Link href="/signup"
-          className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-7 py-3.5 rounded-xl font-semibold text-sm transition-all shadow-[0_6px_24px_rgba(99,102,241,0.35)] hover:shadow-[0_8px_30px_rgba(99,102,241,0.5)] hover:-translate-y-0.5">
+          className="inline-flex items-center gap-2 bg-[#a85f30] hover:bg-[#c2703d] text-white px-7 py-3.5 rounded-xl font-semibold text-sm transition-all shadow-[0_6px_24px_rgba(194,112,61,0.35)] hover:shadow-[0_8px_30px_rgba(194,112,61,0.5)] hover:-translate-y-0.5">
           Create your free account <ArrowRight className="w-4 h-4" />
         </Link>
       </section>

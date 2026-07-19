@@ -21,7 +21,7 @@ type ApiError = { response?: { status?: number; data?: { message?: string } } };
 
 const CLIPBOARD_CLEAR_MS = 20_000;
 const TRUST_TTL_MINUTES = 5;
-const VAULT_COPPER = "#c2703d";
+const VAULT_SLATE = "#64748b";
 
 export function RevealSecretModal({ item, accentColor, onClose }: { item: VaultItem; accentColor: string; onClose: () => void }) {
   const [revealed, setRevealed]         = useState<string | null>(null);
@@ -87,7 +87,7 @@ export function RevealSecretModal({ item, accentColor, onClose }: { item: VaultI
 
   return (
     <TransactionModalOverlay onDismiss={onClose} maxWidth="max-w-sm">
-      <FormModalShell accent="from-[#27272a] to-[#c2703d]">
+      <FormModalShell accent="from-[#334155] to-[#64748b]">
         <FormModalHeader icon={resolveVaultIcon(item)} hex={accentColor} title={item.title} onClose={onClose} />
 
         {revealed === null ? (
@@ -104,13 +104,13 @@ export function RevealSecretModal({ item, accentColor, onClose }: { item: VaultI
                 {...form.register("currentPassword")} />
               <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
                 <input type="checkbox" checked={trustDevice} onChange={(e) => setTrustDevice(e.target.checked)}
-                  data-testid="vault-trust-device-checkbox" style={{ accentColor: VAULT_COPPER }}
+                  data-testid="vault-trust-device-checkbox" style={{ accentColor: VAULT_SLATE }}
                   className="w-3.5 h-3.5 rounded border-border bg-background cursor-pointer" />
                 Trust this device for {TRUST_TTL_MINUTES} minutes
               </label>
               <div className="flex gap-2 pt-1">
                 <Button type="submit" variant="gradient" loading={isPending} data-testid="vault-reveal-submit"
-                  className="flex-1 bg-gradient-to-r from-[#27272a] to-[#c2703d] hover:opacity-90 shadow-[#c2703d]/25">
+                  className="flex-1 bg-gradient-to-r from-[#334155] to-[#64748b] hover:opacity-90 shadow-[#64748b]/25">
                   {isPending ? "Verifying…" : "Reveal"}
                 </Button>
                 <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
@@ -131,7 +131,7 @@ export function RevealSecretModal({ item, accentColor, onClose }: { item: VaultI
             {revealedTotp && <TotpCodeDisplay base32Secret={revealedTotp} />}
             <div className="flex gap-2">
               <Button type="button" variant="gradient" onClick={handleCopy}
-                className="flex-1 bg-gradient-to-r from-[#27272a] to-[#c2703d] hover:opacity-90 shadow-[#c2703d]/25">
+                className="flex-1 bg-gradient-to-r from-[#334155] to-[#64748b] hover:opacity-90 shadow-[#64748b]/25">
                 <Copy className="w-4 h-4" /> Copy
               </Button>
               <Button type="button" variant="secondary" onClick={onClose}>

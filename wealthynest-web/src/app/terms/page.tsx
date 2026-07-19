@@ -80,7 +80,7 @@ export default function TermsPage() {
           <Section title="6. Data and privacy">
             <p>
               Your use of the App is also governed by our{" "}
-              <a href="/privacy" className="text-indigo-500 hover:underline">Privacy Policy</a>,
+              <a href="/privacy" className="text-[#c2703d] hover:underline">Privacy Policy</a>,
               which is incorporated into these Terms by reference.
             </p>
           </Section>
@@ -141,7 +141,7 @@ export default function TermsPage() {
           <div className="pt-4 border-t border-border">
             <p className="text-sm text-muted-foreground">
               Questions about these terms?{" "}
-              <a href="mailto:support@wealthynest.in" className="text-indigo-500 hover:underline">
+              <a href="mailto:support@wealthynest.in" className="text-[#c2703d] hover:underline">
                 support@wealthynest.in
               </a>
             </p>
