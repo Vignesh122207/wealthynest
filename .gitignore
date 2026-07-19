@@ -3,6 +3,10 @@
 .env.*
 !.env.example
 
+# Android signing keystore — permanent identity, never commit. Back this up somewhere durable
+# outside git; losing it means losing the ability to ever update the Play Store listing.
+android/keystore/
+
 # macOS
 .DS_Store
 
