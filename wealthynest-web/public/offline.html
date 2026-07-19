@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>You're offline — WealthyNest</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: #0f172a; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif;
+    text-align: center; padding: 24px;
+  }
+  .card { max-width: 360px; }
+  h1 { font-size: 1.25rem; margin: 0 0 8px; }
+  p { color: #94a3b8; margin: 0 0 20px; font-size: 0.9rem; line-height: 1.5; }
+  button {
+    background: #6366f1; color: white; border: none; border-radius: 8px; padding: 10px 20px;
+    font-size: 0.9rem; cursor: pointer; font-family: inherit;
+  }
+  button:hover { background: #4f46e5; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>You're offline</h1>
+    <p>WealthyNest needs a connection to load your data. Check your network and try again.</p>
+    <button onclick="location.reload()">Retry</button>
+  </div>
+</body>
+</html>
