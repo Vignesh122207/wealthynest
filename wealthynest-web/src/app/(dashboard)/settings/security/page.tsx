@@ -304,7 +304,7 @@ function PasskeysSection() {
                   Added {formatDate(p.createdAt)}{p.lastUsedAt ? ` · Last used ${formatDate(p.lastUsedAt)}` : ""}
                 </p>
               </div>
-              <button onClick={() => deletePasskey(p.id)} title="Remove passkey"
+              <button onClick={() => deletePasskey(p.id)} title="Remove passkey" data-testid="security-passkey-delete"
                 className="text-muted-foreground/60 hover:text-red-500 transition-colors shrink-0">
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
@@ -322,9 +322,10 @@ function PasskeysSection() {
               placeholder="e.g. My iPhone"
               className="h-9"
               aria-label="Passkey nickname"
+              data-testid="security-passkey-nickname-input"
             />
           </div>
-          <button onClick={handleAdd} disabled={registering}
+          <button onClick={handleAdd} disabled={registering} data-testid="security-passkey-submit"
             className="h-9 px-3.5 rounded-xl text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-60 transition-colors flex items-center gap-1.5">
             {registering && <Loader2 className="w-3.5 h-3.5 animate-spin" />} {registering ? "Follow your device's prompt…" : "Continue"}
           </button>
@@ -334,7 +335,7 @@ function PasskeysSection() {
           </button>
         </div>
       ) : (
-        <button onClick={() => setShowAdd(true)}
+        <button onClick={() => setShowAdd(true)} data-testid="security-passkey-add-toggle"
           className="h-9 px-3.5 rounded-xl text-xs font-medium bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 transition-colors">
           Add a passkey
         </button>

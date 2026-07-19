@@ -49,7 +49,7 @@ export function LiveSearch({ placeholder, minChars = 2, onSearch, renderResult, 
       <div className="relative">
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 pointer-events-none" />
         <input value={q} onChange={e => setQ(e.target.value)}
-          placeholder={placeholder}
+          placeholder={placeholder} data-testid="live-search-input"
           className="w-full h-12 pl-10 pr-10 rounded-xl bg-muted/50 border border-border text-sm text-foreground placeholder-muted-foreground/40 focus:outline-none focus:border-indigo-500 focus:bg-background transition-all" />
         {loading
           ? <RefreshCw className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 animate-spin" />
@@ -60,9 +60,9 @@ export function LiveSearch({ placeholder, minChars = 2, onSearch, renderResult, 
         <p className="text-xs text-amber-400 mt-1.5 pl-1">{error}</p>
       )}
       {open && results.length > 0 && (
-        <div className="mt-2 bg-card border border-border rounded-xl overflow-hidden max-h-64 overflow-y-auto">
+        <div data-testid="live-search-results" className="mt-2 bg-card border border-border rounded-xl overflow-hidden max-h-64 overflow-y-auto">
           {results.map((r, i) => (
-            <button key={i} type="button"
+            <button key={i} type="button" data-testid={`live-search-result-${i}`}
               onClick={() => { onSelect(r); setQ(""); setResults([]); setOpen(false); }}
               className="w-full text-left px-4 py-3 hover:bg-muted/60 transition-colors border-b border-border/50 last:border-0">
               {renderResult(r)}

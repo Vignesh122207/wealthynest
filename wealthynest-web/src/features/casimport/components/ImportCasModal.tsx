@@ -147,7 +147,7 @@ export function ImportCasModal({ onClose }: { onClose: () => void }) {
                 (check the email it arrived in for the exact format). Enter it to continue.
               </p>
               <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                placeholder="CAS PDF password" autoFocus
+                placeholder="CAS PDF password" autoFocus data-testid="import-cas-password-input"
                 className="w-full h-9 px-3 rounded-lg bg-muted/60 border border-border text-sm text-foreground" />
               <div className="flex gap-2">
                 <Button variant="gradient" onClick={handlePasswordSubmit} loading={previewing} disabled={!password}
@@ -168,7 +168,7 @@ export function ImportCasModal({ onClose }: { onClose: () => void }) {
                     <span className="text-amber-500"> · {includedRows.length - readyCount} need{includedRows.length - readyCount === 1 ? "s" : ""} a fix before import</span>
                   )}
                 </p>
-                <button type="button" onClick={addManualRow}
+                <button type="button" onClick={addManualRow} data-testid="import-cas-add-row"
                   className="flex items-center gap-1 text-xs font-medium text-indigo-500 hover:text-indigo-600 transition-colors shrink-0">
                   <Plus className="w-3.5 h-3.5" /> Add missed scheme
                 </button>
@@ -179,26 +179,28 @@ export function ImportCasModal({ onClose }: { onClose: () => void }) {
                   <div key={r.rowIndex} className={cn("p-3 space-y-2", !r.included && "opacity-50")}>
                     <div className="flex items-start gap-2">
                       <input type="checkbox" checked={r.included} onChange={() => updateRow(i, { included: !r.included })}
-                        title="Include in import" className="mt-1.5 shrink-0 accent-rose-500" />
+                        title="Include in import" data-testid={`import-cas-checkbox-${r.rowIndex}`}
+                        className="mt-1.5 shrink-0 accent-rose-500" />
                       <input value={r.schemeName} onChange={e => updateRow(i, { schemeName: e.target.value })}
-                        placeholder="Scheme name"
+                        placeholder="Scheme name" data-testid={`import-cas-scheme-${r.rowIndex}`}
                         className="flex-1 min-w-0 h-8 px-2 rounded-lg bg-muted/60 border border-border text-xs text-foreground" />
-                      <button type="button" onClick={() => removeRow(i)} title="Remove row"
+                      <button type="button" onClick={() => removeRow(i)} title="Remove row" data-testid={`import-cas-remove-${r.rowIndex}`}
                         className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-muted-foreground/60 hover:text-red-500 hover:bg-red-500/10 transition-colors">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                     <div className="grid grid-cols-4 gap-2 pl-6">
-                      <LabeledInput label="Units" value={r.units} onChange={v => {
+                      <LabeledInput label="Units" value={r.units} testId={`import-cas-units-${r.rowIndex}`} onChange={v => {
                         const nav = Number(r.nav);
                         updateRow(i, { units: v, currentValue: nav > 0 && Number(v) > 0 ? String(Number(v) * nav) : r.currentValue });
                       }} />
-                      <LabeledInput label="NAV" value={r.nav} onChange={v => {
+                      <LabeledInput label="NAV" value={r.nav} testId={`import-cas-nav-${r.rowIndex}`} onChange={v => {
                         const units = Number(r.units);
                         updateRow(i, { nav: v, currentValue: units > 0 && Number(v) > 0 ? String(units * Number(v)) : r.currentValue });
                       }} />
-                      <LabeledInput label="Current value" value={r.currentValue} onChange={v => updateRow(i, { currentValue: v })} />
-                      <LabeledInput label="Invested (optional)" value={r.investedAmount}
+                      <LabeledInput label="Current value" value={r.currentValue} testId={`import-cas-value-${r.rowIndex}`}
+                        onChange={v => updateRow(i, { currentValue: v })} />
+                      <LabeledInput label="Invested (optional)" value={r.investedAmount} testId={`import-cas-invested-${r.rowIndex}`}
                         onChange={v => updateRow(i, { investedAmount: v })} />
                     </div>
                     <div className="pl-6 flex items-center gap-3 text-[11px] text-muted-foreground/70">
@@ -254,11 +256,11 @@ export function ImportCasModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-function LabeledInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function LabeledInput({ label, value, onChange, testId }: { label: string; value: string; onChange: (v: string) => void; testId: string }) {
   return (
     <label className="block">
       <span className="block text-[10px] text-muted-foreground/70 mb-0.5">{label}</span>
-      <input type="number" step="any" value={value} onChange={e => onChange(e.target.value)}
+      <input type="number" step="any" value={value} onChange={e => onChange(e.target.value)} data-testid={testId}
         className="w-full h-7 px-1.5 rounded-lg bg-muted/60 border border-border text-xs text-foreground" />
     </label>
   );

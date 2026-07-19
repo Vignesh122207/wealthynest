@@ -258,7 +258,7 @@ export function LoginForm() {
     <div className="min-h-screen flex bg-background">
 
       {/* ── Left panel — brand ──────────────────────────────── */}
-      <div className="hidden lg:flex flex-col justify-between w-[44%] shrink-0 relative overflow-hidden
+      <aside aria-label="WealthyNest" className="hidden lg:flex flex-col justify-between w-[44%] shrink-0 relative overflow-hidden
         bg-gradient-to-br from-indigo-600 via-[#4338ca] to-violet-700 p-12">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-20 -left-20 w-72 h-72 rounded-full bg-white/5 blur-3xl" />
@@ -293,10 +293,10 @@ export function LoginForm() {
         <p className="relative text-xs text-indigo-300">
           © {new Date().getFullYear()} WealthyNest · Built with ♥
         </p>
-      </div>
+      </aside>
 
       {/* ── Right panel — form ──────────────────────────────── */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
+      <main className="flex-1 flex flex-col items-center justify-center px-6 py-12">
 
         <div className="lg:hidden flex items-center gap-2 mb-8">
           <BrandMark boxClassName="w-8 h-8" iconClassName="w-5 h-5" />
@@ -384,7 +384,7 @@ export function LoginForm() {
           </p>
         </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }

@@ -237,6 +237,7 @@ export function ImportStatementModal({ onClose, bankAccounts, cashAccounts, init
                       data-testid={`import-row-checkbox-${r.rowIndex}`}
                       onChange={() => toggleRow(i)} className="shrink-0 accent-indigo-500" />
                     <div className={cn("flex-1 min-w-0", bulkSelectable && "cursor-pointer")}
+                      data-testid={`import-row-select-${r.rowIndex}`}
                       onClick={bulkSelectable ? () => toggleSelected(i) : undefined}
                       title={bulkSelectable ? "Select for bulk categorize" : undefined}>
                       <p className="text-xs text-foreground truncate">{r.description || "—"}</p>

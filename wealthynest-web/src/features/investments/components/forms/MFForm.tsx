@@ -64,12 +64,12 @@ export function MFForm({ defaultValues, onSubmit, onCancel, isPending, bankAccou
 
       {selected && (
         <div className="grid sm:grid-cols-2 gap-4">
-          <FormCurrencyInput label="Units" {...form.register("units")}
+          <FormCurrencyInput label="Units" data-testid="mf-units-input" {...form.register("units")}
             error={form.formState.errors.units?.message} />
-          <FormCurrencyInput label="Buy NAV (per unit)" {...form.register("avgBuyPrice")}
+          <FormCurrencyInput label="Buy NAV (per unit)" data-testid="mf-avg-buy-price-input" {...form.register("avgBuyPrice")}
             error={form.formState.errors.avgBuyPrice?.message} />
           <Controller control={form.control} name="purchaseDate" render={({ field, fieldState }) => (
-            <FormDatePicker label="Purchase Date" value={field.value ?? ""} onChange={field.onChange}
+            <FormDatePicker label="Purchase Date" testId="mf-purchase-date-input" value={field.value ?? ""} onChange={field.onChange}
               onBlur={field.onBlur} error={fieldState.error?.message} />
           )} />
           {bankAccounts.length > 0 && (

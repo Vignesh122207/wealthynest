@@ -1,0 +1,35 @@
+{
+  "name": "wealthynest-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Playwright end-to-end automation for WealthyNest",
+  "scripts": {
+    "test": "playwright test --project=chromium",
+    "test:auth": "playwright test tests/auth --project=chromium",
+    "test:smoke": "playwright test tests/smoke --project=chromium",
+    "test:regression": "playwright test tests/regression --workers=1 --project=chromium",
+    "test:regression:firefox": "E2E_PROJECTS=chromium,firefox playwright test tests/regression --workers=1 --project=firefox",
+    "test:regression:webkit": "E2E_PROJECTS=chromium,webkit playwright test tests/regression --workers=1 --project=webkit",
+    "test:responsive": "playwright test tests/responsive/responsive.spec.ts --project=mobile-chrome",
+    "test:tablet": "playwright test tests/responsive/tablet.spec.ts --project=tablet",
+    "test:a11y": "playwright test tests/a11y --project=chromium",
+    "test:performance": "playwright test tests/performance --project=chromium",
+    "test:visual": "playwright test tests/visual --project=chromium",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "report": "playwright show-report",
+    "install:browsers": "playwright install --with-deps"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
+    "@faker-js/faker": "^9.0.0",
+    "@playwright/test": "^1.48.0",
+    "@types/node": "^20",
+    "@types/pg": "^8.11.0",
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5",
+    "pg": "^8.13.0",
+    "typescript": "^5"
+  }
+}

@@ -31,7 +31,7 @@ export function SpendingDonut({ categoryBreakdown, year, month, chart, onAddExpe
     <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm h-full flex flex-col animate-fade-in-up card-hover">
       <div className="flex items-center justify-between mb-1">
         <div>
-          <h3 className="font-bold text-foreground text-sm">Spending</h3>
+          <h2 className="font-bold text-foreground text-sm">Spending</h2>
           <p className="text-[11px] text-muted-foreground/70 mt-0.5">By category · {label}</p>
         </div>
         <Link href="/expenses"

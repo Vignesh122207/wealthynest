@@ -96,12 +96,12 @@ export function StockForm({ defaultValues, onSubmit, onCancel, isPending, bankAc
               Quantity and buy price reflect your full transaction history — use <strong>Buy</strong> or <strong>Sell</strong> to change your position instead of editing them here.
             </p>
           )}
-          <FormCurrencyInput label="Quantity (shares)" placeholder="0" disabled={quantityLocked} {...form.register("units")}
+          <FormCurrencyInput label="Quantity (shares)" placeholder="0" disabled={quantityLocked} data-testid="stock-units-input" {...form.register("units")}
             error={form.formState.errors.units?.message} />
-          <FormCurrencyInput label="Buy Price per Share" placeholder="0" disabled={quantityLocked} {...form.register("avgBuyPrice")}
+          <FormCurrencyInput label="Buy Price per Share" placeholder="0" disabled={quantityLocked} data-testid="stock-avg-buy-price-input" {...form.register("avgBuyPrice")}
             error={form.formState.errors.avgBuyPrice?.message} />
           <Controller control={form.control} name="purchaseDate" render={({ field, fieldState }) => (
-            <FormDatePicker label="Purchase Date" value={field.value ?? ""} onChange={field.onChange}
+            <FormDatePicker label="Purchase Date" testId="stock-purchase-date-input" value={field.value ?? ""} onChange={field.onChange}
               onBlur={field.onBlur} error={fieldState.error?.message} />
           )} />
           {bankAccounts.length > 0 && (

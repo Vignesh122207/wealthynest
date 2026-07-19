@@ -38,7 +38,7 @@ export function TransfersTabContent({
 
       <div className="bg-card border border-border rounded-2xl overflow-hidden">
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-          <h3 className="font-semibold text-foreground text-sm">Transfers</h3>
+          <h2 className="font-semibold text-foreground text-sm">Transfers</h2>
           <div className="flex items-center gap-3">
             {searchedTransfers.length > 0 && (
               <span className="text-xs font-bold text-indigo-500 dark:text-indigo-400 tabular-nums">

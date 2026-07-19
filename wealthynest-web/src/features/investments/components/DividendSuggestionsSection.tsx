@@ -66,7 +66,7 @@ export function DividendSuggestionsSection({ stockCount }: { stockCount: number 
             {pending.length > 1 && (
               <button
                 disabled={logging || dismissing}
-                onClick={handleLogAll}
+                onClick={handleLogAll} data-testid="dividend-log-all-button"
                 className="h-7 px-3 rounded-lg text-xs font-semibold bg-indigo-600/80 hover:bg-indigo-600 text-white transition-all disabled:opacity-50 whitespace-nowrap">
                 Log All
               </button>
@@ -76,7 +76,7 @@ export function DividendSuggestionsSection({ stockCount }: { stockCount: number 
             {pending.map(s => {
               const key = `${s.investmentId}|${s.exDate}`;
               return (
-                <div key={key}
+                <div key={key} data-testid="dividend-suggestion-row"
                   className="bg-card rounded-xl px-3 py-3 space-y-2 border border-border/40">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -88,6 +88,7 @@ export function DividendSuggestionsSection({ stockCount }: { stockCount: number 
                     <button
                       disabled={dismissing || logging}
                       onClick={() => dismissDividend({ investmentId: s.investmentId, exDate: s.exDate })}
+                      data-testid="dividend-dismiss-button"
                       className="text-xs text-muted-foreground/60 hover:text-red-400 transition-colors shrink-0 mt-0.5"
                       title="Dismiss this suggestion">
                       <X className="w-3.5 h-3.5" />
@@ -101,12 +102,14 @@ export function DividendSuggestionsSection({ stockCount }: { stockCount: number 
                         inputMode="decimal"
                         value={getAmt(s)}
                         onChange={e => setAmounts(a => ({ ...a, [key]: e.target.value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1") }))}
+                        data-testid="dividend-amount-input"
                         className="w-full h-8 pl-6 pr-2 rounded-lg bg-muted/60 border border-border text-xs text-foreground tabular-nums focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/40 transition-all"
                       />
                     </div>
                     <button
                       disabled={logging || dismissing}
                       onClick={() => handleLog(s)}
+                      data-testid="dividend-log-button"
                       className="h-8 px-3 rounded-lg text-xs font-semibold bg-indigo-600/80 hover:bg-indigo-600 text-white transition-all disabled:opacity-50 whitespace-nowrap">
                       Log
                     </button>

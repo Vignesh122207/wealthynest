@@ -64,7 +64,7 @@ export function WalletOverview({ accounts }: WalletOverviewProps) {
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
           <Wallet className="w-4 h-4 text-primary" />
-          <h3 className="font-bold text-foreground text-sm">Accounts Overview</h3>
+          <h2 className="font-bold text-foreground text-sm">Accounts Overview</h2>
         </div>
         <Link href="/accounts" className="text-[11px] font-semibold text-primary hover:underline transition-colors">
           View all →
