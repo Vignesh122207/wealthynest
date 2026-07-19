@@ -95,6 +95,7 @@ wealthynest:
     rate-limit:
       auth-requests-per-minute: 10
       api-requests-per-minute: 200
+      trusted-proxies: ${RATE_LIMIT_TRUSTED_PROXIES:}
   pagination:
     default-page-size: 20
     max-page-size: 100

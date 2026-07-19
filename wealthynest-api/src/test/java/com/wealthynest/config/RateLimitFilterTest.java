@@ -39,6 +39,10 @@ class RateLimitFilterTest {
         filter = new RateLimitConfig.RateLimitFilter(props, redisTemplate);
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         lenient().when(request.getRemoteAddr()).thenReturn("10.0.0.5");
+        // Every trusted-proxy test checks CF-Connecting-IP before X-Forwarded-For — default it to
+        // absent here so tests that only care about the X-Forwarded-For fallback don't also need
+        // to stub this.
+        lenient().when(request.getHeader("CF-Connecting-IP")).thenReturn(null);
     }
 
     @Test
@@ -153,5 +157,60 @@ class RateLimitFilterTest {
 
         verify(valueOperations).increment("ratelimit:api:10.0.0.5");
         verify(request, never()).getHeader("X-Forwarded-For");
+    }
+
+    @Test
+    @DisplayName("remoteAddr falls inside a trusted CIDR range -> uses CF-Connecting-IP")
+    void trustedCidrRange_usesCfConnectingIp() throws Exception {
+        props.setTrustedProxies("172.19.0.0/16");
+        when(request.getRemoteAddr()).thenReturn("172.19.4.7");
+        when(request.getRequestURI()).thenReturn("/api/v1/expenses");
+        when(request.getHeader("CF-Connecting-IP")).thenReturn("203.0.113.9");
+        when(valueOperations.increment("ratelimit:api:203.0.113.9")).thenReturn(1L);
+
+        filter.doFilter(request, response, chain);
+
+        verify(valueOperations).increment("ratelimit:api:203.0.113.9");
+    }
+
+    @Test
+    @DisplayName("remoteAddr falls outside a trusted CIDR range -> headers ignored, uses remoteAddr")
+    void untrustedCidrRange_ignoresHeaders() throws Exception {
+        props.setTrustedProxies("172.19.0.0/16");
+        when(request.getRequestURI()).thenReturn("/api/v1/expenses");
+        when(valueOperations.increment("ratelimit:api:10.0.0.5")).thenReturn(1L);
+
+        filter.doFilter(request, response, chain);
+
+        verify(valueOperations).increment("ratelimit:api:10.0.0.5");
+        verify(request, never()).getHeader("CF-Connecting-IP");
+        verify(request, never()).getHeader("X-Forwarded-For");
+    }
+
+    @Test
+    @DisplayName("trusted proxy sends both CF-Connecting-IP and X-Forwarded-For -> CF-Connecting-IP wins")
+    void bothHeadersPresent_prefersCfConnectingIp() throws Exception {
+        props.setTrustedProxies("10.0.0.5");
+        when(request.getRequestURI()).thenReturn("/api/v1/expenses");
+        when(request.getHeader("CF-Connecting-IP")).thenReturn("203.0.113.9");
+        when(valueOperations.increment("ratelimit:api:203.0.113.9")).thenReturn(1L);
+
+        filter.doFilter(request, response, chain);
+
+        verify(valueOperations).increment("ratelimit:api:203.0.113.9");
+        verify(request, never()).getHeader("X-Forwarded-For");
+    }
+
+    @Test
+    @DisplayName("trusted proxy, no CF-Connecting-IP -> falls back to X-Forwarded-For")
+    void trustedProxyNoCfHeader_fallsBackToForwardedFor() throws Exception {
+        props.setTrustedProxies("10.0.0.5");
+        when(request.getRequestURI()).thenReturn("/api/v1/expenses");
+        when(request.getHeader("X-Forwarded-For")).thenReturn("203.0.113.9, 10.0.0.5");
+        when(valueOperations.increment("ratelimit:api:203.0.113.9")).thenReturn(1L);
+
+        filter.doFilter(request, response, chain);
+
+        verify(valueOperations).increment("ratelimit:api:203.0.113.9");
     }
 }

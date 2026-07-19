@@ -68,7 +68,7 @@ public class EmailServiceImpl implements EmailService {
                         <table cellpadding="0" cellspacing="0" align="center">
                           <tr>
                             <td style="background:rgba(255,255,255,0.15);border-radius:12px;width:44px;height:44px;text-align:center;vertical-align:middle;">
-                              <span style="font-size:22px;line-height:44px;">📈</span>
+                              <span style="font-size:22px;font-weight:800;line-height:44px;color:#ffffff;font-family:'Segoe UI',Arial,sans-serif;">W</span>
                             </td>
                             <td style="padding-left:10px;vertical-align:middle;">
                               <span style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">WealthyNest</span>
@@ -135,7 +135,7 @@ public class EmailServiceImpl implements EmailService {
                         <table cellpadding="0" cellspacing="0" align="center">
                           <tr>
                             <td style="background:rgba(255,255,255,0.15);border-radius:12px;width:44px;height:44px;text-align:center;vertical-align:middle;">
-                              <span style="font-size:22px;line-height:44px;">📈</span>
+                              <span style="font-size:22px;font-weight:800;line-height:44px;color:#ffffff;font-family:'Segoe UI',Arial,sans-serif;">W</span>
                             </td>
                             <td style="padding-left:10px;vertical-align:middle;">
                               <span style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">WealthyNest</span>
