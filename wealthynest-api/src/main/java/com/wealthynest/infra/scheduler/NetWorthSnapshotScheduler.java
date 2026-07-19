@@ -5,7 +5,6 @@ import com.wealthynest.domain.networth.service.NetWorthService;
 import com.wealthynest.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 
@@ -17,8 +16,7 @@ public class NetWorthSnapshotScheduler {
     private final NetWorthService  netWorthService;
     private final UserRepository   userRepository;
 
-    /** Runs on the 1st of every month at 02:00 AM to snapshot each user's net worth. */
-    @Scheduled(cron = "0 0 2 1 * *")
+    /** Entry point called by JobSchedulerService (NET_WORTH_SNAPSHOT job — configurable/triggerable from Admin). */
     public void takeMonthlySnapshots() {
         LocalDate prev  = LocalDate.now().minusMonths(1);
         int year  = prev.getYear();

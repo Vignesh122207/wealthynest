@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,11 +16,13 @@ public interface SipTransactionRepository extends JpaRepository<SipTransaction, 
 
     List<SipTransaction> findByInvestmentIdOrderByTransactionDateAsc(UUID investmentId);
 
+    /** Batch-load variant for portfolio-wide aggregation (e.g. computePortfolioXirr) — avoids
+     * one query per investment. */
+    List<SipTransaction> findByInvestmentIdInOrderByTransactionDateAsc(Collection<UUID> investmentIds);
+
     @Query("SELECT COALESCE(SUM(s.amount), 0) FROM SipTransaction s WHERE s.investmentId = :id AND s.transactionType = 'BUY'")
     BigDecimal sumBuyAmountByInvestmentId(@Param("id") UUID id);
 
     @Query("SELECT COALESCE(SUM(s.units), 0) FROM SipTransaction s WHERE s.investmentId = :id AND s.transactionType = 'BUY'")
     BigDecimal sumUnitsByInvestmentId(@Param("id") UUID id);
-
-    boolean existsByInvestmentId(UUID investmentId);
 }

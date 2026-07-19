@@ -2,11 +2,13 @@ package com.wealthynest.domain.income.service;
 
 import com.wealthynest.common.exception.AccessDeniedException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
+import com.wealthynest.domain.account.service.AccountOwnershipGuard;
 import com.wealthynest.domain.income.dto.request.CreateIncomeRequest;
 import com.wealthynest.domain.income.dto.request.UpdateIncomeRequest;
 import com.wealthynest.domain.income.dto.response.IncomeResponse;
 import com.wealthynest.domain.income.entity.IncomeEntry;
 import com.wealthynest.domain.income.repository.IncomeRepository;
+import com.wealthynest.domain.investment.repository.InvestmentIncomeLogRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
@@ -18,11 +20,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class IncomeServiceImpl implements IncomeService {
     private final IncomeRepository incomeRepository;
+    private final AccountOwnershipGuard accountOwnershipGuard;
+    private final InvestmentIncomeLogRepository investmentIncomeLogRepository;
 
     @Override
     @Transactional
     @CacheEvict(value = "dashboard", allEntries = true)
     public IncomeResponse create(UUID userId, CreateIncomeRequest request) {
+        accountOwnershipGuard.validateAccountOwnership(request.getAccountId(), userId);
         com.wealthynest.domain.income.entity.IncomePaymentMode mode =
                 request.getPaymentMode() != null
                         ? request.getPaymentMode()
@@ -82,16 +87,17 @@ public class IncomeServiceImpl implements IncomeService {
     @Transactional
     @CacheEvict(value = "dashboard", allEntries = true)
     public IncomeResponse update(UUID id, UUID userId, UpdateIncomeRequest request) {
-        IncomeEntry entry = incomeRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("IncomeEntry", "id", id));
-        if (!entry.getUserId().equals(userId)) throw new AccessDeniedException();
+        IncomeEntry entry = findAndValidateOwner(id, userId);
         if (request.getAmount()      != null) entry.setAmount(request.getAmount());
         if (request.getSource()      != null) entry.setSource(request.getSource());
         if (request.getDescription() != null) entry.setDescription(request.getDescription());
         if (request.getIncomeDate()  != null) entry.setIncomeDate(request.getIncomeDate());
         if (request.getPeriodMonth() != null) entry.setPeriodMonth(request.getPeriodMonth());
         if (request.getPeriodYear()  != null) entry.setPeriodYear(request.getPeriodYear());
-        if (request.getAccountId()   != null) entry.setAccountId(request.getAccountId());
+        if (request.getAccountId()   != null) {
+            accountOwnershipGuard.validateAccountOwnership(request.getAccountId(), userId);
+            entry.setAccountId(request.getAccountId());
+        }
         if (request.getPaymentMode() != null) entry.setPaymentMode(request.getPaymentMode());
         return toResponse(incomeRepository.save(entry));
     }
@@ -100,10 +106,18 @@ public class IncomeServiceImpl implements IncomeService {
     @Transactional
     @CacheEvict(value = "dashboard", allEntries = true)
     public void delete(UUID id, UUID userId) {
+        IncomeEntry entry = findAndValidateOwner(id, userId);
+        // income_entry_id has no ON DELETE policy — clear the back-reference from any auto-logged
+        // investment income (dividend/interest/FD maturity) before deleting the row it points to.
+        investmentIncomeLogRepository.clearIncomeEntryId(id);
+        incomeRepository.delete(entry);
+    }
+
+    private IncomeEntry findAndValidateOwner(UUID id, UUID userId) {
         IncomeEntry entry = incomeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("IncomeEntry", "id", id));
         if (!entry.getUserId().equals(userId)) throw new AccessDeniedException();
-        incomeRepository.delete(entry);
+        return entry;
     }
 
     private IncomeResponse toResponse(IncomeEntry e) {

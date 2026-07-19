@@ -14,16 +14,8 @@ public final class SecurityUtils {
     public static UUID requireCurrentUserId() {
         return getCurrentUserId().orElseThrow(() -> new IllegalStateException("No authenticated user in context"));
     }
-    public static Optional<String> getCurrentUserEmail() {
-        return getCurrentUserPrincipal().map(UserPrincipal::getEmail);
-    }
     public static Optional<UUID> getCurrentFamilyId() {
         return getCurrentUserPrincipal().map(UserPrincipal::getFamilyId);
-    }
-    public static boolean hasRole(String role) {
-        return getCurrentUserPrincipal()
-                .map(p -> p.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_" + role)))
-                .orElse(false);
     }
     private static Optional<UserPrincipal> getCurrentUserPrincipal() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();

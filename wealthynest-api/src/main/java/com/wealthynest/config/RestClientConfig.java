@@ -73,6 +73,19 @@ public class RestClientConfig {
             .build();
     }
 
+    /** BSE India public API — equity list download */
+    @Bean("bseClient")
+    public RestClient bseClient() {
+        return RestClient.builder()
+            .requestFactory(timeoutFactory(Duration.ofSeconds(15), Duration.ofSeconds(60)))
+            .baseUrl("https://api.bseindia.com")
+            .defaultHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120")
+            .defaultHeader("Accept", "application/json,text/plain,*/*")
+            .defaultHeader("Origin", "https://www.bseindia.com")
+            .defaultHeader("Referer", "https://www.bseindia.com/")
+            .build();
+    }
+
     /** frankfurter.app — fallback USD/INR rate */
     @Bean("frankfurterClient")
     public RestClient frankfurterClient() {
@@ -80,6 +93,19 @@ public class RestClientConfig {
             .requestFactory(timeoutFactory(Duration.ofSeconds(5), Duration.ofSeconds(8)))
             .baseUrl("https://api.frankfurter.app")
             .defaultHeader("Accept", "application/json")
+            .defaultHeader("User-Agent", "WealthyNest/1.0")
+            .build();
+    }
+
+    /** Have I Been Pwned "Pwned Passwords" range API — k-anonymity breach check for Vault Health.
+     * Only a 5-char SHA-1 prefix is ever sent; short timeouts + caller-side fail-open since a
+     * save must never block on this being reachable. */
+    @Bean("hibpClient")
+    public RestClient hibpClient() {
+        return RestClient.builder()
+            .requestFactory(timeoutFactory(Duration.ofSeconds(3), Duration.ofSeconds(5)))
+            .baseUrl("https://api.pwnedpasswords.com")
+            .defaultHeader("Accept", "text/plain")
             .defaultHeader("User-Agent", "WealthyNest/1.0")
             .build();
     }

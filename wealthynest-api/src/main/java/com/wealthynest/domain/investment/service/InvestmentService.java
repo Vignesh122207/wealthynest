@@ -1,13 +1,8 @@
 package com.wealthynest.domain.investment.service;
 
-import com.wealthynest.domain.investment.dto.request.CreateInvestmentRequest;
-import com.wealthynest.domain.investment.dto.request.CreateSipTransactionRequest;
-import com.wealthynest.domain.investment.dto.request.LogIncomeRequest;
-import com.wealthynest.domain.investment.dto.response.DividendSuggestionResponse;
-import com.wealthynest.domain.investment.dto.response.IncomeHistoryResponse;
-import com.wealthynest.domain.investment.dto.response.InvestmentResponse;
-import com.wealthynest.domain.investment.dto.response.InvestmentSearchResult;
-import com.wealthynest.domain.investment.dto.response.SipTransactionResponse;
+import com.wealthynest.domain.investment.dto.request.*;
+import com.wealthynest.domain.investment.dto.response.*;
+import com.wealthynest.domain.investment.entity.InvestmentType;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -32,8 +27,18 @@ public interface InvestmentService {
     List<SipTransactionResponse> getSipTransactions(UUID investmentId, UUID userId);
     void deleteSipTransaction(Long sipId, UUID userId);
     Double computeXirr(UUID investmentId, UUID userId);
+    Double computePortfolioXirr(UUID userId);
+    Double computeTypeXirr(UUID userId, InvestmentType type);
     IncomeHistoryResponse getIncomeHistory(UUID userId, int year);
 
     // Manual income logging
     void logIncome(UUID investmentId, UUID userId, LogIncomeRequest req);
+
+    // Dismiss a dividend suggestion (issue #3)
+    void dismissDividend(UUID investmentId, UUID userId, DismissDividendRequest req);
+
+    // Stock buy-more / sell transactions (issues #6, #7)
+    StockTransactionResponse addStockTransaction(UUID investmentId, UUID userId, CreateStockTransactionRequest req);
+    List<StockTransactionResponse> getStockTransactions(UUID investmentId, UUID userId);
+    void deleteStockTransaction(UUID investmentId, Long txnId, UUID userId);
 }

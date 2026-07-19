@@ -1,7 +1,7 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
-import { ResetPasswordForm } from "@/features/auth/components/ResetPasswordForm";
+import {useSearchParams} from "next/navigation";
+import {ResetPasswordForm} from "@/features/auth/components/ResetPasswordForm";
 
 export function ResetPasswordPageClient() {
   const params = useSearchParams();

@@ -6,9 +6,12 @@ services:
     environment:
       POSTGRES_DB:       wealthynest
       POSTGRES_USER:     wealthynest
-      POSTGRES_PASSWORD: wealthynest
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    # Bound to localhost only — reachable from the host for local tooling/
+    # `mvn spring-boot:run` against the dockerized DB, but not from the
+    # network or internet the way a bare "5432:5432" mapping would be.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - wealthynest-postgres-data:/var/lib/postgresql/data
     networks:
@@ -23,14 +26,15 @@ services:
     image: redis:7-alpine
     container_name: wealthynest-redis
     restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - wealthynest-redis-data:/data
     networks:
       - wealthynest-net
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "--no-auth-warning", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -52,14 +56,21 @@ services:
     ports:
       - "8080:8080"
     environment:
-      APP_ENV:      prod
+      # Overridable so the Google OAuth E2E test can opt into the `e2e-oauth-test` profile
+      # (`APP_ENV=prod,e2e-oauth-test docker compose up -d --build wealthynest-api`) without
+      # changing default behavior for a normal `docker compose up -d` — see playwright/README.md's
+      # Google OAuth section.
+      APP_ENV:      ${APP_ENV:-prod}
       DB_URL:       jdbc:postgresql://postgres:5432/wealthynest
       DB_USERNAME:  wealthynest
-      DB_PASSWORD:  wealthynest
+      DB_PASSWORD:  ${DB_PASSWORD}
       REDIS_HOST:   redis
       REDIS_PORT:   6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
       JWT_SECRET:          ${JWT_SECRET}
       JWT_ACCESS_EXPIRY:   7200000
+      VAULT_ENCRYPTION_KEY: ${VAULT_ENCRYPTION_KEY}
+      VAULT_HASH_PEPPER:    ${VAULT_HASH_PEPPER}
       CORS_ORIGINS:        ${CORS_ORIGINS}
       PORT:         8080
       MAIL_HOST:     ${MAIL_HOST}
@@ -67,6 +78,7 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       FRONTEND_URL:  ${FRONTEND_URL}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
     networks:
       - wealthynest-net
     healthcheck:
@@ -81,6 +93,7 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${API_URL}
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
     container_name: wealthynest-web
     restart: unless-stopped
     depends_on:

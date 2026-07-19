@@ -1,8 +1,5 @@
 package com.wealthynest.config;
 
-import io.github.bucket4j.Bandwidth;
-import io.github.bucket4j.Bucket;
-import io.github.bucket4j.Refill;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -14,15 +11,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
-import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Configuration
 public class RateLimitConfig {
@@ -42,17 +36,17 @@ public class RateLimitConfig {
         private String trustedProxies        = "";
     }
 
+    // Fixed 1-minute window counter kept in Redis so the limit is shared across
+    // every instance in a horizontally-scaled deployment (previously an
+    // in-memory bucket4j map, which meant each instance had its own separate
+    // budget and the count reset on every restart/deploy).
     @Slf4j
     @Component
     @Order(1)
     @RequiredArgsConstructor
     public static class RateLimitFilter implements Filter {
         private final RateLimitProperties props;
-
-        private final Map<String, Bucket>  authBuckets   = new ConcurrentHashMap<>();
-        private final Map<String, Bucket>  apiBuckets    = new ConcurrentHashMap<>();
-        private final Map<String, Instant> authLastSeen  = new ConcurrentHashMap<>();
-        private final Map<String, Instant> apiLastSeen   = new ConcurrentHashMap<>();
+        private final StringRedisTemplate redisTemplate;
 
         @Override
         public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
@@ -63,16 +57,10 @@ public class RateLimitConfig {
             String path = request.getRequestURI();
             boolean isAuthPath = path.startsWith("/api/v1/auth/");
 
-            Bucket bucket;
-            if (isAuthPath) {
-                authLastSeen.put(ip, Instant.now());
-                bucket = authBuckets.computeIfAbsent(ip, k -> buildBucket(props.getAuthRequestsPerMinute()));
-            } else {
-                apiLastSeen.put(ip, Instant.now());
-                bucket = apiBuckets.computeIfAbsent(ip, k -> buildBucket(props.getApiRequestsPerMinute()));
-            }
+            int    limit = isAuthPath ? props.getAuthRequestsPerMinute() : props.getApiRequestsPerMinute();
+            String key   = "ratelimit:" + (isAuthPath ? "auth:" : "api:") + ip;
 
-            if (bucket.tryConsume(1)) {
+            if (tryConsume(key, limit)) {
                 chain.doFilter(req, res);
             } else {
                 log.warn("Rate limit exceeded for IP: {} on path: {}", ip, path);
@@ -83,22 +71,24 @@ public class RateLimitConfig {
             }
         }
 
-        /** Evict buckets not seen in the last 30 minutes to prevent unbounded memory growth. */
-        @Scheduled(fixedDelay = 600_000)
-        public void evictStaleBuckets() {
-            Instant cutoff = Instant.now().minusSeconds(1800);
-            authLastSeen.entrySet().removeIf(e -> e.getValue().isBefore(cutoff));
-            authBuckets.keySet().retainAll(authLastSeen.keySet());
-            apiLastSeen.entrySet().removeIf(e -> e.getValue().isBefore(cutoff));
-            apiBuckets.keySet().retainAll(apiLastSeen.keySet());
-            log.debug("Rate-limiter eviction: auth={} api={}", authBuckets.size(), apiBuckets.size());
-        }
-
-        private Bucket buildBucket(int requestsPerMinute) {
-            return Bucket.builder()
-                    .addLimit(Bandwidth.classic(requestsPerMinute,
-                            Refill.intervally(requestsPerMinute, Duration.ofMinutes(1))))
-                    .build();
+        /**
+         * Atomically increments the per-IP counter for the current 1-minute window
+         * and sets its expiry the first time the key is created. Fails open (allows
+         * the request through) if Redis itself is unreachable — rate limiting is a
+         * defense-in-depth layer, not the only safeguard, so an outage here
+         * shouldn't take down the whole API.
+         */
+        private boolean tryConsume(String key, int limit) {
+            try {
+                Long count = redisTemplate.opsForValue().increment(key);
+                if (count != null && count == 1L) {
+                    redisTemplate.expire(key, Duration.ofMinutes(1));
+                }
+                return count == null || count <= limit;
+            } catch (Exception e) {
+                log.warn("Rate limiter Redis error, failing open: {}", e.getMessage());
+                return true;
+            }
         }
 
         private String resolveClientIp(HttpServletRequest request) {

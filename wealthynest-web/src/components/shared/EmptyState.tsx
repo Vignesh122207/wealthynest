@@ -1,5 +1,6 @@
-import { type LucideIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
+import {type LucideIcon} from "lucide-react";
+import {cn} from "@/lib/utils";
+import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
 
 interface EmptyStateProps {
   icon:        LucideIcon;
@@ -7,16 +8,17 @@ interface EmptyStateProps {
   description: string;
   action?:     React.ReactNode;
   className?:  string;
+  /** Defaults to "gray" for a genuinely empty list — pass "red" (via QueryErrorState, usually)
+   * when this is standing in for a failed request instead, so the icon itself signals which one. */
+  tone?:       IconTone;
 }
 
-export function EmptyState({ icon: Icon, title, description, action, className }: EmptyStateProps) {
+export function EmptyState({ icon: Icon, title, description, action, className, tone = "gray" }: EmptyStateProps) {
   return (
     <div className={cn("flex flex-col items-center justify-center py-16 text-center px-4", className)}>
-      <div className="w-14 h-14 rounded-2xl bg-slate-800/60 flex items-center justify-center mb-4">
-        <Icon className="w-7 h-7 text-slate-500" />
-      </div>
-      <h3 className="text-base font-semibold text-slate-300 mb-1">{title}</h3>
-      <p className="text-sm text-slate-500 max-w-xs mb-5">{description}</p>
+      <PremiumIcon icon={Icon} tone={tone} size="lg" className="mb-4" />
+      <h3 className="text-base font-semibold text-foreground mb-1">{title}</h3>
+      <p className="text-sm text-muted-foreground max-w-xs mb-5">{description}</p>
       {action}
     </div>
   );

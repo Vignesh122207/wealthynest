@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowLeft, Loader2, TicketCheck } from "lucide-react";
+import {useState} from "react";
+import {ArrowLeft, Loader2, TicketCheck} from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Header } from "@/components/layout/Header";
-import { PageWrapper } from "@/components/layout/PageWrapper";
-import { useCreateTicket } from "@/features/support/hooks/useSupport";
-import type { TicketCategory } from "@/features/support/types/support.types";
-import { cn } from "@/lib/utils";
+import {useRouter} from "next/navigation";
+import {Header} from "@/components/layout/Header";
+import {PageWrapper} from "@/components/layout/PageWrapper";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {useCreateTicket} from "@/features/support/hooks/useSupport";
+import type {TicketCategory} from "@/features/support/types/support.types";
+import {cn} from "@/lib/utils";
 
 const CATEGORIES: { value: TicketCategory; label: string; emoji: string; desc: string }[] = [
   { value: "BUG_REPORT",        emoji: "🐛", label: "Bug Report",       desc: "Something isn't working correctly" },
@@ -45,20 +46,18 @@ export default function NewTicketPage() {
 
   return (
     <div className="flex flex-col flex-1">
-      <Header title="New Ticket" />
+      <Header title="New Ticket" subtitle="Describe your issue and we'll help you out" />
       <PageWrapper>
-        <div className="max-w-lg mx-auto space-y-6">
+        <div className="max-w-lg md:max-w-3xl mx-auto space-y-6">
 
           <Link href="/settings" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="w-3.5 h-3.5" />
-            Support
+            Settings
           </Link>
 
           {/* Header */}
           <div className="flex flex-col items-center gap-3 py-2">
-            <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 flex items-center justify-center">
-              <TicketCheck className="w-8 h-8 text-indigo-500" />
-            </div>
+            <PremiumIcon icon={TicketCheck} tone="indigo" size="xl" />
             <div className="text-center">
               <p className="text-base font-semibold text-foreground">Create a Support Ticket</p>
               <p className="text-xs text-muted-foreground mt-1">Describe your issue and we&apos;ll respond in the app.</p>
@@ -107,9 +106,10 @@ export default function NewTicketPage() {
                   onChange={e => setSubject(e.target.value)}
                   placeholder="Brief summary of your issue"
                   maxLength={200}
+                  data-testid="ticket-subject-input"
                   className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                 />
-                {errors.subject && <p className="text-xs text-red-500">{errors.subject}</p>}
+                {errors.subject && <p className="text-xs text-red-600 dark:text-red-400">{errors.subject}</p>}
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground block">
@@ -122,15 +122,17 @@ export default function NewTicketPage() {
                   placeholder="Describe the issue in detail — steps to reproduce, what you expected vs what happened..."
                   rows={6}
                   maxLength={5000}
+                  data-testid="ticket-description-input"
                   className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/40 resize-none"
                 />
-                {errors.description && <p className="text-xs text-red-500">{errors.description}</p>}
+                {errors.description && <p className="text-xs text-red-600 dark:text-red-400">{errors.description}</p>}
               </div>
             </div>
 
             <button
               type="submit"
               disabled={isPending}
+              data-testid="ticket-submit"
               className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-semibold py-3 rounded-xl transition-colors"
             >
               {isPending && <Loader2 className="w-4 h-4 animate-spin" />}

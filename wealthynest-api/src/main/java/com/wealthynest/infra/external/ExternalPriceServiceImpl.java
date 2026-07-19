@@ -2,21 +2,31 @@ package com.wealthynest.infra.external;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wealthynest.domain.investment.entity.MfMaster;
+import com.wealthynest.domain.investment.repository.MfMasterRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.*;
-import java.util.*;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ExternalPriceServiceImpl implements ExternalPriceService {
 
+    private final MfMasterRepository mfMasterRepository;
     private final RestClient mfApiClient;
     private final RestClient swissquoteClient;
     private final RestClient forexClient;        // open.er-api.com
@@ -169,24 +179,44 @@ public class ExternalPriceServiceImpl implements ExternalPriceService {
     // ── Mutual Funds ──────────────────────────────────────────────────────────
 
     @Override
-    public List<Map<String, String>> searchMFSchemes(String query) {
+    @Transactional
+    public int syncMfMaster() {
         try {
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> results = mfApiClient.get()
-                .uri("/mf/search?q={q}", query)
+                .uri("/mf")
                 .retrieve().body(List.class);
-            if (results == null) return List.of();
-            List<Map<String, String>> out = new ArrayList<>();
+            if (results == null || results.isEmpty()) {
+                log.warn("MF master list fetch returned empty — leaving existing mf_master untouched");
+                return 0;
+            }
+
+            List<MfMaster> batch = new ArrayList<>(results.size());
             for (Map<String, Object> r : results) {
                 Object code = r.get("schemeCode");
                 String name = (String) r.get("schemeName");
-                if (code != null && name != null)
-                    out.add(Map.of("schemeCode", String.valueOf(code), "schemeName", name));
+                if (code != null && name != null) {
+                    batch.add(MfMaster.builder().schemeCode(String.valueOf(code)).schemeName(name).build());
+                }
             }
-            return out;
+
+            // Full replace, not upsert — mfapi.in's list is the complete current universe each
+            // time, so this is the simplest way to also drop schemes that got delisted/merged.
+            mfMasterRepository.truncate();
+            for (int i = 0; i < batch.size(); i += 1000) {
+                List<MfMaster> chunk = batch.subList(i, Math.min(i + 1000, batch.size()));
+                mfMasterRepository.saveAll(chunk);
+            }
+            // Not batch.size() — mfapi.in's raw list repeats a meaningful number of scheme codes
+            // (confirmed on a real sync: 113k raw entries, 37k distinct), and scheme_code being
+            // the @Id means saveAll() merges those in place rather than erroring, so the actual
+            // row count only matches the distinct-code count, not the input size.
+            int saved = (int) mfMasterRepository.count();
+            log.info("MF master sync complete: {} distinct schemes ({} raw entries)", saved, batch.size());
+            return saved;
         } catch (Exception e) {
-            log.warn("MF search failed for '{}': {}", query, e.getMessage());
-            return List.of();
+            log.error("MF master sync failed: {}", e.getMessage(), e);
+            return 0;
         }
     }
 
@@ -227,6 +257,34 @@ public class ExternalPriceServiceImpl implements ExternalPriceService {
         } catch (Exception e) {
             log.warn("Stock price fetch failed for {}: {}", symbol, e.getMessage());
             return null;
+        }
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public List<com.wealthynest.domain.investment.dto.response.InvestmentSearchResult> searchBSEStocks(String query) {
+        try {
+            Map<String, Object> body = yahooClient.get()
+                .uri("/v1/finance/search?q={q}&quotesCount=20&newsCount=0&enableFuzzyQuery=false", query)
+                .retrieve().body(Map.class);
+            if (body == null || !body.containsKey("quotes")) return List.of();
+            List<Map<String, Object>> quotes = (List<Map<String, Object>>) body.get("quotes");
+            List<com.wealthynest.domain.investment.dto.response.InvestmentSearchResult> results = new ArrayList<>();
+            for (Map<String, Object> q : quotes) {
+                String sym = String.valueOf(q.getOrDefault("symbol", ""));
+                String type = String.valueOf(q.getOrDefault("quoteType", ""));
+                // Only include BSE equity listings
+                if (!sym.endsWith(".BO") || !"EQUITY".equalsIgnoreCase(type)) continue;
+                String baseSymbol = sym.substring(0, sym.length() - 3); // strip ".BO"
+                String shortName  = String.valueOf(q.getOrDefault("longname",
+                    q.getOrDefault("shortname", baseSymbol)));
+                results.add(com.wealthynest.domain.investment.dto.response.InvestmentSearchResult.builder()
+                    .symbol(baseSymbol).name(shortName).exchange("BSE").type("STOCK").build());
+            }
+            return results;
+        } catch (Exception e) {
+            log.debug("Yahoo BSE search failed for '{}': {}", query, e.getMessage());
+            return List.of();
         }
     }
 

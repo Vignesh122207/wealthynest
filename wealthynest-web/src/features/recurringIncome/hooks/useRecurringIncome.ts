@@ -1,11 +1,11 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {toast} from "sonner";
 import {
-  recurringIncomeApi,
-  type CreateRecurringIncomePayload,
-  type UpdateRecurringIncomePayload,
+    type CreateRecurringIncomePayload,
+    recurringIncomeApi,
+    type UpdateRecurringIncomePayload,
 } from "../api/recurringIncome.api";
 
 const KEY = ["recurring-income"] as const;
@@ -47,9 +47,9 @@ export function useToggleRecurringIncome() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => recurringIncomeApi.toggle(id),
-    onSuccess: () => {
+    onSuccess: (rule) => {
       qc.invalidateQueries({ queryKey: KEY });
-      toast.success("Rule updated");
+      toast.success(rule.active ? "Rule activated" : "Rule paused");
     },
     onError: () => toast.error("Failed to toggle rule"),
   });

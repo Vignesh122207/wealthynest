@@ -1,5 +1,5 @@
-import { Suspense } from "react";
-import { ResetPasswordPageClient } from "./ResetPasswordPageClient";
+import {Suspense} from "react";
+import {ResetPasswordPageClient} from "./ResetPasswordPageClient";
 
 export const metadata = { title: "Reset Password — WealthyNest" };
 

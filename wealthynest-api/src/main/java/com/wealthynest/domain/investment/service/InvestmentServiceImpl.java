@@ -2,31 +2,30 @@ package com.wealthynest.domain.investment.service;
 
 import com.wealthynest.common.exception.AccessDeniedException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
+import com.wealthynest.domain.account.entity.AccountTransfer;
+import com.wealthynest.domain.account.repository.AccountTransferRepository;
+import com.wealthynest.domain.account.repository.WalletAccountRepository;
+import com.wealthynest.domain.account.service.AccountOwnershipGuard;
 import com.wealthynest.domain.asset.entity.Asset;
 import com.wealthynest.domain.asset.entity.AssetType;
 import com.wealthynest.domain.asset.repository.AssetRepository;
-import com.wealthynest.domain.account.entity.AccountTransfer;
-import com.wealthynest.domain.account.repository.AccountTransferRepository;
-import com.wealthynest.domain.investment.dto.request.CreateInvestmentRequest;
-import com.wealthynest.domain.investment.dto.request.CreateSipTransactionRequest;
+import com.wealthynest.domain.income.entity.IncomeEntry;
+import com.wealthynest.domain.income.entity.IncomePaymentMode;
+import com.wealthynest.domain.income.entity.IncomeSource;
+import com.wealthynest.domain.income.repository.IncomeRepository;
+import com.wealthynest.domain.investment.dto.request.*;
 import com.wealthynest.domain.investment.dto.response.*;
 import com.wealthynest.domain.investment.entity.*;
 import com.wealthynest.domain.investment.repository.*;
-import com.wealthynest.domain.account.repository.WalletAccountRepository;
-import com.wealthynest.domain.income.entity.IncomeEntry;
-import com.wealthynest.domain.income.entity.IncomeSource;
-import com.wealthynest.domain.income.entity.IncomePaymentMode;
-import com.wealthynest.domain.income.repository.IncomeRepository;
-import com.wealthynest.domain.investment.dto.request.LogIncomeRequest;
 import com.wealthynest.infra.external.ExternalPriceService;
 import com.wealthynest.infra.scheduler.AutoIncomeScheduler;
 import com.wealthynest.infra.util.XirrCalculator;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -39,25 +38,99 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class InvestmentServiceImpl implements InvestmentService {
 
+    // Marks a StockTransaction that was backfilled from an investment's pre-ledger units/
+    // avgBuyPrice (added before Buy More/Sell tracking existed) rather than one the user actually
+    // logged via the transaction modal. Reuses the existing `notes` column instead of a new
+    // boolean/migration for a single cosmetic flag — the frontend checks for this exact string to
+    // label the row "Opening position" instead of a plain Buy.
+    private static final String SEED_TXN_NOTE = "Opening position (auto-recorded)";
+
     private final InvestmentRepository          investmentRepository;
     private final AssetRepository               assetRepository;
     private final StockPriceCacheRepository     stockPriceCacheRepository;
     private final GoldPriceCacheRepository      goldPriceCacheRepository;
     private final MFNavCacheRepository          mfNavCacheRepository;
     private final StockMasterRepository         stockMasterRepository;
+    private final MfMasterRepository            mfMasterRepository;
     private final SipTransactionRepository      sipTransactionRepository;
     private final NseCorporateActionRepository  corpActionRepository;
     private final InvestmentIncomeLogRepository incomeLogRepository;
     private final WalletAccountRepository       accountRepository;
+    private final AccountOwnershipGuard         accountOwnershipGuard;
     private final AccountTransferRepository     accountTransferRepository;
     private final IncomeRepository              incomeRepository;
     private final ExternalPriceService          externalPriceService;
     private final AutoIncomeScheduler           autoIncomeScheduler;
+    private final DismissedDividendRepository   dismissedDividendRepository;
+    private final StockTransactionRepository    stockTransactionRepository;
 
     @Override @Transactional
     public InvestmentResponse createInvestment(UUID userId, CreateInvestmentRequest req) {
+        // For stocks: merge into the existing holding row instead of creating a duplicate.
+        // All buy lots are tracked as StockTransactions; WAC is recalculated from them.
+        if (req.getInvestmentType() == InvestmentType.STOCK && req.getSymbol() != null
+                && req.getUnits() != null && req.getUnits().compareTo(BigDecimal.ZERO) > 0
+                && req.getAvgBuyPrice() != null) {
+            Optional<Investment> existing = investmentRepository
+                .findByUserIdAndSymbolAndInvestmentTypeAndActiveTrue(
+                    userId, req.getSymbol(), InvestmentType.STOCK);
+            if (existing.isPresent()) {
+                Investment inv = existing.get();
+                // Seed initial transaction if not yet tracked
+                if (stockTransactionRepository.countByInvestmentId(inv.getId()) == 0
+                        && inv.getUnits() != null && inv.getUnits().compareTo(BigDecimal.ZERO) > 0
+                        && inv.getAvgBuyPrice() != null) {
+                    stockTransactionRepository.save(StockTransaction.builder()
+                        .investmentId(inv.getId())
+                        .transactionDate(inv.getPurchaseDate() != null ? inv.getPurchaseDate() : LocalDate.now())
+                        .transactionType("BUY")
+                        .quantity(inv.getUnits())
+                        .pricePerShare(inv.getAvgBuyPrice())
+                        .brokerage(inv.getBrokerage() != null ? inv.getBrokerage() : BigDecimal.ZERO)
+                        .notes(SEED_TXN_NOTE)
+                        .build());
+                }
+                // Record the new buy lot
+                BigDecimal brokerage = req.getBrokerage() != null ? req.getBrokerage() : BigDecimal.ZERO;
+                stockTransactionRepository.save(StockTransaction.builder()
+                    .investmentId(inv.getId())
+                    .transactionDate(req.getPurchaseDate() != null ? req.getPurchaseDate() : LocalDate.now())
+                    .transactionType("BUY")
+                    .quantity(req.getUnits())
+                    .pricePerShare(req.getAvgBuyPrice())
+                    .brokerage(brokerage)
+                    .notes(req.getNotes())
+                    .build());
+                // Debit source account if specified
+                if (req.getDebitAccountId() != null) {
+                    accountOwnershipGuard.validateAccountOwnership(req.getDebitAccountId(), userId);
+                    BigDecimal cost = req.getUnits().multiply(req.getAvgBuyPrice()).add(brokerage);
+                    accountTransferRepository.save(AccountTransfer.builder()
+                        .userId(userId)
+                        .fromAccountId(req.getDebitAccountId())
+                        .toAccountId(null)
+                        .amount(cost)
+                        .transferDate(req.getPurchaseDate() != null ? req.getPurchaseDate() : LocalDate.now())
+                        .description("Buy " + req.getSymbol() + " ×" + req.getUnits())
+                        .build());
+                }
+                recalculateStockTotals(inv, req.getAvgBuyPrice());
+                return enrich(inv);
+            }
+        }
+
+        accountOwnershipGuard.validateAccountOwnership(req.getLinkedAccountId(), userId);
+        accountOwnershipGuard.validateAccountOwnership(req.getDebitAccountId(), userId);
+
         // Auto-create linked asset
         UUID assetId = req.getAssetId();
+        if (assetId != null) {
+            // Otherwise a caller could point a new investment at someone else's asset —
+            // every later update would then overwrite that asset's real value (IDOR write).
+            UUID requestedAssetId = assetId;
+            assetRepository.findByIdAndUserId(requestedAssetId, userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Asset", "id", requestedAssetId));
+        }
         if (assetId == null) {
             String name = nameFor(req);
             Asset asset = Asset.builder()
@@ -79,6 +152,7 @@ public class InvestmentServiceImpl implements InvestmentService {
             .currentValue(computeCurrentValue(req))
             .sipAmount(req.getSipAmount()).sipDay(req.getSipDay())
             .purchaseDate(req.getPurchaseDate())
+            .faceValue(req.getFaceValue())
             .couponRate(req.getCouponRate()).couponFrequency(req.getCouponFrequency())
             .couponCreditDay(req.getCouponCreditDay())
             .maturityDate(req.getMaturityDate()).bankName(req.getBankName())
@@ -86,17 +160,22 @@ public class InvestmentServiceImpl implements InvestmentService {
             .quantityGrams(req.getQuantityGrams())
             .goldKarat(req.getGoldKarat() != null ? req.getGoldKarat() : 22)
             .linkedAccountId(req.getLinkedAccountId())
+            .tdsRate(req.getTdsRate() != null ? req.getTdsRate() : BigDecimal.ZERO)
+            .brokerage(req.getBrokerage() != null ? req.getBrokerage() : BigDecimal.ZERO)
             .notes(req.getNotes()).active(true).build();
 
         Investment saved = investmentRepository.save(inv);
 
         // Create a debit transfer if a source account was specified (toAccountId null = investment has no real destination)
         if (req.getDebitAccountId() != null) {
+            // Debit = investedAmount + brokerage (brokerage is a cost on top of the investment)
+            BigDecimal brokerageAmt = req.getBrokerage() != null ? req.getBrokerage() : BigDecimal.ZERO;
+            BigDecimal debitAmt = req.getInvestedAmount().add(brokerageAmt);
             AccountTransfer debitTransfer = AccountTransfer.builder()
                 .userId(userId)
                 .fromAccountId(req.getDebitAccountId())
                 .toAccountId(null)
-                .amount(req.getInvestedAmount())
+                .amount(debitAmt)
                 .transferDate(req.getPurchaseDate() != null ? req.getPurchaseDate() : LocalDate.now())
                 .description("Investment: " + nameFor(req))
                 .build();
@@ -104,6 +183,21 @@ public class InvestmentServiceImpl implements InvestmentService {
             saved.setDebitTransferId(savedTransfer.getId());
             saved.setDebitAccountId(req.getDebitAccountId());
             investmentRepository.save(saved);
+        }
+
+        // Seed the initial BUY transaction for stocks so sell/buy-more recalculations work correctly
+        if (saved.getInvestmentType() == InvestmentType.STOCK
+                && saved.getUnits() != null && saved.getUnits().compareTo(BigDecimal.ZERO) > 0
+                && saved.getAvgBuyPrice() != null) {
+            stockTransactionRepository.save(StockTransaction.builder()
+                .investmentId(saved.getId())
+                .transactionDate(saved.getPurchaseDate() != null ? saved.getPurchaseDate() : LocalDate.now())
+                .transactionType("BUY")
+                .quantity(saved.getUnits())
+                .pricePerShare(saved.getAvgBuyPrice())
+                .brokerage(saved.getBrokerage() != null ? saved.getBrokerage() : BigDecimal.ZERO)
+                .notes(SEED_TXN_NOTE)
+                .build());
         }
 
         // Register after-commit hook so backfill runs only after the investment row is visible in DB.
@@ -128,9 +222,12 @@ public class InvestmentServiceImpl implements InvestmentService {
     public InvestmentResponse updateInvestment(UUID id, UUID userId, CreateInvestmentRequest req) {
         Investment inv = findAndValidate(id, userId);
         UUID oldLinkedAccountId = inv.getLinkedAccountId();
+        accountOwnershipGuard.validateAccountOwnership(req.getLinkedAccountId(), userId);
 
-        // Sync debit transfer amount if investedAmount was corrected
-        if (inv.getDebitTransferId() != null && req.getInvestedAmount() != null
+        boolean isStock = inv.getInvestmentType() == InvestmentType.STOCK;
+
+        // For non-stock types, sync the debit transfer amount if investedAmount changed
+        if (!isStock && inv.getDebitTransferId() != null && req.getInvestedAmount() != null
                 && req.getInvestedAmount().compareTo(inv.getInvestedAmount()) != 0) {
             accountTransferRepository.findById(inv.getDebitTransferId()).ifPresent(t -> {
                 t.setAmount(req.getInvestedAmount());
@@ -139,18 +236,30 @@ public class InvestmentServiceImpl implements InvestmentService {
         }
 
         inv.setInvestmentType(req.getInvestmentType());
+
+        // Guard: if a stock's symbol is being changed to one already held in another active row,
+        // block it — the user should use "Add transaction" on the existing holding instead.
+        if (isStock && req.getSymbol() != null
+                && !req.getSymbol().equalsIgnoreCase(inv.getSymbol())) {
+            investmentRepository
+                .findByUserIdAndSymbolAndInvestmentTypeAndActiveTrue(userId, req.getSymbol(), InvestmentType.STOCK)
+                .ifPresent(other -> {
+                    if (!other.getId().equals(id))
+                        throw new IllegalArgumentException(
+                            "You already have an active holding for " + req.getSymbol() +
+                            ". Add a buy transaction to that position instead of creating a duplicate.");
+                });
+        }
+
         inv.setSymbol(req.getSymbol());
         inv.setExchange(req.getExchange() != null ? req.getExchange() : "NSE");
         inv.setSchemeCode(req.getSchemeCode());
         inv.setCompanyName(req.getCompanyName());
-        inv.setUnits(req.getUnits());
-        inv.setAvgBuyPrice(req.getAvgBuyPrice());
-        inv.setCurrentPrice(req.getCurrentPrice());
-        inv.setInvestedAmount(req.getInvestedAmount());
-        inv.setCurrentValue(computeCurrentValue(req));
+        inv.setGoldKarat(req.getGoldKarat() != null ? req.getGoldKarat() : inv.getGoldKarat());
         inv.setSipAmount(req.getSipAmount());
         inv.setSipDay(req.getSipDay());
         inv.setPurchaseDate(req.getPurchaseDate());
+        inv.setFaceValue(req.getFaceValue());
         inv.setCouponRate(req.getCouponRate());
         inv.setCouponFrequency(req.getCouponFrequency());
         inv.setCouponCreditDay(req.getCouponCreditDay());
@@ -159,7 +268,52 @@ public class InvestmentServiceImpl implements InvestmentService {
         inv.setCompoundingFrequency(req.getCompoundingFrequency());
         inv.setQuantityGrams(req.getQuantityGrams());
         inv.setLinkedAccountId(req.getLinkedAccountId());
+        inv.setTdsRate(req.getTdsRate() != null ? req.getTdsRate() : BigDecimal.ZERO);
         inv.setNotes(req.getNotes());
+
+        if (isStock) {
+            investmentRepository.save(inv); // save metadata first so ID is available
+
+            List<StockTransaction> txns =
+                stockTransactionRepository.findByInvestmentIdOrderByTransactionDateAsc(id);
+            // Units/avg price are only a free-form "correct my initial buy" field while the seed
+            // transaction is the ONLY transaction on record. Once a Buy More/Sell has happened,
+            // units/avgBuyPrice are derived from the full ledger (see recalculateStockTotals) —
+            // applying the edit form's (already-aggregate) values on top of that would double
+            // count the seed against the other transactions still in the ledger.
+            if (txns.size() <= 1 && req.getUnits() != null
+                    && req.getUnits().compareTo(BigDecimal.ZERO) > 0 && req.getAvgBuyPrice() != null) {
+                StockTransaction seed = txns.stream()
+                    .filter(t -> "BUY".equals(t.getTransactionType()))
+                    .findFirst().orElse(null);
+                if (seed != null) {
+                    seed.setQuantity(req.getUnits());
+                    seed.setPricePerShare(req.getAvgBuyPrice());
+                    if (inv.getPurchaseDate() != null) seed.setTransactionDate(inv.getPurchaseDate());
+                    stockTransactionRepository.save(seed);
+                } else {
+                    stockTransactionRepository.save(StockTransaction.builder()
+                        .investmentId(id)
+                        .transactionDate(inv.getPurchaseDate() != null ? inv.getPurchaseDate() : LocalDate.now())
+                        .transactionType("BUY")
+                        .quantity(req.getUnits())
+                        .pricePerShare(req.getAvgBuyPrice())
+                        .brokerage(inv.getBrokerage() != null ? inv.getBrokerage() : BigDecimal.ZERO)
+                        .notes(SEED_TXN_NOTE)
+                        .build());
+                }
+            }
+            recalculateStockTotals(inv, null);
+        } else {
+            // Non-stock: apply financial values from request directly
+            inv.setUnits(req.getUnits());
+            inv.setAvgBuyPrice(req.getAvgBuyPrice());
+            inv.setCurrentPrice(req.getCurrentPrice());
+            inv.setInvestedAmount(req.getInvestedAmount());
+            inv.setCurrentValue(computeCurrentValue(req));
+            inv.setBrokerage(req.getBrokerage() != null ? req.getBrokerage() : BigDecimal.ZERO);
+        }
+
         assetRepository.findById(inv.getAssetId()).ifPresent(a -> {
             a.setCurrentValue(inv.getCurrentValue());
             a.setAsOfDate(LocalDate.now());
@@ -216,18 +370,43 @@ public class InvestmentServiceImpl implements InvestmentService {
     @Override
     public List<InvestmentSearchResult> searchStocks(String query) {
         if (query == null || query.isBlank()) return List.of();
-        return stockMasterRepository.search(query.trim(), Pageable.ofSize(15)).stream()
+        String q = query.trim();
+
+        // 1. Search local NSE master DB (and BSE-only records we may have seeded)
+        List<InvestmentSearchResult> dbResults = stockMasterRepository.search(q, Pageable.ofSize(15)).stream()
             .map(s -> InvestmentSearchResult.builder()
                 .symbol(s.getSymbol()).name(s.getCompanyName())
                 .exchange(s.getExchange()).type("STOCK").build())
-            .toList();
+            .collect(Collectors.toCollection(ArrayList::new));
+
+        // Collect NSE symbols already in DB results for deduplication
+        Set<String> nseSymbols = dbResults.stream()
+            .filter(r -> "NSE".equals(r.getExchange()))
+            .map(r -> r.getSymbol().toLowerCase())
+            .collect(Collectors.toSet());
+
+        // 2. Supplement with BSE stocks from Yahoo Finance — only include those not already on NSE
+        List<InvestmentSearchResult> bseYahoo = externalPriceService.searchBSEStocks(q);
+        for (InvestmentSearchResult bse : bseYahoo) {
+            if (!nseSymbols.contains(bse.getSymbol().toLowerCase())
+                    && dbResults.stream().noneMatch(r -> r.getSymbol().equalsIgnoreCase(bse.getSymbol())
+                        && "BSE".equals(r.getExchange()))) {
+                dbResults.add(bse);
+            }
+        }
+
+        // Cap at 20 results, NSE first (already ordered by DB query)
+        return dbResults.size() > 20 ? dbResults.subList(0, 20) : dbResults;
     }
 
     @Override
     public List<InvestmentSearchResult> searchMF(String query) {
-        return externalPriceService.searchMFSchemes(query).stream()
+        if (query == null || query.isBlank()) return List.of();
+        // Local mf_master lookup instead of proxying live to mfapi.in on every keystroke — see
+        // MfMasterSyncScheduler for how the table stays current.
+        return mfMasterRepository.search(query.trim(), Pageable.ofSize(15)).stream()
             .map(m -> InvestmentSearchResult.builder()
-                .schemeCode(m.get("schemeCode")).name(m.get("schemeName")).type("MF").build())
+                .schemeCode(m.getSchemeCode()).name(m.getSchemeName()).type("MF").build())
             .toList();
     }
 
@@ -380,10 +559,20 @@ public class InvestmentServiceImpl implements InvestmentService {
                 priceLastUpdated = gc.getLastUpdated();
             }
         } else if (inv.getInvestmentType() == InvestmentType.FD && inv.getCouponRate() != null) {
-            maturityAmt    = computeFDMaturity(inv);
+            maturityAmt     = computeFDMaturity(inv);
             accruedInterest = computeFDAccrued(inv);
+            // Include accrued interest in currentVal so gain/loss and overview totals are accurate
+            if (accruedInterest != null)
+                currentVal = inv.getInvestedAmount().add(accruedInterest);
         } else if (inv.getInvestmentType() == InvestmentType.BOND && inv.getCouponRate() != null) {
-            maturityAmt = inv.getInvestedAmount(); // face value returned at maturity
+            // Maturity principal = face value × units (what the bondholder receives at maturity,
+            // independent of the purchase price which may be at discount or premium).
+            BigDecimal fv = inv.getFaceValue() != null ? inv.getFaceValue() : inv.getAvgBuyPrice();
+            if (fv != null && inv.getUnits() != null)
+                maturityAmt = fv.multiply(inv.getUnits()).setScale(2, RoundingMode.HALF_UP);
+            accruedInterest = computeBondAccrued(inv);
+            if (accruedInterest != null)
+                currentVal = inv.getInvestedAmount().add(accruedInterest);
         }
 
         BigDecimal gainLoss = currentVal.subtract(inv.getInvestedAmount());
@@ -408,6 +597,7 @@ public class InvestmentServiceImpl implements InvestmentService {
             .gainLoss(gainLoss).gainLossPct(gainLossPct)
             .sipAmount(inv.getSipAmount()).sipDay(inv.getSipDay())
             .purchaseDate(inv.getPurchaseDate())
+            .faceValue(inv.getFaceValue())
             .couponRate(inv.getCouponRate()).couponFrequency(inv.getCouponFrequency())
             .couponCreditDay(inv.getCouponCreditDay())
             .maturityDate(inv.getMaturityDate()).bankName(inv.getBankName())
@@ -418,11 +608,15 @@ public class InvestmentServiceImpl implements InvestmentService {
             .linkedAccountId(inv.getLinkedAccountId())
             .debitAccountId(inv.getDebitAccountId())
             .debitAccountName(debitAccountName)
+            .tdsRate(inv.getTdsRate())
+            .brokerage(inv.getBrokerage())
             .notes(inv.getNotes())
             .active(inv.isActive()).createdAt(inv.getCreatedAt())
             .dayChange(dayChange).dayChangePct(dayChangePct)
             .week52High(w52h).week52Low(w52l)
             .priceLastUpdated(priceLastUpdated)
+            .transactionCount(inv.getInvestmentType() == InvestmentType.STOCK
+                    ? (int) stockTransactionRepository.countByInvestmentId(inv.getId()) : 0)
             .build();
     }
 
@@ -466,6 +660,32 @@ public class InvestmentServiceImpl implements InvestmentService {
         return mat != null ? mat.subtract(fd.getInvestedAmount()) : null;
     }
 
+    // Pro-rata coupon income accrued from purchaseDate to today (or maturityDate, whichever is earlier).
+    // Uses simple day-count: faceValue × couponRate / 100 × days / 365, net of TDS.
+    private BigDecimal computeBondAccrued(Investment bond) {
+        if (bond.getCouponRate() == null || bond.getPurchaseDate() == null) return null;
+        // Coupon is always on face value, not on purchase price
+        BigDecimal fv = bond.getFaceValue() != null ? bond.getFaceValue() : bond.getAvgBuyPrice();
+        BigDecimal faceValueTotal = fv != null && bond.getUnits() != null
+            ? fv.multiply(bond.getUnits())
+            : bond.getInvestedAmount();
+        LocalDate to = LocalDate.now();
+        if (bond.getMaturityDate() != null && bond.getMaturityDate().isBefore(to)) to = bond.getMaturityDate();
+        long days = ChronoUnit.DAYS.between(bond.getPurchaseDate(), to);
+        if (days <= 0) return BigDecimal.ZERO;
+        BigDecimal gross = faceValueTotal
+            .multiply(bond.getCouponRate())
+            .divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP)
+            .multiply(BigDecimal.valueOf(days))
+            .divide(BigDecimal.valueOf(365), 2, RoundingMode.HALF_UP);
+        BigDecimal tdsRate = bond.getTdsRate() != null ? bond.getTdsRate() : BigDecimal.ZERO;
+        if (tdsRate.compareTo(BigDecimal.ZERO) > 0)
+            gross = gross.multiply(BigDecimal.ONE.subtract(
+                tdsRate.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP)
+            )).setScale(2, RoundingMode.HALF_UP);
+        return gross;
+    }
+
     // ── Phase 2: Dividend suggestions ─────────────────────────────────────────
 
     @Override @Transactional(readOnly = true)
@@ -477,6 +697,11 @@ public class InvestmentServiceImpl implements InvestmentService {
                       && i.getPurchaseDate() != null)
             .toList();
 
+        // Collect dismissed dividends for this user once to avoid per-action DB hits
+        Set<String> dismissed = dismissedDividendRepository.findByUserId(userId).stream()
+            .map(d -> d.getInvestmentId() + "|" + d.getExDate())
+            .collect(Collectors.toSet());
+
         List<DividendSuggestionResponse> suggestions = new ArrayList<>();
         for (Investment inv : stocks) {
             List<NseCorporateAction> actions =
@@ -485,6 +710,8 @@ public class InvestmentServiceImpl implements InvestmentService {
             for (NseCorporateAction ca : actions) {
                 BigDecimal dps = ca.getDividendPerShare() != null ? ca.getDividendPerShare() : BigDecimal.ZERO;
                 if (dps.compareTo(BigDecimal.ZERO) <= 0) continue;
+                // Skip dismissed suggestions (issue #3)
+                if (dismissed.contains(inv.getId() + "|" + ca.getExDate())) continue;
                 BigDecimal suggested = inv.getUnits().multiply(dps).setScale(2, RoundingMode.HALF_UP);
                 boolean logged = incomeLogRepository.existsByInvestmentIdAndIncomeTypeAndEventDate(
                     inv.getId(), "DIVIDEND", ca.getExDate());
@@ -560,10 +787,48 @@ public class InvestmentServiceImpl implements InvestmentService {
         investmentRepository.save(inv);
     }
 
+    // Appends this investment's dated cashflows to the running lists — shared by computeXirr (one
+    // investment) and computePortfolioXirr (every active investment's cashflows combined on one
+    // timeline). Checks both ledgers an investment can have (a SIP ledger for recurring/mutual-fund
+    // style buys, a stock-transaction ledger for buy-more/sell trades) rather than just SIP, so a
+    // stock bought incrementally over time doesn't collapse to "the whole current invested amount
+    // went in on day one" — which would silently understate or overstate the real annualized return.
+    // Falls back to a single outflow on the purchase date only when neither ledger has any rows.
+    private void appendInvestmentCashflows(Investment inv, List<SipTransaction> sipTxns, List<StockTransaction> stockTxns,
+                                            List<Double> cashflows, List<LocalDate> dates) {
+        boolean any = false;
+        for (SipTransaction t : sipTxns) {
+            // BUY = outflow (negative), REDEEM = inflow (positive)
+            double sign = "REDEEM".equalsIgnoreCase(t.getTransactionType()) ? 1.0 : -1.0;
+            cashflows.add(sign * t.getAmount().doubleValue());
+            dates.add(t.getTransactionDate());
+            any = true;
+        }
+        for (StockTransaction t : stockTxns) {
+            // Same cost/proceeds formula addStockTransaction uses when moving money between
+            // accounts: BUY costs quantity×price plus brokerage, SELL nets quantity×price minus
+            // brokerage.
+            BigDecimal gross = t.getQuantity().multiply(t.getPricePerShare());
+            BigDecimal brokerage = t.getBrokerage() != null ? t.getBrokerage() : BigDecimal.ZERO;
+            boolean isSell = "SELL".equalsIgnoreCase(t.getTransactionType());
+            BigDecimal signed = isSell ? gross.subtract(brokerage) : gross.add(brokerage).negate();
+            cashflows.add(signed.doubleValue());
+            dates.add(t.getTransactionDate());
+            any = true;
+        }
+        if (!any && inv.getPurchaseDate() != null && inv.getInvestedAmount() != null) {
+            // No ledger at all — treat as one outflow on the purchase date
+            cashflows.add(-inv.getInvestedAmount().doubleValue());
+            dates.add(inv.getPurchaseDate());
+        }
+    }
+
     @Override @Transactional(readOnly = true)
     public Double computeXirr(UUID investmentId, UUID userId) {
         Investment inv = findAndValidate(investmentId, userId);
-        List<SipTransaction> txns = sipTransactionRepository
+        List<SipTransaction> sipTxns = sipTransactionRepository
+            .findByInvestmentIdOrderByTransactionDateAsc(investmentId);
+        List<StockTransaction> stockTxns = stockTransactionRepository
             .findByInvestmentIdOrderByTransactionDateAsc(investmentId);
 
         BigDecimal currentVal = inv.getCurrentValue();
@@ -571,21 +836,8 @@ public class InvestmentServiceImpl implements InvestmentService {
 
         List<Double> cashflows = new ArrayList<>();
         List<LocalDate> dates   = new ArrayList<>();
-
-        if (!txns.isEmpty()) {
-            for (SipTransaction t : txns) {
-                // BUY = outflow (negative), REDEEM = inflow (positive)
-                double sign = "REDEEM".equalsIgnoreCase(t.getTransactionType()) ? 1.0 : -1.0;
-                cashflows.add(sign * t.getAmount().doubleValue());
-                dates.add(t.getTransactionDate());
-            }
-        } else if (inv.getPurchaseDate() != null) {
-            // Single purchase — treat as one outflow
-            cashflows.add(-inv.getInvestedAmount().doubleValue());
-            dates.add(inv.getPurchaseDate());
-        } else {
-            return null;
-        }
+        appendInvestmentCashflows(inv, sipTxns, stockTxns, cashflows, dates);
+        if (cashflows.isEmpty()) return null;
 
         // Final cashflow = current value today (positive inflow = liquidation)
         cashflows.add(currentVal.doubleValue());
@@ -601,6 +853,69 @@ public class InvestmentServiceImpl implements InvestmentService {
         return Double.isNaN(xirr) ? null : Math.round(xirr * 100.0) / 100.0;
     }
 
+    // Aggregates every given investment's own cashflow timeline (SIP buys/redeems, stock-ledger
+    // buys/sells, or a single purchase-date outflow where neither ledger exists) into one combined
+    // timeline, plus one final inflow for their total current value today. This is the
+    // money-weighted return across the group — not an average of each investment's individual
+    // XIRR, which would misweight investments held for different durations or amounts. Shared by
+    // computePortfolioXirr (every active investment) and computeTypeXirr (just one type, e.g. every
+    // active stock) — same aggregation, just a different input list.
+    private Double computeXirrForInvestments(List<Investment> investments) {
+        if (investments.isEmpty()) return null;
+
+        List<UUID> investmentIds = investments.stream().map(Investment::getId).toList();
+        Map<UUID, List<SipTransaction>> sipTxnsByInvestment = sipTransactionRepository
+            .findByInvestmentIdInOrderByTransactionDateAsc(investmentIds).stream()
+            .collect(Collectors.groupingBy(SipTransaction::getInvestmentId));
+        Map<UUID, List<StockTransaction>> stockTxnsByInvestment = stockTransactionRepository
+            .findByInvestmentIdInOrderByTransactionDateAsc(investmentIds).stream()
+            .collect(Collectors.groupingBy(StockTransaction::getInvestmentId));
+
+        List<Double> cashflows = new ArrayList<>();
+        List<LocalDate> dates  = new ArrayList<>();
+        BigDecimal totalCurrentValue = BigDecimal.ZERO;
+
+        for (Investment inv : investments) {
+            appendInvestmentCashflows(inv,
+                sipTxnsByInvestment.getOrDefault(inv.getId(), List.of()),
+                stockTxnsByInvestment.getOrDefault(inv.getId(), List.of()),
+                cashflows, dates);
+            if (inv.getCurrentValue() != null) totalCurrentValue = totalCurrentValue.add(inv.getCurrentValue());
+        }
+
+        if (cashflows.isEmpty() || totalCurrentValue.compareTo(BigDecimal.ZERO) <= 0) return null;
+
+        cashflows.add(totalCurrentValue.doubleValue());
+        dates.add(LocalDate.now());
+
+        double xirr = XirrCalculator.calculate(cashflows, dates);
+        if (Double.isNaN(xirr)) {
+            // Fall back to simple annualized return, spanning from the earliest cashflow to today
+            LocalDate earliest = dates.stream().min(LocalDate::compareTo).orElse(null);
+            double totalInvested = investments.stream()
+                .map(Investment::getInvestedAmount).filter(Objects::nonNull)
+                .mapToDouble(BigDecimal::doubleValue).sum();
+            if (earliest != null) {
+                double years = ChronoUnit.DAYS.between(earliest, LocalDate.now()) / 365.0;
+                xirr = XirrCalculator.simpleAnnualized(totalInvested, totalCurrentValue.doubleValue(), years);
+            }
+        }
+        return Double.isNaN(xirr) ? null : Math.round(xirr * 100.0) / 100.0;
+    }
+
+    @Override @Transactional(readOnly = true)
+    public Double computePortfolioXirr(UUID userId) {
+        return computeXirrForInvestments(investmentRepository.findByUserIdAndActiveTrue(userId));
+    }
+
+    @Override @Transactional(readOnly = true)
+    public Double computeTypeXirr(UUID userId, InvestmentType type) {
+        List<Investment> investments = investmentRepository.findByUserIdAndActiveTrue(userId).stream()
+            .filter(inv -> inv.getInvestmentType() == type)
+            .toList();
+        return computeXirrForInvestments(investments);
+    }
+
     private SipTransactionResponse toSipResponse(SipTransaction s) {
         return SipTransactionResponse.builder()
             .id(s.getId()).transactionDate(s.getTransactionDate())
@@ -614,6 +929,7 @@ public class InvestmentServiceImpl implements InvestmentService {
         if (!inv.getUserId().equals(userId)) throw new AccessDeniedException();
         return inv;
     }
+
 
     private String nameFor(CreateInvestmentRequest r) {
         if (r.getCompanyName() != null && !r.getCompanyName().isBlank()) return r.getCompanyName();
@@ -724,7 +1040,7 @@ public class InvestmentServiceImpl implements InvestmentService {
             }
         }
 
-        // Add historical bond coupon schedule (pre-current-month, display only)
+        // Add historical bond coupon schedule (pre-current-month, display only) — issue #14: include accountName
         LocalDate monthStart = LocalDate.now().withDayOfMonth(1);
         LocalDate yearStart  = LocalDate.of(year, 1, 1);
         LocalDate yearEnd    = LocalDate.of(year, 12, 31);
@@ -733,10 +1049,27 @@ public class InvestmentServiceImpl implements InvestmentService {
                     || bond.getCouponRate() == null || bond.getCouponFrequency() == null
                     || bond.getPurchaseDate() == null) continue;
             int paymentsPerYear = couponPaymentsPerYear(bond.getCouponFrequency());
-            BigDecimal couponAmt = bond.getInvestedAmount()
+            // Coupon is on face value × units, not purchase price (which may differ at discount/premium)
+            BigDecimal fv = bond.getFaceValue() != null ? bond.getFaceValue() : bond.getAvgBuyPrice();
+            BigDecimal faceValueTotal = fv != null && bond.getUnits() != null
+                ? fv.multiply(bond.getUnits())
+                : bond.getInvestedAmount();
+            BigDecimal grossCoupon = faceValueTotal
                 .multiply(bond.getCouponRate())
                 .divide(BigDecimal.valueOf(100L * paymentsPerYear), 2, RoundingMode.HALF_UP);
-            for (LocalDate cpDate : buildCouponDates(bond.getPurchaseDate(), bond.getMaturityDate(), bond.getCouponFrequency())) {
+            BigDecimal tdsRate = bond.getTdsRate() != null ? bond.getTdsRate() : BigDecimal.ZERO;
+            BigDecimal couponAmt = tdsRate.compareTo(BigDecimal.ZERO) > 0
+                ? grossCoupon.multiply(BigDecimal.ONE.subtract(
+                    tdsRate.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP)))
+                    .setScale(2, RoundingMode.HALF_UP)
+                : grossCoupon;
+
+            // Resolve account name for display-only records using the bond's linkedAccountId
+            String bondAccName = bond.getLinkedAccountId() != null
+                ? accountNames.getOrDefault(bond.getLinkedAccountId(), null)
+                : null;
+
+            for (LocalDate cpDate : buildCouponDates(bond.getPurchaseDate(), bond.getMaturityDate(), bond.getCouponFrequency(), bond.getCouponCreditDay())) {
                 if (cpDate.isBefore(yearStart) || cpDate.isAfter(yearEnd)) continue;
                 if (cpDate.isAfter(LocalDate.now())) continue;
                 if (cpDate.isBefore(monthStart)) {
@@ -750,6 +1083,8 @@ public class InvestmentServiceImpl implements InvestmentService {
                         .amount(couponAmt)
                         .investmentId(bond.getId())
                         .investmentName(resolveInvName(bond))
+                        .accountId(bond.getLinkedAccountId())
+                        .accountName(bondAccName)   // fix issue #14
                         .credited(false)
                         .investmentActive(bond.isActive())
                         .build());
@@ -759,13 +1094,26 @@ public class InvestmentServiceImpl implements InvestmentService {
 
         records.sort(Comparator.comparing(IncomeHistoryResponse.Record::getEventDate).reversed());
 
+        // Fix issue #15: compute totals from ALL records (credited + display-only) so bond coupon total isn't 0
+        BigDecimal allDividendTotal   = BigDecimal.ZERO;
+        BigDecimal allBondCouponTotal = BigDecimal.ZERO;
+        BigDecimal allFdMaturityTotal = BigDecimal.ZERO;
+        for (IncomeHistoryResponse.Record r : records) {
+            if (r.getAmount() == null) continue;
+            switch (r.getIncomeType()) {
+                case "DIVIDEND"    -> allDividendTotal   = allDividendTotal.add(r.getAmount());
+                case "BOND_COUPON" -> allBondCouponTotal = allBondCouponTotal.add(r.getAmount());
+                case "FD_MATURITY" -> allFdMaturityTotal = allFdMaturityTotal.add(r.getAmount());
+            }
+        }
+
         return IncomeHistoryResponse.builder()
                 .summary(IncomeHistoryResponse.Summary.builder()
                         .year(year)
-                        .dividendTotal(dividendTotal)
-                        .bondCouponTotal(bondCouponTotal)
-                        .fdMaturityTotal(fdMaturityTotal)
-                        .grandTotal(dividendTotal.add(bondCouponTotal).add(fdMaturityTotal))
+                        .dividendTotal(allDividendTotal)
+                        .bondCouponTotal(allBondCouponTotal)
+                        .fdMaturityTotal(allFdMaturityTotal)
+                        .grandTotal(allDividendTotal.add(allBondCouponTotal).add(allFdMaturityTotal))
                         .build())
                 .records(records)
                 .build();
@@ -777,14 +1125,20 @@ public class InvestmentServiceImpl implements InvestmentService {
         };
     }
 
-    private List<LocalDate> buildCouponDates(LocalDate from, LocalDate to, String freq) {
+    private List<LocalDate> buildCouponDates(LocalDate from, LocalDate to, String freq, Integer creditDay) {
         List<LocalDate> dates = new ArrayList<>();
         int months = switch (freq.toUpperCase()) {
             case "MONTHLY" -> 1; case "QUARTERLY" -> 3; case "HALF_YEARLY" -> 6; default -> 12;
         };
         LocalDate cur = from.plusMonths(months);
         LocalDate end = to != null ? to : LocalDate.now();
-        while (!cur.isAfter(end)) { dates.add(cur); cur = cur.plusMonths(months); }
+        while (!cur.isAfter(end)) {
+            LocalDate payDate = creditDay != null && creditDay >= 1
+                ? cur.withDayOfMonth(Math.min(creditDay, cur.lengthOfMonth()))
+                : cur;
+            dates.add(payDate);
+            cur = cur.plusMonths(months);
+        }
         return dates;
     }
 
@@ -803,5 +1157,167 @@ public class InvestmentServiceImpl implements InvestmentService {
             case GOLD, GOLD_ETF -> AssetType.GOLD;
             default             -> AssetType.OTHER;
         };
+    }
+
+    // ── Dismiss dividend suggestion (issue #3) ───────────────────────────────
+
+    @Override @Transactional
+    public void dismissDividend(UUID investmentId, UUID userId, DismissDividendRequest req) {
+        Investment inv = investmentRepository.findById(investmentId)
+            .orElseThrow(() -> new ResourceNotFoundException("Investment", "id", investmentId));
+        if (!inv.getUserId().equals(userId)) throw new AccessDeniedException("Access denied");
+        LocalDate exDate = LocalDate.parse(req.getExDate());
+        if (!dismissedDividendRepository.existsByUserIdAndInvestmentIdAndExDate(userId, investmentId, exDate)) {
+            dismissedDividendRepository.save(DismissedDividend.builder()
+                .userId(userId).investmentId(investmentId).exDate(exDate).build());
+        }
+    }
+
+    // ── Stock buy-more / sell transactions (issues #6, #7) ──────────────────
+
+    @Override @Transactional
+    public StockTransactionResponse addStockTransaction(UUID investmentId, UUID userId, CreateStockTransactionRequest req) {
+        Investment inv = investmentRepository.findById(investmentId)
+            .orElseThrow(() -> new ResourceNotFoundException("Investment", "id", investmentId));
+        if (!inv.getUserId().equals(userId)) throw new AccessDeniedException("Access denied");
+        accountOwnershipGuard.validateAccountOwnership(req.getDebitAccountId(), userId);
+
+        boolean isSell = "SELL".equalsIgnoreCase(req.getTransactionType());
+        BigDecimal brokerage = req.getBrokerage() != null ? req.getBrokerage() : BigDecimal.ZERO;
+
+        // Retroactively seed the initial BUY for investments created before transaction tracking
+        if (stockTransactionRepository.countByInvestmentId(investmentId) == 0
+                && inv.getUnits() != null && inv.getUnits().compareTo(BigDecimal.ZERO) > 0
+                && inv.getAvgBuyPrice() != null) {
+            stockTransactionRepository.save(StockTransaction.builder()
+                .investmentId(investmentId)
+                .transactionDate(inv.getPurchaseDate() != null ? inv.getPurchaseDate() : LocalDate.now())
+                .transactionType("BUY")
+                .quantity(inv.getUnits())
+                .pricePerShare(inv.getAvgBuyPrice())
+                .brokerage(inv.getBrokerage() != null ? inv.getBrokerage() : BigDecimal.ZERO)
+                .notes(SEED_TXN_NOTE)
+                .build());
+        }
+
+        StockTransaction txn = StockTransaction.builder()
+            .investmentId(investmentId)
+            .transactionDate(req.getTransactionDate())
+            .transactionType(req.getTransactionType().toUpperCase())
+            .quantity(req.getQuantity())
+            .pricePerShare(req.getPricePerShare())
+            .brokerage(brokerage)
+            .notes(req.getNotes())
+            .build();
+        StockTransaction saved = stockTransactionRepository.save(txn);
+
+        String stockName = inv.getSymbol() != null ? inv.getSymbol() : inv.getCompanyName();
+
+        if (isSell) {
+            // Credit sell proceeds (quantity × price − brokerage) to the account
+            if (req.getDebitAccountId() != null) {
+                BigDecimal proceeds = req.getQuantity().multiply(req.getPricePerShare()).subtract(brokerage);
+                if (proceeds.compareTo(BigDecimal.ZERO) > 0) {
+                    accountTransferRepository.save(AccountTransfer.builder()
+                        .userId(userId)
+                        .fromAccountId(null)
+                        .toAccountId(req.getDebitAccountId())
+                        .amount(proceeds)
+                        .transferDate(req.getTransactionDate())
+                        .description("Sell " + stockName + " ×" + req.getQuantity())
+                        .build());
+                }
+            }
+        } else {
+            // Debit buy cost (quantity × price + brokerage) from the account
+            if (req.getDebitAccountId() != null) {
+                BigDecimal cost = req.getQuantity().multiply(req.getPricePerShare()).add(brokerage);
+                accountTransferRepository.save(AccountTransfer.builder()
+                    .userId(userId)
+                    .fromAccountId(req.getDebitAccountId())
+                    .toAccountId(null)
+                    .amount(cost)
+                    .transferDate(req.getTransactionDate())
+                    .description("Buy " + stockName + " ×" + req.getQuantity())
+                    .build());
+            }
+        }
+
+        recalculateStockTotals(inv, req.getPricePerShare());
+        return toStockTxnResponse(saved);
+    }
+
+    @Override
+    public List<StockTransactionResponse> getStockTransactions(UUID investmentId, UUID userId) {
+        Investment inv = investmentRepository.findById(investmentId)
+            .orElseThrow(() -> new ResourceNotFoundException("Investment", "id", investmentId));
+        if (!inv.getUserId().equals(userId)) throw new AccessDeniedException("Access denied");
+        return stockTransactionRepository.findByInvestmentIdOrderByTransactionDateAsc(investmentId)
+            .stream().map(this::toStockTxnResponse).toList();
+    }
+
+    @Override @Transactional
+    public void deleteStockTransaction(UUID investmentId, Long txnId, UUID userId) {
+        Investment inv = investmentRepository.findById(investmentId)
+            .orElseThrow(() -> new ResourceNotFoundException("Investment", "id", investmentId));
+        if (!inv.getUserId().equals(userId)) throw new AccessDeniedException("Access denied");
+        stockTransactionRepository.deleteById(txnId);
+        recalculateStockTotals(inv, null);
+    }
+
+    /**
+     * Recalculates units, avgBuyPrice, investedAmount and currentValue for a stock investment
+     * using the Weighted Average Cost (WAC) method:
+     *   avgBuyPrice  = totalBuyAmount / totalBuyQty      (unchanged by sells)
+     *   netQty       = totalBuyQty − totalSellQty
+     *   investedAmount = netQty × avgBuyPrice            (cost basis of remaining shares)
+     *
+     * Marks investment inactive when all shares are sold (netQty = 0).
+     */
+    private void recalculateStockTotals(Investment inv, BigDecimal fallbackPrice) {
+        UUID investmentId = inv.getId();
+        BigDecimal totalBuyQty    = stockTransactionRepository.sumBuyQuantityByInvestmentId(investmentId);
+        BigDecimal totalBuyAmount = stockTransactionRepository.sumBuyAmountByInvestmentId(investmentId);
+        BigDecimal netQty         = stockTransactionRepository.sumNetQuantityByInvestmentId(investmentId)
+                                        .max(BigDecimal.ZERO);
+
+        if (totalBuyQty.compareTo(BigDecimal.ZERO) > 0) {
+            // WAC: average cost per share across all BUY transactions (4dp for display)
+            BigDecimal wac = totalBuyAmount.divide(totalBuyQty, 4, RoundingMode.HALF_UP);
+            inv.setAvgBuyPrice(wac);
+            inv.setUnits(netQty);
+            // Cost basis: proportional share of total buy amount, computed in one step
+            // to avoid amplifying the 4dp WAC rounding error (netQty * WAC can drift
+            // by up to netQty × 0.00005, e.g. ₹0.50 on 10,000 shares).
+            inv.setInvestedAmount(
+                totalBuyAmount.multiply(netQty)
+                    .divide(totalBuyQty, 2, RoundingMode.HALF_UP)
+            );
+        } else {
+            inv.setUnits(BigDecimal.ZERO);
+            inv.setInvestedAmount(BigDecimal.ZERO);
+        }
+
+        BigDecimal price = inv.getCurrentPrice() != null ? inv.getCurrentPrice()
+                         : (fallbackPrice != null ? fallbackPrice : BigDecimal.ZERO);
+        inv.setCurrentValue(inv.getUnits().multiply(price).setScale(2, RoundingMode.HALF_UP));
+
+        // If all shares are sold, deactivate the position
+        if (netQty.compareTo(BigDecimal.ZERO) == 0) {
+            inv.setActive(false);
+        } else if (!inv.isActive()) {
+            inv.setActive(true);
+        }
+
+        investmentRepository.save(inv);
+    }
+
+    private StockTransactionResponse toStockTxnResponse(StockTransaction t) {
+        return StockTransactionResponse.builder()
+            .id(t.getId()).investmentId(t.getInvestmentId())
+            .transactionDate(t.getTransactionDate()).transactionType(t.getTransactionType())
+            .quantity(t.getQuantity()).pricePerShare(t.getPricePerShare())
+            .brokerage(t.getBrokerage()).notes(t.getNotes()).createdAt(t.getCreatedAt())
+            .build();
     }
 }

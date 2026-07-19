@@ -1,27 +1,51 @@
 "use client";
 
-import { useState } from "react";
+import {useState} from "react";
 import {
-  Plus, Target, Trash2, ChevronLeft, ChevronRight, AlertTriangle, Pencil, X,
-  Calendar, CalendarDays, Tag, Check, ArrowUpDown, ChevronDown,
+    AlertTriangle,
+    ArrowUpDown,
+    BadgeCheck,
+    Calendar,
+    CalendarDays,
+    Check,
+    ChevronLeft,
+    ChevronRight,
+    PieChart,
+    Plus,
+    Tag,
+    Target,
+    Users,
+    Wallet,
+    X,
 } from "lucide-react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Header } from "@/components/layout/Header";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { TableRowSkeleton } from "@/components/shared/LoadingSkeleton";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { FormSelect } from "@/components/forms/FormSelect";
-import { FormCurrencyInput } from "@/components/forms/FormCurrencyInput";
-import { CurrencyDisplay } from "@/components/shared/CurrencyDisplay";
-import {
-  useBudgets, useCreateBudget, useUpdateBudget, useDeleteBudget,
-} from "@/features/budgets/hooks/useBudgets";
-import { useCategories, useCreateCategory, useDeleteCategory } from "@/features/categories/hooks/useCategories";
-import { budgetSchema, editBudgetSchema, type BudgetFormValues, type EditBudgetFormValues } from "@/features/budgets/schemas/budget.schema";
-import type { Budget, BudgetType } from "@/features/budgets/types/budget.types";
-import { formatCurrency, cn } from "@/lib/utils";
-import { toast } from "sonner";
+import {useForm} from "react-hook-form";
+import {zodResolver} from "@hookform/resolvers/zod";
+import {Header} from "@/components/layout/Header";
+import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
+import {EmptyState} from "@/components/shared/EmptyState";
+import {QueryErrorState} from "@/components/shared/QueryErrorState";
+import {TableRowSkeleton} from "@/components/shared/LoadingSkeleton";
+import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
+import {FormSelect} from "@/components/forms/FormSelect";
+import {Button} from "@/components/ui/Button";
+import {Card} from "@/components/ui/Card";
+import {FormModalShell} from "@/components/ui/FormModalShell";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {CategoryPicker} from "@/components/transactions/CategoryPicker";
+import {FormModalHeader} from "@/components/transactions/FormModalHeader";
+import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
+import {BigAmountInput} from "@/components/transactions/BigAmountInput";
+import {getCategoryColor, getCategoryIcon} from "@/lib/categoryMeta";
+import {CATEGORY_COLOR_PALETTE, CATEGORY_ICON_LIST, suggestUnusedCombo} from "@/lib/categoryIcons";
+import {useBudgets, useCreateBudget, useDeleteBudget,} from "@/features/budgets/hooks/useBudgets";
+import {useCategories, useCreateCategory, useDeleteCategory} from "@/features/categories/hooks/useCategories";
+import {type BudgetFormValues, budgetSchema} from "@/features/budgets/schemas/budget.schema";
+import {BudgetDetailModal} from "@/features/budgets/components/BudgetDetailModal";
+import type {Budget, BudgetType} from "@/features/budgets/types/budget.types";
+import {cn} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {useAuthStore} from "@/features/auth/store/auth.store";
+import {toast} from "sonner";
 
 function monthLabel(year: number, month: number) {
   return new Date(year, month - 1).toLocaleString("en-IN", { month: "long", year: "numeric" });
@@ -34,199 +58,58 @@ const ALERT_OPTIONS = [
   { value: "100", label: "100%" },
 ];
 
-const COLOR_PRESETS = [
-  "#6366f1","#22c55e","#f59e0b","#ef4444","#06b6d4",
-  "#8b5cf6","#ec4899","#14b8a6","#f97316","#64748b",
-];
+// ─── Budget Row — one clickable row per budget, no separate edit/delete icons ─
 
-// ─── Category Picker (with color dots) ────────────────────────────────────────
-
-function CategoryPicker({ categories, value, onChange, error, existingCategoryIds }: {
-  categories: { id: string; name: string; color?: string | null }[];
-  value: string;
-  onChange: (id: string) => void;
-  error?: string;
-  existingCategoryIds?: Set<string>;
-}) {
-  const [open, setOpen] = useState(false);
-  const selected = categories.find(c => c.id === value);
-  return (
-    <div className="relative">
-      <label className="block text-xs text-muted-foreground mb-1.5 font-medium">Category</label>
-      <button type="button" onClick={() => setOpen(v => !v)}
-        className="w-full h-10 px-3 rounded-xl bg-muted/60 border border-border text-sm text-left flex items-center gap-2 hover:border-indigo-500 focus:outline-none focus:border-indigo-500 transition-colors">
-        {selected ? (
-          <>
-            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: selected.color ?? "#6366f1" }} />
-            <span className="text-foreground">{selected.name}</span>
-          </>
-        ) : (
-          <span className="text-muted-foreground">Select category</span>
-        )}
-        <ChevronDown className="w-4 h-4 text-muted-foreground ml-auto shrink-0" />
-      </button>
-      {open && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto">
-          {categories.length === 0 && (
-            <p className="text-xs text-muted-foreground px-3 py-2">No categories yet</p>
-          )}
-          {categories.map(c => {
-            const isDisabled = existingCategoryIds?.has(c.id) ?? false;
-            return (
-              <button key={c.id} type="button"
-                onClick={() => {
-                  if (isDisabled) {
-                    toast.error("A budget for this category already exists this month.");
-                    return;
-                  }
-                  onChange(c.id); setOpen(false);
-                }}
-                className={cn(
-                  "w-full flex items-center gap-2 px-3 py-2 hover:bg-muted/60 text-sm text-foreground transition-colors",
-                  isDisabled && "opacity-40 cursor-not-allowed"
-                )}>
-                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: c.color ?? "#6366f1" }} />
-                {c.name}
-                {value === c.id && <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 ml-auto" />}
-                {isDisabled && !( value === c.id) && <span className="text-[10px] text-muted-foreground/60 ml-auto">already set</span>}
-              </button>
-            );
-          })}
-        </div>
-      )}
-      {error && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{error}</p>}
-    </div>
-  );
-}
-
-// ─── Budget Bar ───────────────────────────────────────────────────────────────
-
-function BudgetBar({ b }: { b: Budget }) {
-  const pct      = Math.min(100, b.percentUsed);
-  const alert    = b.alertThreshold ?? 80;
-  const pctColor = b.overBudget ? "text-red-600 dark:text-red-400" : b.percentUsed > alert ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground";
+function BudgetRow({ budget, onEdit }: { budget: Budget; onEdit: () => void }) {
+  const { fmt } = useAmountFormatter();
+  const pct      = Math.min(100, budget.percentUsed);
+  const alert    = budget.alertThreshold ?? 80;
+  const pctColor = budget.overBudget ? "text-red-600 dark:text-red-400" : budget.percentUsed > alert ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground";
+  const catName  = budget.categoryName ?? "Budget";
+  const catColor = getCategoryColor(catName, budget.categoryColor);
+  const catIcon  = getCategoryIcon({ name: catName, icon: budget.categoryIcon });
 
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 min-w-0">
-          {b.overBudget && <AlertTriangle className="w-3.5 h-3.5 text-red-600 dark:text-red-400 shrink-0" />}
-          <span className="text-sm font-medium text-foreground truncate">{b.categoryName ?? "Budget"}</span>
-          {b.budgetType === "YEARLY" && (
-            <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 shrink-0">YEARLY</span>
-          )}
+    <button type="button" onClick={onEdit}
+      aria-label={`Edit ${catName} budget, ${budget.percentUsed.toFixed(0)}% used`}
+      className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors text-left">
+      <PremiumIcon icon={catIcon} hex={catColor} size="sm" className="w-9 h-9" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            {budget.overBudget && <AlertTriangle className="w-3.5 h-3.5 text-red-600 dark:text-red-400 shrink-0" />}
+            <span className="text-sm font-medium text-foreground truncate">{catName}</span>
+            {budget.shared && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/15 text-indigo-400 border border-indigo-500/20 shrink-0">
+                <Users className="w-2.5 h-2.5" /> Shared
+              </span>
+            )}
+          </div>
+          <span className={cn("text-xs font-bold tabular-nums shrink-0", pctColor)}>{budget.percentUsed.toFixed(0)}%</span>
         </div>
-        <div className="flex items-center gap-2 shrink-0 ml-4 text-xs text-muted-foreground">
-          <CurrencyDisplay amount={b.spent} size="sm" color="muted" />
-          <span className="text-muted-foreground/60">/</span>
-          <CurrencyDisplay amount={b.amount} size="sm" color="muted" />
-          <span className={cn("font-semibold w-10 text-right tabular-nums", pctColor)}>
-            {b.percentUsed.toFixed(0)}%
+        <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-1.5">
+          <div className={cn("h-full rounded-full transition-all duration-500",
+            pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-500" : "bg-emerald-500")} style={{ width: `${pct}%` }} />
+        </div>
+        <div className="flex items-center justify-between mt-1">
+          <span className="text-xs text-muted-foreground/70 tabular-nums">{fmt(budget.spent)} / {fmt(budget.amount)}</span>
+          <span className={cn("text-xs", budget.overBudget ? "text-red-600 dark:text-red-400 font-medium" : "text-muted-foreground/60")}>
+            {budget.overBudget ? `Over by ${fmt(Math.abs(budget.remaining))}` : `${fmt(budget.remaining)} left`}
           </span>
         </div>
       </div>
-      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-        <div className={cn("h-full rounded-full transition-all duration-500",
-          pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-500" : "bg-emerald-500"
-        )} style={{ width: `${pct}%` }} />
-      </div>
-      {b.overBudget
-        ? <p className="text-xs text-red-600 dark:text-red-400">Over by {formatCurrency(Math.abs(b.remaining))}</p>
-        : <p className="text-xs text-muted-foreground/80">{formatCurrency(b.remaining)} remaining</p>
-      }
-    </div>
+    </button>
   );
 }
 
 // ─── Edit Modal ───────────────────────────────────────────────────────────────
 
-function EditModal({ budget, onClose }: { budget: Budget; onClose: () => void }) {
-  const { mutate: updateBudget, isPending } = useUpdateBudget();
-  const { data: categories = [] } = useCategories("EXPENSE");
-  const [selectedCategoryId, setSelectedCategoryId] = useState(budget.categoryId);
-  const form = useForm<EditBudgetFormValues>({
-    resolver: zodResolver(editBudgetSchema),
-    defaultValues: {
-      amount:         budget.amount,
-      alertThreshold: budget.alertThreshold ?? 80,
-    },
-  });
-  const onSubmit = (v: EditBudgetFormValues) =>
-    updateBudget(
-      {
-        id: budget.id,
-        payload: {
-          amount: Number(v.amount),
-          alertThreshold: v.alertThreshold ? Number(v.alertThreshold) : undefined,
-          categoryId: selectedCategoryId !== budget.categoryId ? selectedCategoryId : undefined,
-        },
-      },
-      { onSuccess: onClose }
-    );
-
-  const alert = budget.alertThreshold ?? 80;
-
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-      onClick={onClose}>
-      <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-sm"
-        onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="font-semibold text-foreground text-sm">Edit Budget</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {budget.categoryName} · {budget.budgetType === "YEARLY" ? "Yearly" : "Monthly"}
-            </p>
-          </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="bg-muted/40 rounded-xl p-3 mb-4">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs text-muted-foreground">Current usage</span>
-            <span className={cn("text-xs font-bold tabular-nums",
-              budget.overBudget ? "text-red-600 dark:text-red-400" : budget.percentUsed > alert ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400")}>
-              {budget.percentUsed.toFixed(0)}%
-            </span>
-          </div>
-          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-            <div className={cn("h-full rounded-full",
-              budget.overBudget ? "bg-red-500" : budget.percentUsed > alert ? "bg-amber-500" : "bg-indigo-500")}
-              style={{ width: `${Math.min(100, budget.percentUsed)}%` }} />
-          </div>
-          <p className="text-xs text-muted-foreground/80 mt-1">
-            {formatCurrency(budget.spent)} spent · Alert fires at {alert}%
-          </p>
-        </div>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <CategoryPicker
-            categories={categories}
-            value={selectedCategoryId}
-            onChange={setSelectedCategoryId}
-          />
-          <FormCurrencyInput label="New Budget Limit" placeholder="0"
-            error={form.formState.errors.amount?.message} {...form.register("amount")} />
-          <FormSelect label="Alert At (%)" options={ALERT_OPTIONS} error={form.formState.errors.alertThreshold?.message} {...form.register("alertThreshold")} />
-          <div className="flex gap-2 pt-1">
-            <button type="submit" disabled={isPending}
-              className="flex-1 h-10 rounded-xl text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-all disabled:opacity-60">
-              {isPending ? "Saving…" : "Update"}
-            </button>
-            <button type="button" onClick={onClose}
-              className="h-10 px-4 rounded-xl text-sm text-muted-foreground bg-muted hover:bg-muted/80 transition-all">
-              Cancel
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function BudgetsPage() {
+  const { fmt } = useAmountFormatter();
+  const { user } = useAuthStore();
+  const inFamily = !!user?.familyId;
   const now = new Date();
   const [year,        setYear]        = useState(now.getFullYear());
   const [month,       setMonth]       = useState(now.getMonth() + 1);
@@ -237,10 +120,11 @@ export default function BudgetsPage() {
   const [budgetType,  setBudgetType]  = useState<BudgetType>("MONTHLY");
   const [showAddCat,  setShowAddCat]  = useState(false);
   const [newCatName,  setNewCatName]  = useState("");
-  const [newCatColor, setNewCatColor] = useState(COLOR_PRESETS[0]);
+  const [newCatColor, setNewCatColor] = useState(CATEGORY_COLOR_PALETTE[0]);
+  const [newCatIcon,  setNewCatIcon]  = useState(CATEGORY_ICON_LIST[0].key);
   const [sortByUsage, setSortByUsage] = useState(false);
 
-  const { data: budgets = [], isLoading } = useBudgets(year, month);
+  const { data: budgets = [], isLoading, isError, refetch } = useBudgets(year, month);
   const { mutate: createBudget, isPending }              = useCreateBudget();
   const { mutate: deleteBudget }                         = useDeleteBudget();
   const { data: categories = [] }                        = useCategories("EXPENSE");
@@ -256,15 +140,27 @@ export default function BudgetsPage() {
   const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
 
   const existingCategoryIds = new Set(budgets.map(b => b.categoryId));
+  const availableCategories = categories.filter(c => !existingCategoryIds.has(c.id));
 
   const handleAddCategory = () => {
     if (!newCatName.trim()) return;
-    createCategory({ name: newCatName.trim(), color: newCatColor, type: "EXPENSE" }, {
+    createCategory({ name: newCatName.trim(), color: newCatColor, icon: newCatIcon, type: "EXPENSE" }, {
       onSuccess: (cat) => {
         form.setValue("categoryId", cat.id);
-        setNewCatName(""); setNewCatColor(COLOR_PRESETS[0]); setShowAddCat(false);
+        setNewCatName(""); setShowAddCat(false);
       },
     });
+  };
+
+  // Pre-selects the nearest icon+color pair no existing expense category is using yet,
+  // same suggestion logic as the Settings → Categories picker.
+  const openAddCategory = () => {
+    if (!showAddCat) {
+      const suggestion = suggestUnusedCombo(categories);
+      setNewCatIcon(suggestion.icon);
+      setNewCatColor(suggestion.color);
+    }
+    setShowAddCat(v => !v);
   };
 
   const navigate = (dir: -1 | 1) => {
@@ -294,20 +190,28 @@ export default function BudgetsPage() {
   const monthlyBudgets = sorted(budgets.filter(b => b.budgetType === "MONTHLY"));
   const yearlyBudgets  = sorted(budgets.filter(b => b.budgetType === "YEARLY"));
 
-  const totalBudgeted   = budgets.reduce((s, b) => s + b.amount, 0);
-  const totalSpent      = budgets.reduce((s, b) => s + b.spent,  0);
-  const totalRemaining  = Math.max(0, totalBudgeted - totalSpent);
-  const overBudgetCount = budgets.filter(b => b.overBudget).length;
-
   const monthlyBudgeted  = monthlyBudgets.reduce((s, b) => s + b.amount, 0);
   const monthlySpent     = monthlyBudgets.reduce((s, b) => s + b.spent, 0);
   const yearlyBudgeted   = yearlyBudgets.reduce((s, b) => s + b.amount, 0);
   const yearlySpent      = yearlyBudgets.reduce((s, b) => s + b.spent, 0);
 
+  // Monthly and yearly budgets live on different time bases (a monthly amount recurs
+  // every month, a yearly amount doesn't) — summing them raw would understate the true
+  // annual commitment. Annualize monthly (×12) before combining with yearly (as-is).
+  // annualSpent (from the API) is the actual full-calendar-year spend in each budget's
+  // category regardless of type, so it pairs honestly with annualBudgeted — no extrapolation.
+  const annualBudgeted   = monthlyBudgeted * 12 + yearlyBudgeted;
+  const annualSpent      = budgets.reduce((s, b) => s + b.annualSpent, 0);
+  const annualRemaining  = Math.max(0, annualBudgeted - annualSpent);
+  const overBudgetCount  = budgets.filter(b => b.overBudget).length;
+
   return (
     <div className="flex flex-col flex-1">
-      <Header title="Budgets" />
-      {editBudget && <EditModal budget={editBudget} onClose={() => setEditBudget(null)} />}
+      <Header title="Budgets" subtitle="Set spending limits by category and track how you're pacing" />
+      {editBudget && (
+        <BudgetDetailModal budget={editBudget} onClose={() => setEditBudget(null)}
+          onDelete={() => { setConfirmId(editBudget.id); setEditBudget(null); }} />
+      )}
       {confirmId && (
         <ConfirmDialog open title="Delete Budget"
           description="This budget will be permanently deleted. Historical expense data is kept."
@@ -317,64 +221,69 @@ export default function BudgetsPage() {
       )}
       {confirmCatId && (
         <ConfirmDialog open title="Delete Category"
-          description="Any budgets using this category will remain but show no category name. Delete anyway?"
+          description="Any budgets on this category will also be removed. Existing expenses are kept and will still show this category — recreating it with the same name brings it back."
           confirmLabel="Delete" danger
           onConfirm={() => { deleteCategory(confirmCatId); setConfirmCatId(null); }}
           onCancel={() => setConfirmCatId(null)} />
       )}
 
       {showForm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={() => setShowForm(false)}>
-          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-card border border-border rounded-2xl p-5"
-            onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="font-semibold text-foreground text-sm">New Budget</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Budgets persist across months — navigate months to compare spending.</p>
+        <TransactionModalOverlay onDismiss={() => setShowForm(false)}>
+          <FormModalShell accent="from-amber-500 to-orange-600">
+              <FormModalHeader icon={PieChart} tone="orange" title="New Budget" onClose={() => setShowForm(false)} />
+              <p className="text-xs text-muted-foreground -mt-3 mb-4">
+                Budgets persist across months — navigate months to compare spending.
+                {inFamily && " Since you're in a family group, this budget will be shared and its spend combines everyone's expenses in this category."}
+              </p>
+              <div className="flex gap-2 mb-4 flex-wrap">
+                {(["MONTHLY", "YEARLY"] as BudgetType[]).map(t => (
+                  <button key={t} type="button" data-testid={`budget-type-${t}`}
+                    onClick={() => { setBudgetType(t); form.setValue("budgetType", t); }}
+                    className={cn("flex items-center gap-2 px-4 h-9 rounded-xl text-sm font-medium transition-all border",
+                      budgetType === t
+                        ? "bg-amber-600 border-amber-500 text-white"
+                        : "bg-muted/60 border-border text-muted-foreground hover:text-foreground")}>
+                    {t === "MONTHLY" ? <Calendar className="w-3.5 h-3.5" /> : <CalendarDays className="w-3.5 h-3.5" />}
+                    {t === "MONTHLY" ? "Monthly" : "Yearly"}
+                  </button>
+                ))}
+                <span className="text-xs text-muted-foreground self-center ml-1">
+                  {budgetType === "MONTHLY" ? "Resets each month" : "Tracks full-year spending"}
+                </span>
               </div>
-              <button type="button" onClick={() => setShowForm(false)} className="text-muted-foreground hover:text-foreground transition-colors">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="flex gap-2 mb-4 flex-wrap">
-              {(["MONTHLY", "YEARLY"] as BudgetType[]).map(t => (
-                <button key={t} type="button"
-                  onClick={() => { setBudgetType(t); form.setValue("budgetType", t); }}
-                  className={cn("flex items-center gap-2 px-4 h-9 rounded-xl text-sm font-medium transition-all border",
-                    budgetType === t
-                      ? "bg-indigo-600 border-indigo-500 text-white"
-                      : "bg-muted/60 border-border text-muted-foreground hover:text-foreground")}>
-                  {t === "MONTHLY" ? <Calendar className="w-3.5 h-3.5" /> : <CalendarDays className="w-3.5 h-3.5" />}
-                  {t === "MONTHLY" ? "Monthly" : "Yearly"}
-                </button>
-              ))}
-              <span className="text-xs text-muted-foreground self-center ml-1">
-                {budgetType === "MONTHLY" ? "Resets each month" : "Tracks full-year spending"}
-              </span>
-            </div>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="grid sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <CategoryPicker
-                  categories={categories}
+                  categories={availableCategories.map(c => ({ value: c.id, label: c.name, icon: c.icon, color: c.color }))}
                   value={watchedCategoryId ?? ""}
                   onChange={id => form.setValue("categoryId", id, { shouldValidate: true })}
                   error={form.formState.errors.categoryId?.message}
-                  existingCategoryIds={existingCategoryIds}
+                  manageHref="/settings/categories"
+                  testId="budget-category-picker"
                 />
-                <button type="button" onClick={() => setShowAddCat(v => !v)}
-                  className="flex items-center gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-300 transition-colors">
+                <button type="button" onClick={openAddCategory}
+                  className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 hover:text-amber-500 transition-colors">
                   <Tag className="w-3 h-3" /> {showAddCat ? "Cancel" : "Add custom category"}
                 </button>
                 {showAddCat && (
                   <div className="bg-muted/60 border border-border/60 rounded-xl p-3 space-y-3">
                     <p className="text-xs font-medium text-foreground">New Category</p>
                     <input value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="Category name"
-                      className="w-full h-9 px-3 rounded-lg bg-background border border-border text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:border-indigo-500 transition-colors" />
+                      className="w-full h-9 px-3 rounded-lg bg-background border border-border text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:border-amber-500 transition-colors" />
+                    <div className="space-y-1.5">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Icon</p>
+                      <div className="flex flex-wrap gap-2">
+                        {CATEGORY_ICON_LIST.map(({ key, icon }) => (
+                          <button key={key} type="button" onClick={() => setNewCatIcon(key)}
+                            className={cn("rounded-lg transition-all", newCatIcon === key ? "ring-2 ring-amber-500 ring-offset-2 ring-offset-card" : "opacity-70 hover:opacity-100")}>
+                            <PremiumIcon icon={icon} hex={newCatColor} size="xs" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     <div className="space-y-1.5">
                       <p className="text-xs text-muted-foreground uppercase tracking-wide">Color</p>
                       <div className="flex flex-wrap gap-2">
-                        {COLOR_PRESETS.map(c => (
+                        {CATEGORY_COLOR_PALETTE.map(c => (
                           <button key={c} type="button" onClick={() => setNewCatColor(c)}
                             className="w-6 h-6 rounded-full border-2 transition-all"
                             style={{ background: c, borderColor: newCatColor === c ? "white" : "transparent" }} />
@@ -382,37 +291,33 @@ export default function BudgetsPage() {
                       </div>
                     </div>
                     <button type="button" onClick={handleAddCategory} disabled={!newCatName.trim() || creatingCat}
-                      className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-60 transition-all">
+                      className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium bg-amber-600 hover:bg-amber-500 text-white disabled:opacity-60 transition-all">
                       <Check className="w-3.5 h-3.5" /> {creatingCat ? "Adding…" : "Add"}
                     </button>
                   </div>
                 )}
-              </div>
-              <FormCurrencyInput label="Budget Limit" placeholder="0"
-                error={form.formState.errors.amount?.message} {...form.register("amount")} />
-              <FormSelect label="Alert At (%)" options={ALERT_OPTIONS} {...form.register("alertThreshold")} />
-              <div className="flex items-end gap-2">
-                <button type="submit" disabled={isPending}
-                  className="flex-1 h-10 rounded-xl text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-all disabled:opacity-60">
-                  {isPending ? "Saving…" : "Create"}
-                </button>
-                <button type="button" onClick={() => setShowForm(false)}
-                  className="h-10 px-4 rounded-xl text-sm text-muted-foreground bg-muted/60 hover:bg-muted transition-all">
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+                <BigAmountInput colorClass="text-amber-500 dark:text-amber-400" testId="budget-amount-input"
+                  error={form.formState.errors.amount?.message} inputProps={form.register("amount")} />
+                <FormSelect label="Alert At (%)" options={ALERT_OPTIONS} {...form.register("alertThreshold")} />
+                <div className="flex gap-2 pt-1">
+                  <Button type="submit" data-testid="budget-form-submit" variant="gradient" loading={isPending}
+                    className="flex-1 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 shadow-amber-500/25 disabled:shadow-none">
+                    {isPending ? "Saving…" : "Create"}
+                  </Button>
+                  <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>Cancel</Button>
+                </div>
+              </form>
+          </FormModalShell>
+        </TransactionModalOverlay>
       )}
 
-      <main className="flex-1 p-4 md:p-5 lg:p-6 pb-24 lg:pb-6 overflow-auto">
+      <main className="flex-1 p-4 md:p-5 lg:p-6 pb-36 lg:pb-24 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-5">
 
         {/* Navigator + Actions */}
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-1.5">
-            <button onClick={() => navigate(-1)}
+            <button onClick={() => navigate(-1)} aria-label="Previous month"
               className="w-8 h-8 rounded-lg bg-muted/60 hover:bg-muted flex items-center justify-center transition-all">
               <ChevronLeft className="w-4 h-4 text-muted-foreground" />
             </button>
@@ -420,13 +325,13 @@ export default function BudgetsPage() {
               <span className="text-sm font-semibold text-foreground">{monthLabel(year, month)}</span>
               <p className="text-xs text-muted-foreground leading-tight">Monthly budgets · Yearly shows {year}</p>
             </div>
-            <button onClick={() => navigate(1)} disabled={isCurrentMonth}
+            <button onClick={() => navigate(1)} disabled={isCurrentMonth} aria-label="Next month"
               className="w-8 h-8 rounded-lg bg-muted/60 hover:bg-muted flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed">
               <ChevronRight className="w-4 h-4 text-muted-foreground" />
             </button>
             {!isCurrentMonth && (
               <button onClick={goToToday}
-                className="h-7 px-2.5 rounded-lg bg-indigo-600/20 border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 text-[11px] font-medium hover:bg-indigo-600/30 transition-all">
+                className="h-7 px-2.5 rounded-lg bg-amber-600/20 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-[11px] font-medium hover:bg-amber-600/30 transition-all">
                 Today
               </button>
             )}
@@ -435,122 +340,129 @@ export default function BudgetsPage() {
             <button onClick={() => setSortByUsage(v => !v)}
               className={cn("flex items-center gap-1.5 h-9 px-3 rounded-xl text-xs font-medium transition-all border",
                 sortByUsage
-                  ? "bg-amber-600/20 border-amber-500/40 text-amber-300"
+                  ? "bg-gradient-to-r from-amber-500 to-orange-600 border-transparent text-white shadow-lg shadow-amber-500/25"
                   : "bg-muted/60 border-border text-muted-foreground hover:text-foreground")}>
               <ArrowUpDown className="w-3.5 h-3.5" />
               {sortByUsage ? "Sorted by usage" : "Sort by usage"}
-            </button>
-            <button onClick={() => setShowForm(v => !v)}
-              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
-              <Plus className="w-4 h-4" /> Create Budget
             </button>
           </div>
         </div>
 
         {/* Summary */}
         {budgets.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            <div className="bg-card border border-border rounded-2xl p-4">
-              <p className="text-xs text-muted-foreground mb-1">Total Budgeted</p>
-              <p className="text-lg font-bold text-foreground tabular-nums">{formatCurrency(totalBudgeted)}</p>
-            </div>
-            <div className="bg-card border border-border rounded-2xl p-4">
-              <p className="text-xs text-muted-foreground mb-1">Total Spent</p>
-              <p className="text-lg font-bold text-red-600 dark:text-red-400 tabular-nums">{formatCurrency(totalSpent)}</p>
-            </div>
-            <div className="bg-card border border-border rounded-2xl p-4">
-              <p className="text-xs text-muted-foreground mb-1">Remaining</p>
-              <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{formatCurrency(totalRemaining)}</p>
-            </div>
-            <div className={cn("bg-card border rounded-2xl p-4",
-              overBudgetCount > 0 ? "border-red-500/30" : "border-border")}>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <Card className="p-4">
+              <PremiumIcon icon={Wallet} tone="orange" size="xs" className="mb-2" />
+              <p className="text-xs text-muted-foreground mb-1">Budgeted This Year</p>
+              <p className="text-lg font-bold text-foreground tabular-nums">{fmt(annualBudgeted)}</p>
+              {(monthlyBudgeted > 0 || yearlyBudgeted > 0) && (
+                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                  {monthlyBudgeted > 0 && (
+                    <span className="inline-flex items-center gap-1 pl-1 pr-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-medium tabular-nums">
+                      <Calendar className="w-2.5 h-2.5" /> {fmt(monthlyBudgeted)}<span className="opacity-60">/mo×12</span>
+                    </span>
+                  )}
+                  {yearlyBudgeted > 0 && (
+                    <span className="inline-flex items-center gap-1 pl-1 pr-1.5 py-0.5 rounded-md bg-violet-500/10 text-violet-600 dark:text-violet-400 text-[10px] font-medium tabular-nums">
+                      <CalendarDays className="w-2.5 h-2.5" /> {fmt(yearlyBudgeted)}<span className="opacity-60">/yr</span>
+                    </span>
+                  )}
+                </div>
+              )}
+            </Card>
+            <Card className="p-4">
+              <PremiumIcon icon={Target} tone="red" size="xs" className="mb-2" />
+              <p className="text-xs text-muted-foreground mb-1">Spent This Year</p>
+              <p className="text-lg font-bold text-red-600 dark:text-red-400 tabular-nums">{fmt(annualSpent)}</p>
+              <span className="inline-flex items-center gap-1 mt-1.5 pl-1 pr-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-medium">
+                <BadgeCheck className="w-2.5 h-2.5" /> Actual · Jan–Dec {year}
+              </span>
+            </Card>
+            <Card className="p-4">
+              <PremiumIcon icon={Check} tone="green" size="xs" className="mb-2" />
+              <p className="text-xs text-muted-foreground mb-1">Remaining This Year</p>
+              <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{fmt(annualRemaining)}</p>
+            </Card>
+            <Card className={cn("p-4", overBudgetCount > 0 && "border-red-500/30")}>
+              <PremiumIcon icon={AlertTriangle} tone={overBudgetCount > 0 ? "red" : "gray"} size="xs" className="mb-2" />
               <p className="text-xs text-muted-foreground mb-1">Over Budget</p>
               <p className={cn("text-lg font-bold tabular-nums",
                 overBudgetCount > 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400")}>
                 {overBudgetCount} {overBudgetCount === 1 ? "category" : "categories"}
               </p>
-            </div>
+            </Card>
           </div>
         )}
 
         {/* Budget lists */}
         {[
-          { label: "Monthly Budgets", icon: Calendar,     color: "text-indigo-600 dark:text-indigo-400", list: monthlyBudgets, type: "MONTHLY" as BudgetType, budgeted: monthlyBudgeted, spent: monthlySpent },
-          { label: "Yearly Budgets",  icon: CalendarDays, color: "text-violet-600 dark:text-violet-400", list: yearlyBudgets,  type: "YEARLY"  as BudgetType, budgeted: yearlyBudgeted,  spent: yearlySpent  },
-        ].map(({ label, icon: Icon, color, list, type, budgeted: typeBudgeted, spent: typeSpent }) => (
-          <div key={type} className="bg-card border border-border rounded-2xl overflow-hidden">
+          { label: "Monthly Budgets", icon: Calendar,     tone: "blue" as const,   list: monthlyBudgets, type: "MONTHLY" as BudgetType, budgeted: monthlyBudgeted, spent: monthlySpent },
+          { label: "Yearly Budgets",  icon: CalendarDays, tone: "violet" as const, list: yearlyBudgets,  type: "YEARLY"  as BudgetType, budgeted: yearlyBudgeted,  spent: yearlySpent  },
+        ].map(({ label, icon, tone, list, type, budgeted: typeBudgeted, spent: typeSpent }) => (
+          <Card key={type} className="overflow-hidden">
             <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
-              <Icon className={cn("w-4 h-4", color)} />
+              <PremiumIcon icon={icon} tone={tone} size="xs" />
               <span className="font-semibold text-foreground text-sm">{label}</span>
               {type === "YEARLY" && <span className="text-xs text-muted-foreground">({year})</span>}
               <span className="text-xs text-muted-foreground">{list.length}</span>
               {list.length > 0 && (
                 <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
-                  <span>Budgeted <span className="text-foreground font-medium">{formatCurrency(typeBudgeted)}</span></span>
-                  <span>Spent <span className="text-red-600 dark:text-red-400 font-medium">{formatCurrency(typeSpent)}</span></span>
-                  <span>Left <span className={cn("font-medium", typeSpent > typeBudgeted ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400")}>{formatCurrency(Math.max(0, typeBudgeted - typeSpent))}</span></span>
+                  <span>Budgeted <span className="text-foreground font-medium">{fmt(typeBudgeted)}</span></span>
+                  <span>Spent <span className="text-red-600 dark:text-red-400 font-medium">{fmt(typeSpent)}</span></span>
+                  <span>Left <span className={cn("font-medium", typeSpent > typeBudgeted ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400")}>{fmt(Math.max(0, typeBudgeted - typeSpent))}</span></span>
                 </div>
               )}
             </div>
-            {isLoading ? <TableRowSkeleton rows={3} /> : list.length === 0 ? (
+            {isLoading ? <TableRowSkeleton rows={3} /> : isError ? (
+              <QueryErrorState onRetry={() => refetch()} description="Couldn't load your budgets. Check your connection and try again." />
+            ) : list.length === 0 ? (
               <EmptyState icon={Target} title={`No ${type === "MONTHLY" ? "monthly" : "yearly"} budgets`}
                 description={`Create a ${type === "MONTHLY" ? "monthly" : "yearly"} budget to track spending limits.`}
                 action={
                   <button onClick={() => { setShowForm(true); setBudgetType(type); }}
-                    className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
+                    className="flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
                     <Plus className="w-4 h-4" /> Create {type === "MONTHLY" ? "Monthly" : "Yearly"} Budget
                   </button>
                 } />
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
+              <div className="divide-y divide-border/40">
                 {list.map(b => (
-                  <div key={b.id} className={cn("p-4 rounded-xl border border-border hover:bg-muted/20 group transition-colors", b.overBudget && "border-l-4 border-l-red-500")}>
-                    <div className="flex items-start gap-3">
-                      <div className="w-1 self-stretch rounded-full shrink-0 mt-1"
-                        style={{ backgroundColor: (b as any).categoryColor ?? "#6366f1" }} />
-                      <div className="flex-1 min-w-0"><BudgetBar b={b} /></div>
-                      <div className="flex items-center gap-1 shrink-0 ml-2 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => setEditBudget(b)}
-                          className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-indigo-400 hover:bg-indigo-500/10 transition-all">
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={() => setConfirmId(b.id)}
-                          className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-all">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  <BudgetRow key={b.id} budget={b} onEdit={() => setEditBudget(b)} />
                 ))}
               </div>
             )}
-          </div>
+          </Card>
         ))}
 
         {/* Custom Categories */}
         {categories.filter(c => !c.isSystem).length > 0 && (
-          <div className="bg-card border border-border rounded-2xl overflow-hidden">
+          <Card className="overflow-hidden">
             <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-              <Tag className="w-4 h-4 text-muted-foreground" />
+              <PremiumIcon icon={Tag} tone="gray" size="xs" />
               <span className="font-semibold text-foreground text-sm">Custom Categories</span>
               <span className="text-xs text-muted-foreground ml-auto">{categories.filter(c => !c.isSystem).length}</span>
             </div>
             <div className="px-5 py-4 flex flex-wrap gap-2">
               {categories.filter(c => !c.isSystem).map(c => (
-                <div key={c.id} className="flex items-center gap-2 bg-muted/60 border border-border/60 rounded-lg px-3 py-1.5 group">
-                  <div className="w-2 h-2 rounded-full shrink-0" style={{ background: c.color ?? "#6366f1" }} />
+                <div key={c.id} className="flex items-center gap-2 bg-muted/60 border border-border/60 rounded-lg pl-1.5 pr-2.5 py-1.5 group">
+                  <PremiumIcon icon={getCategoryIcon(c)} hex={getCategoryColor(c.name, c.color)} size="xs" />
                   <span className="text-xs text-foreground">{c.name}</span>
-                  <button onClick={() => setConfirmCatId(c.id)}
+                  <button onClick={() => setConfirmCatId(c.id)} aria-label={`Delete ${c.name} category`}
                     className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground/80 hover:text-red-400 ml-1">
-                    <X className="w-3 h-3" />
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
         )}
         </div>
       </main>
+
+      {/* ── Floating Action Button ── */}
+      <FloatingActionButton actions={[
+        { icon: Target, label: "Add Budget", color: "amber", testId: "fab-add-budget", onClick: () => setShowForm(true) },
+      ]} />
     </div>
   );
 }

@@ -1,10 +1,10 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { QUERY_KEYS } from "@/lib/constants";
-import { incomeApi } from "../api/income.api";
-import type { CreateIncomePayload } from "../types/income.types";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {toast} from "sonner";
+import {QUERY_KEYS} from "@/lib/constants";
+import {incomeApi} from "../api/income.api";
+import type {CreateIncomePayload} from "../types/income.types";
 
 const INCOME_KEY = ["income"];
 

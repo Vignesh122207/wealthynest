@@ -1,6 +1,10 @@
 package com.wealthynest.domain.investment.dto.response;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -26,6 +30,7 @@ public class InvestmentResponse {
     private BigDecimal sipAmount;
     private Integer    sipDay;
     private LocalDate  purchaseDate;
+    private BigDecimal faceValue;
     private BigDecimal couponRate;
     private String     couponFrequency;
     private Integer    couponCreditDay;
@@ -39,6 +44,8 @@ public class InvestmentResponse {
     private UUID       linkedAccountId;
     private UUID       debitAccountId;
     private String     debitAccountName;
+    private BigDecimal tdsRate;       // TDS % for bond coupons
+    private BigDecimal brokerage;     // Brokerage paid on purchase
     private String     notes;
     private boolean    active;
     private Instant    createdAt;
@@ -48,4 +55,8 @@ public class InvestmentResponse {
     private BigDecimal week52High;
     private BigDecimal week52Low;
     private Instant    priceLastUpdated;
+    /** STOCK only — number of buy/sell transactions on record. Once &gt;1, units/avgBuyPrice are
+     * derived from the transaction ledger (weighted average cost), so the frontend disables
+     * direct editing of those fields and points to Buy More/Sell instead. */
+    private int        transactionCount;
 }

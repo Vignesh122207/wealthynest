@@ -6,15 +6,12 @@ import com.wealthynest.domain.asset.entity.Asset;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface AssetMapper {
     @Mapping(target = "assetType", expression = "java(asset.getAssetType().name())")
     @Mapping(target = "active", source = "active")
     AssetResponse toResponse(Asset asset);
-
-    List<AssetResponse> toResponseList(List<Asset> assets);
 
     @BeanMapping(builder = @org.mapstruct.Builder(disableBuilder = true))
     @Mapping(target = "id", ignore = true)

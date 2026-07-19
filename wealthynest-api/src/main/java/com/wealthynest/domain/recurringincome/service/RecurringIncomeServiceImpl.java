@@ -4,6 +4,7 @@ import com.wealthynest.common.exception.AccessDeniedException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.domain.account.entity.WalletAccount;
 import com.wealthynest.domain.account.repository.WalletAccountRepository;
+import com.wealthynest.domain.account.service.AccountOwnershipGuard;
 import com.wealthynest.domain.income.dto.request.CreateIncomeRequest;
 import com.wealthynest.domain.income.entity.IncomePaymentMode;
 import com.wealthynest.domain.income.entity.IncomeSource;
@@ -31,6 +32,7 @@ public class RecurringIncomeServiceImpl implements RecurringIncomeService {
 
     private final RecurringIncomeRepository recurringIncomeRepository;
     private final WalletAccountRepository   walletAccountRepository;
+    private final AccountOwnershipGuard     accountOwnershipGuard;
     private final IncomeService             incomeService;
 
     @Override
@@ -43,6 +45,7 @@ public class RecurringIncomeServiceImpl implements RecurringIncomeService {
     @Override
     @Transactional
     public RecurringIncomeResponse create(UUID userId, CreateRecurringIncomeRequest req) {
+        accountOwnershipGuard.validateAccountOwnership(req.getAccountId(), userId);
         RecurringIncome rule = RecurringIncome.builder()
                 .userId(userId)
                 .accountId(req.getAccountId())
@@ -59,7 +62,10 @@ public class RecurringIncomeServiceImpl implements RecurringIncomeService {
     @Transactional
     public RecurringIncomeResponse update(UUID id, UUID userId, UpdateRecurringIncomeRequest req) {
         RecurringIncome rule = findOwned(id, userId);
-        if (req.getAccountId()  != null) rule.setAccountId(req.getAccountId());
+        if (req.getAccountId()  != null) {
+            accountOwnershipGuard.validateAccountOwnership(req.getAccountId(), userId);
+            rule.setAccountId(req.getAccountId());
+        }
         if (req.getSource()     != null) rule.setSource(req.getSource());
         if (req.getAmount()     != null) rule.setAmount(req.getAmount());
         if (req.getDescription()!= null) rule.setDescription(req.getDescription());
@@ -111,7 +117,7 @@ public class RecurringIncomeServiceImpl implements RecurringIncomeService {
                 recurringIncomeRepository.save(rule);
                 credited++;
             } catch (Exception e) {
-                log.error("Failed to process recurring income rule {}: {}", rule.getId(), e.getMessage());
+                log.error("Failed to process recurring income rule {}: {}", rule.getId(), e.getMessage(), e);
             }
         }
         log.info("Recurring income run: {} rule(s) credited on {}", credited, today);

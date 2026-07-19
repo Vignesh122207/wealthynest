@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Sprout } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useAuthStore } from "@/features/auth/store/auth.store";
+import {usePathname} from "next/navigation";
+import {cn} from "@/lib/utils";
+import {useAuthStore} from "@/features/auth/store/auth.store";
+import {BrandMark} from "@/components/icons/BrandMark";
 
 const LINKS = [
   { href: "/support", label: "Support" },
@@ -19,9 +19,7 @@ export function PublicNav() {
   return (
     <nav className="flex items-center justify-between px-6 lg:px-12 h-16 border-b border-border sticky top-0 bg-background/90 backdrop-blur-sm z-20">
       <Link href="/" className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
-          <Sprout className="w-4 h-4 text-white" />
-        </div>
+        <BrandMark boxClassName="w-8 h-8" iconClassName="w-5 h-5" />
         <span className="text-base font-bold tracking-tight text-foreground">WealthyNest</span>
       </Link>
 
@@ -70,9 +68,7 @@ export function PublicFooter() {
     <footer className="border-t border-border mt-auto">
       <div className="max-w-4xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center">
-            <Sprout className="w-3 h-3 text-white" />
-          </div>
+          <BrandMark boxClassName="w-7 h-7" iconClassName="w-4 h-4" roundedClassName="rounded-lg" />
           <span className="text-sm font-semibold text-foreground">WealthyNest</span>
         </div>
 

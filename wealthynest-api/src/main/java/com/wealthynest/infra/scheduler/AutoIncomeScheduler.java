@@ -5,7 +5,10 @@ import com.wealthynest.domain.income.entity.IncomePaymentMode;
 import com.wealthynest.domain.income.entity.IncomeSource;
 import com.wealthynest.domain.income.repository.IncomeRepository;
 import com.wealthynest.domain.investment.entity.*;
-import com.wealthynest.domain.investment.repository.*;
+import com.wealthynest.domain.investment.repository.InvestmentIncomeLogRepository;
+import com.wealthynest.domain.investment.repository.InvestmentRepository;
+import com.wealthynest.domain.investment.repository.NseCorporateActionRepository;
+import com.wealthynest.domain.investment.repository.StockPriceCacheRepository;
 import com.wealthynest.infra.external.ExternalPriceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +24,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -49,69 +53,84 @@ public class AutoIncomeScheduler {
     // ─── Dividends (Yahoo Finance query2 — no crumb, sequential with 2s delay) ──
 
     private void processDividends() {
-        List<Investment> stocks = investmentRepository.findAll().stream()
-            .filter(i -> i.isActive() && i.getInvestmentType() == InvestmentType.STOCK
-                && i.getSymbol() != null && i.getPurchaseDate() != null)
-            .toList();
-        for (int i = 0; i < stocks.size(); i++) {
-            // 2-second gap between stocks to stay well within Yahoo's rate limits
-            if (i > 0) {
+        // Group by symbol — one Yahoo API call per distinct symbol regardless of how many
+        // users hold it. This changes time complexity from O(total_investments) to O(symbols).
+        Map<String, List<Investment>> bySymbol = investmentRepository
+            .findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK)
+            .stream()
+            .filter(i -> i.getSymbol() != null && i.getPurchaseDate() != null)
+            .collect(Collectors.groupingBy(Investment::getSymbol));
+
+        int idx = 0;
+        for (Map.Entry<String, List<Investment>> entry : bySymbol.entrySet()) {
+            if (idx++ > 0) {
                 try { Thread.sleep(2000); } catch (InterruptedException e) {
                     Thread.currentThread().interrupt(); return;
                 }
             }
-            self.processSingleStockDividends(stocks.get(i));
+            self.processSymbolDividends(entry.getKey(), entry.getValue());
         }
     }
 
+    /**
+     * Fetches dividend history from Yahoo ONCE for a symbol, then credits each holder's investment.
+     * Replaces per-investment Yahoo calls — at scale this is O(distinct_symbols) API calls,
+     * not O(total_stock_investments).
+     */
     @Transactional
-    public void processSingleStockDividends(Investment inv) {
-        long fromEpoch = inv.getPurchaseDate().atStartOfDay()
-            .toInstant(java.time.ZoneOffset.UTC).getEpochSecond();
+    public void processSymbolDividends(String symbol, List<Investment> investments) {
+        // Use the first investment's exchange to build the Yahoo ticker (all same symbol → same exchange)
+        Investment representative = investments.get(0);
         Map<String, BigDecimal> divHistory;
         try {
-            divHistory = externalPriceService.fetchDividendHistory(inv.getSymbol(), fromEpoch);
+            long earliestEpoch = investments.stream()
+                .map(i -> i.getPurchaseDate().atStartOfDay().toInstant(java.time.ZoneOffset.UTC).getEpochSecond())
+                .min(Long::compareTo).orElse(0L);
+            divHistory = externalPriceService.fetchDividendHistory(yahooTicker(representative), earliestEpoch);
         } catch (RuntimeException e) {
-            // fetchDividendHistory throws only after exhausting its own retries — skip this stock
-            // in the current batch run; the next scheduled run will try again.
-            log.warn("Dividend processing skipped for {} (Yahoo unavailable after retries): {}",
-                inv.getSymbol(), e.getMessage());
+            log.warn("Dividend processing skipped for {} (Yahoo unavailable after retries): {}", symbol, e.getMessage());
             return;
         }
+        if (divHistory.isEmpty()) return;
 
-        try {
-            LocalDate monthStart = LocalDate.now().withDayOfMonth(1);
-            for (Map.Entry<String, BigDecimal> entry : divHistory.entrySet()) {
-                LocalDate  exDate   = LocalDate.parse(entry.getKey());
-                BigDecimal perShare = entry.getValue();
-                if (exDate.isBefore(inv.getPurchaseDate())) continue;
-                if (exDate.isAfter(LocalDate.now())) continue;
-                if (perShare == null || perShare.compareTo(BigDecimal.ZERO) <= 0) continue;
+        LocalDate today      = LocalDate.now();
+        LocalDate monthStart = today.withDayOfMonth(1);
 
-                // Always save to corporate actions — used for display in investment history
-                if (!corporateActionRepository.existsBySymbolAndActionTypeAndExDate(
-                        inv.getSymbol(), "DIVIDEND", exDate)) {
-                    corporateActionRepository.save(NseCorporateAction.builder()
-                        .symbol(inv.getSymbol()).actionType("DIVIDEND")
-                        .exDate(exDate).dividendPerShare(perShare).build());
-                }
-
-                // Only credit income for current month onward (not historical backfill)
-                if (exDate.isBefore(monthStart)) continue;
-
-                if (incomeLogRepository.existsByInvestmentIdAndIncomeTypeAndEventDate(
-                        inv.getId(), "DIVIDEND", exDate)) continue;
-
-                BigDecimal units    = inv.getUnits() != null ? inv.getUnits() : BigDecimal.ONE;
-                BigDecimal totalDiv = perShare.multiply(units).setScale(2, RoundingMode.HALF_UP);
-
-                IncomeEntry income = createIncome(inv, totalDiv, exDate, IncomeSource.DIVIDEND,
-                    "Dividend: " + inv.getSymbol() + " ₹" + perShare + "/share");
-                saveIncomeLog(inv, income, "DIVIDEND", exDate, totalDiv);
-                log.info("Dividend ₹{} for {} on {}", totalDiv, inv.getSymbol(), exDate);
+        // Corporate actions are per-symbol — save once, not once per holder
+        for (Map.Entry<String, BigDecimal> entry : divHistory.entrySet()) {
+            LocalDate  exDate   = LocalDate.parse(entry.getKey());
+            BigDecimal perShare = entry.getValue();
+            if (perShare == null || perShare.compareTo(BigDecimal.ZERO) <= 0) continue;
+            if (exDate.isAfter(today)) continue;
+            if (!corporateActionRepository.existsBySymbolAndActionTypeAndExDate(symbol, "DIVIDEND", exDate)) {
+                corporateActionRepository.save(NseCorporateAction.builder()
+                    .symbol(symbol).actionType("DIVIDEND")
+                    .exDate(exDate).dividendPerShare(perShare).build());
             }
-        } catch (Exception e) {
-            log.warn("Dividend processing failed for {}: {}", inv.getSymbol(), e.getMessage());
+        }
+
+        // Credit income per investment (each user bought at a different date and holds different units)
+        for (Investment inv : investments) {
+            try {
+                for (Map.Entry<String, BigDecimal> entry : divHistory.entrySet()) {
+                    LocalDate  exDate   = LocalDate.parse(entry.getKey());
+                    BigDecimal perShare = entry.getValue();
+                    if (perShare == null || perShare.compareTo(BigDecimal.ZERO) <= 0) continue;
+                    if (exDate.isBefore(inv.getPurchaseDate())) continue;
+                    if (exDate.isAfter(today)) continue;
+                    if (exDate.isBefore(monthStart)) continue;
+                    if (incomeLogRepository.existsByInvestmentIdAndIncomeTypeAndEventDate(
+                            inv.getId(), "DIVIDEND", exDate)) continue;
+                    BigDecimal units    = inv.getUnits() != null ? inv.getUnits() : BigDecimal.ONE;
+                    BigDecimal totalDiv = perShare.multiply(units).setScale(2, RoundingMode.HALF_UP);
+                    IncomeEntry income  = createIncome(inv, totalDiv, exDate, IncomeSource.DIVIDEND,
+                        "Dividend: " + symbol + " ₹" + perShare + "/share");
+                    saveIncomeLog(inv, income, "DIVIDEND", exDate, totalDiv);
+                    log.info("Dividend ₹{} for {} (inv {}) on {}", totalDiv, symbol, inv.getId(), exDate);
+                }
+            } catch (Exception e) {
+                log.warn("Dividend crediting failed for investment {} ({}): {}", inv.getId(), symbol, e.getMessage());
+            }
         }
     }
 
@@ -130,20 +149,25 @@ public class AutoIncomeScheduler {
     public void backfillDividendsForStock(Investment inv) {
         if (inv.getSymbol() == null || inv.getPurchaseDate() == null) return;
 
-        // Get cached price or fetch fresh from Yahoo; always update this investment's currentValue
-        BigDecimal cachedPrice = stockPriceCacheRepository.findById(inv.getSymbol())
-            .map(StockPriceCache::getCurrentPrice).orElse(null);
-        if (cachedPrice == null) {
-            BigDecimal fetchedPrice = externalPriceService.fetchStockPrice(inv.getSymbol());
-            if (fetchedPrice != null) {
-                stockPriceCacheRepository.save(StockPriceCache.builder()
-                    .symbol(inv.getSymbol()).exchange("NSE")
-                    .currentPrice(fetchedPrice).lastUpdated(Instant.now()).build());
-                cachedPrice = fetchedPrice;
-            }
+        // Issue #10: always fetch a fresh live price from Yahoo for a newly added stock;
+        // the existing cache may contain yesterday's EOD price, so we bypass it here.
+        BigDecimal livePrice = null;
+        try {
+            livePrice = externalPriceService.fetchStockPrice(yahooTicker(inv));
+        } catch (Exception e) {
+            log.warn("Live price fetch failed for {} after add: {}", inv.getSymbol(), e.getMessage());
         }
-        if (cachedPrice != null) {
-            final BigDecimal finalPrice = cachedPrice;
+        if (livePrice == null) {
+            // Fall back to cache if Yahoo is unavailable
+            livePrice = stockPriceCacheRepository.findById(inv.getSymbol())
+                .map(StockPriceCache::getCurrentPrice).orElse(null);
+        }
+        if (livePrice != null) {
+            // Update / insert the cache with the fresh price
+            stockPriceCacheRepository.save(StockPriceCache.builder()
+                .symbol(inv.getSymbol()).exchange("NSE")
+                .currentPrice(livePrice).lastUpdated(Instant.now()).build());
+            final BigDecimal finalPrice = livePrice;
             investmentRepository.findById(inv.getId()).ifPresent(i -> {
                 i.setCurrentPrice(finalPrice);
                 if (i.getUnits() != null)
@@ -151,7 +175,7 @@ public class AutoIncomeScheduler {
                 investmentRepository.save(i);
             });
             log.info("Current value set to ₹{}/share × {} units for {} ({})",
-                cachedPrice, inv.getUnits(), inv.getSymbol(), inv.getId());
+                livePrice, inv.getUnits(), inv.getSymbol(), inv.getId());
         }
 
         log.info("Backfilling dividends for {} from {}", inv.getSymbol(), inv.getPurchaseDate());
@@ -180,7 +204,7 @@ public class AutoIncomeScheduler {
             .toInstant(java.time.ZoneOffset.UTC).getEpochSecond();
         Map<String, BigDecimal> divHistory;
         try {
-            divHistory = externalPriceService.fetchDividendHistory(inv.getSymbol(), fromEpoch);
+            divHistory = externalPriceService.fetchDividendHistory(yahooTicker(inv), fromEpoch);
         } catch (RuntimeException e) {
             // fetchDividendHistory throws only when all its internal retries are exhausted
             log.warn("Dividend backfill attempt {}/{} failed for {}: {}",
@@ -225,9 +249,9 @@ public class AutoIncomeScheduler {
     // ─── Bond coupons ─────────────────────────────────────────────────────────
 
     private void processBondCoupons() {
-        investmentRepository.findAll().stream()
-            .filter(i -> i.isActive() && i.getInvestmentType() == InvestmentType.BOND
-                && i.getCouponRate() != null && i.getCouponFrequency() != null
+        investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.BOND)
+            .stream()
+            .filter(i -> i.getCouponRate() != null && i.getCouponFrequency() != null
                 && i.getPurchaseDate() != null)
             .forEach(b -> self.processSingleBondCoupons(b));
     }
@@ -236,14 +260,25 @@ public class AutoIncomeScheduler {
     public void processSingleBondCoupons(Investment bond) {
         try {
             int paymentsPerYear = paymentsPerYear(bond.getCouponFrequency());
-            // investedAmount is already total face value (faceValuePerBond × quantity)
-            BigDecimal couponAmt = bond.getInvestedAmount()
+            // Coupon is on face value × units, not purchase price (which may differ at discount/premium)
+            BigDecimal fv = bond.getFaceValue() != null ? bond.getFaceValue() : bond.getAvgBuyPrice();
+            BigDecimal faceValueTotal = fv != null && bond.getUnits() != null
+                ? fv.multiply(bond.getUnits())
+                : bond.getInvestedAmount();
+            BigDecimal grossCoupon = faceValueTotal
                 .multiply(bond.getCouponRate())
                 .divide(BigDecimal.valueOf(100L * paymentsPerYear), 2, RoundingMode.HALF_UP);
+            // Issue #12: apply TDS deduction — net coupon = gross × (1 − tdsRate/100)
+            BigDecimal tdsRate = bond.getTdsRate() != null ? bond.getTdsRate() : BigDecimal.ZERO;
+            BigDecimal couponAmt = tdsRate.compareTo(BigDecimal.ZERO) > 0
+                ? grossCoupon.multiply(BigDecimal.ONE.subtract(
+                    tdsRate.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP)))
+                    .setScale(2, RoundingMode.HALF_UP)
+                : grossCoupon;
 
             LocalDate monthStart = LocalDate.now().withDayOfMonth(1);
             for (LocalDate cpDate : generateCouponDates(
-                    bond.getPurchaseDate(), bond.getMaturityDate(), bond.getCouponFrequency())) {
+                    bond.getPurchaseDate(), bond.getMaturityDate(), bond.getCouponFrequency(), bond.getCouponCreditDay())) {
                 if (cpDate.isAfter(LocalDate.now())) continue;
                 // Only credit coupons from current month onward; historical coupons are display-only
                 if (cpDate.isBefore(monthStart)) continue;
@@ -271,9 +306,9 @@ public class AutoIncomeScheduler {
     // ─── FD interest & maturity ───────────────────────────────────────────────
 
     private void processFDInterestAndMaturity() {
-        investmentRepository.findAll().stream()
-            .filter(i -> i.isActive() && i.getInvestmentType() == InvestmentType.FD
-                && i.getCouponRate() != null && i.getPurchaseDate() != null)
+        investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.FD)
+            .stream()
+            .filter(i -> i.getCouponRate() != null && i.getPurchaseDate() != null)
             .forEach(fd -> self.processSingleFD(fd));
     }
 
@@ -311,38 +346,53 @@ public class AutoIncomeScheduler {
 
     /** Seeds live Yahoo price for all active STOCK investments that have no StockPriceCache entry. */
     public void seedMissingStockPrices() {
-        List<Investment> missing = investmentRepository.findAll().stream()
-            .filter(i -> i.isActive() && i.getInvestmentType() == InvestmentType.STOCK
-                && i.getSymbol() != null
-                && !stockPriceCacheRepository.existsById(i.getSymbol()))
+        // Collect distinct symbols across all active stock holdings
+        List<Investment> stocks = investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK).stream()
+            .filter(i -> i.getSymbol() != null)
             .toList();
-        if (missing.isEmpty()) return;
-        log.info("Seeding live prices for {} stocks without cache", missing.size());
-        for (int i = 0; i < missing.size(); i++) {
-            if (i > 0) {
-                try { Thread.sleep(1000); } catch (InterruptedException e) {
+
+        // Deduplicate by symbol so we make one Yahoo call per symbol
+        java.util.LinkedHashMap<String, Investment> bySymbol = new java.util.LinkedHashMap<>();
+        for (Investment inv : stocks) bySymbol.putIfAbsent(inv.getSymbol(), inv);
+
+        if (bySymbol.isEmpty()) return;
+        log.info("Refreshing live prices for {} distinct stock symbols via Yahoo Finance", bySymbol.size());
+
+        int idx = 0;
+        for (Map.Entry<String, Investment> e : bySymbol.entrySet()) {
+            if (idx++ > 0) {
+                try { Thread.sleep(1000); } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt(); return;
                 }
             }
-            Investment inv = missing.get(i);
+            String symbol = e.getKey();
+            Investment inv = e.getValue();
             try {
-                BigDecimal price = externalPriceService.fetchStockPrice(inv.getSymbol());
-                if (price != null) {
-                    stockPriceCacheRepository.save(StockPriceCache.builder()
-                        .symbol(inv.getSymbol()).exchange("NSE")
-                        .currentPrice(price).lastUpdated(Instant.now()).build());
-                    // update all active investments holding this symbol
-                    investmentRepository.findAll().stream()
-                        .filter(x -> x.isActive() && inv.getSymbol().equals(x.getSymbol()) && x.getUnits() != null)
-                        .forEach(x -> {
-                            x.setCurrentPrice(price);
-                            x.setCurrentValue(x.getUnits().multiply(price));
-                            investmentRepository.save(x);
-                        });
-                    log.info("Seeded ₹{} for {}", price, inv.getSymbol());
+                BigDecimal price = externalPriceService.fetchStockPrice(yahooTicker(inv));
+                if (price == null) { log.warn("Yahoo returned null price for {}", symbol); continue; }
+
+                // Upsert cache
+                StockPriceCache cache = stockPriceCacheRepository.findById(symbol)
+                    .orElse(StockPriceCache.builder().symbol(symbol)
+                        .exchange(inv.getExchange() != null ? inv.getExchange() : "NSE").build());
+                if (cache.getCurrentPrice() != null) {
+                    BigDecimal prev = cache.getCurrentPrice();
+                    cache.setPreviousClose(prev);
+                    BigDecimal chg = price.subtract(prev);
+                    cache.setDayChange(chg);
+                    if (prev.compareTo(BigDecimal.ZERO) > 0)
+                        cache.setDayChangePct(chg.divide(prev, 4, RoundingMode.HALF_UP)
+                            .multiply(BigDecimal.valueOf(100)));
                 }
-            } catch (Exception e) {
-                log.warn("Price seed failed for {}: {}", inv.getSymbol(), e.getMessage());
+                cache.setCurrentPrice(price);
+                cache.setLastUpdated(Instant.now());
+                stockPriceCacheRepository.save(cache);
+
+                // Single bulk UPDATE for all users holding this symbol — O(1) round-trip
+                int rows = investmentRepository.bulkUpdatePriceBySymbol(symbol, price);
+                log.info("Refreshed ₹{} for {} ({} investment rows)", price, symbol, rows);
+            } catch (Exception ex) {
+                log.warn("Price refresh failed for {}: {}", symbol, ex.getMessage());
             }
         }
     }
@@ -386,7 +436,7 @@ public class AutoIncomeScheduler {
         };
     }
 
-    private List<LocalDate> generateCouponDates(LocalDate from, LocalDate to, String freq) {
+    private List<LocalDate> generateCouponDates(LocalDate from, LocalDate to, String freq, Integer creditDay) {
         List<LocalDate> dates = new java.util.ArrayList<>();
         int months = switch (freq.toUpperCase()) {
             case "MONTHLY"     -> 1;
@@ -397,10 +447,22 @@ public class AutoIncomeScheduler {
         LocalDate cur = from.plusMonths(months);
         LocalDate end = to != null ? to : LocalDate.now();
         while (!cur.isAfter(end)) {
-            dates.add(cur);
+            // If a credit day is configured, pin the day-of-month to it (clamped to month length)
+            LocalDate payDate = creditDay != null && creditDay >= 1
+                ? cur.withDayOfMonth(Math.min(creditDay, cur.lengthOfMonth()))
+                : cur;
+            dates.add(payDate);
             cur = cur.plusMonths(months);
         }
         return dates;
+    }
+
+    /** Build the correct Yahoo Finance ticker: appends .BO for BSE investments, .NS for everything else. */
+    private String yahooTicker(Investment inv) {
+        String sym = inv.getSymbol();
+        if (sym == null) return null;
+        if (sym.endsWith(".NS") || sym.endsWith(".BO")) return sym;
+        return "BSE".equals(inv.getExchange()) ? sym + ".BO" : sym + ".NS";
     }
 
     private BigDecimal calculateFDInterest(Investment fd) {

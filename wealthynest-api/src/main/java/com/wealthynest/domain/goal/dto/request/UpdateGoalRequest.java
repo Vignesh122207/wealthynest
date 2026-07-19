@@ -1,7 +1,10 @@
 package com.wealthynest.domain.goal.dto.request;
 
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 

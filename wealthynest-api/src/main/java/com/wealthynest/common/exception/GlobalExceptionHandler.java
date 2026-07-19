@@ -5,15 +5,20 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.Map;
@@ -51,6 +56,29 @@ public class GlobalExceptionHandler {
                         .path(req.getRequestURI()).fieldErrors(fieldErrors).build());
     }
 
+    /** Spring 6.1's validation path for constraint annotations on @RequestParam/@PathVariable
+     * (e.g. @Email, @NotBlank) — a separate exception type from MethodArgumentNotValidException,
+     * which only covers @Valid @RequestBody. Without this handler it fell through to the generic
+     * 500 handler below instead of the same 422 shape as body validation. */
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ErrorResponse> handleHandlerMethodValidation(HandlerMethodValidationException ex, HttpServletRequest req) {
+        Map<String, String> fieldErrors = ex.getParameterValidationResults().stream()
+                .collect(Collectors.toMap(
+                        r -> r.getMethodParameter().getParameterName(),
+                        r -> r.getResolvableErrors().isEmpty() ? "Invalid value" : r.getResolvableErrors().get(0).getDefaultMessage(),
+                        (a, b) -> a));
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(
+                ErrorResponse.builder().success(false).status(422)
+                        .error("VALIDATION_FAILED").message("Request validation failed")
+                        .path(req.getRequestURI()).fieldErrors(fieldErrors).build());
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+                .body(buildError(HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED", ex.getMessage(), req));
+    }
+
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex, HttpServletRequest req) {
         Map<String, String> fieldErrors = ex.getConstraintViolations().stream()
@@ -78,6 +106,26 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(buildError(HttpStatus.BAD_REQUEST, "INVALID_PARAMETER",
                         String.format("Parameter '%s' has invalid value", ex.getName()), req));
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingParameter(MissingServletRequestParameterException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(buildError(HttpStatus.BAD_REQUEST, "MISSING_PARAMETER",
+                        String.format("Required parameter '%s' is missing", ex.getParameterName()), req));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleMalformedBody(HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(buildError(HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST", "Request body is missing or malformed", req));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex, HttpServletRequest req) {
+        log.warn("Data integrity violation at {}: {}", req.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(buildError(HttpStatus.CONFLICT, "DATA_CONFLICT", "This conflicts with existing data", req));
     }
 
     @ExceptionHandler(Exception.class)

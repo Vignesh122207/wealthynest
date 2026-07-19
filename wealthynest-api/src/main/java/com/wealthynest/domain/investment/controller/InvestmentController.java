@@ -2,10 +2,9 @@ package com.wealthynest.domain.investment.controller;
 
 import com.wealthynest.common.response.ApiResponse;
 import com.wealthynest.common.security.SecurityUtils;
-import com.wealthynest.domain.investment.dto.request.CreateInvestmentRequest;
-import com.wealthynest.domain.investment.dto.request.CreateSipTransactionRequest;
-import com.wealthynest.domain.investment.dto.request.LogIncomeRequest;
+import com.wealthynest.domain.investment.dto.request.*;
 import com.wealthynest.domain.investment.dto.response.*;
+import com.wealthynest.domain.investment.entity.InvestmentType;
 import com.wealthynest.domain.investment.service.InvestmentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +13,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -127,6 +125,20 @@ public class InvestmentController {
             investmentService.computeXirr(id, SecurityUtils.requireCurrentUserId())));
     }
 
+    @GetMapping("/portfolio-xirr")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Double>> getPortfolioXirr() {
+        return ResponseEntity.ok(ApiResponse.success(
+            investmentService.computePortfolioXirr(SecurityUtils.requireCurrentUserId())));
+    }
+
+    @GetMapping("/type-xirr")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Double>> getTypeXirr(@RequestParam InvestmentType type) {
+        return ResponseEntity.ok(ApiResponse.success(
+            investmentService.computeTypeXirr(SecurityUtils.requireCurrentUserId(), type)));
+    }
+
     @PostMapping("/{id}/log-income")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> logIncome(
@@ -142,5 +154,41 @@ public class InvestmentController {
         int targetYear = year > 0 ? year : java.time.LocalDate.now().getYear();
         return ResponseEntity.ok(ApiResponse.success(
             investmentService.getIncomeHistory(SecurityUtils.requireCurrentUserId(), targetYear)));
+    }
+
+    // ── Dismiss dividend suggestion (issue #3) ───────────────────────────────
+
+    @PostMapping("/{id}/dismiss-dividend")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> dismissDividend(
+            @PathVariable UUID id, @Valid @RequestBody DismissDividendRequest req) {
+        investmentService.dismissDividend(id, SecurityUtils.requireCurrentUserId(), req);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // ── Stock transactions: buy-more / sell (issues #6, #7) ─────────────────
+
+    @PostMapping("/{id}/stock-transactions")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<StockTransactionResponse>> addStockTransaction(
+            @PathVariable UUID id, @Valid @RequestBody CreateStockTransactionRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(
+            investmentService.addStockTransaction(id, SecurityUtils.requireCurrentUserId(), req)));
+    }
+
+    @GetMapping("/{id}/stock-transactions")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<List<StockTransactionResponse>>> getStockTransactions(
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(
+            investmentService.getStockTransactions(id, SecurityUtils.requireCurrentUserId())));
+    }
+
+    @DeleteMapping("/{id}/stock-transactions/{txnId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> deleteStockTransaction(
+            @PathVariable UUID id, @PathVariable Long txnId) {
+        investmentService.deleteStockTransaction(id, txnId, SecurityUtils.requireCurrentUserId());
+        return ResponseEntity.ok(ApiResponse.noContent());
     }
 }

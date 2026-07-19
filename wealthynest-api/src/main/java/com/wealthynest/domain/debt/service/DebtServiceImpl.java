@@ -1,7 +1,13 @@
 package com.wealthynest.domain.debt.service;
 
 import com.wealthynest.common.exception.AccessDeniedException;
+import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
+import com.wealthynest.domain.account.entity.AccountTransfer;
+import com.wealthynest.domain.account.repository.AccountTransferRepository;
+import com.wealthynest.domain.account.repository.WalletAccountRepository;
+import com.wealthynest.domain.account.service.AccountBalanceGuard;
+import com.wealthynest.domain.account.service.AccountOwnershipGuard;
 import com.wealthynest.domain.debt.dto.request.CreateDebtRequest;
 import com.wealthynest.domain.debt.dto.request.RecordPaymentRequest;
 import com.wealthynest.domain.debt.dto.request.UpdateDebtRequest;
@@ -13,33 +19,33 @@ import com.wealthynest.domain.debt.entity.DebtStatus;
 import com.wealthynest.domain.debt.entity.DebtType;
 import com.wealthynest.domain.debt.repository.DebtPaymentRepository;
 import com.wealthynest.domain.debt.repository.DebtRecordRepository;
-import com.wealthynest.domain.account.repository.WalletAccountRepository;
-import com.wealthynest.domain.expense.entity.Expense;
-import com.wealthynest.domain.expense.repository.ExpenseRepository;
-import com.wealthynest.domain.income.entity.IncomeEntry;
-import com.wealthynest.domain.income.entity.IncomePaymentMode;
-import com.wealthynest.domain.income.entity.IncomeSource;
-import com.wealthynest.domain.income.repository.IncomeRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * A debt is money leaving or entering your control, not spending or earning — so it's booked as a
+ * one-sided AccountTransfer (one of fromAccountId/toAccountId null, the same shape balance
+ * adjustments use), tagged debt=true with a contact name and a direction label (LENT/BORROWED/REPAID),
+ * rather than as a synthetic Expense/Income row under a shared "Debt & Loans" category.
+ */
 @Service
 @RequiredArgsConstructor
 public class DebtServiceImpl implements DebtService {
 
-    private final DebtRecordRepository   debtRecordRepository;
-    private final DebtPaymentRepository  debtPaymentRepository;
+    private final DebtRecordRepository    debtRecordRepository;
+    private final DebtPaymentRepository   debtPaymentRepository;
     private final WalletAccountRepository accountRepository;
-    private final ExpenseRepository      expenseRepository;
-    private final IncomeRepository       incomeRepository;
-
-    // System "Debt & Loans" expense category (inserted by migration)
-    private static final UUID DEBT_LOANS_CATEGORY_ID = UUID.fromString("d1eb7000-0000-0000-0000-000000000001");
+    private final AccountOwnershipGuard   accountOwnershipGuard;
+    private final AccountBalanceGuard     accountBalanceGuard;
+    private final AccountTransferRepository transferRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -57,7 +63,9 @@ public class DebtServiceImpl implements DebtService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "dashboard", allEntries = true)
     public DebtRecordResponse create(UUID userId, CreateDebtRequest request) {
+        accountOwnershipGuard.validateAccountOwnership(request.getAccountId(), userId);
         DebtRecord record = DebtRecord.builder()
                 .userId(userId)
                 .type(request.getType())
@@ -66,6 +74,7 @@ public class DebtServiceImpl implements DebtService {
                 .contactPhone(request.getContactPhone())
                 .amount(request.getAmount())
                 .description(request.getDescription())
+                .debtDate(request.getDebtDate() != null ? request.getDebtDate() : LocalDate.now())
                 .dueDate(request.getDueDate())
                 .build();
         record = debtRecordRepository.save(record);
@@ -79,36 +88,19 @@ public class DebtServiceImpl implements DebtService {
                     ? "Lent to " + request.getContactName()
                     : "Borrowed from " + request.getContactName());
 
-            if (request.getType() == DebtType.LENT) {
-                // Debit the account — money went out
-                Expense expense = Expense.builder()
-                        .userId(userId)
-                        .categoryId(DEBT_LOANS_CATEGORY_ID)
-                        .accountId(request.getAccountId())
-                        .amount(request.getAmount())
-                        .expenseDate(today)
-                        .description(label)
-                        .debt(true)
-                        .build();
-                Expense saved = expenseRepository.save(expense);
-                record.setLinkedExpenseId(saved.getId());
-            } else {
-                // Credit the account — money came in
-                IncomeEntry income = IncomeEntry.builder()
-                        .userId(userId)
-                        .accountId(request.getAccountId())
-                        .source(IncomeSource.OTHER)
-                        .paymentMode(IncomePaymentMode.BANK_ACCOUNT)
-                        .amount(request.getAmount())
-                        .incomeDate(today)
-                        .periodMonth(today.getMonthValue())
-                        .periodYear(today.getYear())
-                        .description(label)
-                        .debt(true)
-                        .build();
-                IncomeEntry saved = incomeRepository.save(income);
-                record.setLinkedIncomeId(saved.getId());
-            }
+            boolean isLent = request.getType() == DebtType.LENT;
+            AccountTransfer transfer = AccountTransfer.builder()
+                    .userId(userId)
+                    .fromAccountId(isLent ? request.getAccountId() : null)
+                    .toAccountId(isLent ? null : request.getAccountId())
+                    .amount(request.getAmount())
+                    .description(label)
+                    .debt(true)
+                    .debtContactName(request.getContactName())
+                    .debtLabel(isLent ? "LENT" : "BORROWED")
+                    .transferDate(today)
+                    .build();
+            record.setLinkedTransferId(transferRepository.save(transfer).getId());
             record = debtRecordRepository.save(record);
         }
 
@@ -117,26 +109,29 @@ public class DebtServiceImpl implements DebtService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "dashboard", allEntries = true)
     public DebtRecordResponse update(UUID id, UUID userId, UpdateDebtRequest request) {
         DebtRecord record = findOwned(id, userId);
         if (request.getContactName()  != null) record.setContactName(request.getContactName());
         if (request.getContactPhone() != null) record.setContactPhone(request.getContactPhone());
         if (request.getDescription()  != null) record.setDescription(request.getDescription());
+        if (request.getDebtDate()     != null) record.setDebtDate(request.getDebtDate());
         if (request.getDueDate()      != null) record.setDueDate(request.getDueDate());
+
+        if (request.getContactName() != null && record.getLinkedTransferId() != null) {
+            transferRepository.findById(record.getLinkedTransferId()).ifPresent(t -> {
+                t.setDebtContactName(request.getContactName());
+                transferRepository.save(t);
+            });
+        }
 
         if (request.getAmount() != null && request.getAmount().compareTo(record.getAmount()) != 0) {
             record.setAmount(request.getAmount());
-            // Keep the linked account entry in sync
-            if (record.getLinkedExpenseId() != null) {
-                expenseRepository.findById(record.getLinkedExpenseId()).ifPresent(e -> {
-                    e.setAmount(request.getAmount());
-                    expenseRepository.save(e);
-                });
-            }
-            if (record.getLinkedIncomeId() != null) {
-                incomeRepository.findById(record.getLinkedIncomeId()).ifPresent(inc -> {
-                    inc.setAmount(request.getAmount());
-                    incomeRepository.save(inc);
+            // Keep the linked transfer in sync
+            if (record.getLinkedTransferId() != null) {
+                transferRepository.findById(record.getLinkedTransferId()).ifPresent(t -> {
+                    t.setAmount(request.getAmount());
+                    transferRepository.save(t);
                 });
             }
         }
@@ -146,12 +141,23 @@ public class DebtServiceImpl implements DebtService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "dashboard", allEntries = true)
     public DebtRecordResponse recordPayment(UUID id, UUID userId, RecordPaymentRequest request) {
         DebtRecord record = findOwned(id, userId);
         if (record.getStatus() == DebtStatus.SETTLED)
-            throw new IllegalStateException("Debt is already fully settled");
+            throw new BusinessException("Debt is already fully settled", HttpStatus.CONFLICT);
 
-        // Create an account entry to reflect the money movement
+        BigDecimal remaining = record.getAmount().subtract(record.getAmountSettled());
+        if (request.getAmount().compareTo(remaining) > 0) {
+            throw new BusinessException(
+                    "Payment of " + request.getAmount() + " exceeds the remaining balance of " + remaining + ".",
+                    HttpStatus.BAD_REQUEST);
+        }
+        if (record.getType() == DebtType.BORROWED) {
+            // Repaying a debt debits a real wallet account — same "can't go negative" rule as an expense.
+            accountBalanceGuard.validateSufficientBalance(record.getAccountId(), userId, request.getAmount(), BigDecimal.ZERO);
+        }
+
         UUID linkedEntryId = null;
         if (record.getAccountId() != null) {
             LocalDate today = LocalDate.now();
@@ -161,34 +167,19 @@ public class DebtServiceImpl implements DebtService {
                             ? "Received from " + record.getContactName()
                             : "Paid to " + record.getContactName());
 
-            if (record.getType() == DebtType.LENT) {
-                // Money came back in — credit the account
-                IncomeEntry income = IncomeEntry.builder()
-                        .userId(record.getUserId())
-                        .accountId(record.getAccountId())
-                        .source(IncomeSource.OTHER)
-                        .paymentMode(IncomePaymentMode.BANK_ACCOUNT)
-                        .amount(request.getAmount())
-                        .incomeDate(today)
-                        .periodMonth(today.getMonthValue())
-                        .periodYear(today.getYear())
-                        .description(label)
-                        .debt(true)
-                        .build();
-                linkedEntryId = incomeRepository.save(income).getId();
-            } else {
-                // Money went out — debit the account
-                Expense expense = Expense.builder()
-                        .userId(record.getUserId())
-                        .categoryId(DEBT_LOANS_CATEGORY_ID)
-                        .accountId(record.getAccountId())
-                        .amount(request.getAmount())
-                        .expenseDate(today)
-                        .description(label)
-                        .debt(true)
-                        .build();
-                linkedEntryId = expenseRepository.save(expense).getId();
-            }
+            boolean isLent = record.getType() == DebtType.LENT;
+            AccountTransfer transfer = AccountTransfer.builder()
+                    .userId(record.getUserId())
+                    .fromAccountId(isLent ? null : record.getAccountId())
+                    .toAccountId(isLent ? record.getAccountId() : null)
+                    .amount(request.getAmount())
+                    .description(label)
+                    .debt(true)
+                    .debtContactName(record.getContactName())
+                    .debtLabel("REPAID")
+                    .transferDate(today)
+                    .build();
+            linkedEntryId = transferRepository.save(transfer).getId();
         }
 
         DebtPayment payment = DebtPayment.builder()
@@ -207,6 +198,7 @@ public class DebtServiceImpl implements DebtService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "dashboard", allEntries = true)
     public DebtRecordResponse settle(UUID id, UUID userId) {
         DebtRecord record = findOwned(id, userId);
         BigDecimal remaining = record.getAmount().subtract(record.getAmountSettled()).max(BigDecimal.ZERO);
@@ -217,33 +209,19 @@ public class DebtServiceImpl implements DebtService {
             String label = record.getType() == DebtType.LENT
                     ? "Settled by " + record.getContactName()
                     : "Settled to " + record.getContactName();
-            UUID linkedEntryId;
-            if (record.getType() == DebtType.LENT) {
-                IncomeEntry income = IncomeEntry.builder()
-                        .userId(record.getUserId())
-                        .accountId(record.getAccountId())
-                        .source(IncomeSource.OTHER)
-                        .paymentMode(IncomePaymentMode.BANK_ACCOUNT)
-                        .amount(remaining)
-                        .incomeDate(today)
-                        .periodMonth(today.getMonthValue())
-                        .periodYear(today.getYear())
-                        .description(label)
-                        .debt(true)
-                        .build();
-                linkedEntryId = incomeRepository.save(income).getId();
-            } else {
-                Expense expense = Expense.builder()
-                        .userId(record.getUserId())
-                        .categoryId(DEBT_LOANS_CATEGORY_ID)
-                        .accountId(record.getAccountId())
-                        .amount(remaining)
-                        .expenseDate(today)
-                        .description(label)
-                        .debt(true)
-                        .build();
-                linkedEntryId = expenseRepository.save(expense).getId();
-            }
+            boolean isLent = record.getType() == DebtType.LENT;
+            AccountTransfer transfer = AccountTransfer.builder()
+                    .userId(record.getUserId())
+                    .fromAccountId(isLent ? null : record.getAccountId())
+                    .toAccountId(isLent ? record.getAccountId() : null)
+                    .amount(remaining)
+                    .description(label)
+                    .debt(true)
+                    .debtContactName(record.getContactName())
+                    .debtLabel("REPAID")
+                    .transferDate(today)
+                    .build();
+            UUID linkedEntryId = transferRepository.save(transfer).getId();
             debtPaymentRepository.save(DebtPayment.builder()
                     .debtId(record.getId())
                     .amount(remaining)
@@ -259,25 +237,18 @@ public class DebtServiceImpl implements DebtService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "dashboard", allEntries = true)
     public void delete(UUID id, UUID userId) {
         DebtRecord record = findOwned(id, userId);
 
-        // Reverse every payment-linked account entry before the CASCADE deletes the payments
+        // Reverse every payment-linked transfer before the CASCADE deletes the payments
         debtPaymentRepository.findByDebtIdOrderByPaidAtDesc(record.getId()).forEach(p -> {
-            if (p.getLinkedEntryId() != null) {
-                if (record.getType() == DebtType.LENT) {
-                    incomeRepository.deleteById(p.getLinkedEntryId());
-                } else {
-                    expenseRepository.deleteById(p.getLinkedEntryId());
-                }
-            }
+            if (p.getLinkedEntryId() != null) transferRepository.deleteById(p.getLinkedEntryId());
         });
 
-        // Reverse the initial account entry
-        if (record.getLinkedExpenseId() != null)
-            expenseRepository.deleteById(record.getLinkedExpenseId());
-        if (record.getLinkedIncomeId() != null)
-            incomeRepository.deleteById(record.getLinkedIncomeId());
+        // Reverse the initial transfer
+        if (record.getLinkedTransferId() != null)
+            transferRepository.deleteById(record.getLinkedTransferId());
 
         debtRecordRepository.delete(record); // ON DELETE CASCADE removes debt_payments
     }
@@ -316,6 +287,7 @@ public class DebtServiceImpl implements DebtService {
                 .contactPhone(r.getContactPhone())
                 .amount(r.getAmount())
                 .description(r.getDescription())
+                .debtDate(r.getDebtDate())
                 .dueDate(r.getDueDate())
                 .status(r.getStatus().name())
                 .amountSettled(r.getAmountSettled())

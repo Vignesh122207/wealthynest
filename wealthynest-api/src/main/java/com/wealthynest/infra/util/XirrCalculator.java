@@ -21,7 +21,7 @@ public final class XirrCalculator {
         if (cashflows == null || cashflows.size() < 2) return Double.NaN;
         if (cashflows.size() != dates.size()) return Double.NaN;
 
-        LocalDate t0 = dates.get(0);
+        LocalDate t0 = dates.getFirst();
         double rate = 0.10; // 10% initial guess
 
         for (int iter = 0; iter < 200; iter++) {
@@ -41,7 +41,7 @@ public final class XirrCalculator {
                 return newRate * 100.0;
             }
             // clamp to avoid runaway
-            rate = Math.max(-0.9999, Math.min(newRate, 100.0));
+            rate = Math.clamp(newRate, -0.9999, 100.0);
         }
         return Double.NaN;
     }

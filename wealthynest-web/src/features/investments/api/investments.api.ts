@@ -1,13 +1,16 @@
-import { apiClient } from "@/lib/axios";
-import type { ApiResponse } from "@/types/api.types";
+import {apiClient} from "@/lib/axios";
+import type {ApiResponse} from "@/types/api.types";
 import type {
-  Investment,
-  CreateInvestmentPayload,
-  InvestmentSearchResult,
-  SipTransaction,
-  CreateSipPayload,
-  DividendSuggestion,
-  IncomeHistory,
+    CreateInvestmentPayload,
+    CreateSipPayload,
+    CreateStockTransactionPayload,
+    DividendSuggestion,
+    IncomeHistory,
+    Investment,
+    InvestmentSearchResult,
+    InvestmentType,
+    SipTransaction,
+    StockTransaction,
 } from "../types/investment.types";
 
 export const investmentsApi = {
@@ -50,6 +53,12 @@ export const investmentsApi = {
   getXirr: async (investmentId: string): Promise<number | null> =>
     (await apiClient.get<ApiResponse<number | null>>(`/investments/${investmentId}/xirr`)).data.data,
 
+  getPortfolioXirr: async (): Promise<number | null> =>
+    (await apiClient.get<ApiResponse<number | null>>("/investments/portfolio-xirr")).data.data,
+
+  getTypeXirr: async (type: InvestmentType): Promise<number | null> =>
+    (await apiClient.get<ApiResponse<number | null>>("/investments/type-xirr", { params: { type } })).data.data,
+
   // Phase 2 — Dividend suggestions
   getDividendSuggestions: async (): Promise<DividendSuggestion[]> =>
     (await apiClient.get<ApiResponse<DividendSuggestion[]>>("/investments/dividend-suggestions")).data.data ?? [],
@@ -63,5 +72,21 @@ export const investmentsApi = {
     incomeType: string; exDate: string; amount: number; perShare?: number; shares?: number;
   }): Promise<void> => {
     await apiClient.post(`/investments/${investmentId}/log-income`, data);
+  },
+
+  // Dismiss a dividend suggestion
+  dismissDividend: async (investmentId: string, exDate: string): Promise<void> => {
+    await apiClient.post(`/investments/${investmentId}/dismiss-dividend`, { exDate });
+  },
+
+  // Stock buy/sell transactions (buy-more, sell)
+  getStockTransactions: async (investmentId: string): Promise<StockTransaction[]> =>
+    (await apiClient.get<ApiResponse<StockTransaction[]>>(`/investments/${investmentId}/stock-transactions`)).data.data ?? [],
+
+  addStockTransaction: async (investmentId: string, data: CreateStockTransactionPayload): Promise<StockTransaction> =>
+    (await apiClient.post<ApiResponse<StockTransaction>>(`/investments/${investmentId}/stock-transactions`, data)).data.data,
+
+  deleteStockTransaction: async (investmentId: string, txnId: number): Promise<void> => {
+    await apiClient.delete(`/investments/${investmentId}/stock-transactions/${txnId}`);
   },
 };

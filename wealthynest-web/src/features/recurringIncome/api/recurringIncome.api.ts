@@ -1,6 +1,6 @@
-import { apiClient } from "@/lib/axios";
-import type { ApiResponse } from "@/types/api.types";
-import type { RecurringIncome } from "../types/recurringIncome.types";
+import {apiClient} from "@/lib/axios";
+import type {ApiResponse} from "@/types/api.types";
+import type {RecurringIncome} from "../types/recurringIncome.types";
 
 export interface CreateRecurringIncomePayload {
   accountId:    string;

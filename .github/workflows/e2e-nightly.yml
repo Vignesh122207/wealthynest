@@ -1,0 +1,81 @@
+name: E2E (Playwright)
+
+# Deliberately NOT on push/pull_request — the 128-test regression suite needs the full
+# docker-compose stack (postgres/redis/api/web) up, which takes several minutes to build and
+# start, so it doesn't belong in the fast PR-gating path. Runs nightly and on-demand instead.
+on:
+  schedule:
+    - cron: "0 2 * * *" # 02:00 UTC daily
+  workflow_dispatch: {}
+
+concurrency:
+  group: e2e-nightly
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Throwaway secrets for an ephemeral CI-only stack — generated fresh every run, never
+      # persisted, never real. Real deployments use actual secrets via the platform's own
+      # env/secret store, not this file.
+      - name: Generate ephemeral .env for the docker-compose stack
+        run: |
+          cat > .env <<EOF
+          JWT_SECRET=$(openssl rand -base64 48)
+          VAULT_ENCRYPTION_KEY=$(openssl rand -base64 32)
+          VAULT_HASH_PEPPER=$(openssl rand -base64 32)
+          DB_PASSWORD=$(openssl rand -hex 16)
+          REDIS_PASSWORD=$(openssl rand -hex 16)
+          CORS_ORIGINS=http://localhost:3000
+          FRONTEND_URL=http://localhost:3000
+          MAIL_HOST=localhost
+          MAIL_PORT=1025
+          MAIL_USERNAME=test
+          MAIL_PASSWORD=test
+          API_URL=http://wealthynest-api:8080/api/v1
+          EOF
+
+      - name: Start the stack
+        run: docker compose up -d --build postgres redis wealthynest-api wealthynest-web
+
+      - name: Wait for API and web to become healthy
+        run: |
+          timeout 180 bash -c 'until curl -sf http://localhost:8080/actuator/health | grep -q "\"status\":\"UP\""; do sleep 3; done'
+          timeout 120 bash -c 'until curl -sf http://localhost:3000 > /dev/null; do sleep 3; done'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: playwright/package-lock.json
+
+      - name: Install Playwright
+        working-directory: playwright
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      # playwright/config/env.ts loads ../../.env (the repo-root file generated above) via
+      # dotenv, so DB_PASSWORD and friends are already picked up — nothing to pass explicitly.
+      - name: Run E2E suite
+        working-directory: playwright
+        run: npm test
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright/playwright-report/
+          retention-days: 14
+
+      - name: Tear down the stack
+        if: always()
+        run: docker compose down -v

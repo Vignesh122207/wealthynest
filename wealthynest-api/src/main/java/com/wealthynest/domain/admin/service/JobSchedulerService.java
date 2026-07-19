@@ -1,12 +1,10 @@
 package com.wealthynest.domain.admin.service;
 
+import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.domain.admin.entity.JobScheduleConfig;
 import com.wealthynest.domain.admin.repository.JobScheduleConfigRepository;
 import com.wealthynest.infra.external.StockDataService;
-import com.wealthynest.infra.scheduler.AutoIncomeScheduler;
-import com.wealthynest.infra.scheduler.PriceRefreshScheduler;
-import com.wealthynest.infra.scheduler.RecurringExpenseScheduler;
-import com.wealthynest.infra.scheduler.RecurringIncomeScheduler;
+import com.wealthynest.infra.scheduler.*;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +14,11 @@ import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -37,6 +40,21 @@ public class JobSchedulerService {
     private final StockDataService            stockDataService;
     private final RecurringExpenseScheduler   recurringExpenseScheduler;
     private final RecurringIncomeScheduler    recurringIncomeScheduler;
+    private final NetWorthSnapshotScheduler   netWorthSnapshotScheduler;
+    private final StockDataScheduler          stockDataScheduler;
+    private final LoanEmiScheduler            loanEmiScheduler;
+    private final LowBalanceScheduler         lowBalanceScheduler;
+    private final SpendAnomalyScheduler       spendAnomalyScheduler;
+    private final DebtReminderScheduler       debtReminderScheduler;
+    private final EmiReminderScheduler        emiReminderScheduler;
+    private final RecurringTransferScheduler  recurringTransferScheduler;
+    private final RecurringGoalContributionScheduler recurringGoalContributionScheduler;
+    private final MfMasterSyncScheduler       mfMasterSyncScheduler;
+    private final DataSource                  dataSource;
+
+    /** Namespaces this service's advisory-lock keys away from any future unrelated use of the
+     * same mechanism — the actual job identity lives in the low 32 bits (see lockKeyFor). */
+    private static final long ADVISORY_LOCK_NAMESPACE = 0x4A4F4200_00000000L;
 
     private final ThreadPoolTaskScheduler taskScheduler = new ThreadPoolTaskScheduler();
     private final Map<String, ScheduledFuture<?>> futures = new ConcurrentHashMap<>();
@@ -60,7 +78,7 @@ public class JobSchedulerService {
     @Transactional
     public JobScheduleConfig updateSchedule(String jobName, String cronExpression) {
         JobScheduleConfig cfg = configRepo.findById(jobName)
-            .orElseThrow(() -> new IllegalArgumentException("Unknown job: " + jobName));
+            .orElseThrow(() -> new ResourceNotFoundException("Job", "name", jobName));
         cfg.setCronExpression(cronExpression);
         configRepo.save(cfg);
         schedule(cfg);
@@ -76,7 +94,7 @@ public class JobSchedulerService {
     public void triggerNow(String jobName) {
         // Validate job name before submitting
         if (!configRepo.existsById(jobName)) {
-            throw new IllegalArgumentException("Unknown job: " + jobName);
+            throw new ResourceNotFoundException("Job", "name", jobName);
         }
         log.info("Manual trigger (async): {}", jobName);
         markRunning(jobName);
@@ -102,14 +120,55 @@ public class JobSchedulerService {
         futures.put(cfg.getJobName(), future);
     }
 
+    /**
+     * Runs a job under a Postgres session-level advisory lock keyed by job name, so that if this
+     * service is ever scaled to more than one instance, only one instance actually executes a
+     * given job's body on a given tick — the others see the lock held and skip immediately instead
+     * of both crediting the same recurring income or debiting the same EMI. The lock is taken and
+     * released on a connection borrowed directly from the pool (bypassing Spring's transactional
+     * connection) so its lifecycle can't leak across pooled-connection reuse.
+     */
     private void runScheduled(String jobName) {
         log.info("Scheduled run: {}", jobName);
-        markRunning(jobName);
-        try {
-            runJob(jobName);
-            markSuccess(jobName);
-        } catch (Exception e) {
-            markFailed(jobName, e.getMessage());
+        long lockKey = lockKeyFor(jobName);
+        try (Connection conn = dataSource.getConnection()) {
+            if (!tryLock(conn, lockKey)) {
+                log.info("Skipping {} — already running on another instance", jobName);
+                return;
+            }
+            try {
+                markRunning(jobName);
+                runJob(jobName);
+                markSuccess(jobName);
+            } catch (Exception e) {
+                markFailed(jobName, e.getMessage());
+            } finally {
+                unlock(conn, lockKey);
+            }
+        } catch (SQLException e) {
+            log.error("Advisory lock unavailable for job {}: {}", jobName, e.getMessage(), e);
+        }
+    }
+
+    private long lockKeyFor(String jobName) {
+        return ADVISORY_LOCK_NAMESPACE | (jobName.hashCode() & 0xFFFFFFFFL);
+    }
+
+    private boolean tryLock(Connection conn, long lockKey) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement("SELECT pg_try_advisory_lock(?)")) {
+            ps.setLong(1, lockKey);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() && rs.getBoolean(1);
+            }
+        }
+    }
+
+    private void unlock(Connection conn, long lockKey) {
+        try (PreparedStatement ps = conn.prepareStatement("SELECT pg_advisory_unlock(?)")) {
+            ps.setLong(1, lockKey);
+            ps.execute();
+        } catch (SQLException e) {
+            log.warn("Failed to release advisory lock {}: {}", lockKey, e.getMessage());
         }
     }
 
@@ -121,7 +180,17 @@ public class JobSchedulerService {
             case "MF_NAV"               -> priceRefreshScheduler.refreshMFNav();
             case "RECURRING_EXPENSES"   -> recurringExpenseScheduler.processRecurringExpenses();
             case "RECURRING_INCOME"     -> recurringIncomeScheduler.processRecurringIncome();
-            default -> throw new IllegalArgumentException("Unknown job: " + jobName);
+            case "NET_WORTH_SNAPSHOT"   -> netWorthSnapshotScheduler.takeMonthlySnapshots();
+            case "STOCK_WEEKLY_REFRESH" -> stockDataScheduler.weeklyMasterRefresh();
+            case "MF_MASTER_SYNC"       -> mfMasterSyncScheduler.weeklySync();
+            case "LOAN_EMI"             -> loanEmiScheduler.processDueEmis();
+            case "LOW_BALANCE_CHECK"    -> lowBalanceScheduler.checkAllAccounts();
+            case "SPEND_ANOMALY_CHECK"  -> spendAnomalyScheduler.checkRecentExpenses();
+            case "DEBT_DUE_REMINDER"    -> debtReminderScheduler.checkUpcomingDueDates();
+            case "LOAN_EMI_REMINDER"    -> emiReminderScheduler.checkUpcomingEmis();
+            case "RECURRING_TRANSFER"   -> recurringTransferScheduler.processRecurringTransfers();
+            case "RECURRING_GOAL_CONTRIBUTION" -> recurringGoalContributionScheduler.processRecurringGoalContributions();
+            default -> throw new ResourceNotFoundException("Job", "name", jobName);
         }
     }
 

@@ -5,6 +5,7 @@ import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -17,6 +18,7 @@ public class UserPrincipal implements UserDetails {
     private final String fullName;
     private final UUID   familyId;
     private final boolean active;
+    private final Instant lockedUntil;
     private final Collection<? extends GrantedAuthority> authorities;
 
     private UserPrincipal(User user) {
@@ -26,6 +28,7 @@ public class UserPrincipal implements UserDetails {
         this.fullName    = user.getFullName();
         this.familyId    = user.getFamilyId();
         this.active      = user.isActive();
+        this.lockedUntil = user.getLockedUntil();
         this.authorities = List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
     }
 
@@ -33,7 +36,7 @@ public class UserPrincipal implements UserDetails {
 
     @Override public String getUsername()              { return email; }
     @Override public boolean isAccountNonExpired()     { return true; }
-    @Override public boolean isAccountNonLocked()      { return true; }
+    @Override public boolean isAccountNonLocked()      { return lockedUntil == null || Instant.now().isAfter(lockedUntil); }
     @Override public boolean isCredentialsNonExpired() { return true; }
     @Override public boolean isEnabled()               { return active; }
 }

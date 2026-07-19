@@ -4,24 +4,22 @@ import com.wealthynest.common.response.ApiResponse;
 import com.wealthynest.common.response.PagedResponse;
 import com.wealthynest.common.security.SecurityUtils;
 import com.wealthynest.domain.account.dto.request.CreateAccountRequest;
+import com.wealthynest.domain.account.dto.request.LoanPaymentRequest;
 import com.wealthynest.domain.account.dto.request.TransferRequest;
 import com.wealthynest.domain.account.dto.request.UpdateTransferRequest;
 import com.wealthynest.domain.account.dto.response.AccountResponse;
 import com.wealthynest.domain.account.dto.response.TransferResponse;
+import com.wealthynest.domain.account.service.LoanPaymentService;
 import com.wealthynest.domain.account.service.WalletAccountService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.http.ContentDisposition;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -32,6 +30,7 @@ import java.util.UUID;
 public class WalletAccountController {
 
     private final WalletAccountService accountService;
+    private final LoanPaymentService   loanPaymentService;
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<AccountResponse>>> getAll() {
@@ -67,9 +66,16 @@ public class WalletAccountController {
                 accountService.unarchiveAccount(id, SecurityUtils.requireCurrentUserId())));
     }
 
+    @PatchMapping("/{id}/set-primary")
+    public ResponseEntity<ApiResponse<AccountResponse>> setPrimary(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                accountService.setPrimary(id, SecurityUtils.requireCurrentUserId())));
+    }
+
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable UUID id) {
-        accountService.deleteAccount(id, SecurityUtils.requireCurrentUserId());
+    public ResponseEntity<Void> delete(@PathVariable UUID id,
+            @RequestParam(defaultValue = "false") boolean alsoDeleteTransactions) {
+        accountService.deleteAccount(id, SecurityUtils.requireCurrentUserId(), alsoDeleteTransactions);
         return ResponseEntity.noContent().build();
     }
 
@@ -98,6 +104,14 @@ public class WalletAccountController {
     public ResponseEntity<Void> deleteTransfer(@PathVariable UUID id) {
         accountService.deleteTransfer(id, SecurityUtils.requireCurrentUserId());
         return ResponseEntity.noContent().build();
+    }
+
+    /** Records a loan payment (EMI or prepayment) — split into interest expense + principal transfer. */
+    @PostMapping("/{id}/loan-payment")
+    public ResponseEntity<ApiResponse<LoanPaymentService.AccountResult>> recordLoanPayment(
+            @PathVariable UUID id, @Valid @RequestBody LoanPaymentRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(loanPaymentService.recordPayment(
+                id, SecurityUtils.requireCurrentUserId(), request.getAmount(), request.getFromAccountId())));
     }
 
     @PostMapping("/{id}/adjust-balance")

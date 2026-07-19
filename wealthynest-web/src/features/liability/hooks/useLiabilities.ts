@@ -1,10 +1,10 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { QUERY_KEYS } from "@/lib/constants";
-import { liabilitiesApi } from "../api/liabilities.api";
-import type { CreateLiabilityPayload } from "../types/liability.types";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {toast} from "sonner";
+import {QUERY_KEYS} from "@/lib/constants";
+import {liabilitiesApi} from "../api/liabilities.api";
+import type {CreateLiabilityPayload} from "../types/liability.types";
 
 export function useLiabilities() {
   return useQuery({

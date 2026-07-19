@@ -19,11 +19,14 @@ public class AccountResponse {
     private String     accountNumber;
     private BigDecimal openingBalance;
     private BigDecimal currentBalance;
+    private BigDecimal lowBalanceThreshold;
+    private boolean     belowLowBalanceThreshold;
     private BigDecimal totalMoneyIn;
     private BigDecimal totalMoneyOut;
     private List<AccountTransactionItem> recentTransactions;
     private Instant    createdAt;
     private boolean    archived;
+    private boolean    primary;
 
     // Credit card fields (null for non-credit-card accounts)
     private BigDecimal creditLimit;
@@ -33,4 +36,14 @@ public class AccountResponse {
     private BigDecimal apr;
     private LocalDate  nextStatementDate;
     private LocalDate  nextDueDate;
+
+    // Loan fields (null for non-loan accounts; currentBalance = outstanding, apr = interest rate)
+    private String     loanType;
+    private BigDecimal principalAmount;
+    private BigDecimal emiAmount;
+    private Integer    emiDay;
+    private UUID       autopayAccountId;
+    private String     autopayAccountName;
+    private LocalDate  loanEndDate;
+    private LocalDate  nextEmiDate;
 }

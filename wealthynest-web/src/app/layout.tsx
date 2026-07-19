@@ -1,11 +1,12 @@
-import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
-import { ThemeProvider } from "next-themes";
-import { ThemedToaster } from "@/components/ui/ThemedToaster";
-import { Providers } from "./providers";
+import type {Metadata, Viewport} from "next";
+import {Inter, Plus_Jakarta_Sans} from "next/font/google";
+import {ThemeProvider} from "next-themes";
+import {ThemedToaster} from "@/components/ui/ThemedToaster";
+import {Providers} from "./providers";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+const inter    = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+const jakarta  = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-jakarta", display: "swap", weight: ["400","500","600","700","800"] });
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -34,7 +35,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={inter.variable}>
+    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${jakarta.variable}`}>
       <body className="bg-background text-foreground antialiased">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
           <Providers>

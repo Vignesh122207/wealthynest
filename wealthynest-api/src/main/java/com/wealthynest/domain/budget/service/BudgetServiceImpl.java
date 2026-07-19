@@ -11,16 +11,17 @@ import com.wealthynest.domain.budget.mapper.BudgetMapper;
 import com.wealthynest.domain.budget.repository.BudgetRepository;
 import com.wealthynest.domain.category.entity.Category;
 import com.wealthynest.domain.category.repository.CategoryRepository;
+import com.wealthynest.domain.category.service.CategoryOwnershipGuard;
 import com.wealthynest.domain.expense.repository.ExpenseRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -32,15 +33,20 @@ public class BudgetServiceImpl implements BudgetService {
     private final CategoryRepository categoryRepository;
     private final ExpenseRepository  expenseRepository;
     private final BudgetMapper       budgetMapper;
+    private final CategoryOwnershipGuard categoryOwnershipGuard;
 
     @Override
     @Transactional
     public BudgetResponse createOrUpdateBudget(UUID userId, UUID familyId, CreateBudgetRequest request) {
+        categoryOwnershipGuard.validateCategoryOwnership(request.getCategoryId(), userId, familyId);
         BudgetType type = request.getBudgetType() != null ? request.getBudgetType() : BudgetType.MONTHLY;
 
-        // Budgets are always personal — the family tab reads them per-user via the user's own token
-        Budget budget = budgetRepository.findByUserIdAndCategoryIdAndBudgetType(userId, request.getCategoryId(), type)
-            .orElseGet(() -> Budget.builder().userId(userId).categoryId(request.getCategoryId())
+        // A budget is family-shared whenever its creator currently belongs to a family — same
+        // convention as Category/Asset/Liability/Expense (see CategoryServiceImpl.createCategory).
+        Budget budget = (familyId != null
+                ? budgetRepository.findByFamilyIdAndCategoryIdAndBudgetType(familyId, request.getCategoryId(), type)
+                : budgetRepository.findByUserIdAndCategoryIdAndBudgetType(userId, request.getCategoryId(), type))
+            .orElseGet(() -> Budget.builder().userId(userId).familyId(familyId).categoryId(request.getCategoryId())
                 .periodMonth(0).periodYear(0).build());
         budget.setAmount(request.getAmount());
         budget.setBudgetType(type);
@@ -49,21 +55,20 @@ public class BudgetServiceImpl implements BudgetService {
         if (request.getAlertThreshold() != null) budget.setAlertThreshold(request.getAlertThreshold());
 
         LocalDate now = LocalDate.now();
-        return enrich(budgetMapper.toResponse(budgetRepository.save(budget)), userId, null, now.getYear(), now.getMonthValue());
+        return enrich(budgetMapper.toResponse(budgetRepository.save(budget)), userId, familyId, now.getYear(), now.getMonthValue());
     }
 
     @Override
     @Transactional
     public BudgetResponse updateBudget(UUID budgetId, UUID userId, UUID familyId, UpdateBudgetRequest request) {
-        Budget budget = budgetRepository.findById(budgetId)
-            .orElseThrow(() -> new ResourceNotFoundException("Budget", "id", budgetId));
-        boolean owned = (familyId != null && familyId.equals(budget.getFamilyId()))
-                     || (userId   != null && userId.equals(budget.getUserId()));
-        if (!owned) throw new AccessDeniedException();
+        Budget budget = findAndValidateOwner(budgetId, userId, familyId);
 
         if (request.getAmount() != null)          budget.setAmount(request.getAmount());
         if (request.getAlertThreshold() != null)  budget.setAlertThreshold(request.getAlertThreshold());
-        if (request.getCategoryId() != null)      budget.setCategoryId(request.getCategoryId());
+        if (request.getCategoryId() != null) {
+            categoryOwnershipGuard.validateCategoryOwnership(request.getCategoryId(), userId, familyId);
+            budget.setCategoryId(request.getCategoryId());
+        }
 
         LocalDate now = LocalDate.now();
         return enrich(budgetMapper.toResponse(budgetRepository.save(budget)), userId, familyId, now.getYear(), now.getMonthValue());
@@ -72,14 +77,14 @@ public class BudgetServiceImpl implements BudgetService {
     @Override
     @Transactional(readOnly = true)
     public List<BudgetResponse> getBudgets(UUID userId, UUID familyId, int year, int month) {
-        // Always personal — combined family budgets are not a concept; each member owns their budgets
-        List<Budget> all = budgetRepository.findByUserId(userId);
+        // Family-shared once the caller belongs to a family — mirrors CategoryServiceImpl.getCategories.
+        List<Budget> all = familyId != null ? budgetRepository.findByFamilyId(familyId) : budgetRepository.findByUserId(userId);
         // Batch-load all categories upfront to avoid N+1
         Set<UUID> catIds = all.stream().map(Budget::getCategoryId).collect(Collectors.toSet());
         Map<UUID, Category> catMap = categoryRepository.findAllById(catIds).stream()
             .collect(Collectors.toMap(Category::getId, c -> c));
         return all.stream()
-            .map(b -> enrich(budgetMapper.toResponse(b), userId, null, year, month, catMap))
+            .map(b -> enrich(budgetMapper.toResponse(b), userId, familyId, year, month, catMap))
             .toList();
     }
 
@@ -93,37 +98,18 @@ public class BudgetServiceImpl implements BudgetService {
     @Override
     @Transactional
     public void deleteBudget(UUID budgetId, UUID userId, UUID familyId) {
+        Budget budget = findAndValidateOwner(budgetId, userId, familyId);
+        expenseRepository.clearBudgetId(budgetId);
+        budgetRepository.delete(budget);
+    }
+
+    private Budget findAndValidateOwner(UUID budgetId, UUID userId, UUID familyId) {
         Budget budget = budgetRepository.findById(budgetId)
             .orElseThrow(() -> new ResourceNotFoundException("Budget", "id", budgetId));
         boolean owned = (familyId != null && familyId.equals(budget.getFamilyId()))
                      || (userId   != null && userId.equals(budget.getUserId()));
         if (!owned) throw new AccessDeniedException();
-        budgetRepository.delete(budget);
-    }
-
-    @Override
-    @Transactional
-    public int copyBudgets(UUID userId, UUID familyId, int fromYear, int fromMonth, int toYear, int toMonth) {
-        List<Budget> source = budgetRepository.findByUserIdAndPeriodYearAndPeriodMonthAndBudgetType(userId, fromYear, fromMonth, BudgetType.MONTHLY);
-        if (source.isEmpty()) return 0;
-        int copied = 0;
-        for (Budget b : source) {
-            Optional<Budget> existing = budgetRepository.findByUserIdAndCategoryIdAndPeriodYearAndPeriodMonthAndBudgetType(userId, b.getCategoryId(), toYear, toMonth, BudgetType.MONTHLY);
-            if (existing.isEmpty()) {
-                budgetRepository.save(Budget.builder()
-                    .userId(userId)
-                    .familyId(null)
-                    .categoryId(b.getCategoryId())
-                    .amount(b.getAmount())
-                    .budgetType(BudgetType.MONTHLY)
-                    .alertThreshold(b.getAlertThreshold())
-                    .periodYear(toYear)
-                    .periodMonth(toMonth)
-                    .build());
-                copied++;
-            }
-        }
-        return copied;
+        return budget;
     }
 
     private BudgetResponse enrich(BudgetResponse r, UUID userId, UUID familyId, int year, int month) {
@@ -136,16 +122,25 @@ public class BudgetServiceImpl implements BudgetService {
             ? preloadedCats.get(r.getCategoryId())
             : categoryRepository.findById(r.getCategoryId()).orElse(null);
         BigDecimal spent;
+        BigDecimal annualSpent;
         if (r.getBudgetType() == BudgetType.YEARLY) {
             spent = familyId != null
                 ? expenseRepository.sumByFamilyCategoryAndYear(familyId, r.getCategoryId(), year)
                 : expenseRepository.sumByUserCategoryAndYear(userId, r.getCategoryId(), year);
+            annualSpent = spent;
         } else {
             spent = familyId != null
                 ? expenseRepository.sumByFamilyCategoryAndMonth(familyId, r.getCategoryId(), year, month)
                 : expenseRepository.sumByUserCategoryAndMonth(userId, r.getCategoryId(), year, month);
+            // Full calendar-year spend in this category, independent of the requested month —
+            // lets callers build an annualized total (budgeted monthly x12 + yearly) that pairs
+            // with a real actual-spend figure instead of extrapolating from a single month.
+            annualSpent = familyId != null
+                ? expenseRepository.sumByFamilyCategoryAndYear(familyId, r.getCategoryId(), year)
+                : expenseRepository.sumByUserCategoryAndYear(userId, r.getCategoryId(), year);
         }
         if (spent == null) spent = BigDecimal.ZERO;
+        if (annualSpent == null) annualSpent = BigDecimal.ZERO;
         BigDecimal remaining = r.getAmount().subtract(spent);
         double pct = r.getAmount().compareTo(BigDecimal.ZERO) > 0
             ? spent.divide(r.getAmount(), 4, RoundingMode.HALF_UP)
@@ -157,12 +152,13 @@ public class BudgetServiceImpl implements BudgetService {
             .categoryName(cat != null ? cat.getName() : null)
             .categoryIcon(cat != null ? cat.getIcon() : null)
             .categoryColor(cat != null ? cat.getColor() : null)
-            .amount(r.getAmount()).spent(spent).remaining(remaining)
+            .amount(r.getAmount()).spent(spent).annualSpent(annualSpent).remaining(remaining)
             .percentUsed(pct).overBudget(pct > 100.0)
             .periodMonth(month).periodYear(year)
             .alertThreshold(threshold)
             .alertTriggered(pct >= threshold.doubleValue())
             .budgetType(r.getBudgetType() != null ? r.getBudgetType() : BudgetType.MONTHLY)
+            .shared(r.isShared())
             .build();
     }
 }

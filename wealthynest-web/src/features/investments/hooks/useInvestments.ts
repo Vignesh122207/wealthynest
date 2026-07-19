@@ -1,10 +1,15 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { QUERY_KEYS } from "@/lib/constants";
-import { investmentsApi } from "../api/investments.api";
-import type { CreateInvestmentPayload, CreateSipPayload } from "../types/investment.types";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {toast} from "sonner";
+import {QUERY_KEYS} from "@/lib/constants";
+import {investmentsApi} from "../api/investments.api";
+import type {
+    CreateInvestmentPayload,
+    CreateSipPayload,
+    CreateStockTransactionPayload,
+    InvestmentType
+} from "../types/investment.types";
 
 export function useInvestments() {
   return useQuery({ queryKey: QUERY_KEYS.INVESTMENTS, queryFn: investmentsApi.getInvestments });
@@ -32,6 +37,8 @@ function invalidateAll(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: QUERY_KEYS.NET_WORTH_SUMMARY });
   qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
   qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
+  qc.invalidateQueries({ queryKey: ["portfolio-xirr"] });
+  qc.invalidateQueries({ queryKey: ["type-xirr"] });
 }
 
 export function useCreateInvestment() {
@@ -43,7 +50,11 @@ export function useCreateInvestment() {
       // Invalidate income-history after a delay so the async backfill has time to complete
       const backfillTypes = ["STOCK", "BOND", "FD"];
       if (backfillTypes.includes(payload.investmentType)) {
-        setTimeout(() => qc.invalidateQueries({ queryKey: ["income-history"] }), 6000);
+        setTimeout(() => {
+          qc.invalidateQueries({ queryKey: ["income-history"] });
+          // Issue #1: refresh dividend suggestions so newly added stock appears immediately
+          qc.invalidateQueries({ queryKey: ["dividend-suggestions"] });
+        }, 6000);
       }
       toast.success("Investment added");
     },
@@ -118,6 +129,28 @@ export function useXirr(investmentId: string | null) {
   });
 }
 
+// Money-weighted return across every active investment's combined cashflow timeline — see
+// InvestmentServiceImpl.computePortfolioXirr for why this isn't just an average of each
+// investment's own XIRR.
+export function usePortfolioXirr() {
+  return useQuery({
+    queryKey: ["portfolio-xirr"],
+    queryFn:  investmentsApi.getPortfolioXirr,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// Same money-weighted aggregation as usePortfolioXirr, scoped to one investment type (e.g. every
+// active stock's combined cashflow timeline) — see InvestmentServiceImpl.computeTypeXirr.
+export function useTypeXirr(type: InvestmentType, enabled = true) {
+  return useQuery({
+    queryKey: ["type-xirr", type],
+    queryFn:  () => investmentsApi.getTypeXirr(type),
+    enabled,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 // Phase 2 — Dividend suggestions
 export function useDividendSuggestions() {
   return useQuery({
@@ -147,7 +180,6 @@ export function useLogIncome() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["income-history"] });
       qc.invalidateQueries({ queryKey: ["dividend-suggestions"] });
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.DIVIDENDS });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
       toast.success("Dividend logged to income");
@@ -155,3 +187,55 @@ export function useLogIncome() {
     onError: () => toast.error("Failed to log dividend"),
   });
 }
+
+// Dismiss a dividend suggestion (issue #3)
+export function useDismissDividend() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ investmentId, exDate }: { investmentId: string; exDate: string }) =>
+      investmentsApi.dismissDividend(investmentId, exDate),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["dividend-suggestions"] });
+    },
+    onError: () => toast.error("Failed to dismiss suggestion"),
+  });
+}
+
+// Stock transactions — buy more / sell (issues #6, #7)
+export function useAddStockTransaction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ investmentId, data }: { investmentId: string; data: CreateStockTransactionPayload }) =>
+      investmentsApi.addStockTransaction(investmentId, data),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["stock-transactions", vars.investmentId] });
+      invalidateAll(qc);
+      toast.success("Transaction recorded");
+    },
+    onError: () => toast.error("Failed to record transaction"),
+  });
+}
+
+// Only fetched once a stock's history panel is expanded (enabled), not for every card up front.
+export function useStockTransactions(investmentId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["stock-transactions", investmentId],
+    queryFn: () => investmentsApi.getStockTransactions(investmentId),
+    enabled,
+  });
+}
+
+export function useDeleteStockTransaction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ investmentId, txnId }: { investmentId: string; txnId: number }) =>
+      investmentsApi.deleteStockTransaction(investmentId, txnId),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["stock-transactions", vars.investmentId] });
+      invalidateAll(qc);
+      toast.success("Transaction removed");
+    },
+    onError: () => toast.error("Failed to remove transaction"),
+  });
+}
+

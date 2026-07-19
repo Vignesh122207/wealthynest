@@ -1,6 +1,6 @@
-import { apiClient } from "@/lib/axios";
-import type { ApiResponse } from "@/types/api.types";
-import type { Asset, CreateAssetPayload } from "../types/asset.types";
+import {apiClient} from "@/lib/axios";
+import type {ApiResponse} from "@/types/api.types";
+import type {Asset, CreateAssetPayload} from "../types/asset.types";
 
 export const assetsApi = {
   getAssets:   async (): Promise<Asset[]>   => (await apiClient.get<ApiResponse<Asset[]>>("/assets")).data.data,

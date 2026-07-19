@@ -32,6 +32,8 @@ export interface Investment {
   linkedAccountId?:  string;
   debitAccountId?:   string;
   debitAccountName?: string;
+  tdsRate?:          number;
+  brokerage?:        number;
   notes?:         string;
   active:         boolean;
   createdAt:      string;
@@ -40,6 +42,9 @@ export interface Investment {
   week52High?:    number;
   week52Low?:     number;
   priceLastUpdated?: string;
+  /** STOCK only — number of buy/sell transactions on record. Once >1, units/avgBuyPrice come
+   * from the transaction ledger (weighted average cost) — edit them via Buy More/Sell instead. */
+  transactionCount?: number;
 }
 
 export interface CreateInvestmentPayload {
@@ -66,7 +71,31 @@ export interface CreateInvestmentPayload {
   goldKarat?:           number;
   linkedAccountId?:     string;
   debitAccountId?:      string;
+  tdsRate?:             number;
+  brokerage?:           number;
   notes?:               string;
+}
+
+export interface StockTransaction {
+  id:              number;
+  investmentId:    string;
+  transactionDate: string;
+  transactionType: 'BUY' | 'SELL';
+  quantity:        number;
+  pricePerShare:   number;
+  brokerage:       number;
+  notes?:          string;
+  createdAt:       string;
+}
+
+export interface CreateStockTransactionPayload {
+  transactionDate: string;
+  transactionType: 'BUY' | 'SELL';
+  quantity:        number;
+  pricePerShare:   number;
+  brokerage?:      number;
+  debitAccountId?: string;
+  notes?:          string;
 }
 
 export interface InvestmentSearchResult {

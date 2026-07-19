@@ -28,7 +28,7 @@ public class AuditService {
                     .oldValue(oldValue).newValue(newValue)
                     .ipAddress(ipAddress).userAgent(userAgent).build());
         } catch (Exception e) {
-            log.error("Failed to persist audit log for action {}: {}", action, e.getMessage());
+            log.error("Failed to persist audit log for action {}: {}", action, e.getMessage(), e);
         }
     }
 }

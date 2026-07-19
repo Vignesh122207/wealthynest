@@ -1,6 +1,6 @@
-import { apiClient } from "@/lib/axios";
-import type { ApiResponse } from "@/types/api.types";
-import type { DashboardData } from "../types/dashboard.types";
+import {apiClient} from "@/lib/axios";
+import type {ApiResponse} from "@/types/api.types";
+import type {DashboardData} from "../types/dashboard.types";
 
 export const dashboardApi = {
   getDashboard: async (year?: number, month?: number): Promise<DashboardData> => {

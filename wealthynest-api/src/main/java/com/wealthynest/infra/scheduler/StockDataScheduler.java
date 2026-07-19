@@ -8,7 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.DayOfWeek;
@@ -37,6 +36,11 @@ public class StockDataScheduler {
             stockDataService.refreshNSEMaster();
         }
 
+        if (stockMasterRepository.countByExchange("BSE") < 500) {
+            log.info("Triggering initial BSE master download …");
+            stockDataService.refreshBSEMaster();
+        }
+
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Kolkata"));
 
         if (stockPriceCacheRepository.count() == 0) {
@@ -57,16 +61,16 @@ public class StockDataScheduler {
     }
 
     /**
-     * Weekly — Sunday 2 AM IST: refresh full NSE equity list + full corporate actions list.
-     * Catches any gaps in the daily CA files (holidays, network issues).
+     * Weekly full refresh — entry point called by JobSchedulerService (STOCK_WEEKLY_REFRESH job,
+     * configurable/triggerable from Admin). Refreshes full NSE equity list + full corporate actions
+     * list, catching any gaps in the daily CA files (holidays, network issues).
      */
-    @Async
-    @Scheduled(cron = "0 0 2 * * SUN", zone = "Asia/Kolkata")
     public void weeklyMasterRefresh() {
         log.info("Weekly stock master refresh starting …");
-        int stocks = stockDataService.refreshNSEMaster();
-        int caEvents = stockDataService.refreshCorporateActions();
-        log.info("Weekly refresh done: {} stocks, {} CA events", stocks, caEvents);
+        int nseStocks = stockDataService.refreshNSEMaster();
+        int bseStocks = stockDataService.refreshBSEMaster();
+        int caEvents  = stockDataService.refreshCorporateActions();
+        log.info("Weekly refresh done: {} NSE stocks, {} BSE stocks, {} CA events", nseStocks, bseStocks, caEvents);
     }
 
     // dailyEODUpdate() removed — now handled by JobSchedulerService via NSE_EOD job (6 PM IST weekdays).

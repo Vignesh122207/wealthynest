@@ -1,13 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import {useState} from "react";
+import {useForm, useWatch} from "react-hook-form";
+import {zodResolver} from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { Eye, EyeOff, IndianRupee, Sprout, Loader2, ShieldCheck, Target, Wallet } from "lucide-react";
-import { registerSchema, type RegisterFormValues } from "../schemas/auth.schema";
-import { useRegister } from "../hooks/useAuth";
-import { cn } from "@/lib/utils";
+import {Eye, EyeOff, IndianRupee, Loader2, ShieldCheck, Target, Wallet} from "lucide-react";
+import {BrandMark} from "@/components/icons/BrandMark";
+import {GoogleSignInButton} from "./GoogleSignInButton";
+import {type RegisterFormValues, registerSchema} from "../schemas/auth.schema";
+import {useRegister} from "../hooks/useAuth";
+import {cn} from "@/lib/utils";
+
+const googleClientIdConfigured = !!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
 const PERKS = [
   { icon: Wallet,       text: "Net worth across all accounts" },
@@ -27,8 +31,9 @@ function PasswordStrength({ password }: { password: string }) {
   ];
   const score = checks.filter(Boolean).length;
   const labels = ["", "Weak", "Weak", "Fair", "Good", "Strong"];
-  const colors = ["", "bg-red-500", "bg-red-400", "bg-amber-500", "bg-emerald-500", "bg-emerald-400"];
-  const textColors = ["", "text-red-400", "text-red-400", "text-amber-400", "text-emerald-400", "text-emerald-400"];
+  const barColors  = ["", "bg-red-500", "bg-red-400", "bg-amber-500", "bg-emerald-500", "bg-emerald-400"];
+  const textColors = ["", "text-red-600 dark:text-red-400", "text-red-600 dark:text-red-400",
+    "text-amber-600 dark:text-amber-400", "text-emerald-600 dark:text-emerald-400", "text-emerald-600 dark:text-emerald-400"];
 
   return (
     <div className="mt-2 space-y-1.5">
@@ -38,7 +43,7 @@ function PasswordStrength({ password }: { password: string }) {
             key={i}
             className={cn(
               "h-1 flex-1 rounded-full transition-all duration-300",
-              i <= score ? colors[score] : "bg-white/10"
+              i <= score ? barColors[score] : "bg-muted"
             )}
           />
         ))}
@@ -68,7 +73,7 @@ export function SignupForm() {
   ];
 
   return (
-    <div className="min-h-screen flex bg-[#0d0d1a]">
+    <div className="min-h-screen flex bg-background">
 
       {/* ── Left panel — brand ──────────────────────────────── */}
       <div className="hidden lg:flex flex-col justify-between w-[44%] shrink-0 relative overflow-hidden
@@ -79,9 +84,7 @@ export function SignupForm() {
         </div>
 
         <div className="relative flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
-            <Sprout className="w-5 h-5 text-white" />
-          </div>
+          <BrandMark variant="glass" boxClassName="w-9 h-9" iconClassName="w-5 h-5" />
           <span className="text-xl font-bold text-white tracking-tight">WealthyNest</span>
         </div>
 
@@ -113,91 +116,106 @@ export function SignupForm() {
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
 
         <div className="lg:hidden flex items-center gap-2 mb-8">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-md shadow-emerald-500/30">
-            <Sprout className="w-4 h-4 text-white" />
-          </div>
-          <span className="text-lg font-bold text-white">WealthyNest</span>
+          <BrandMark boxClassName="w-8 h-8" iconClassName="w-5 h-5" />
+          <span className="text-lg font-bold text-foreground">WealthyNest</span>
         </div>
 
         <div className="w-full max-w-sm">
           <div className="mb-7">
-            <h2 className="text-2xl font-bold text-white mb-1">Create account</h2>
-            <p className="text-slate-400 text-sm">It&apos;s free. No card required.</p>
+            <h2 className="text-2xl font-bold text-foreground mb-1">Create account</h2>
+            <p className="text-muted-foreground text-sm">It&apos;s free. No card required.</p>
           </div>
+
+          {/* Google creates the account automatically on first sign-in — same backend path as
+              the login page's button, just entered from "Sign up" instead of "Sign in" for
+              anyone who wouldn't think to click a "sign in" button before they have an account. */}
+          {googleClientIdConfigured && (
+            <>
+              <GoogleSignInButton rememberMe={false} />
+              <div className="flex items-center gap-3 py-3">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs text-muted-foreground/70">or create an account with email</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+            </>
+          )}
 
           <form onSubmit={form.handleSubmit((v) => register(v))} className="space-y-3">
             {fields.map(({ name, label, type = "text", placeholder }) => (
               <div key={name} className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-300">{label}</label>
+                <label className="text-xs font-medium text-muted-foreground">{label}</label>
                 <input
+                  data-testid={`signup-${name}-input`}
                   type={type}
                   placeholder={placeholder}
                   {...form.register(name)}
                   className={cn(
-                    "auth-input w-full h-11 px-4 rounded-xl text-sm outline-none transition-all",
-                    "bg-white/5 border border-white/10 text-white placeholder:text-slate-500",
+                    "w-full h-11 px-4 rounded-xl text-sm outline-none transition-all",
+                    "bg-background border border-border text-foreground placeholder:text-muted-foreground",
                     "focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/25",
                     form.formState.errors[name] && "border-red-500/60"
                   )}
                 />
                 {form.formState.errors[name] && (
-                  <p className="text-xs text-red-400">{form.formState.errors[name]?.message}</p>
+                  <p className="text-xs text-red-600 dark:text-red-400">{form.formState.errors[name]?.message}</p>
                 )}
               </div>
             ))}
 
             {/* Password with strength indicator */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-300">Password</label>
+              <label className="text-xs font-medium text-muted-foreground">Password</label>
               <div className="relative">
                 <input
+                  data-testid="signup-password-input"
                   type={showPassword ? "text" : "password"}
                   placeholder="Min 8 chars, uppercase, number"
                   {...form.register("password")}
                   className={cn(
-                    "auth-input w-full h-11 px-4 pr-10 rounded-xl text-sm outline-none transition-all",
-                    "bg-white/5 border border-white/10 text-white placeholder:text-slate-500",
+                    "w-full h-11 px-4 pr-10 rounded-xl text-sm outline-none transition-all",
+                    "bg-background border border-border text-foreground placeholder:text-muted-foreground",
                     "focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/25",
                     form.formState.errors.password && "border-red-500/60"
                   )}
                 />
                 <button type="button" onClick={() => setShowPassword(p => !p)}
-                  className="absolute right-3 top-3 text-slate-400 hover:text-slate-200 transition-colors">
+                  className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors">
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
               <PasswordStrength password={passwordValue} />
               {form.formState.errors.password && (
-                <p className="text-xs text-red-400">{form.formState.errors.password.message}</p>
+                <p className="text-xs text-red-600 dark:text-red-400">{form.formState.errors.password.message}</p>
               )}
             </div>
 
             {/* Confirm password */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-300">Confirm password</label>
+              <label className="text-xs font-medium text-muted-foreground">Confirm password</label>
               <div className="relative">
                 <input
+                  data-testid="signup-confirm-password-input"
                   type={showConfirm ? "text" : "password"}
                   placeholder="••••••••"
                   {...form.register("confirmPassword")}
                   className={cn(
-                    "auth-input w-full h-11 px-4 pr-10 rounded-xl text-sm outline-none transition-all",
-                    "bg-white/5 border border-white/10 text-white placeholder:text-slate-500",
+                    "w-full h-11 px-4 pr-10 rounded-xl text-sm outline-none transition-all",
+                    "bg-background border border-border text-foreground placeholder:text-muted-foreground",
                     "focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/25",
                     form.formState.errors.confirmPassword && "border-red-500/60"
                   )}
                 />
                 <button type="button" onClick={() => setShowConfirm(p => !p)}
-                  className="absolute right-3 top-3 text-slate-400 hover:text-slate-200 transition-colors">
+                  className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors">
                   {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
               {form.formState.errors.confirmPassword && (
-                <p className="text-xs text-red-400">{form.formState.errors.confirmPassword.message}</p>
+                <p className="text-xs text-red-600 dark:text-red-400">{form.formState.errors.confirmPassword.message}</p>
               )}
             </div>
 
-            <button type="submit" disabled={isPending}
+            <button data-testid="signup-submit" type="submit" disabled={isPending}
               className={cn(
                 "w-full h-11 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 mt-1",
                 "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/30",
@@ -208,9 +226,9 @@ export function SignupForm() {
             </button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-slate-400">
+          <p className="mt-6 text-center text-sm text-muted-foreground">
             Already have an account?{" "}
-            <Link href="/login" className="text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">
+            <Link href="/login" className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 font-semibold transition-colors">
               Sign in
             </Link>
           </p>

@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
@@ -54,6 +55,87 @@ public class NotificationServiceImpl implements NotificationService {
         notificationRepository.save(Notification.builder()
                 .userId(userId)
                 .type("BUDGET_ALERT")
+                .title(title)
+                .message(message)
+                .build());
+    }
+
+    @Override @Transactional
+    public void createLowBalanceNotification(UUID userId, String accountName, BigDecimal balance, BigDecimal threshold) {
+        String title = "Low Balance: " + accountName;
+        Instant startOfDay = Instant.now().truncatedTo(ChronoUnit.DAYS);
+        boolean alreadySentToday = notificationRepository
+                .existsByUserIdAndTypeAndTitleAndCreatedAtAfter(userId, "LOW_BALANCE", title, startOfDay);
+        if (alreadySentToday) return;
+
+        String message = String.format(
+            "%s has dropped to ₹%.0f, at or below your ₹%.0f alert threshold.",
+            accountName, balance, threshold);
+
+        notificationRepository.save(Notification.builder()
+                .userId(userId)
+                .type("LOW_BALANCE")
+                .title(title)
+                .message(message)
+                .build());
+    }
+
+    @Override @Transactional
+    public void createSpendAnomalyNotification(UUID userId, String categoryName, BigDecimal amount, BigDecimal average) {
+        String title = "Unusual Spend: " + categoryName;
+        Instant startOfDay = Instant.now().truncatedTo(ChronoUnit.DAYS);
+        boolean alreadySentToday = notificationRepository
+                .existsByUserIdAndTypeAndTitleAndCreatedAtAfter(userId, "SPEND_ANOMALY", title, startOfDay);
+        if (alreadySentToday) return;
+
+        String message = String.format(
+            "A %s expense of ₹%.0f is well above your usual ₹%.0f for this category — check it's expected.",
+            categoryName, amount, average);
+
+        notificationRepository.save(Notification.builder()
+                .userId(userId)
+                .type("SPEND_ANOMALY")
+                .title(title)
+                .message(message)
+                .build());
+    }
+
+    @Override @Transactional
+    public void createDebtDueNotification(UUID userId, String contactName, BigDecimal amount, LocalDate dueDate, String debtType) {
+        String title = "Debt Due: " + contactName;
+        Instant startOfDay = Instant.now().truncatedTo(ChronoUnit.DAYS);
+        boolean alreadySentToday = notificationRepository
+                .existsByUserIdAndTypeAndTitleAndCreatedAtAfter(userId, "DEBT_DUE", title, startOfDay);
+        if (alreadySentToday) return;
+
+        boolean isToday = dueDate.isEqual(LocalDate.now());
+        String verb = "LENT".equals(debtType) ? "owes you" : "you owe";
+        String message = isToday
+            ? String.format("%s ₹%.0f — %s is due today.", contactName, amount, verb)
+            : String.format("%s ₹%.0f — %s is due on %s.", contactName, amount, verb, dueDate);
+
+        notificationRepository.save(Notification.builder()
+                .userId(userId)
+                .type("DEBT_DUE")
+                .title(title)
+                .message(message)
+                .build());
+    }
+
+    @Override @Transactional
+    public void createEmiUpcomingNotification(UUID userId, String loanName, BigDecimal amount, LocalDate dueDate) {
+        String title = "EMI Due Soon: " + loanName;
+        Instant startOfDay = Instant.now().truncatedTo(ChronoUnit.DAYS);
+        boolean alreadySentToday = notificationRepository
+                .existsByUserIdAndTypeAndTitleAndCreatedAtAfter(userId, "LOAN_EMI_UPCOMING", title, startOfDay);
+        if (alreadySentToday) return;
+
+        String message = String.format(
+            "Your %s EMI of ₹%.0f will be auto-paid on %s.", loanName, amount, dueDate);
+
+        notificationRepository.save(Notification.builder()
+                .userId(userId)
+                .type("LOAN_EMI_UPCOMING")
                 .title(title)
                 .message(message)
                 .build());

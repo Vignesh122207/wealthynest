@@ -12,6 +12,7 @@ public class BudgetSummaryResponse {
     private UUID       categoryId;
     private String     categoryName;
     private String     categoryColor;
+    private String     categoryIcon;
     private BigDecimal budgeted;
     private BigDecimal spent;
     private double     percentUsed;

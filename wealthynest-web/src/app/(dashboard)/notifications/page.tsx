@@ -1,68 +1,97 @@
 "use client";
 
-import { useState } from "react";
+import {useState} from "react";
 import Link from "next/link";
 import {
-  Bell, AlertCircle, AlertTriangle, CheckCircle2, Info,
-  TrendingUp, Target, Flag, Clock, X,
+    AlertCircle,
+    AlertTriangle,
+    Bell,
+    CalendarClock,
+    CheckCircle2,
+    Clock,
+    Flag,
+    Flame,
+    Info,
+    Landmark,
+    type LucideIcon,
+    Target,
+    TrendingUp,
+    Wallet,
+    X,
 } from "lucide-react";
-import { Header } from "@/components/layout/Header";
-import { PageWrapper } from "@/components/layout/PageWrapper";
-import { useNotifications, type AppNotification, type NotifSeverity } from "@/hooks/useNotifications";
-import { useNotificationStore } from "@/store/notification.store";
-import { useServerNotifications, useMarkAllServerRead, toAppNotification } from "@/features/notifications/hooks/useServerNotifications";
-import { cn } from "@/lib/utils";
+import {Header} from "@/components/layout/Header";
+import {PageWrapper} from "@/components/layout/PageWrapper";
+import {EmptyState} from "@/components/shared/EmptyState";
+import {QueryErrorState} from "@/components/shared/QueryErrorState";
+import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
+import {type AppNotification, type NotifSeverity} from "@/hooks/useNotifications";
+import {useNotificationStore} from "@/store/notification.store";
+import {
+    useMarkAllServerRead,
+    useMergedNotifications,
+    useServerNotifications
+} from "@/features/notifications/hooks/useServerNotifications";
+import {cn} from "@/lib/utils";
 
-const SEVERITY_ICON: Record<NotifSeverity, React.ElementType> = {
+const SEVERITY_ICON: Record<NotifSeverity, LucideIcon> = {
   error:   AlertCircle,
   warning: AlertTriangle,
   success: CheckCircle2,
   info:    Info,
 };
 
-const SEVERITY_COLOR: Record<NotifSeverity, string> = {
-  error:   "text-red-500",
-  warning: "text-amber-500",
-  success: "text-emerald-500",
-  info:    "text-indigo-500",
-};
-
-const SEVERITY_BG: Record<NotifSeverity, string> = {
-  error:   "bg-red-500/10",
-  warning: "bg-amber-500/10",
-  success: "bg-emerald-500/10",
-  info:    "bg-indigo-500/10",
+const SEVERITY_TONE: Record<NotifSeverity, IconTone> = {
+  error:   "red",
+  warning: "orange",
+  success: "green",
+  info:    "indigo",
 };
 
 const TYPE_LABELS: Record<AppNotification["type"], string> = {
-  budget:   "Budget",
-  income:   "Income",
-  goal:     "Goal",
-  maturity: "Maturity",
+  budget:     "Budget",
+  income:     "Income",
+  goal:       "Goal",
+  maturity:   "Maturity",
+  lowBalance: "Low Balance",
+  anomaly:    "Unusual Spend",
+  debtDue:    "Debt Due",
+  loanEmi:    "Loan EMI",
 };
 
 const TYPE_ICON: Record<AppNotification["type"], React.ElementType> = {
-  budget:   Target,
-  income:   TrendingUp,
-  goal:     Flag,
-  maturity: Clock,
+  budget:     Target,
+  income:     TrendingUp,
+  goal:       Flag,
+  maturity:   Clock,
+  lowBalance: Wallet,
+  anomaly:    Flame,
+  debtDue:    CalendarClock,
+  loanEmi:    Landmark,
 };
 
 const TYPE_HREF: Record<AppNotification["type"], string> = {
-  budget:   "/budgets",
-  income:   "/expenses?tab=income",
-  goal:     "/goals",
-  maturity: "/investments",
+  budget:     "/budgets",
+  income:     "/expenses?tab=income",
+  goal:       "/goals",
+  maturity:   "/investments",
+  lowBalance: "/accounts",
+  anomaly:    "/expenses",
+  debtDue:    "/debts",
+  loanEmi:    "/accounts",
 };
 
 type Filter = "all" | AppNotification["type"];
 
 const FILTERS: { value: Filter; label: string }[] = [
-  { value: "all",      label: "All"      },
-  { value: "budget",   label: "Budgets"  },
-  { value: "goal",     label: "Goals"    },
-  { value: "income",   label: "Income"   },
-  { value: "maturity", label: "Maturity" },
+  { value: "all",        label: "All"           },
+  { value: "budget",     label: "Budgets"       },
+  { value: "goal",       label: "Goals"         },
+  { value: "income",     label: "Income"        },
+  { value: "maturity",   label: "Maturity"      },
+  { value: "lowBalance", label: "Low Balance"   },
+  { value: "anomaly",    label: "Unusual Spend" },
+  { value: "debtDue",    label: "Debt Due"      },
+  { value: "loanEmi",    label: "Loan EMI"      },
 ];
 
 function formatNotifDate(dateStr?: string) {
@@ -103,9 +132,7 @@ function NotifRow({
         ? "bg-indigo-500/5 border-indigo-500/20 hover:bg-indigo-500/8"
         : "bg-card border-border hover:bg-muted/40"
     )}>
-      <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5", SEVERITY_BG[n.severity])}>
-        <SeverityIcon className={cn("w-4 h-4", SEVERITY_COLOR[n.severity])} />
-      </div>
+      <PremiumIcon icon={SeverityIcon} tone={SEVERITY_TONE[n.severity]} size="sm" className="mt-0.5" />
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-semibold text-foreground leading-snug">{n.title}</p>
@@ -151,25 +178,10 @@ function ListSkeleton() {
 export default function NotificationsPage() {
   const [filter, setFilter] = useState<Filter>("all");
 
-  const { notifications: localNotifs }    = useNotifications();
-  const { data: serverNotifs = [], isLoading } = useServerNotifications();
-  const { seenIds, markSeen }             = useNotificationStore();
-  const markAllServer                     = useMarkAllServerRead();
-
-  const serverMapped = serverNotifs.map(toAppNotification);
-
-  const allNotifs = [...serverMapped, ...localNotifs.filter(
-    (n) => !serverMapped.some((s) => s.title === n.title && s.message === n.message)
-  )];
-
-  // Count server unread excluding locally dismissed; local unread from store
-  const serverUnread = serverNotifs.filter(
-    n => !n.read && !seenIds.includes(`server-${n.id}`)
-  ).length;
-  const localUnread  = localNotifs.filter(
-    n => !seenIds.includes(n.id) && !serverMapped.some(s => s.title === n.title && s.message === n.message)
-  ).length;
-  const unreadCount  = serverUnread + localUnread;
+  const { data: serverNotifs = [], isLoading, isError, refetch } = useServerNotifications();
+  const { notifications: allNotifs, unreadCount }  = useMergedNotifications();
+  const { seenIds, markSeen }                      = useNotificationStore();
+  const markAllServer                              = useMarkAllServerRead();
 
   const filtered = filter === "all"
     ? allNotifs
@@ -194,7 +206,7 @@ export default function NotificationsPage() {
 
   return (
     <>
-      <Header title="Notifications" />
+      <Header title="Notifications" subtitle="Stay on top of alerts, reminders, and account activity" />
       <PageWrapper>
         <div className="max-w-3xl space-y-6">
 
@@ -211,6 +223,7 @@ export default function NotificationsPage() {
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllRead}
+                data-testid="notifications-mark-all-read"
                 className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
               >
                 Mark all as read
@@ -239,14 +252,15 @@ export default function NotificationsPage() {
           {/* List */}
           {isLoading ? (
             <ListSkeleton />
+          ) : isError ? (
+            <QueryErrorState onRetry={() => refetch()} description="Couldn't load your notifications. Check your connection and try again." />
           ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
-                <Bell className="w-7 h-7 text-muted-foreground/40" />
-              </div>
-              <p className="text-sm font-medium text-foreground">All clear</p>
-              <p className="text-xs text-muted-foreground mt-1">No notifications in this category.</p>
-            </div>
+            <EmptyState
+              icon={Bell}
+              title="All clear"
+              description="No notifications in this category."
+              className="py-20"
+            />
           ) : (
             <div className="space-y-5">
               {GROUP_ORDER.filter(g => grouped[g]?.length).map(group => (

@@ -1,8 +1,8 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { QUERY_KEYS } from "@/lib/constants";
-import { networthApi } from "../api/networth.api";
+import {useQuery} from "@tanstack/react-query";
+import {QUERY_KEYS} from "@/lib/constants";
+import {networthApi} from "../api/networth.api";
 
 export function useNetWorthSummary() {
   return useQuery({

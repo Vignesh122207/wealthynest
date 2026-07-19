@@ -13,6 +13,7 @@ import com.wealthynest.domain.networth.dto.response.NetWorthSummaryResponse.Asse
 import com.wealthynest.domain.networth.dto.response.NetWorthSummaryResponse.LiabilityBreakdown;
 import com.wealthynest.domain.networth.entity.NetWorthSnapshot;
 import com.wealthynest.domain.networth.repository.NetWorthSnapshotRepository;
+import com.wealthynest.domain.user.entity.User;
 import com.wealthynest.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -41,7 +42,10 @@ public class NetWorthServiceImpl implements NetWorthService {
         BigDecimal liquidBalance  = BigDecimal.ZERO;
         BigDecimal emergencyFund  = BigDecimal.ZERO;
         BigDecimal creditCardDebt = BigDecimal.ZERO;
+        BigDecimal loanDebt       = BigDecimal.ZERO;
         List<LiabilityBreakdown> creditCardBreakdown = new ArrayList<>();
+        Map<String, BigDecimal> loanOutstandingByType = new LinkedHashMap<>();
+        Map<String, Integer>    loanCountByType       = new LinkedHashMap<>();
         for (AccountResponse a : accounts) {
             BigDecimal bal = a.getCurrentBalance() != null ? a.getCurrentBalance() : BigDecimal.ZERO;
             if ("EMERGENCY_FUND".equals(a.getAccountType())) {
@@ -57,7 +61,16 @@ public class NetWorthServiceImpl implements NetWorthService {
                             .totalOutstanding(outstanding)
                             .build());
                 }
+            } else if ("LOAN".equals(a.getAccountType())) {
+                BigDecimal outstanding = bal.max(BigDecimal.ZERO);
+                loanDebt = loanDebt.add(outstanding);
+                if (outstanding.compareTo(BigDecimal.ZERO) > 0) {
+                    String type = a.getLoanType() != null ? a.getLoanType() : "OTHER";
+                    loanOutstandingByType.merge(type, outstanding, BigDecimal::add);
+                    loanCountByType.merge(type, 1, Integer::sum);
+                }
             } else {
+                // Cash, bank, and investment-account (broker cash) balances are all liquid assets
                 liquidBalance = liquidBalance.add(bal);
             }
         }
@@ -144,10 +157,15 @@ public class NetWorthServiceImpl implements NetWorthService {
                 .map(Liability::getOutstandingAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal totalLiabilities = manualLiabilities.add(creditCardDebt);
+        BigDecimal totalLiabilities = manualLiabilities.add(creditCardDebt).add(loanDebt);
 
-        // Merge credit card breakdown into liability breakdown list
+        // Merge credit card + loan-account breakdowns into the liability breakdown list
         List<LiabilityBreakdown> allLiabilityBreakdown = new ArrayList<>(liabilityBreakdown);
+        loanOutstandingByType.forEach((type, outstanding) -> allLiabilityBreakdown.add(LiabilityBreakdown.builder()
+                .liabilityType(type)
+                .count(loanCountByType.getOrDefault(type, 1))
+                .totalOutstanding(outstanding)
+                .build()));
         if (!creditCardBreakdown.isEmpty()) {
             BigDecimal totalCC = creditCardBreakdown.stream()
                     .map(LiabilityBreakdown::getTotalOutstanding)
@@ -182,39 +200,31 @@ public class NetWorthServiceImpl implements NetWorthService {
 
     @Override @Transactional(readOnly = true)
     public BigDecimal getFamilyNetWorth(UUID familyId) {
-        var members = userRepository.findByFamilyId(familyId);
-        BigDecimal total = BigDecimal.ZERO;
-        for (var member : members) {
-            UUID uid = member.getId();
-            // Wallet accounts — split into liquid and credit card debt
-            BigDecimal walletBalance = BigDecimal.ZERO;
-            BigDecimal ccDebt = BigDecimal.ZERO;
-            for (AccountResponse a : walletAccountService.getAccounts(uid)) {
-                BigDecimal bal = a.getCurrentBalance() != null ? a.getCurrentBalance() : BigDecimal.ZERO;
-                if ("CREDIT_CARD".equals(a.getAccountType())) {
-                    ccDebt = ccDebt.add(bal.max(BigDecimal.ZERO));
-                } else {
-                    walletBalance = walletBalance.add(bal);
-                }
-            }
-            // Investment portfolio
-            BigDecimal invValue = investmentRepository.sumCurrentValueByUser(uid);
-            if (invValue == null) invValue = BigDecimal.ZERO;
-            // Manual assets only — excludes investment-linked assets to avoid double-counting with invValue
-            BigDecimal assetValue = assetRepository.sumManualAssetValueByUser(uid);
-            if (assetValue == null) assetValue = BigDecimal.ZERO;
-            // Manual liabilities
-            BigDecimal liabilities = liabilityRepository.sumOutstandingByUser(uid);
-            if (liabilities == null) liabilities = BigDecimal.ZERO;
+        List<UUID> memberIds = userRepository.findByFamilyId(familyId).stream().map(User::getId).toList();
+        if (memberIds.isEmpty()) return BigDecimal.ZERO;
 
-            total = total
-                .add(walletBalance)
-                .add(invValue)
-                .add(assetValue)
-                .subtract(liabilities)
-                .subtract(ccDebt);
+        // One batched enrich pass across every member's accounts instead of one getAccounts()
+        // call (and its own ~8 grouped queries) per member.
+        BigDecimal walletBalance = BigDecimal.ZERO;
+        BigDecimal ccDebt = BigDecimal.ZERO;
+        for (AccountResponse a : walletAccountService.getAccountsForUsers(memberIds)) {
+            BigDecimal bal = a.getCurrentBalance() != null ? a.getCurrentBalance() : BigDecimal.ZERO;
+            if ("CREDIT_CARD".equals(a.getAccountType()) || "LOAN".equals(a.getAccountType())) {
+                ccDebt = ccDebt.add(bal.max(BigDecimal.ZERO));
+            } else {
+                walletBalance = walletBalance.add(bal);
+            }
         }
-        return total;
+
+        BigDecimal invValue = investmentRepository.sumCurrentValueByUserIn(memberIds);
+        if (invValue == null) invValue = BigDecimal.ZERO;
+        // Manual assets only — excludes investment-linked assets to avoid double-counting with invValue
+        BigDecimal assetValue = assetRepository.sumManualAssetValueByUserIn(memberIds);
+        if (assetValue == null) assetValue = BigDecimal.ZERO;
+        BigDecimal liabilities = liabilityRepository.sumOutstandingByUserIn(memberIds);
+        if (liabilities == null) liabilities = BigDecimal.ZERO;
+
+        return walletBalance.add(invValue).add(assetValue).subtract(liabilities).subtract(ccDebt);
     }
 
     @Override

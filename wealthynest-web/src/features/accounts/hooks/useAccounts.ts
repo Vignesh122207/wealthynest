@@ -1,10 +1,11 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { QUERY_KEYS } from "@/lib/constants";
-import { accountsApi } from "../api/accounts.api";
-import type { CreateAccountPayload, TransferPayload } from "../types/account.types";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {toast} from "sonner";
+import {QUERY_KEYS} from "@/lib/constants";
+import {apiErrorMessage, formatCurrency} from "@/lib/utils";
+import {accountsApi} from "../api/accounts.api";
+import type {CreateAccountPayload, TransferPayload} from "../types/account.types";
 
 export function useAccounts() {
   return useQuery({
@@ -30,7 +31,7 @@ export function useCreateAccount() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.GOALS });
       toast.success("Account created");
     },
-    onError: (e: Error) => toast.error(e.message ?? "Failed to create account"),
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to create account")),
   });
 }
 
@@ -45,7 +46,7 @@ export function useUpdateAccount() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.GOALS });
       toast.success("Account updated");
     },
-    onError: () => toast.error("Failed to update account"),
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to update account")),
   });
 }
 
@@ -59,7 +60,7 @@ export function useArchiveAccount() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.GOALS });
       toast.success("Account archived");
     },
-    onError: () => toast.error("Failed to archive account"),
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to archive account")),
   });
 }
 
@@ -73,21 +74,39 @@ export function useUnarchiveAccount() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.GOALS });
       toast.success("Account restored");
     },
-    onError: () => toast.error("Failed to restore account"),
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to restore account")),
+  });
+}
+
+export function useSetPrimaryAccount() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => accountsApi.setPrimary(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
+      toast.success("Primary account updated");
+    },
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to set primary account")),
   });
 }
 
 export function useDeleteAccount() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => accountsApi.deleteAccount(id),
+    mutationFn: ({ id, alsoDeleteTransactions }: { id: string; alsoDeleteTransactions?: boolean }) =>
+      accountsApi.deleteAccount(id, alsoDeleteTransactions),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.GOALS });
+      // Only matters when alsoDeleteTransactions was set (rows actually removed), but cheap
+      // enough to always run rather than thread a conditional through the mutation result.
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.EXPENSES });
+      qc.invalidateQueries({ queryKey: ["income"] });
       toast.success("Account deleted");
     },
-    onError: () => toast.error("Failed to delete account"),
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to delete account")),
   });
 }
 
@@ -109,7 +128,7 @@ export function useTransfer() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.GOALS });
       toast.success("Transfer recorded");
     },
-    onError: () => toast.error("Failed to record transfer"),
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to record transfer")),
   });
 }
 
@@ -125,7 +144,7 @@ export function useUpdateTransfer() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.GOALS });
       toast.success("Transfer updated");
     },
-    onError: () => toast.error("Failed to update transfer"),
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to update transfer")),
   });
 }
 
@@ -140,7 +159,26 @@ export function useDeleteTransfer() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.GOALS });
       toast.success("Transfer deleted");
     },
-    onError: () => toast.error("Failed to delete transfer"),
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to delete transfer")),
+  });
+}
+
+export function useRecordLoanPayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, amount, fromAccountId }: { id: string; amount: number; fromAccountId?: string }) =>
+      accountsApi.recordLoanPayment(id, amount, fromAccountId),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.EXPENSES });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.NET_WORTH_SUMMARY });
+      toast.success(r.interestPaid > 0
+        ? `Payment recorded — ${formatCurrency(r.principalPaid)} principal, ${formatCurrency(r.interestPaid)} interest`
+        : "Payment recorded");
+    },
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to record payment")),
   });
 }
 
@@ -151,9 +189,10 @@ export function useAdjustBalance() {
       accountsApi.adjustBalance(id, targetBalance),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
       toast.success("Balance adjusted");
     },
-    onError: () => toast.error("Failed to adjust balance"),
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to adjust balance")),
   });
 }

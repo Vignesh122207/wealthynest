@@ -1,6 +1,6 @@
-import { apiClient } from "@/lib/axios";
-import type { ApiResponse } from "@/types/api.types";
-import type { CreateIncomePayload, IncomeEntry } from "../types/income.types";
+import {apiClient} from "@/lib/axios";
+import type {ApiResponse} from "@/types/api.types";
+import type {CreateIncomePayload, IncomeEntry} from "../types/income.types";
 
 export const incomeApi = {
   getIncome: async (year?: number, month?: number, includeDebt?: boolean): Promise<IncomeEntry[]> => {

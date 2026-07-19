@@ -45,7 +45,7 @@ public class EmailServiceImpl implements EmailService {
             mailSender.send(message);
             log.info("Email sent to {} — subject: {}", to, subject);
         } catch (MessagingException e) {
-            log.error("Failed to send email to {}: {}", to, e.getMessage());
+            log.error("Failed to send email to {}: {}", to, e.getMessage(), e);
         }
     }
 
@@ -67,7 +67,7 @@ public class EmailServiceImpl implements EmailService {
                       <td style="background:linear-gradient(135deg,#4f46e5 0%%,#7c3aed 100%%);padding:36px 40px;text-align:center;">
                         <table cellpadding="0" cellspacing="0" align="center">
                           <tr>
-                            <td style="background:linear-gradient(135deg,#34d399,#0d9488);border-radius:12px;width:44px;height:44px;text-align:center;vertical-align:middle;">
+                            <td style="background:rgba(255,255,255,0.15);border-radius:12px;width:44px;height:44px;text-align:center;vertical-align:middle;">
                               <span style="font-size:22px;line-height:44px;">🌱</span>
                             </td>
                             <td style="padding-left:10px;vertical-align:middle;">
@@ -134,7 +134,7 @@ public class EmailServiceImpl implements EmailService {
                       <td style="background:linear-gradient(135deg,#4f46e5 0%%,#7c3aed 100%%);padding:36px 40px;text-align:center;">
                         <table cellpadding="0" cellspacing="0" align="center">
                           <tr>
-                            <td style="background:linear-gradient(135deg,#34d399,#0d9488);border-radius:12px;width:44px;height:44px;text-align:center;vertical-align:middle;">
+                            <td style="background:rgba(255,255,255,0.15);border-radius:12px;width:44px;height:44px;text-align:center;vertical-align:middle;">
                               <span style="font-size:22px;line-height:44px;">🌱</span>
                             </td>
                             <td style="padding-left:10px;vertical-align:middle;">

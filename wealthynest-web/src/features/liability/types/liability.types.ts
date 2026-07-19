@@ -1,6 +1,6 @@
 export type LiabilityType =
   | "HOME_LOAN" | "CAR_LOAN" | "PERSONAL_LOAN"
-  | "CREDIT_CARD" | "EDUCATION_LOAN" | "BUSINESS_LOAN" | "OTHER";
+  | "CREDIT_CARD" | "EDUCATION_LOAN" | "GOLD_LOAN" | "BUSINESS_LOAN" | "OTHER";
 
 export interface Liability {
   id:                string;
@@ -17,6 +17,9 @@ export interface Liability {
   active:            boolean;
   createdAt:         string;
   updatedAt:         string;
+  /** True for entries derived live from Accounts (loan accounts, credit-card dues) — edit at source. */
+  derived?:          boolean;
+  sourceAccountId?:  string;
 }
 
 export interface CreateLiabilityPayload {

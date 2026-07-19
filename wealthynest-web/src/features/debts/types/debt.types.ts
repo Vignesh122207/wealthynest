@@ -17,6 +17,7 @@ export interface DebtRecord {
   contactPhone?:   string;
   amount:          number;
   description?:    string;
+  debtDate?:       string;
   dueDate?:        string;
   status:          DebtStatus;
   amountSettled:   number;

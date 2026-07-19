@@ -35,4 +35,10 @@ public class Category extends BaseEntity {
     @Column(name = "is_system", nullable = false)
     @Builder.Default
     private boolean system = false;
+
+    // Soft-delete: archived categories are hidden from pickers/lists but keep labelling the
+    // expenses that reference them; recreating the same name+type un-archives the row.
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean archived = false;
 }

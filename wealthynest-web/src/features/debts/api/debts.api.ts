@@ -1,6 +1,6 @@
-import { apiClient } from "@/lib/axios";
-import type { ApiResponse } from "@/types/api.types";
-import type { DebtRecord, DebtType } from "../types/debt.types";
+import {apiClient} from "@/lib/axios";
+import type {ApiResponse} from "@/types/api.types";
+import type {DebtRecord, DebtType} from "../types/debt.types";
 
 export interface CreateDebtPayload {
   type:          DebtType;
@@ -8,6 +8,7 @@ export interface CreateDebtPayload {
   contactPhone?: string;
   amount:        number;
   description?:  string;
+  debtDate?:     string;
   dueDate?:      string;
   accountId?:    string;
 }
@@ -17,6 +18,7 @@ export interface UpdateDebtPayload {
   contactPhone?: string;
   amount?:       number;
   description?:  string;
+  debtDate?:     string;
   dueDate?:      string;
 }
 

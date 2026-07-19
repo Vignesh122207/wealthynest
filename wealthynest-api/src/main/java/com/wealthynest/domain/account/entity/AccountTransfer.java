@@ -33,6 +33,16 @@ public class AccountTransfer {
     @Column(length = 255)
     private String description;
 
+    @Column(name = "is_debt", nullable = false)
+    @Builder.Default
+    private boolean debt = false;
+
+    @Column(name = "debt_contact_name", length = 255)
+    private String debtContactName;
+
+    @Column(name = "debt_label", length = 20)
+    private String debtLabel;
+
     @Column(name = "transfer_date", nullable = false)
     private LocalDate transferDate;
 

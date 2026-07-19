@@ -1,5 +1,6 @@
 package com.wealthynest.domain.support.service;
 
+import com.wealthynest.common.exception.AccessDeniedException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.domain.notification.entity.Notification;
 import com.wealthynest.domain.notification.repository.NotificationRepository;
@@ -16,7 +17,6 @@ import com.wealthynest.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,9 +48,7 @@ public class SupportTicketServiceImpl implements SupportTicketService {
         ticket = ticketRepository.save(ticket);
 
         // Notify all admins in-app
-        List<User> admins = userRepository.findAll().stream()
-                .filter(u -> UserRole.ADMIN.equals(u.getRole()))
-                .collect(Collectors.toList());
+        List<User> admins = userRepository.findByRole(UserRole.ADMIN);
         User submitter = userRepository.findById(userId).orElse(null);
         String submitterName = submitter != null ? submitter.getFullName() : "A user";
         for (User admin : admins) {

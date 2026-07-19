@@ -13,7 +13,6 @@ import java.util.UUID;
 public interface AuditLogRepository extends JpaRepository<AuditLog, UUID> {
 
     Page<AuditLog> findAllByOrderByCreatedAtDesc(Pageable pageable);
-    Page<AuditLog> findByUserIdOrderByCreatedAtDesc(UUID userId, Pageable pageable);
 
     @Query("""
         SELECT a FROM AuditLog a

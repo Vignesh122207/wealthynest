@@ -1,6 +1,6 @@
-import { apiClient } from "@/lib/axios";
-import type { ApiResponse, PagedResponse } from "@/types/api.types";
-import type { CreateExpensePayload, Expense, ExpenseFilters } from "../types/expense.types";
+import {apiClient} from "@/lib/axios";
+import type {ApiResponse, PagedResponse} from "@/types/api.types";
+import type {CreateExpensePayload, Expense, ExpenseFilters} from "../types/expense.types";
 
 export const expensesApi = {
   getExpenses: async (filters: ExpenseFilters = {}): Promise<PagedResponse<Expense>> => {

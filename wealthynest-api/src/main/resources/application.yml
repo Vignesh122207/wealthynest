@@ -1,6 +1,14 @@
 spring:
   application:
     name: wealthynest-api
+  threads:
+    virtual:
+      # Tomcat serves each request on a virtual thread instead of a platform thread, so blocking
+      # JDBC/Redis/external-HTTP calls (the bulk of every request in this app) no longer consume a
+      # limited platform-thread slot for their full duration — meaningfully higher concurrency
+      # headroom under load. Safe here: the codebase has exactly one `synchronized` block (a rare,
+      # short-lived double-checked-locking init in AuthServiceImpl), so pinning risk is negligible.
+      enabled: true
   profiles:
     active: ${APP_ENV:dev}
   datasource:
@@ -33,6 +41,10 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: false
     validate-on-migrate: true
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -75,6 +87,9 @@ wealthynest:
       secret: ${JWT_SECRET:change-this-secret-in-production-min-256-bits-long}
       access-token-expiry-ms: ${JWT_ACCESS_EXPIRY:7200000}
       refresh-token-expiry-ms: ${JWT_REFRESH_EXPIRY:2592000000}
+    vault:
+      encryption-key: ${VAULT_ENCRYPTION_KEY:change-this-key-in-production-must-be-32-byte-base64}
+      hash-pepper: ${VAULT_HASH_PEPPER:change-this-pepper-in-production}
     cors:
       allowed-origins: ${CORS_ORIGINS:http://localhost:3000}
     rate-limit:
@@ -87,6 +102,11 @@ wealthynest:
     from: "WealthyNest <noreply@wealthynest.in>"
     frontend-url: ${FRONTEND_URL:http://localhost:3000}
     reset-token-expiry-minutes: 15
+  webauthn:
+    rp-id: ${WEBAUTHN_RP_ID:}
+    rp-name: WealthyNest
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:}
 
 management:
   endpoints:

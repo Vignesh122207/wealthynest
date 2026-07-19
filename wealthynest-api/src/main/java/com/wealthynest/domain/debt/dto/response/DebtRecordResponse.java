@@ -1,6 +1,10 @@
 package com.wealthynest.domain.debt.dto.response;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -17,6 +21,7 @@ public class DebtRecordResponse {
     private String                   contactPhone;
     private BigDecimal               amount;
     private String                   description;
+    private LocalDate                debtDate;
     private LocalDate                dueDate;
     private String                   status;
     private BigDecimal               amountSettled;

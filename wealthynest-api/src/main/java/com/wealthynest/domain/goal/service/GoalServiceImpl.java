@@ -4,6 +4,7 @@ import com.wealthynest.common.exception.AccessDeniedException;
 import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.domain.account.dto.response.AccountResponse;
+import com.wealthynest.domain.account.service.AccountOwnershipGuard;
 import com.wealthynest.domain.account.service.WalletAccountService;
 import com.wealthynest.domain.goal.dto.request.CreateGoalRequest;
 import com.wealthynest.domain.goal.dto.request.UpdateGoalRequest;
@@ -24,8 +25,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class GoalServiceImpl implements GoalService {
 
-    private final GoalRepository       goalRepository;
-    private final WalletAccountService walletAccountService;
+    private final GoalRepository        goalRepository;
+    private final WalletAccountService  walletAccountService;
+    private final AccountOwnershipGuard accountOwnershipGuard;
 
     @Override
     @Transactional(readOnly = true)
@@ -42,6 +44,7 @@ public class GoalServiceImpl implements GoalService {
         BigDecimal saved = req.getSavedAmount() != null ? req.getSavedAmount() : BigDecimal.ZERO;
         if (saved.compareTo(req.getTargetAmount()) > 0)
             throw new BusinessException("Amount already saved cannot exceed the target amount", HttpStatus.BAD_REQUEST);
+        accountOwnershipGuard.validateAccountOwnership(req.getAccountId(), userId);
 
         Goal goal = Goal.builder()
                 .userId(userId)
@@ -78,6 +81,7 @@ public class GoalServiceImpl implements GoalService {
         if (Boolean.TRUE.equals(req.getUnlinkAccount())) {
             goal.setAccountId(null);
         } else if (req.getAccountId() != null) {
+            accountOwnershipGuard.validateAccountOwnership(req.getAccountId(), userId);
             goal.setAccountId(req.getAccountId());
         }
         return toResponse(goalRepository.save(goal), buildAccountMap(userId));

@@ -1,9 +1,13 @@
 export type IncomePaymentMode = "CASH" | "BANK_ACCOUNT";
 
+export type IncomeSource =
+  | "SALARY" | "FREELANCE" | "BUSINESS" | "RENTAL"
+  | "BONUS"  | "INTEREST"  | "DIVIDEND" | "OTHER";
+
 export interface IncomeEntry {
   id:           string;
   accountId?:   string;
-  source:       string;
+  source:       IncomeSource;
   paymentMode:  IncomePaymentMode;
   amount:       number;
   description?: string;
@@ -16,7 +20,7 @@ export interface IncomeEntry {
 
 export interface CreateIncomePayload {
   accountId?:   string;
-  source:       string;
+  source:       IncomeSource;
   paymentMode?: IncomePaymentMode;
   amount:       number;
   description?: string;

@@ -14,30 +14,26 @@ import java.util.UUID;
 @Repository
 public interface BudgetRepository extends JpaRepository<Budget, UUID> {
 
-    // Monthly budgets for a specific month
-    List<Budget>     findByFamilyIdAndPeriodYearAndPeriodMonthAndBudgetType(UUID familyId, int year, int month, BudgetType type);
-    Optional<Budget> findByFamilyIdAndCategoryIdAndPeriodYearAndPeriodMonthAndBudgetType(UUID familyId, UUID categoryId, int year, int month, BudgetType type);
-
-    List<Budget>     findByUserIdAndPeriodYearAndPeriodMonthAndBudgetType(UUID userId, int year, int month, BudgetType type);
-    Optional<Budget> findByUserIdAndCategoryIdAndPeriodYearAndPeriodMonthAndBudgetType(UUID userId, UUID categoryId, int year, int month, BudgetType type);
-
-    // Yearly budgets (period_month = 0)
-    List<Budget>     findByFamilyIdAndPeriodYearAndBudgetType(UUID familyId, int year, BudgetType type);
-    Optional<Budget> findByFamilyIdAndCategoryIdAndPeriodYearAndBudgetType(UUID familyId, UUID categoryId, int year, BudgetType type);
-
-    List<Budget>     findByUserIdAndPeriodYearAndBudgetType(UUID userId, int year, BudgetType type);
-    Optional<Budget> findByUserIdAndCategoryIdAndPeriodYearAndBudgetType(UUID userId, UUID categoryId, int year, BudgetType type);
-
     // All budgets for a user (templates — no period filter)
     List<Budget> findByUserId(UUID userId);
+
+    // All shared budgets for a family (templates — no period filter)
     List<Budget> findByFamilyId(UUID familyId);
 
     // Find a specific template by category + type (for create-or-update)
     Optional<Budget> findByUserIdAndCategoryIdAndBudgetType(UUID userId, UUID categoryId, BudgetType type);
+
+    // Family-scoped equivalent, for create-or-update once the caller belongs to a family
     Optional<Budget> findByFamilyIdAndCategoryIdAndBudgetType(UUID familyId, UUID categoryId, BudgetType type);
 
     // All budgets for a category (for expense-linking dropdown)
     List<Budget> findByUserIdAndCategoryId(UUID userId, UUID categoryId);
+
+    // Family-scoped equivalent — used by the budget-breach check so any family member's
+    // expense can trigger a shared budget's alert, not just the budget's original creator.
+    List<Budget> findByFamilyIdAndCategoryId(UUID familyId, UUID categoryId);
+
+    boolean existsByCategoryId(UUID categoryId);
 
     @Modifying
     @Query("""
@@ -56,4 +52,14 @@ public interface BudgetRepository extends JpaRepository<Budget, UUID> {
     @Modifying
     @Query("UPDATE Budget b SET b.familyId = null WHERE b.familyId = :familyId")
     void clearFamilyId(@Param("familyId") UUID familyId);
+
+    /** Detaches one departing member's own budgets from the family. */
+    @Modifying
+    @Query("UPDATE Budget b SET b.familyId = null WHERE b.userId = :userId AND b.familyId = :familyId")
+    void clearFamilyIdForUser(@Param("userId") UUID userId, @Param("familyId") UUID familyId);
+
+    /** Removes all budgets on a category (any owner) — used when the category itself is deleted. */
+    @Modifying
+    @Query("DELETE FROM Budget b WHERE b.categoryId = :categoryId")
+    void deleteByCategoryId(@Param("categoryId") UUID categoryId);
 }

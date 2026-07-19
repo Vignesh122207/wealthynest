@@ -2,17 +2,22 @@ package com.wealthynest.domain.expense.service;
 
 import com.wealthynest.common.exception.AccessDeniedException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
+import com.wealthynest.domain.account.service.AccountBalanceGuard;
+import com.wealthynest.domain.account.service.AccountOwnershipGuard;
+import com.wealthynest.domain.account.service.WalletAccountService;
 import com.wealthynest.domain.budget.entity.Budget;
 import com.wealthynest.domain.budget.entity.BudgetType;
 import com.wealthynest.domain.budget.repository.BudgetRepository;
 import com.wealthynest.domain.category.entity.Category;
 import com.wealthynest.domain.category.repository.CategoryRepository;
+import com.wealthynest.domain.category.service.CategoryOwnershipGuard;
 import com.wealthynest.domain.expense.dto.request.CreateExpenseRequest;
 import com.wealthynest.domain.expense.dto.request.UpdateExpenseRequest;
 import com.wealthynest.domain.expense.dto.response.ExpenseResponse;
 import com.wealthynest.domain.expense.entity.Expense;
 import com.wealthynest.domain.expense.mapper.ExpenseMapper;
 import com.wealthynest.domain.expense.repository.ExpenseRepository;
+import com.wealthynest.domain.expensesplit.service.ExpenseSplitService;
 import com.wealthynest.domain.notification.service.NotificationService;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
@@ -23,14 +28,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -42,20 +44,29 @@ public class ExpenseServiceImpl implements ExpenseService {
     private final ExpenseMapper      expenseMapper;
     private final BudgetRepository   budgetRepository;
     private final NotificationService notificationService;
+    private final AccountOwnershipGuard  accountOwnershipGuard;
+    private final AccountBalanceGuard    accountBalanceGuard;
+    private final WalletAccountService   walletAccountService;
+    private final ExpenseSplitService    expenseSplitService;
+    private final CategoryOwnershipGuard categoryOwnershipGuard;
 
     @Override
     @Transactional
     @CacheEvict(value = "dashboard", allEntries = true)
     public ExpenseResponse createExpense(UUID userId, UUID familyId, CreateExpenseRequest request) {
-        categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new ResourceNotFoundException("Category", "id", request.getCategoryId()));
+        categoryOwnershipGuard.validateCategoryOwnership(request.getCategoryId(), userId, familyId);
+        accountOwnershipGuard.validateAccountOwnership(request.getAccountId(), userId);
+        accountBalanceGuard.validateSufficientBalance(request.getAccountId(), userId, request.getAmount(), BigDecimal.ZERO);
         Expense expense = expenseMapper.toEntity(request);
         expense.setUserId(userId);
         expense.setFamilyId(familyId);
         expense.setBudgetId(request.getBudgetId());
         expense.setAccountId(request.getAccountId());
-        ExpenseResponse response = enrich(expenseMapper.toResponse(expenseRepository.save(expense)));
-        checkBudgetBreach(userId, request.getCategoryId(), request.getExpenseDate());
+        Expense saved = expenseRepository.save(expense);
+        ExpenseResponse response = enrich(expenseMapper.toResponse(saved));
+        checkBudgetBreach(userId, familyId, request.getCategoryId(), request.getExpenseDate());
+        walletAccountService.checkLowBalance(request.getAccountId(), userId);
+        expenseSplitService.createSplits(saved, request.getSplitWith());
         return response;
     }
 
@@ -64,7 +75,11 @@ public class ExpenseServiceImpl implements ExpenseService {
     @CacheEvict(value = "dashboard", allEntries = true)
     public ExpenseResponse updateExpense(UUID expenseId, UUID userId, UpdateExpenseRequest request) {
         Expense expense = findAndValidateOwner(expenseId, userId);
-        if (request.getCategoryId()    != null) expense.setCategoryId(request.getCategoryId());
+        BigDecimal previousAmount = expense.getAmount();
+        if (request.getCategoryId()    != null) {
+            categoryOwnershipGuard.validateCategoryOwnership(request.getCategoryId(), userId, expense.getFamilyId());
+            expense.setCategoryId(request.getCategoryId());
+        }
         if (request.getAmount()        != null) expense.setAmount(request.getAmount());
         if (request.getDescription()   != null) expense.setDescription(request.getDescription());
         if (request.getNotes()         != null) expense.setNotes(request.getNotes());
@@ -72,6 +87,10 @@ public class ExpenseServiceImpl implements ExpenseService {
         if (request.getRecurring()     != null) expense.setRecurring(request.getRecurring());
         if (request.getRecurrenceRule()!= null) expense.setRecurrenceRule(request.getRecurrenceRule());
         if (request.getPaymentMethod() != null) expense.setPaymentMethod(request.getPaymentMethod());
+        if (request.getAmount() != null) {
+            expenseSplitService.validateAmountCoversSplits(expenseId, expense.getAmount());
+            accountBalanceGuard.validateSufficientBalance(expense.getAccountId(), userId, expense.getAmount(), previousAmount);
+        }
         return enrich(expenseMapper.toResponse(expenseRepository.save(expense)));
     }
 
@@ -145,18 +164,26 @@ public class ExpenseServiceImpl implements ExpenseService {
         return page.map(expenseMapper::toResponse).map(r -> enrichWithMap(r, catMap));
     }
 
-    private void checkBudgetBreach(UUID userId, UUID categoryId, LocalDate expenseDate) {
+    private void checkBudgetBreach(UUID userId, UUID familyId, UUID categoryId, LocalDate expenseDate) {
         if (categoryId == null) return;
         LocalDate date = expenseDate != null ? expenseDate : LocalDate.now();
         int year = date.getYear(), month = date.getMonthValue();
-        List<Budget> budgets = budgetRepository.findByUserIdAndCategoryId(userId, categoryId);
+        // Family-shared budgets aggregate spend across every member — check those (family-scoped)
+        // instead of the acting user's own budgets whenever the expense belongs to a family.
+        List<Budget> budgets = familyId != null
+                ? budgetRepository.findByFamilyIdAndCategoryId(familyId, categoryId)
+                : budgetRepository.findByUserIdAndCategoryId(userId, categoryId);
         for (Budget budget : budgets) {
             try {
                 BigDecimal spent;
                 if (budget.getBudgetType() == BudgetType.YEARLY) {
-                    spent = expenseRepository.sumByUserCategoryAndYear(userId, categoryId, year);
+                    spent = familyId != null
+                            ? expenseRepository.sumByFamilyCategoryAndYear(familyId, categoryId, year)
+                            : expenseRepository.sumByUserCategoryAndYear(userId, categoryId, year);
                 } else {
-                    spent = expenseRepository.sumByUserCategoryAndMonth(userId, categoryId, year, month);
+                    spent = familyId != null
+                            ? expenseRepository.sumByFamilyCategoryAndMonth(familyId, categoryId, year, month)
+                            : expenseRepository.sumByUserCategoryAndMonth(userId, categoryId, year, month);
                 }
                 if (spent == null) spent = BigDecimal.ZERO;
                 if (budget.getAmount().compareTo(BigDecimal.ZERO) == 0) continue;

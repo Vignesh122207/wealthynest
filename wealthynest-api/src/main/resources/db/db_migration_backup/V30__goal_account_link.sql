@@ -1,1 +1,0 @@
-ALTER TABLE goals ADD COLUMN IF NOT EXISTS account_id UUID REFERENCES wallet_accounts(id) ON DELETE SET NULL;
