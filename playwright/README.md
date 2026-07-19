@@ -45,11 +45,14 @@ double — see Phase 24's own section for what broke, what got fixed, a real orc
 a real performance budget) needs a product or infra decision this suite genuinely can't make on its
 own — see "Known gaps" below.
 
-That's **107 `test:regression`-family tests** (auth 10 + smoke 1 + regression 96 across 24 files)
-**plus 45 more** across the standalone suites — Responsive (13: mobile-chrome, tablet, tablet-portrait,
-narrow-desktop), Accessibility (15: all 14 dashboard pages + login), Performance (8: loadEventEnd +
-real Core Web Vitals per page), Visual (7: 4 static + 3 dynamic-empty-state), and the new standalone
-`tests/oauth/` suite (2) — **152 tests total**, all reusing the same scaffold.
+That's **110 `test:regression`-family tests** (auth 10 + smoke 1 + regression 99 across 24 files —
+Phase 24 added 3 validation-depth tests to `goals.spec.ts`/`debts.spec.ts`) **plus 45 more** across
+the standalone suites — Responsive (13: mobile-chrome, tablet, tablet-portrait, narrow-desktop),
+Accessibility (15: all 14 dashboard pages + login), Performance (8: loadEventEnd + real Core Web
+Vitals per page), Visual (7: 4 static + 3 dynamic-empty-state), and the new standalone `tests/oauth/`
+suite (2) — **155 tests total**, all reusing the same scaffold. Every regression file is now
+individually confirmed passing under firefox and webkit, not just chromium (see Phase 24's
+cross-browser section).
 
 Every one of Phase 3-5's 24 new regression tests has been individually confirmed green in
 isolation, as has auth (10/10) and smoke (1/1). A single simultaneous `npm run test:regression`
@@ -1099,6 +1102,28 @@ layout-shifting element with no reserved space, a synchronous long task on click
 `loadEventEnd` alone couldn't see, at the same generous, environment-variance-tolerant threshold
 philosophy as before.
 
+**WebKit confirmation**: the same file-by-file sweep firefox got now covers WebKit too — all 22
+non-WebAuthn regression files individually confirmed passing (`accounts` through `vault`), using the
+`E2E_PROJECTS=webkit`-alone fix above from the start rather than discovering it partway through.
+`statement-import.spec.ts`'s "manual column mapping" test failed once under sustained rate-limit
+pressure (same shape as the transactions.spec.ts flake firefox's own sweep hit) and passed clean
+both in isolation and as part of a full 4/4 file run immediately after — confirmed rate-limit-
+adjacent flakiness, not a WebKit-specific bug, before counting it as done.
+
+**Validation-path depth**: three new tests targeting real, previously-untested cross-field
+validation rules — found by reading `goalSchema.ts`/`debt.schema.ts` directly rather than guessing
+which forms might have interesting rules. `goals.spec.ts` gained a zero-target-amount rejection (the
+schema's `.positive()` constraint) and a saved-amount-exceeds-target-amount rejection (a
+`superRefine` cross-field check with its own dedicated error message); `debts.spec.ts` gained a
+due-date-before-debt-date rejection (`debt.schema.ts`'s own `superRefine`, comparing against the
+default-to-today debt date). All three assert the client-side error message renders **and** that
+nothing was created (no false-positive "the error showed AND it also saved anyway"). This is
+deliberately narrow — a spot-check of two forms with genuinely interesting cross-field logic, not a
+blanket validation pass across every form in the app, since most single-field validation
+(`.min(1)`, `@NotBlank`) is lower-risk and Bean Validation/zod already enforce it structurally; the
+Bond form bug Phase 6 found (a cross-field derived-value bug, not a simple required-field miss) is
+exactly the shape of bug this kind of test is worth adding for.
+
 ## Known gaps
 
 Most of what this section used to list (Vault Health/TOTP/export, Stock/MF investments, Dividend,
@@ -1106,11 +1131,11 @@ Statement/CAS Import depth, WebAuthn round-trip, Google OAuth round-trip, cross-
 a11y severity/breadth, visual/responsive breadth) was closed out in Phases 15-24 above. What's left
 needs a product or infra decision this suite can't make on its own, not more Playwright code:
 
-- **Cross-browser** (Phases 21 + 24) is now both structurally correct *and* individually verified
-  for every regression file except `webauthn.spec.ts` (Chromium-only by hard platform limit, not a
-  gap — see Phase 24). Still opt-in, by design — `test:regression` and the other default scripts
-  stay pinned to `--project=chromium` (see "chromium only, on purpose"); webkit hasn't had the same
-  file-by-file confirmation pass firefox just got.
+- **Cross-browser** (Phases 21 + 24) is now both structurally correct *and* individually verified,
+  under **both** firefox and webkit, for every regression file except `webauthn.spec.ts`
+  (Chromium-only by hard platform limit, not a gap — see Phase 24). Still opt-in, by design —
+  `test:regression` and the other default scripts stay pinned to `--project=chromium` (see "chromium
+  only, on purpose") — this closes the verification gap, not the opt-in-by-design choice itself.
 - **Accessibility** (Phases 22 + 24) now asserts every severity tier across all 14 dashboard pages —
   genuinely closed as a suite; any residual gap is only in *other* apps' pages this suite doesn't
   render (there are none left in the app's own nav).

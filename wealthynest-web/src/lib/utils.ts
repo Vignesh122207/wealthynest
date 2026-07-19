@@ -104,6 +104,7 @@ export function formatCurrencyCompact(amount: number, currency?: string): string
     style: "currency",
     currency: curr,
     notation: "compact",
+    minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(amount);
 }
