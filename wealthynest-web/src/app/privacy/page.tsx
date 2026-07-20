@@ -1,6 +1,7 @@
 import type {Metadata} from "next";
 import {Shield} from "lucide-react";
 import {LegalPageChrome} from "@/components/layout/LegalPageChrome";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
 
 export const metadata: Metadata = { title: "Privacy Policy" };
 
@@ -20,8 +21,8 @@ export default function PrivacyPage() {
 
         {/* Header */}
         <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[#935a35]/10 mb-5">
-            <Shield className="w-6 h-6 text-[#935a35]" />
+          <div className="mx-auto w-fit mb-5">
+            <PremiumIcon icon={Shield} hex="#935a35" size="md" />
           </div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Privacy Policy</h1>
           <p className="text-xs text-muted-foreground">Last updated: June 2026</p>

@@ -14,9 +14,15 @@ export const viewport: Viewport = {
   maximumScale: 5,
 };
 
+const TITLE = "WealthyNest – Personal Finance";
+const DESCRIPTION = "Smart personal finance for Indian families. Track expenses, budgets, assets and investments.";
+
 export const metadata: Metadata = {
-  title: { default: "WealthyNest – Personal Finance", template: "%s | WealthyNest" },
-  description: "Smart personal finance for Indian families. Track expenses, budgets, assets and investments.",
+  // Required for Next to resolve opengraph-image.tsx/twitter-image.tsx (relative by default) into
+  // the absolute URLs social platforms' crawlers need — without this they silently fail to embed.
+  metadataBase: new URL("https://wealthynest.in"),
+  title: { default: TITLE, template: "%s | WealthyNest" },
+  description: DESCRIPTION,
   keywords: ["personal finance", "expense tracker", "budget", "investments", "India"],
   manifest: "/manifest.json",
   appleWebApp: {
@@ -30,6 +36,22 @@ export const metadata: Metadata = {
       { url: "/icons/icon-512.png?v=ribbonw-copper", sizes: "512x512", type: "image/png" },
     ],
     apple: [{ url: "/icons/icon-192.png?v=ribbonw-copper", sizes: "192x192" }],
+  },
+  // Image itself comes from opengraph-image.tsx/twitter-image.tsx (Next's file-convention
+  // auto-detects and injects those) — these fields cover the surrounding text/type metadata that
+  // convention doesn't fill in on its own.
+  openGraph: {
+    type: "website",
+    url: "https://wealthynest.in",
+    siteName: "WealthyNest",
+    title: TITLE,
+    description: DESCRIPTION,
+    locale: "en_IN",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
   },
 };
 

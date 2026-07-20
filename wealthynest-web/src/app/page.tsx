@@ -1,14 +1,15 @@
 import Link from "next/link";
 import {
-    ArrowRight,
     Bell,
     ChevronDown,
     CreditCard,
+    Eye,
     FileText,
     Fingerprint,
     Gem,
     HeartHandshake,
     IndianRupee,
+    KeyRound,
     Landmark,
     LineChart,
     Lock,
@@ -24,6 +25,8 @@ import {
 } from "lucide-react";
 import {BrandMark} from "@/components/icons/BrandMark";
 import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
+import {LandingClosingCTA, LandingHeroCTA, LandingNavCTA} from "@/components/layout/LandingCTA";
+import {CountUp} from "@/components/shared/CountUp";
 import {getCategoryColor, getCategoryIcon} from "@/lib/categoryMeta";
 
 // ─── Real demo data — same helpers/tones the actual dashboard uses, fabricated
@@ -68,21 +71,28 @@ const GROUPS: FeatureGroup[] = [
     gradient: ["#f59e0b", "#ea580c"],
     heading: "Budgets that actually warn you",
     body: "Set a monthly or yearly limit per category and get notified the moment you're close to breaching it — not when the statement arrives. Goals track toward a target date. Debts are tracked apart from investments, so what you own and what you owe never get confused.",
-    bullets: ["Budget-breach alerts, in-app and instant", "Goals with real target dates and progress", "Debts kept separate from assets and investments"],
+    bullets: ["Budget-breach alerts, in-app and instant", "Goals with real target dates and progress", "Debts kept separate from assets and investments", "Recurring income, transfers & goal contributions — set once, done"],
   },
   {
     id: "growth", eyebrow: "Growth", icon: TrendingUp,
     gradient: ["#10b981", "#16a34a"],
     heading: "Real returns, not guesses",
     body: "Stocks, mutual funds, gold, real estate, fixed deposits — track what you invested against what it's actually worth today, with XIRR so you see your true annualized return, not just a headline percentage.",
-    bullets: ["XIRR on every holding, not just portfolio total", "Dividends tracked as their own income stream", "Net worth trend, going back as far as your data"],
+    bullets: ["XIRR on every holding, not just portfolio total", "Dividends tracked as their own income stream", "Net worth trend, going back as far as your data", "Mutual fund CAS import, even PDF-password protected"],
   },
   {
     id: "insights", eyebrow: "Insights", icon: LineChart,
     gradient: ["#14b8a6", "#06b6d4"],
     heading: "Built for the whole family",
     body: "Invite your family with a code and share budgets, expenses and goals — see who spent what, this month, at a glance. Export a branded report any time, and get notified the moment something needs your attention.",
-    bullets: ["Shared budgets and per-member spending", "Branded PDF & CSV reports, one click", "Smart alerts for low balance and unusual spending"],
+    bullets: ["Shared budgets and per-member spending", "Split a bill with family and settle up with one tap", "Branded PDF & CSV reports, one click", "Smart alerts for low balance and unusual spending"],
+  },
+  {
+    id: "vault", eyebrow: "Security", icon: KeyRound,
+    gradient: ["#8b5cf6", "#6366f1"],
+    heading: "A vault for everything else",
+    body: "Passwords, PINs, and private notes don't belong in a notes app. WealthyNest's built-in vault encrypts every item, generates strong passwords for you, and holds 2FA codes alongside the login they belong to — so the family's other secrets live somewhere safer too.",
+    bullets: ["Encrypted storage for passwords, PINs & secure notes", "Built-in password generator plus 2FA (TOTP) codes", "Vault Health flags reused or weak passwords"],
   },
 ];
 
@@ -93,7 +103,7 @@ const TRUST = [
   { icon: ShieldCheck,   title: "Free forever",           body: "No paid tier waiting behind a paywall, no feature held back to upsell you later." },
 ];
 
-function MiniStat({ icon: Icon, tone, label, value }: { icon: LucideIcon; tone: IconTone; label: string; value: string }) {
+function MiniStat({ icon: Icon, tone, label, value }: { icon: LucideIcon; tone: IconTone; label: string; value: React.ReactNode }) {
   return (
     <div className="bg-muted/40 rounded-2xl p-3">
       <div className="flex items-center gap-1.5 mb-2">
@@ -120,14 +130,7 @@ export default function LandingPage() {
           <a href="#security" className="hover:text-foreground transition-colors">Security</a>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/login"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-2">
-            Sign in
-          </Link>
-          <Link href="/signup"
-            className="text-sm bg-[#a85f30] hover:bg-[#c2703d] text-white px-4 py-2 rounded-xl transition-colors font-semibold shadow-lg shadow-[#c2703d]/25">
-            Get started
-          </Link>
+          <LandingNavCTA />
         </div>
       </nav>
 
@@ -162,10 +165,7 @@ export default function LandingPage() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 mb-10">
-              <Link href="/signup"
-                className="inline-flex items-center justify-center gap-2 bg-[#a85f30] hover:bg-[#c2703d] text-white px-6 py-3.5 rounded-xl font-semibold text-sm transition-all shadow-[0_6px_24px_rgba(194,112,61,0.35)] hover:shadow-[0_8px_30px_rgba(194,112,61,0.5)] hover:-translate-y-0.5">
-                Start free — takes 2 minutes <ArrowRight className="w-4 h-4" />
-              </Link>
+              <LandingHeroCTA />
               <a href="#features"
                 className="inline-flex items-center justify-center gap-2 bg-muted hover:bg-muted/80 text-foreground px-6 py-3.5 rounded-xl font-semibold text-sm transition-all border border-border">
                 See what&rsquo;s inside <ChevronDown className="w-4 h-4" />
@@ -186,14 +186,16 @@ export default function LandingPage() {
           {/* Right — signature element: a faithful recreation of the real Home
               dashboard, built from the app's own PremiumIcon/category-resolver
               code with fabricated numbers, not a stock illustration. */}
-          <div className="relative animate-fade-in-up delay-150">
+          <div className="relative animate-fade-in-up delay-150 animate-float">
             {/* Peeking card behind — investment stat, offset + rotated for depth */}
             <div className="hidden sm:block absolute -left-6 -bottom-8 w-48 bg-card border border-border/80 rounded-2xl shadow-xl p-4 -rotate-6 opacity-90">
               <div className="flex items-center gap-1.5 mb-2">
                 <PremiumIcon icon={TrendingUp} tone="emerald" size="xs" />
                 <span className="text-[10px] font-semibold text-muted-foreground/70">Investments</span>
               </div>
-              <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">+14.2%</p>
+              <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                <CountUp to={14.2} decimals={1} prefix="+" suffix="%" />
+              </p>
               <p className="text-[10px] text-muted-foreground/60 mt-0.5">XIRR, all holdings</p>
             </div>
 
@@ -210,12 +212,14 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              <p className="text-3xl font-extrabold text-foreground tabular-nums tracking-tight mb-1">₹18,42,600</p>
+              <p className="text-3xl font-extrabold text-foreground tabular-nums tracking-tight mb-1">
+                <CountUp to={1842600} prefix="₹" />
+              </p>
               <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mb-5">▲ 4.8% this month</p>
 
               <div className="grid grid-cols-2 gap-2.5 mb-5">
-                <MiniStat icon={Receipt} tone="red"   label="Expenses" value="₹52,300" />
-                <MiniStat icon={Wallet}  tone="green" label="Income"   value="₹95,000" />
+                <MiniStat icon={Receipt} tone="red"   label="Expenses" value={<CountUp to={52300} prefix="₹" />} />
+                <MiniStat icon={Wallet}  tone="green" label="Income"   value={<CountUp to={95000} prefix="₹" />} />
               </div>
 
               <div className="border-t border-border pt-4">
@@ -245,7 +249,7 @@ export default function LandingPage() {
         <div className="text-center mb-16">
           <p className="text-xs font-bold text-[#c2703d] uppercase tracking-widest mb-3">What&rsquo;s inside</p>
           <h2 className="text-2xl lg:text-3xl font-extrabold text-foreground mb-3 tracking-tight">
-            Four ways WealthyNest keeps you ahead
+            Five ways WealthyNest keeps you ahead
           </h2>
           <p className="text-muted-foreground max-w-md mx-auto" style={{ fontFamily: "var(--font-inter)" }}>
             Everything a real household&rsquo;s finances need — not an expense tracker with extra tabs bolted on.
@@ -349,11 +353,11 @@ export default function LandingPage() {
                       <div className="grid grid-cols-2 gap-2.5">
                         <div className="bg-muted/40 rounded-2xl p-3.5">
                           <p className="text-[10px] font-semibold text-muted-foreground/70 mb-1">Invested</p>
-                          <p className="text-base font-bold text-foreground tabular-nums">₹6,20,000</p>
+                          <p className="text-base font-bold text-foreground tabular-nums"><CountUp to={620000} prefix="₹" /></p>
                         </div>
                         <div className="bg-muted/40 rounded-2xl p-3.5">
                           <p className="text-[10px] font-semibold text-muted-foreground/70 mb-1">XIRR</p>
-                          <p className="text-base font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">+14.2%</p>
+                          <p className="text-base font-bold text-emerald-600 dark:text-emerald-400 tabular-nums"><CountUp to={14.2} decimals={1} prefix="+" suffix="%" /></p>
                         </div>
                       </div>
                     </div>
@@ -384,6 +388,29 @@ export default function LandingPage() {
                       </div>
                     </div>
                   )}
+
+                  {g.id === "vault" && (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3 bg-muted/40 rounded-2xl px-4 py-3.5">
+                        <PremiumIcon icon={KeyRound} gradient={["#8b5cf6", "#6366f1"]} size="sm" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground">Netflix</p>
+                          <p className="text-xs text-muted-foreground tracking-widest">••••••••••••</p>
+                        </div>
+                        <Eye className="w-4 h-4 text-muted-foreground shrink-0" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div className="bg-muted/40 rounded-2xl p-3.5">
+                          <p className="text-[10px] font-semibold text-muted-foreground/70 mb-1">2FA code</p>
+                          <p className="text-base font-bold text-foreground tabular-nums tracking-widest">482 913</p>
+                        </div>
+                        <div className="bg-muted/40 rounded-2xl p-3.5">
+                          <p className="text-[10px] font-semibold text-muted-foreground/70 mb-1">Vault Health</p>
+                          <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">No reuse found</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -398,6 +425,10 @@ export default function LandingPage() {
           <div className="absolute top-8 left-12 w-64 h-64 rounded-full bg-white blur-3xl" />
           <div className="absolute bottom-4 right-16 w-72 h-72 rounded-full bg-white blur-3xl" />
         </div>
+        {/* Softens the cut into/out of this section's flat purple against the dark sections above
+            and below it — a hard color-block edge otherwise reads as an abrupt seam. */}
+        <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-background to-transparent" aria-hidden />
+        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-background to-transparent" aria-hidden />
 
         <div className="relative max-w-6xl mx-auto">
           <div className="text-center mb-14">
@@ -421,6 +452,19 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── Independent note ─────────────────────────────────── */}
+      {/* Deliberately not a stat/testimonial section — there isn't a real user count or quote
+          worth publishing yet, and inventing one for a finance app is exactly the kind of thing
+          the "Free forever, no ads" pitch above is supposed to be a contrast to. This is the
+          honest version of that same trust argument. */}
+      <section className="px-6 py-16 max-w-2xl mx-auto w-full text-center">
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Built independently — no VC funding, no ad network, no data broker deals. Just one
+          developer building the finance app their own family needed. Nothing here to sell you
+          but a better way to track your money.
+        </p>
+      </section>
+
       {/* ── Closing CTA ──────────────────────────────────────── */}
       <section className="px-6 pb-20 lg:pb-24 pt-16 max-w-6xl mx-auto w-full text-center">
         <Sparkles className="w-6 h-6 text-[#c2703d] mx-auto mb-5" />
@@ -430,10 +474,7 @@ export default function LandingPage() {
         <p className="text-muted-foreground max-w-md mx-auto mb-8" style={{ fontFamily: "var(--font-inter)" }}>
           Join the families already tracking their whole financial life in one place — free, forever.
         </p>
-        <Link href="/signup"
-          className="inline-flex items-center gap-2 bg-[#a85f30] hover:bg-[#c2703d] text-white px-7 py-3.5 rounded-xl font-semibold text-sm transition-all shadow-[0_6px_24px_rgba(194,112,61,0.35)] hover:shadow-[0_8px_30px_rgba(194,112,61,0.5)] hover:-translate-y-0.5">
-          Create your free account <ArrowRight className="w-4 h-4" />
-        </Link>
+        <LandingClosingCTA />
       </section>
 
       {/* ── Footer ───────────────────────────────────────────── */}

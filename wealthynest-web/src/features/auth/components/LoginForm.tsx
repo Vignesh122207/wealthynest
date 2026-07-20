@@ -40,7 +40,7 @@ function PinLoginStep({ name, onUsePassword }: { name: string; onUsePassword: ()
   };
 
   return (
-    <div className="w-full max-w-sm">
+    <div className="w-full max-w-sm animate-fade-in-up">
       <div className="mb-7 text-center">
         <div className="w-14 h-14 rounded-2xl bg-[#c2703d]/10 flex items-center justify-center mx-auto mb-4">
           <KeyRound className="w-6 h-6 text-[#c2703d]" />
@@ -55,6 +55,8 @@ function PinLoginStep({ name, onUsePassword }: { name: string; onUsePassword: ()
           inputMode="numeric"
           maxLength={6}
           autoFocus
+          autoComplete="off"
+          aria-label="PIN"
           value={pin}
           onChange={e => setPin(e.target.value.replace(/[^0-9]/g, ""))}
           placeholder="••••"
@@ -65,7 +67,8 @@ function PinLoginStep({ name, onUsePassword }: { name: string; onUsePassword: ()
         <button data-testid="login-pin-submit" type="submit" disabled={isPending || pin.length < 4}
           className="w-full h-11 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2
             bg-[#a85f30] hover:bg-[#c2703d] text-white shadow-lg shadow-[#c2703d]/30
-            disabled:opacity-60 disabled:cursor-not-allowed">
+            hover:shadow-xl hover:shadow-[#c2703d]/40 hover:-translate-y-0.5
+            disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0">
           {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
           {isPending ? "Verifying…" : "Continue"}
         </button>
@@ -91,7 +94,7 @@ function PasswordLoginStep({ form, onSubmit, isPending, emailNotVerified, onBack
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <div className="w-full max-w-sm">
+    <div className="w-full max-w-sm animate-fade-in-up">
       <div className="mb-7 text-center">
         <div className="w-14 h-14 rounded-2xl bg-[#c2703d]/10 flex items-center justify-center mx-auto mb-4">
           <Lock className="w-6 h-6 text-[#c2703d]" />
@@ -120,10 +123,12 @@ function PasswordLoginStep({ form, onSubmit, isPending, emailNotVerified, onBack
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Email</label>
+          <label htmlFor="login-password-step-email" className="text-xs font-medium text-muted-foreground">Email</label>
           <input
+            id="login-password-step-email"
             data-testid="login-password-step-email-input"
             type="email"
+            autoComplete="email"
             placeholder="you@example.com"
             autoFocus
             {...form.register("email")}
@@ -141,15 +146,17 @@ function PasswordLoginStep({ form, onSubmit, isPending, emailNotVerified, onBack
 
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-muted-foreground">Password</label>
+            <label htmlFor="login-password-step-password" className="text-xs font-medium text-muted-foreground">Password</label>
             <Link href="/forgot-password" className="text-xs text-[#a85f30] dark:text-[#d98a52] hover:text-[#c2703d] dark:hover:text-[#e2a877] transition-colors">
               Forgot password?
             </Link>
           </div>
           <div className="relative">
             <input
+              id="login-password-step-password"
               data-testid="login-password-step-password-input"
               type={showPassword ? "text" : "password"}
+              autoComplete="current-password"
               placeholder="••••••••"
               {...form.register("password")}
               className={cn(
@@ -160,6 +167,7 @@ function PasswordLoginStep({ form, onSubmit, isPending, emailNotVerified, onBack
               )}
             />
             <button type="button" onClick={() => setShowPassword(p => !p)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
               className="absolute right-3 top-3.5 text-muted-foreground hover:text-foreground transition-colors">
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
@@ -175,7 +183,7 @@ function PasswordLoginStep({ form, onSubmit, isPending, emailNotVerified, onBack
             type="checkbox"
             id="rememberMe"
             {...form.register("rememberMe")}
-            className="w-4 h-4 rounded border-border bg-background accent-[#c2703d] cursor-pointer"
+            className="w-4 h-4 rounded border-border bg-background accent-[#c2703d] cursor-pointer transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c2703d]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           />
           <label htmlFor="rememberMe" className="text-xs text-muted-foreground cursor-pointer select-none">
             Keep me signed in for 30 days
@@ -186,7 +194,8 @@ function PasswordLoginStep({ form, onSubmit, isPending, emailNotVerified, onBack
           className={cn(
             "w-full h-12 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2",
             "bg-[#a85f30] hover:bg-[#c2703d] text-white shadow-lg shadow-[#c2703d]/30",
-            "disabled:opacity-60 disabled:cursor-not-allowed"
+            "hover:shadow-xl hover:shadow-[#c2703d]/40 hover:-translate-y-0.5",
+            "disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0"
           )}>
           {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
           {isPending ? "Signing in…" : "Sign in"}
@@ -260,6 +269,7 @@ export function LoginForm() {
       {/* ── Left panel — brand ──────────────────────────────── */}
       <aside aria-label="WealthyNest" className="hidden lg:flex flex-col justify-between w-[44%] shrink-0 relative overflow-hidden
         bg-gradient-to-br from-[#a85f30] via-[#8a4a26] to-[#52341f] p-12">
+        <div className="absolute inset-0 bg-dot-grid opacity-40 pointer-events-none" aria-hidden />
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-20 -left-20 w-72 h-72 rounded-full bg-white/5 blur-3xl" />
           <div className="absolute bottom-10 right-0 w-80 h-80 rounded-full bg-[#a8794f]/10 blur-3xl" />
@@ -309,7 +319,7 @@ export function LoginForm() {
           <PasswordLoginStep form={form} onSubmit={onSubmit} isPending={isPending}
             emailNotVerified={emailNotVerified} onBack={() => setShowPasswordStep(false)} />
         ) : (
-        <div className="w-full max-w-sm">
+        <div className="w-full max-w-sm animate-fade-in-up">
           <div className="mb-6">
             <h2 className="text-3xl font-bold text-foreground mb-1.5 tracking-tight">Welcome back</h2>
             <p className="text-muted-foreground text-sm">Sign in to continue to WealthyNest</p>
@@ -319,10 +329,12 @@ export function LoginForm() {
             <div className="space-y-4">
               {/* Email — used by the passkey flow below */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Email</label>
+                <label htmlFor="login-email" className="text-xs font-medium text-muted-foreground">Email</label>
                 <input
+                  id="login-email"
                   data-testid="login-email-input"
                   type="email"
+                  autoComplete="email"
                   placeholder="you@example.com"
                   {...form.register("email")}
                   onKeyDown={(e) => {
@@ -347,7 +359,7 @@ export function LoginForm() {
                   type="checkbox"
                   id="rememberMe"
                   {...form.register("rememberMe")}
-                  className="w-4 h-4 rounded border-border bg-background accent-[#c2703d] cursor-pointer"
+                  className="w-4 h-4 rounded border-border bg-background accent-[#c2703d] cursor-pointer transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c2703d]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 />
                 <label htmlFor="rememberMe" className="text-xs text-muted-foreground cursor-pointer select-none">
                   Keep me signed in for 30 days

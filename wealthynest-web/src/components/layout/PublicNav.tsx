@@ -44,7 +44,7 @@ export function PublicNav() {
         {user ? (
           <Link href="/home"
             className="text-sm bg-[#a85f30] hover:bg-[#c2703d] text-white px-4 py-2 rounded-xl transition-colors font-medium shadow-sm">
-            Go to Dashboard
+            Go to Home
           </Link>
         ) : (
           <>

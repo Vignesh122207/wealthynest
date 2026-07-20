@@ -11,7 +11,7 @@ export default function NotFoundPage() {
       <p className="text-sm text-muted-foreground mb-6 max-w-sm">The page you are looking for does not exist or has been moved.</p>
       <Link href="/home"
         className="flex items-center gap-2 bg-[#a85f30] hover:bg-[#c2703d] text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-all">
-        <Home className="w-4 h-4" /> Back to Dashboard
+        <Home className="w-4 h-4" /> Back to Home
       </Link>
     </div>
   );

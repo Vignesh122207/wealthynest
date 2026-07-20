@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
     Bell,
     ChevronRight,
-    FileText,
     HelpCircle,
     Lock,
     LogOut,
@@ -12,6 +11,7 @@ import {
     Mail,
     Plus,
     RefreshCw,
+    ScrollText,
     Shield,
     Sun,
     Tag,
@@ -30,18 +30,21 @@ import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
 // ─── Menu item ────────────────────────────────────────────────────────────────
 
 function MenuItem({
-  href, icon: Icon, tone, label, description, external,
+  href, icon: Icon, tone, hex, label, description, external,
 }: {
   href: string;
   icon: LucideIcon;
-  tone: IconTone;
+  /** Named tone from the Apple system-color palette. Ignored when `hex` is set — same contract as PremiumIcon itself. */
+  tone?: IconTone;
+  /** Raw hex for a row that needs to match a destination page's exact brand color instead of a named tone. */
+  hex?: string;
   label: string;
   description: string;
   external?: boolean;
 }) {
   const inner = (
     <div className="flex items-center gap-3.5 px-4 py-3.5 hover:bg-muted/60 transition-colors group">
-      <PremiumIcon icon={Icon} tone={tone} size="sm" />
+      <PremiumIcon icon={Icon} tone={tone} hex={hex} size="sm" />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground">{label}</p>
         <p className="text-xs text-muted-foreground mt-0.5 truncate">{description}</p>
@@ -163,11 +166,11 @@ export default function SettingsPage() {
                 <MenuItem href="/settings/support/faq"
                   icon={HelpCircle} tone="cyan"
                   label="FAQ" description="Answers to common questions" />
-                <MenuItem href="/privacy"
-                  icon={Shield} tone="gray"
+                <MenuItem href="/privacy?from=settings"
+                  icon={Shield} hex="#935a35"
                   label="Privacy Policy" description="How we handle your data" />
-                <MenuItem href="/terms"
-                  icon={FileText} tone="gray"
+                <MenuItem href="/terms?from=settings"
+                  icon={ScrollText} tone="emerald"
                   label="Terms of Service" description="Terms & conditions of use" />
               </MenuGroup>
 

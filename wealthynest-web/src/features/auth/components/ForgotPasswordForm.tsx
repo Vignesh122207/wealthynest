@@ -102,11 +102,13 @@ export function ForgotPasswordForm() {
 
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Email address</label>
+                  <label htmlFor="forgot-password-email" className="text-xs font-medium text-muted-foreground">Email address</label>
                   <div className="relative">
                     <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                     <input
+                      id="forgot-password-email"
                       type="email"
+                      autoComplete="email"
                       placeholder="you@example.com"
                       {...form.register("email")}
                       className={cn(
@@ -126,7 +128,8 @@ export function ForgotPasswordForm() {
                   className={cn(
                     "w-full h-11 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 mt-2",
                     "bg-[#a85f30] hover:bg-[#c2703d] text-white shadow-lg shadow-[#c2703d]/30",
-                    "disabled:opacity-60 disabled:cursor-not-allowed"
+                    "hover:shadow-xl hover:shadow-[#c2703d]/40 hover:-translate-y-0.5",
+                    "disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                   )}>
                   {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                   {isPending ? "Sending…" : "Send reset link"}

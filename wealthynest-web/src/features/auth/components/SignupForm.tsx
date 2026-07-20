@@ -67,9 +67,9 @@ export function SignupForm() {
 
   const passwordValue = useWatch({ control: form.control, name: "password" });
 
-  const fields: { name: keyof RegisterFormValues; label: string; type?: string; placeholder: string }[] = [
-    { name: "fullName", label: "Full name", placeholder: "Your full name" },
-    { name: "email",    label: "Email",     type: "email", placeholder: "you@example.com" },
+  const fields: { name: keyof RegisterFormValues; label: string; type?: string; placeholder: string; autoComplete: string }[] = [
+    { name: "fullName", label: "Full name", placeholder: "Your full name", autoComplete: "name" },
+    { name: "email",    label: "Email",     type: "email", placeholder: "you@example.com", autoComplete: "email" },
   ];
 
   return (
@@ -78,6 +78,7 @@ export function SignupForm() {
       {/* ── Left panel — brand ──────────────────────────────── */}
       <div className="hidden lg:flex flex-col justify-between w-[44%] shrink-0 relative overflow-hidden
         bg-gradient-to-br from-[#6b4526] via-[#a85f30] to-[#c9a227] p-12">
+        <div className="absolute inset-0 bg-dot-grid opacity-40 pointer-events-none" aria-hidden />
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -bottom-16 -right-16 w-80 h-80 rounded-full bg-white/5 blur-3xl" />
           <div className="absolute top-20 left-0 w-60 h-60 rounded-full bg-[#e2a877]/10 blur-3xl" />
@@ -93,7 +94,8 @@ export function SignupForm() {
             Start your<br />financial journey
           </h1>
           <p className="text-[#ecc9a3] text-sm leading-relaxed max-w-xs">
-            Join thousands of Indian families managing money smarter every day.
+            Free, forever — no VC funding, no ads, nothing here to sell you but a better way to
+            track your money.
           </p>
           <ul className="space-y-3">
             {PERKS.map(({ icon: Icon, text }) => (
@@ -120,7 +122,7 @@ export function SignupForm() {
           <span className="text-lg font-bold text-foreground">WealthyNest</span>
         </div>
 
-        <div className="w-full max-w-sm">
+        <div className="w-full max-w-sm animate-fade-in-up">
           <div className="mb-7">
             <h2 className="text-2xl font-bold text-foreground mb-1">Create account</h2>
             <p className="text-muted-foreground text-sm">It&apos;s free. No card required.</p>
@@ -141,12 +143,14 @@ export function SignupForm() {
           )}
 
           <form onSubmit={form.handleSubmit((v) => register(v))} className="space-y-3">
-            {fields.map(({ name, label, type = "text", placeholder }) => (
+            {fields.map(({ name, label, type = "text", placeholder, autoComplete }) => (
               <div key={name} className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">{label}</label>
+                <label htmlFor={`signup-${name}`} className="text-xs font-medium text-muted-foreground">{label}</label>
                 <input
+                  id={`signup-${name}`}
                   data-testid={`signup-${name}-input`}
                   type={type}
+                  autoComplete={autoComplete}
                   placeholder={placeholder}
                   {...form.register(name)}
                   className={cn(
@@ -164,11 +168,13 @@ export function SignupForm() {
 
             {/* Password with strength indicator */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Password</label>
+              <label htmlFor="signup-password" className="text-xs font-medium text-muted-foreground">Password</label>
               <div className="relative">
                 <input
+                  id="signup-password"
                   data-testid="signup-password-input"
                   type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
                   placeholder="Min 8 chars, uppercase, number"
                   {...form.register("password")}
                   className={cn(
@@ -179,6 +185,7 @@ export function SignupForm() {
                   )}
                 />
                 <button type="button" onClick={() => setShowPassword(p => !p)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                   className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors">
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -191,11 +198,13 @@ export function SignupForm() {
 
             {/* Confirm password */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Confirm password</label>
+              <label htmlFor="signup-confirm-password" className="text-xs font-medium text-muted-foreground">Confirm password</label>
               <div className="relative">
                 <input
+                  id="signup-confirm-password"
                   data-testid="signup-confirm-password-input"
                   type={showConfirm ? "text" : "password"}
+                  autoComplete="new-password"
                   placeholder="••••••••"
                   {...form.register("confirmPassword")}
                   className={cn(
@@ -206,6 +215,7 @@ export function SignupForm() {
                   )}
                 />
                 <button type="button" onClick={() => setShowConfirm(p => !p)}
+                  aria-label={showConfirm ? "Hide password" : "Show password"}
                   className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors">
                   {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -219,7 +229,8 @@ export function SignupForm() {
               className={cn(
                 "w-full h-11 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 mt-1",
                 "bg-[#a85f30] hover:bg-[#c2703d] text-white shadow-lg shadow-[#c2703d]/30",
-                "disabled:opacity-60 disabled:cursor-not-allowed"
+                "hover:shadow-xl hover:shadow-[#c2703d]/40 hover:-translate-y-0.5",
+                "disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0"
               )}>
               {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
               {isPending ? "Creating account…" : "Create account"}

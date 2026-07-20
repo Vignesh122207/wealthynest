@@ -102,10 +102,12 @@ export function ResetPasswordForm({ token }: Props) {
 
             {/* New password */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">New password</label>
+              <label htmlFor="reset-new-password" className="text-xs font-medium text-muted-foreground">New password</label>
               <div className="relative">
                 <input
+                  id="reset-new-password"
                   type={showNew ? "text" : "password"}
+                  autoComplete="new-password"
                   placeholder="••••••••"
                   {...form.register("newPassword")}
                   className={cn(
@@ -116,6 +118,7 @@ export function ResetPasswordForm({ token }: Props) {
                   )}
                 />
                 <button type="button" onClick={() => setShowNew(p => !p)}
+                  aria-label={showNew ? "Hide password" : "Show password"}
                   className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors">
                   {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -141,10 +144,12 @@ export function ResetPasswordForm({ token }: Props) {
 
             {/* Confirm password */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Confirm password</label>
+              <label htmlFor="reset-confirm-password" className="text-xs font-medium text-muted-foreground">Confirm password</label>
               <div className="relative">
                 <input
+                  id="reset-confirm-password"
                   type={showConfirm ? "text" : "password"}
+                  autoComplete="new-password"
                   placeholder="••••••••"
                   {...form.register("confirmPassword")}
                   className={cn(
@@ -155,6 +160,7 @@ export function ResetPasswordForm({ token }: Props) {
                   )}
                 />
                 <button type="button" onClick={() => setShowConfirm(p => !p)}
+                  aria-label={showConfirm ? "Hide password" : "Show password"}
                   className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors">
                   {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -168,7 +174,8 @@ export function ResetPasswordForm({ token }: Props) {
               className={cn(
                 "w-full h-11 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 mt-2",
                 "bg-[#a85f30] hover:bg-[#c2703d] text-white shadow-lg shadow-[#c2703d]/30",
-                "disabled:opacity-60 disabled:cursor-not-allowed"
+                "hover:shadow-xl hover:shadow-[#c2703d]/40 hover:-translate-y-0.5",
+                "disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0"
               )}>
               {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
               {isPending ? "Saving…" : "Set new password"}

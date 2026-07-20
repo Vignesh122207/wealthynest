@@ -13,7 +13,7 @@ export const registerSchema = z.object({
               .regex(/[A-Z]/, "Must contain an uppercase letter")
               .regex(/[a-z]/, "Must contain a lowercase letter")
               .regex(/\d/, "Must contain a number"),
-  confirmPassword: z.string(),
+  confirmPassword: z.string().min(1, "Please confirm your password"),
 }).refine((d) => d.password === d.confirmPassword, {
   message: "Passwords do not match",
   path: ["confirmPassword"],
@@ -28,7 +28,7 @@ export const resetPasswordSchema = z.object({
     .regex(/[A-Z]/, "Must contain an uppercase letter")
     .regex(/[a-z]/, "Must contain a lowercase letter")
     .regex(/\d/, "Must contain a number"),
-  confirmPassword: z.string(),
+  confirmPassword: z.string().min(1, "Please confirm your password"),
 }).refine((d) => d.newPassword === d.confirmPassword, {
   message: "Passwords do not match",
   path: ["confirmPassword"],

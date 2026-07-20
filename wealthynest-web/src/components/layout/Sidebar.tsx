@@ -80,7 +80,7 @@ const NAV_GROUPS = [
     label: "Account",
     items: [
       { href: "/settings",           label: "Settings",            icon: Settings, gradient: ["#6b7280", "#475569"] as Gradient },
-      { href: "/vault",              label: "Vault",                icon: KeyRound, gradient: ["#334155", "#64748b"] as Gradient },
+      { href: "/vault",              label: "Vault",                icon: KeyRound, gradient: ["#1e3a8a", "#1e293b"] as Gradient },
       { href: "/support-wealthynest", label: "Support WealthyNest", icon: Heart,    gradient: ["#fb7185", "#db2777"] as Gradient },
     ],
   },

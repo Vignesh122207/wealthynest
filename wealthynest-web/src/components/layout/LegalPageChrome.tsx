@@ -1,18 +1,22 @@
 "use client";
 
+import {Suspense} from "react";
 import Link from "next/link";
 import {ArrowLeft} from "lucide-react";
-import {useAuthStore} from "@/features/auth/store/auth.store";
+import {useSearchParams} from "next/navigation";
 import {PublicFooter, PublicNav} from "@/components/layout/PublicNav";
 
-// Privacy/Terms are reachable both from the marketing site (logged-out visitor) and from inside
-// Settings (already-signed-in user). Always showing the full marketing PublicNav made the page
-// feel like you'd been dropped back on the public site — for a signed-in user it's swapped for
-// the same minimal "back" header every other Settings subpage uses instead.
-export function LegalPageChrome({ children }: { children: React.ReactNode }) {
-  const user = useAuthStore(s => s.user);
+// Privacy/Terms are reachable both from the marketing site and from inside Settings. Which chrome
+// to show has to key off *where the click came from*, not whether you're logged in — a logged-in
+// user can still land here from the public landing page footer (bookmark, direct link, or just
+// browsing "/" while signed in), and showing a "← Settings" back-link in that case is a dead end,
+// not a shortcut. Settings' own links to these pages append ?from=settings; anything else
+// (marketing footer/nav, the cross-reference from within Terms' own body text) falls through to
+// the normal public chrome, which already adapts its own CTA for a logged-in visitor.
+function LegalPageChromeInner({ children }: { children: React.ReactNode }) {
+  const fromSettings = useSearchParams().get("from") === "settings";
 
-  if (user) {
+  if (fromSettings) {
     return (
       <div className="min-h-screen bg-background text-foreground flex flex-col">
         <div className="max-w-2xl mx-auto w-full px-4 pt-6">
@@ -32,5 +36,16 @@ export function LegalPageChrome({ children }: { children: React.ReactNode }) {
       {children}
       <PublicFooter />
     </div>
+  );
+}
+
+// useSearchParams() opts its subtree out of static prerendering unless wrapped in Suspense — these
+// pages are otherwise fully static (plain legal text, `export const metadata`), so this boundary
+// exists purely to satisfy that requirement, not because the content is actually slow to load.
+export function LegalPageChrome({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+      <LegalPageChromeInner>{children}</LegalPageChromeInner>
+    </Suspense>
   );
 }

@@ -117,12 +117,23 @@
   0%   { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
 
 @layer utilities {
   .tabular-nums { font-variant-numeric: tabular-nums; }
+  /* Subtle depth texture for the auth pages' colored brand panels — sits under the existing blur
+     circles, low enough opacity to read as texture rather than a pattern. */
+  .bg-dot-grid {
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.14) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
   .animate-fade-in-up { animation: fadeInUp 0.4s cubic-bezier(.22,1,.36,1) both; }
   .animate-fade-in    { animation: fadeIn 0.25s ease both; }
   .animate-scale-in   { animation: scaleIn 0.25s cubic-bezier(.22,1,.36,1) both; }
+  .animate-float      { animation: float 5s ease-in-out infinite; }
 
   /* Stagger delays for card grids */
   .delay-0   { animation-delay:   0ms; }
