@@ -77,7 +77,7 @@ export function SignupForm() {
 
       {/* ── Left panel — brand ──────────────────────────────── */}
       <div className="hidden lg:flex flex-col justify-between w-[44%] shrink-0 relative overflow-hidden
-        bg-gradient-to-br from-[#6b4526] via-[#a85f30] to-[#2563eb] p-12">
+        bg-gradient-to-br from-[#6b4526] via-[#a85f30] to-[#c9a227] p-12">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -bottom-16 -right-16 w-80 h-80 rounded-full bg-white/5 blur-3xl" />
           <div className="absolute top-20 left-0 w-60 h-60 rounded-full bg-[#e2a877]/10 blur-3xl" />
