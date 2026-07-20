@@ -25,7 +25,7 @@ test.describe("Responsive (mobile viewport)", () => {
   // once the overlay is open, navLink() matches both, so scope to `.last()` (the overlay's own
   // copy, mounted after the desktop one) for anything asserted while the overlay is expected open.
   test("dashboard shows the mobile menu toggle instead of the desktop sidebar @responsive", async ({ accountsPage }) => {
-    await accountsPage.goto(ROUTES.dashboard);
+    await accountsPage.goto(ROUTES.home);
     await expect(accountsPage.navLink(ROUTES.accounts)).toBeHidden();
 
     await accountsPage.openMobileMenu();
@@ -33,7 +33,7 @@ test.describe("Responsive (mobile viewport)", () => {
   });
 
   test("mobile nav link navigates and the menu closes behind it @responsive", async ({ accountsPage }) => {
-    await accountsPage.goto(ROUTES.dashboard);
+    await accountsPage.goto(ROUTES.home);
     await accountsPage.openMobileMenu();
     await accountsPage.navLink(ROUTES.accounts).last().click();
 
@@ -42,7 +42,7 @@ test.describe("Responsive (mobile viewport)", () => {
   });
 
   test("key pages have no horizontal overflow at mobile width @responsive", async ({ accountsPage }) => {
-    for (const route of [ROUTES.dashboard, ROUTES.accounts, ROUTES.transactions, ROUTES.investments]) {
+    for (const route of [ROUTES.home, ROUTES.accounts, ROUTES.transactions, ROUTES.investments]) {
       await accountsPage.goto(route);
       await accountsPage.expectNoHorizontalOverflow();
     }

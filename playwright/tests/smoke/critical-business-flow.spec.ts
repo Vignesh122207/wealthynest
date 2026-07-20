@@ -32,7 +32,7 @@ import {InvestmentsPage} from "../../pages/InvestmentsPage";
 // was actually rendering regressionUser's).
 test.describe("Critical Business Flow @smoke @critical", () => {
   test("a new user can complete the full core workflow in one session", async ({
-    page, loginPage, dashboardPage, e2eUser,
+    page, loginPage, homePage, e2eUser,
   }) => {
     const accountsPage = new AccountsPage(page);
     const transactionsPage = new TransactionsPage(page);
@@ -51,7 +51,7 @@ test.describe("Critical Business Flow @smoke @critical", () => {
 
     // ── 1. Login ────────────────────────────────────────────────────────────
     await loginPage.loginWithPassword(e2eUser.email, e2eUser.password);
-    await dashboardPage.expectLoaded();
+    await homePage.expectLoaded();
 
     // ── 2. Create Account — a bank account plus a cash wallet (Transfer needs 2 accounts) ──
     await accountsPage.gotoAccounts();
@@ -93,12 +93,12 @@ test.describe("Critical Business Flow @smoke @critical", () => {
     await investmentsPage.expectInvestmentVisible(fd.bankName);
 
     // ── 9. View Dashboard — everything created above should be reflected ───
-    await dashboardPage.gotoDashboard();
-    await dashboardPage.expectLoaded();
+    await homePage.gotoHome();
+    await homePage.expectLoaded();
     await expect(page.getByText(goal.name)).toBeVisible();
 
     // ── 10. Logout ───────────────────────────────────────────────────────────
-    await dashboardPage.logout();
+    await homePage.logout();
     await expect(page).toHaveURL(new RegExp(`${ROUTES.login}$`));
   });
 });

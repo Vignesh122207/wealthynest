@@ -66,8 +66,8 @@ export class LoginPage {
     await this.passkeyButton.click();
   }
 
-  async expectRedirectedToDashboard(): Promise<void> {
-    await expect(this.page).toHaveURL(new RegExp(`${ROUTES.dashboard}$`));
+  async expectRedirectedToHome(): Promise<void> {
+    await expect(this.page).toHaveURL(new RegExp(`${ROUTES.home}$`));
   }
 
   async expectStillOnLogin(): Promise<void> {

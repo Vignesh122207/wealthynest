@@ -47,7 +47,7 @@ beforeEach(() => {
 });
 
 describe("useLogin", () => {
-  it("clears the query cache, sets auth, greets by first name, and navigates to /dashboard", async () => {
+  it("clears the query cache, sets auth, greets by first name, and navigates to /home", async () => {
     mockedApi.login.mockResolvedValue(authResponse);
     const { Wrapper, queryClient } = createQueryClientWrapper();
     const clearSpy = vi.spyOn(queryClient, "clear");
@@ -59,7 +59,7 @@ describe("useLogin", () => {
     expect(clearSpy).toHaveBeenCalled();
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
     expect(toast.success).toHaveBeenCalledWith("Welcome back, Alice!");
-    expect(pushMock).toHaveBeenCalledWith("/dashboard");
+    expect(pushMock).toHaveBeenCalledWith("/home");
   });
 
   it("defaults rememberMe to false when omitted", async () => {
@@ -273,7 +273,7 @@ describe("usePinLogin", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
-    expect(pushMock).toHaveBeenCalledWith("/dashboard");
+    expect(pushMock).toHaveBeenCalledWith("/home");
   });
 
   it("shows 'Incorrect PIN' fallback on failure", async () => {
@@ -366,7 +366,7 @@ describe("usePasskeyLogin", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
-    expect(pushMock).toHaveBeenCalledWith("/dashboard");
+    expect(pushMock).toHaveBeenCalledWith("/home");
   });
 
   it("silently does nothing when the user cancels the browser prompt", async () => {

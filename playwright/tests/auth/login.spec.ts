@@ -1,9 +1,9 @@
 import {expect, test} from "../../fixtures";
 
 test.describe("Auth — Login", () => {
-  test("logs in with valid email + password and lands on the dashboard @smoke", async ({ loginPage, dashboardPage, toast, e2eUser }) => {
+  test("logs in with valid email + password and lands on home @smoke", async ({ loginPage, homePage, toast, e2eUser }) => {
     await loginPage.loginWithPassword(e2eUser.email, e2eUser.password);
-    await dashboardPage.expectLoaded();
+    await homePage.expectLoaded();
     await toast.expectVisible(new RegExp(`Welcome back`, "i"));
   });
 

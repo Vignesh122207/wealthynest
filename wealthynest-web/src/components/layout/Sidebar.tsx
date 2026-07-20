@@ -45,7 +45,7 @@ const NAV_GROUPS = [
   {
     label: "Overview",
     items: [
-      { href: "/dashboard",   label: "Home",         icon: Home,            gradient: ["#a855f7", "#6366f1"] as Gradient },
+      { href: "/home",   label: "Home",         icon: Home,            gradient: ["#a855f7", "#6366f1"] as Gradient },
       { href: "/accounts",    label: "Accounts",     icon: Wallet,          gradient: ["#3b82f6", "#06b6d4"] as Gradient },
       { href: "/expenses",    label: "Transactions", icon: ArrowLeftRight,  gradient: ["#0ea5e9", "#4f46e5"] as Gradient },
     ],

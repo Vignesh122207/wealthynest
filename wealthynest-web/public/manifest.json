@@ -2,7 +2,7 @@
   "name": "WealthyNest",
   "short_name": "WealthyNest",
   "description": "Smart personal finance for Indian families. Track expenses, budgets, investments and grow your wealth.",
-  "start_url": "/dashboard",
+  "start_url": "/home",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#6366f1",
@@ -46,7 +46,7 @@
       "name": "Dashboard",
       "short_name": "Home",
       "description": "View your financial overview",
-      "url": "/dashboard",
+      "url": "/home",
       "icons": [{ "src": "/icons/icon-192.png?v=ribbonw-copper", "sizes": "192x192" }]
     }
   ]

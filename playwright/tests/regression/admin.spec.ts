@@ -38,7 +38,7 @@ test.describe("Admin", () => {
     // Re-login after markAdmin — the token from provisionE2EUser's own login predates the role
     // change, and role is baked into the JWT at issuance.
     await login.loginWithPassword(admin.email, admin.password);
-    await login.expectRedirectedToDashboard();
+    await login.expectRedirectedToHome();
     adminPage = new AdminPage(adminBrowserPage);
 
     const target = await provisionE2EUser();
@@ -52,9 +52,9 @@ test.describe("Admin", () => {
     await adminContext.close();
   });
 
-  test("a non-admin visiting /admin is redirected to the dashboard @regression", async ({ authedPage }) => {
+  test("a non-admin visiting /admin is redirected to home @regression", async ({ authedPage }) => {
     await authedPage.goto("/admin");
-    await expect(authedPage).toHaveURL(/\/dashboard$/);
+    await expect(authedPage).toHaveURL(/\/home$/);
   });
 
   test("an admin sees the Overview tab with stats @regression", async () => {

@@ -122,7 +122,7 @@ export function Header({ title, subtitle, onExport }: HeaderProps) {
   const { toggleMobileMenu }  = useUIStore();
   const { user }              = useAuthStore();
   const pathname               = usePathname();
-  const isHome                 = pathname === "/dashboard";
+  const isHome                 = pathname === "/home";
 
   const [showNotifs, setShowNotifs] = useState(false);
 

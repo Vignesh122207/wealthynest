@@ -1,7 +1,7 @@
 import {expect, test} from "../../fixtures";
 import {api} from "../../helpers/api.helper";
 import {LoginPage} from "../../pages/auth/LoginPage";
-import {DashboardPage} from "../../pages/DashboardPage";
+import {HomePage} from "../../pages/HomePage";
 import type {BrowserContext, Page} from "@playwright/test";
 
 // A real Google Sign-In round trip, closing the one gap webauthn.spec.ts's own comment used to
@@ -84,8 +84,8 @@ test.describe("Google OAuth (real round trip via backend test double)", () => {
     await page.evaluate((token) => { (window as unknown as { __wnTestIdToken: string }).__wnTestIdToken = token; }, idToken);
     await page.getByTestId("mock-google-signin-button").click();
 
-    await login.expectRedirectedToDashboard();
-    await new DashboardPage(page).expectLoaded();
+    await login.expectRedirectedToHome();
+    await new HomePage(page).expectLoaded();
 
     // Re-mint a fresh token for the same email to fetch a cleanup accessToken directly via the API
     // (an ID token backs a single sign-in event conceptually; minting a new one for teardown is

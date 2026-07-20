@@ -23,13 +23,13 @@ test.describe("Responsive (tablet-landscape viewport)", () => {
   // proving the app's desktop layout holds up at a narrower-than-typical desktop width, not just
   // full-size monitors.
   test("dashboard shows the desktop sidebar, not the mobile menu toggle @responsive", async ({ accountsPage }) => {
-    await accountsPage.goto(ROUTES.dashboard);
+    await accountsPage.goto(ROUTES.home);
     await expect(accountsPage.navLink(ROUTES.accounts)).toBeVisible();
     await expect(accountsPage.byTestId(TEST_IDS.nav.mobileMenuToggle)).toBeHidden();
   });
 
   test("key pages have no horizontal overflow at tablet-landscape width @responsive", async ({ accountsPage }) => {
-    for (const route of [ROUTES.dashboard, ROUTES.accounts, ROUTES.transactions, ROUTES.investments]) {
+    for (const route of [ROUTES.home, ROUTES.accounts, ROUTES.transactions, ROUTES.investments]) {
       await accountsPage.goto(route);
       await accountsPage.expectNoHorizontalOverflow();
     }

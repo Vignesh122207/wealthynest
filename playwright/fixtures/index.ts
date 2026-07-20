@@ -3,7 +3,7 @@ import {regressionStorageStatePathFor, storageStatePathFor} from "../config/env"
 import {type E2EUserFixtureData, readE2EUser, readRegressionUser} from "../helpers/auth.helper";
 import {LoginPage} from "../pages/auth/LoginPage";
 import {SignupPage} from "../pages/auth/SignupPage";
-import {DashboardPage} from "../pages/DashboardPage";
+import {HomePage} from "../pages/HomePage";
 import {AccountsPage} from "../pages/AccountsPage";
 import {TransactionsPage} from "../pages/TransactionsPage";
 import {BudgetsPage} from "../pages/BudgetsPage";
@@ -40,7 +40,7 @@ interface Fixtures {
 
   loginPage: LoginPage;
   signupPage: SignupPage;
-  dashboardPage: DashboardPage;
+  homePage: HomePage;
   accountsPage: AccountsPage;
   transactionsPage: TransactionsPage;
   budgetsPage: BudgetsPage;
@@ -90,7 +90,7 @@ export const test = base.extend<Fixtures>({
 
   loginPage:        async ({ page }, use) => { await use(new LoginPage(page)); },
   signupPage:       async ({ page }, use) => { await use(new SignupPage(page)); },
-  dashboardPage:    async ({ page }, use) => { await use(new DashboardPage(page)); },
+  homePage:    async ({ page }, use) => { await use(new HomePage(page)); },
   accountsPage:     async ({ authedPage }, use) => { await use(new AccountsPage(authedPage)); },
   transactionsPage: async ({ authedPage }, use) => { await use(new TransactionsPage(authedPage)); },
   budgetsPage:      async ({ authedPage }, use) => { await use(new BudgetsPage(authedPage)); },

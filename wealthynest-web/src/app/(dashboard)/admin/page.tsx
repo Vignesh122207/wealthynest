@@ -42,7 +42,7 @@ export default function AdminPage() {
   const { data: openTickets } = useOpenTicketCount();
 
   useEffect(() => {
-    if (user && user.role !== "ADMIN") router.replace("/dashboard");
+    if (user && user.role !== "ADMIN") router.replace("/home");
   }, [user, router]);
 
   // `user` is already hydrated from the persisted auth store by the time this route is

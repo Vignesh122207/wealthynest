@@ -34,6 +34,11 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: "standalone",
   images: { remotePatterns: [{ protocol: "https", hostname: "**" }] },
+  // /dashboard renamed to /home — keeps existing bookmarks and already-installed PWA shortcuts
+  // (which cached the old start_url) working instead of 404ing.
+  async redirects() {
+    return [{ source: "/dashboard", destination: "/home", permanent: true }];
+  },
   async headers() {
     return [{
       source: "/(.*)",

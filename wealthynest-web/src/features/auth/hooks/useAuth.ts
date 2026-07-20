@@ -20,7 +20,7 @@ export function useLogin() {
       qc.clear();
       setAuth(data.user, data.accessToken, data.refreshToken);
       toast.success(`Welcome back, ${data.user.fullName.split(" ")[0]}!`);
-      router.push("/dashboard");
+      router.push("/home");
     },
     onError: (e: ApiError) => toast.error(e.response?.data?.message ?? "Login failed"),
   });
@@ -153,7 +153,7 @@ export function usePinLogin() {
       qc.clear();
       setAuth(data.user, data.accessToken, data.refreshToken);
       toast.success(`Welcome back, ${data.user.fullName.split(" ")[0]}!`);
-      router.push("/dashboard");
+      router.push("/home");
     },
     onError: (e: ApiError) => toast.error(e.response?.data?.message ?? "Incorrect PIN"),
   });
@@ -211,7 +211,7 @@ export function usePasskeyLogin() {
       qc.clear();
       setAuth(data.user, data.accessToken, data.refreshToken);
       toast.success(`Welcome back, ${data.user.fullName.split(" ")[0]}!`);
-      router.push("/dashboard");
+      router.push("/home");
     },
     onError: (e: unknown) => {
       if (e instanceof DOMException && e.name === "NotAllowedError") return; // user cancelled — silent
@@ -232,7 +232,7 @@ export function useGoogleLogin() {
       qc.clear();
       setAuth(data.user, data.accessToken, data.refreshToken);
       toast.success(`Welcome, ${data.user.fullName.split(" ")[0]}!`);
-      router.push("/dashboard");
+      router.push("/home");
     },
     onError: (e: ApiError) => toast.error(e.response?.data?.message ?? "Google sign-in failed"),
   });

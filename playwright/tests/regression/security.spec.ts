@@ -34,7 +34,7 @@ test.describe("Security — password change", () => {
     page = await context.newPage();
     const login = new LoginPage(page);
     await login.loginWithPassword(email, originalPassword);
-    await login.expectRedirectedToDashboard();
+    await login.expectRedirectedToHome();
   });
 
   test.afterAll(async () => {
@@ -55,7 +55,7 @@ test.describe("Security — password change", () => {
 
     const login = new LoginPage(page);
     await login.loginWithPassword(email, newPassword);
-    await login.expectRedirectedToDashboard();
+    await login.expectRedirectedToHome();
 
     // Re-login to get a token minted after the change — the old accessToken predates it and
     // markAdmin's own comment documents the same "role/credential baked in at issuance" gotcha.

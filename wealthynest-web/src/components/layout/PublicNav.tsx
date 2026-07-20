@@ -42,7 +42,7 @@ export function PublicNav() {
 
       <div className="flex items-center gap-3">
         {user ? (
-          <Link href="/dashboard"
+          <Link href="/home"
             className="text-sm bg-[#a85f30] hover:bg-[#c2703d] text-white px-4 py-2 rounded-xl transition-colors font-medium shadow-sm">
             Go to Dashboard
           </Link>

@@ -215,7 +215,7 @@ export function LoginForm() {
   // deliberately NOT a live subscription. A fresh login inside this same page lifecycle calls
   // setAuth() (to populate the store for the redirect that follows), and if this read the store
   // reactively, a pinEnabled user would see the PIN screen flash for a frame right after
-  // successfully signing in with password/Google/passkey, before router.push("/dashboard")
+  // successfully signing in with password/Google/passkey, before router.push("/home")
   // finishes — this only asks "was PIN already set up on this device before I arrived here?".
   const [pinCandidate, setPinCandidate] = useState<{ eligible: boolean; name: string } | null>(null);
   const [hydrated, setHydrated] = useState(false);

@@ -42,7 +42,7 @@ test.describe("WebAuthn / Passkeys", () => {
     try {
       const login = new LoginPage(tunnelPage);
       await login.loginWithPassword(user.email, user.password);
-      await login.expectRedirectedToDashboard();
+      await login.expectRedirectedToHome();
 
       await addVirtualAuthenticator(tunnelPage);
       const settings = new SettingsPage(tunnelPage);
@@ -56,7 +56,7 @@ test.describe("WebAuthn / Passkeys", () => {
       await expect(tunnelPage).toHaveURL(/\/login$/);
 
       await login.loginWithPasskey(user.email);
-      await login.expectRedirectedToDashboard();
+      await login.expectRedirectedToHome();
     } finally {
       await api.closeAccount(user.auth.accessToken).catch(() => {});
       await tunnelContext.close();

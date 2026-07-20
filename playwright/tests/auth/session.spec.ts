@@ -6,7 +6,7 @@ test.describe("Auth — Session handling", () => {
   test("visiting a protected route while logged out redirects to /login @smoke", async ({ page }) => {
     // Deliberately the plain `page` fixture (no storageState) — a genuinely unauthenticated
     // context, exercising DashboardLayout's client-side guard (app/(dashboard)/layout.tsx).
-    await page.goto(ROUTES.dashboard);
+    await page.goto(ROUTES.home);
     await expect(page).toHaveURL(new RegExp(`${ROUTES.login}$`));
   });
 
@@ -27,7 +27,7 @@ test.describe("Auth — Session handling", () => {
       );
     });
     const page = await context.newPage();
-    await page.goto(ROUTES.dashboard);
+    await page.goto(ROUTES.home);
     // DashboardLayout's getMe() call 401s immediately; axios.ts's interceptor tries /auth/refresh
     // with the (also fake) refresh token, that fails too, and it force-logs-out to /login.
     await expect(page).toHaveURL(new RegExp(`${ROUTES.login}$`), { timeout: 15000 });
