@@ -6,11 +6,17 @@ import {Sidebar} from "@/components/layout/Sidebar";
 import {MobileNav} from "@/components/layout/MobileNav";
 import {useAuthStore} from "@/features/auth/store/auth.store";
 import {authApi} from "@/features/auth/api/auth.api";
+import {useAppLockStore} from "@/features/auth/store/appLock.store";
+import {useAppLockTrigger} from "@/features/auth/hooks/useAppLockTrigger";
+import {AppLockScreen} from "@/features/auth/components/AppLockScreen";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, setUser } = useAuthStore();
+  const isLocked  = useAppLockStore((s) => s.isLocked);
   const router    = useRouter();
   const [hydrated, setHydrated] = useState(false);
+
+  useAppLockTrigger();
 
   useEffect(() => { setHydrated(true); }, []);
 
@@ -47,11 +53,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       >
         Skip to content
       </a>
-      <Sidebar />
-      <div id="main-content" className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {children}
+      {/* inert while locked: keeps the still-mounted page (no data loss, no refetch) behind the
+          lock screen out of tab order and screen-reader focus, not just visually obscured. */}
+      <div className="contents" inert={isLocked || undefined}>
+        <Sidebar />
+        <div id="main-content" className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          {children}
+        </div>
+        <MobileNav />
       </div>
-      <MobileNav />
+      {isLocked && <AppLockScreen />}
     </div>
   );
 }

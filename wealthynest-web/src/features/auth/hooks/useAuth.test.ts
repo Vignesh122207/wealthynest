@@ -5,7 +5,7 @@ import {
   useLogin, useRegister, useLogout, useVerifyEmail, useResendVerification, useUpdateProfile,
   useChangePassword, useChangeEmail, useForgotPassword, useResetPassword, useEnablePin,
   useDisablePin, usePinLogin, usePasskeys, useRegisterPasskey, useDeletePasskey,
-  usePasskeyLogin, useGoogleLogin, useCloseAccount,
+  usePasskeyLogin, useGoogleLogin, useCloseAccount, useUnlockWithPin, useUnlockWithPasskey,
 } from "./useAuth";
 import { authApi } from "../api/auth.api";
 import { useAuthStore } from "../store/auth.store";
@@ -285,6 +285,76 @@ describe("usePinLogin", () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(toast.error).toHaveBeenCalledWith("Incorrect PIN");
+  });
+});
+
+describe("useUnlockWithPin", () => {
+  it("sets auth from the rotated tokens WITHOUT clearing the query cache or navigating", async () => {
+    mockedApi.pinLogin.mockResolvedValue(authResponse);
+    const { Wrapper, queryClient } = createQueryClientWrapper();
+    const clearSpy = vi.spyOn(queryClient, "clear");
+
+    const { result } = renderHook(() => useUnlockWithPin(), { wrapper: Wrapper });
+    result.current.mutate({ refreshToken: "rt", pin: "1234" });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
+    expect(clearSpy).not.toHaveBeenCalled();
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it("shows 'Incorrect PIN' fallback on failure", async () => {
+    mockedApi.pinLogin.mockRejectedValue({});
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useUnlockWithPin(), { wrapper: Wrapper });
+    result.current.mutate({ refreshToken: "rt", pin: "0000" });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(toast.error).toHaveBeenCalledWith("Incorrect PIN");
+  });
+});
+
+describe("useUnlockWithPasskey", () => {
+  it("uses the current user's email, sets auth, and does not clear cache or navigate", async () => {
+    useAuthStore.setState({ user: baseUser });
+    mockedApi.getPasskeyLoginOptions.mockResolvedValue({} as never);
+    mockedGetPasskeyAssertion.mockResolvedValue({ id: "cred1" } as never);
+    mockedApi.passkeyLogin.mockResolvedValue(authResponse);
+    const { Wrapper, queryClient } = createQueryClientWrapper();
+    const clearSpy = vi.spyOn(queryClient, "clear");
+
+    const { result } = renderHook(() => useUnlockWithPasskey(), { wrapper: Wrapper });
+    result.current.mutate(false);
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedApi.getPasskeyLoginOptions).toHaveBeenCalledWith("a@x.com");
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
+    expect(clearSpy).not.toHaveBeenCalled();
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it("silently does nothing when the user cancels the browser prompt", async () => {
+    useAuthStore.setState({ user: baseUser });
+    mockedApi.getPasskeyLoginOptions.mockResolvedValue({} as never);
+    mockedGetPasskeyAssertion.mockRejectedValue(new DOMException("cancelled", "NotAllowedError"));
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useUnlockWithPasskey(), { wrapper: Wrapper });
+    result.current.mutate(false);
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("errors without calling the API when there is no active user", async () => {
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useUnlockWithPasskey(), { wrapper: Wrapper });
+    result.current.mutate(false);
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(mockedApi.getPasskeyLoginOptions).not.toHaveBeenCalled();
   });
 });
 

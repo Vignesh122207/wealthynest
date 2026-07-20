@@ -159,6 +159,39 @@ export function usePinLogin() {
   });
 }
 
+// Deliberately separate from usePinLogin/usePasskeyLogin rather than reusing them: those clear
+// the whole query cache and redirect to /home, correct for a real login landing fresh, but wrong
+// for the app-lock screen — the user never left their page, so unlocking should just re-arm the
+// session in place (new rotated tokens) without wiping already-loaded data or navigating them
+// away from wherever they were.
+export function useUnlockWithPin() {
+  const { setAuth } = useAuthStore();
+  return useMutation({
+    mutationFn: ({ refreshToken, pin }: { refreshToken: string; pin: string }) =>
+      authApi.pinLogin(refreshToken, pin),
+    onSuccess: (data) => setAuth(data.user, data.accessToken, data.refreshToken),
+    onError: (e: ApiError) => toast.error(e.response?.data?.message ?? "Incorrect PIN"),
+  });
+}
+
+export function useUnlockWithPasskey() {
+  const { user, setAuth } = useAuthStore();
+  return useMutation({
+    mutationFn: async (rememberMe: boolean) => {
+      if (!user?.email) throw new Error("No active session");
+      const options = await authApi.getPasskeyLoginOptions(user.email);
+      const credential = await getPasskeyAssertion(options);
+      return authApi.passkeyLogin(user.email, credential, rememberMe);
+    },
+    onSuccess: (data) => setAuth(data.user, data.accessToken, data.refreshToken),
+    onError: (e: unknown) => {
+      if (e instanceof DOMException && e.name === "NotAllowedError") return; // user cancelled — silent
+      const err = e as ApiError;
+      toast.error(err.response?.data?.message ?? "Passkey unlock failed");
+    },
+  });
+}
+
 export function usePasskeys() {
   return useQuery({
     queryKey: ["auth", "passkeys"],
