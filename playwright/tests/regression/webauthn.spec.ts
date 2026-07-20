@@ -4,6 +4,8 @@ import {api} from "../../helpers/api.helper";
 import {addVirtualAuthenticator} from "../../helpers/webauthn.helper";
 import {LoginPage} from "../../pages/auth/LoginPage";
 import {SettingsPage} from "../../pages/SettingsPage";
+import {HomePage} from "../../pages/HomePage";
+import {AppLockScreen} from "../../pages/AppLockScreen";
 
 // Its own file, its own single dedicated disposable user (see security.spec.ts's comment on why
 // this used to live there and got moved) — keeping this file's total auth-endpoint traffic to
@@ -57,6 +59,62 @@ test.describe("WebAuthn / Passkeys", () => {
 
       await login.loginWithPasskey(user.email);
       await login.expectRedirectedToHome();
+    } finally {
+      await api.closeAccount(user.auth.accessToken).catch(() => {});
+      await tunnelContext.close();
+    }
+  });
+
+  // Its own provisioned user/context rather than continuing the test above's — that test's user
+  // and tunnelContext are local to its own function scope (a deliberate try/finally per-test
+  // pattern, not a shared beforeAll), and restructuring it to share state risked the very
+  // rate-limit tuning this file's own comment above describes fixing. Self-contained costs a
+  // second provision + password login, but zero of the passkey *registration* traffic
+  // (POST /users/me/webauthn/register/*) counts against the tight 10/min /auth/ bucket the file
+  // comment is protecting — only the app-lock unlock's own options+verify calls do, same as the
+  // pair the first test already spends on its own passkey login.
+  test("the app-lock screen's passkey unlock works @regression", async ({ browser }) => {
+    test.slow(); // real 31s wait to clear the grace period — needs more than the 30s default
+    const TUNNEL_BASE_URL = "https://wealthynest.in";
+    const user = await provisionE2EUser();
+    const tunnelContext = await browser.newContext({ baseURL: TUNNEL_BASE_URL });
+    const tunnelPage = await tunnelContext.newPage();
+
+    try {
+      const login = new LoginPage(tunnelPage);
+      await login.loginWithPassword(user.email, user.password);
+      await login.expectRedirectedToHome();
+
+      await addVirtualAuthenticator(tunnelPage);
+      const settings = new SettingsPage(tunnelPage);
+      await settings.gotoSecurity();
+      await settings.addPasskey(`E2E App-Lock Passkey ${Date.now()}`);
+
+      const home = new HomePage(tunnelPage);
+      const appLock = new AppLockScreen(tunnelPage);
+      // gotoHome() is a real page.goto() (hard navigation), which remounts DashboardLayout fresh —
+      // useAppLockTrigger's own usePasskeys() call has to refetch from scratch, and it's what
+      // decides whether the trigger arms at all. Proceeding straight to goBackground() without
+      // giving that fetch time to land is exactly what used to make this test flaky: backgrounding
+      // could fire while the app still thought this account had zero passkeys and never armed.
+      await home.gotoHome();
+      await home.expectLoaded();
+      // Tracking the specific GET /webauthn/passkeys response across this navigation proved
+      // fragile in practice (Playwright's response tracking doesn't reliably survive a hard
+      // page.goto() boundary — confirmed by hitting "No resource with given identifier found"
+      // while trying to read one). A short settle wait after the fresh page has already rendered
+      // is simpler and just as effective: useAppLockTrigger's own usePasskeys() call fires on
+      // mount and this is comfortably more than a same-region GET needs to complete.
+      await tunnelPage.waitForTimeout(2000);
+
+      await appLock.goBackground();
+      await tunnelPage.waitForTimeout(31_000); // > useAppLockTrigger's 30s BACKGROUND_GRACE_MS
+      await appLock.goForeground();
+      await appLock.expectVisible();
+
+      await appLock.passkeyButton.click();
+      await appLock.expectNotVisible();
+      await expect(tunnelPage).toHaveURL(/\/home$/); // stayed put — no login-flow redirect fired
     } finally {
       await api.closeAccount(user.auth.accessToken).catch(() => {});
       await tunnelContext.close();

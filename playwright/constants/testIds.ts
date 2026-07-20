@@ -24,6 +24,12 @@ export const TEST_IDS = {
     pinUsePassword:         "login-pin-use-password",
     googleContainer:        "google-signin-container",
   },
+  appLock: {
+    pinInput:      "applock-pin-input",
+    pinSubmit:     "applock-pin-submit",
+    passkeyButton: "applock-passkey-button",
+    signOut:       "applock-sign-out",
+  },
   signup: {
     fullNameInput:        "signup-fullName-input",
     emailInput:           "signup-email-input",

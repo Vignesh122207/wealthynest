@@ -132,6 +132,15 @@ export const api = {
     await client().delete("/users/me", { headers: { Authorization: `Bearer ${accessToken}` } });
   },
 
+  /** Enables PIN quick-unlock directly — for app-lock.spec.ts, which is testing what happens
+   * *after* PIN is already set up, not the Settings enable-PIN form itself. Under /users/me/, not
+   * /auth/, so it counts against the general 200 req/min limit, not the tighter 10/min auth one. */
+  async enablePin(accessToken: string, currentPassword: string, pin: string): Promise<void> {
+    await client().post("/users/me/pin/enable", { currentPassword, pin }, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+  },
+
   /** Mints a Google-ID-token-shaped JWT via the backend's `e2e-oauth-test`-profile-only test
    * double (see TestGoogleAuthController) — only reachable when the API is running with that
    * profile active. Used by google-oauth.spec.ts to drive a real Google Sign-In round trip

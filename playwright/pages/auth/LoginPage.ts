@@ -42,8 +42,19 @@ export class LoginPage {
   get pinInput(): Locator {
     return this.page.getByTestId(TEST_IDS.login.pinInput);
   }
+  get pinSubmit(): Locator {
+    return this.page.getByTestId(TEST_IDS.login.pinSubmit);
+  }
   get passkeyButton(): Locator {
     return this.page.getByTestId(TEST_IDS.login.passkeyButton);
+  }
+
+  /** Only ever shown when the auth store already has pinEnabled + a refreshToken cached from a
+   * prior login on this device (see LoginForm.tsx's pinCandidate check) — call loginWithPassword
+   * (or otherwise arrive at that state) before this, not instead of it. */
+  async loginWithPin(pin: string): Promise<void> {
+    await this.pinInput.fill(pin);
+    await this.pinSubmit.click();
   }
 
   /** Full password-path login: email screen -> "Sign in with password" -> password step -> submit. */
