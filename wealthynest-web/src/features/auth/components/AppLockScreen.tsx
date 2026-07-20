@@ -2,9 +2,12 @@
 
 import {useState} from "react";
 import {Fingerprint, KeyRound, Loader2} from "lucide-react";
+import {toast} from "sonner";
 import {useAuthStore} from "../store/auth.store";
 import {useAppLockStore} from "../store/appLock.store";
 import {usePasskeys, useLogout, useUnlockWithPasskey, useUnlockWithPin} from "../hooks/useAuth";
+import {useNativeBiometricStatus} from "../hooks/useNativeBiometric";
+import {BiometryErrorType, isBiometryError, retrievePinViaBiometric} from "../utils/nativeBiometric";
 import {isWebAuthnSupported} from "../utils/webauthn";
 import {BrandMark} from "@/components/icons/BrandMark";
 
@@ -22,6 +25,8 @@ export function AppLockScreen() {
   const { mutate: unlockWithPasskey, isPending: passkeyPending } = useUnlockWithPasskey();
   const { mutate: logout, isPending: loggingOut } = useLogout();
   const { data: passkeys } = usePasskeys();
+  const { data: nativeBiometric } = useNativeBiometricStatus();
+  const [biometricPending, setBiometricPending] = useState(false);
 
   if (!user) return null;
 
@@ -31,6 +36,7 @@ export function AppLockScreen() {
   // passkey button gated purely on browser support with zero registered credentials behind it).
   const pinAvailable = user.pinEnabled;
   const passkeyAvailable = isWebAuthnSupported() && (passkeys?.length ?? 0) > 0;
+  const biometricAvailable = pinAvailable && !!nativeBiometric?.available && !!nativeBiometric?.pinStored;
 
   const handlePinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,6 +46,22 @@ export function AppLockScreen() {
 
   const handlePasskeyUnlock = () => {
     unlockWithPasskey(false, { onSuccess: unlock });
+  };
+
+  // Biometric success only proves "this device" — the retrieved PIN still goes through the same
+  // server-verified unlock a typed PIN would, so an out-of-sync/stale stored PIN just fails there
+  // with the usual "Incorrect PIN" toast rather than silently admitting anyone.
+  const handleBiometricUnlock = async () => {
+    if (!refreshToken) return;
+    setBiometricPending(true);
+    try {
+      const storedPin = await retrievePinViaBiometric();
+      unlockWithPin({ refreshToken, pin: storedPin }, { onSuccess: unlock, onSettled: () => setBiometricPending(false) });
+    } catch (e) {
+      setBiometricPending(false);
+      if (isBiometryError(e) && (e.code === BiometryErrorType.userCancel || e.code === BiometryErrorType.appCancel)) return; // cancelled — silent
+      toast.error("Fingerprint unlock failed");
+    }
   };
 
   return (
@@ -100,6 +122,20 @@ export function AppLockScreen() {
             >
               {passkeyPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Fingerprint className="w-4 h-4" />}
               {passkeyPending ? "Follow your device's prompt…" : "Unlock with a passkey"}
+            </button>
+          )}
+
+          {biometricAvailable && (
+            <button
+              data-testid="applock-biometric-button"
+              type="button"
+              onClick={handleBiometricUnlock}
+              disabled={biometricPending}
+              className="w-full h-11 rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-2
+                bg-muted hover:bg-muted/80 text-foreground disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {biometricPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Fingerprint className="w-4 h-4" />}
+              {biometricPending ? "Follow your device's prompt…" : "Unlock with fingerprint"}
             </button>
           )}
         </div>

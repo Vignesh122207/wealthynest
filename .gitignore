@@ -5,7 +5,9 @@
 
 # Android signing keystore — permanent identity, never commit. Back this up somewhere durable
 # outside git; losing it means losing the ability to ever update the Play Store listing.
-android/keystore/
+android-twa-legacy/keystore/
+wealthynest-web/android/keystore/
+wealthynest-web/android/keystore.properties
 
 # macOS
 .DS_Store
@@ -22,16 +24,28 @@ target/
 .next/
 node_modules/
 
-# Android TWA build output (Bubblewrap-generated Gradle project + build artifacts) — regenerable
-# from android/twa-manifest.json via `bubblewrap update && bubblewrap build`, not source.
-android/app/build/
-android/app/.cxx/
-android/.gradle/
-android/build/
-android/*.apk
-android/*.apk.idsig
-android/*.aab
-android/local.properties
+# Retired TWA (Bubblewrap) Android project — kept only for reference/rollback and its signing
+# keystore, superseded by the Capacitor project at wealthynest-web/android. See
+# ANDROID_APP_ROADMAP.md.
+android-twa-legacy/app/build/
+android-twa-legacy/app/.cxx/
+android-twa-legacy/.gradle/
+android-twa-legacy/build/
+android-twa-legacy/*.apk
+android-twa-legacy/*.apk.idsig
+android-twa-legacy/*.aab
+android-twa-legacy/local.properties
+
+# Capacitor Android project (native Gradle build output) — regenerable via `npx cap sync android`
+# from wealthynest-web/capacitor.config.ts, not source.
+wealthynest-web/android/app/build/
+wealthynest-web/android/app/.cxx/
+wealthynest-web/android/.gradle/
+wealthynest-web/android/build/
+wealthynest-web/android/*.apk
+wealthynest-web/android/*.apk.idsig
+wealthynest-web/android/*.aab
+wealthynest-web/android/local.properties
 
 # Claude Code local files
 .claude/

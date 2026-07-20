@@ -5,6 +5,8 @@ import { AppLockScreen } from "./AppLockScreen";
 import { useAuthStore } from "../store/auth.store";
 import { authApi } from "../api/auth.api";
 import { isWebAuthnSupported } from "../utils/webauthn";
+import { isNativePlatform, isNativeBiometricAvailable, hasBiometricPinStored, retrievePinViaBiometric, isBiometryError } from "../utils/nativeBiometric";
+import { toast } from "sonner";
 import type { User } from "../types/auth.types";
 
 const pushMock = vi.fn();
@@ -19,10 +21,23 @@ vi.mock("../utils/webauthn", () => ({
   isWebAuthnSupported: vi.fn(() => false),
   getPasskeyAssertion: vi.fn(),
 }));
+vi.mock("../utils/nativeBiometric", () => ({
+  BiometryErrorType: { userCancel: "userCancel", appCancel: "appCancel" },
+  isNativePlatform: vi.fn(() => false),
+  isNativeBiometricAvailable: vi.fn(() => Promise.resolve(false)),
+  hasBiometricPinStored: vi.fn(() => Promise.resolve(false)),
+  retrievePinViaBiometric: vi.fn(),
+  isBiometryError: vi.fn(() => false),
+}));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const mockedApi = vi.mocked(authApi);
 const mockedWebAuthnSupported = vi.mocked(isWebAuthnSupported);
+const mockedIsNativePlatform = vi.mocked(isNativePlatform);
+const mockedIsNativeBiometricAvailable = vi.mocked(isNativeBiometricAvailable);
+const mockedHasBiometricPinStored = vi.mocked(hasBiometricPinStored);
+const mockedRetrievePinViaBiometric = vi.mocked(retrievePinViaBiometric);
+const mockedIsBiometryError = vi.mocked(isBiometryError);
 
 const user: User = {
   id: "u1", fullName: "Alice Smith", email: "a@x.com", role: "MEMBER",
@@ -42,6 +57,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockedWebAuthnSupported.mockReturnValue(false);
   mockedApi.listPasskeys.mockResolvedValue([]);
+  mockedIsNativePlatform.mockReturnValue(false);
+  mockedIsNativeBiometricAvailable.mockResolvedValue(false);
+  mockedHasBiometricPinStored.mockResolvedValue(false);
   useAuthStore.setState({
     user, accessToken: "at", refreshToken: "rt", isAuthenticated: true, userVersion: 0,
   });
@@ -135,5 +153,72 @@ describe("AppLockScreen", () => {
 
     await waitFor(() => expect(mockedApi.logout).toHaveBeenCalledWith("rt"));
     expect(pushMock).toHaveBeenCalledWith("/login");
+  });
+
+  describe("native biometric unlock", () => {
+    it("stays hidden on web even for a PIN account", async () => {
+      renderLockScreen();
+      await waitFor(() => expect(mockedHasBiometricPinStored).not.toHaveBeenCalled());
+      expect(screen.queryByTestId("applock-biometric-button")).not.toBeInTheDocument();
+    });
+
+    it("stays hidden natively when the device has no PIN saved to secure storage", async () => {
+      mockedIsNativePlatform.mockReturnValue(true);
+      mockedIsNativeBiometricAvailable.mockResolvedValue(true);
+      mockedHasBiometricPinStored.mockResolvedValue(false);
+      renderLockScreen();
+      await waitFor(() => expect(mockedHasBiometricPinStored).toHaveBeenCalled());
+      expect(screen.queryByTestId("applock-biometric-button")).not.toBeInTheDocument();
+    });
+
+    it("stays hidden for a passkey-only account even if biometrics happen to be available", async () => {
+      useAuthStore.setState({ user: { ...user, pinEnabled: false } });
+      mockedIsNativePlatform.mockReturnValue(true);
+      mockedIsNativeBiometricAvailable.mockResolvedValue(true);
+      mockedHasBiometricPinStored.mockResolvedValue(true);
+      renderLockScreen();
+      await waitFor(() => expect(mockedHasBiometricPinStored).toHaveBeenCalled());
+      expect(screen.queryByTestId("applock-biometric-button")).not.toBeInTheDocument();
+    });
+
+    it("shows the biometric button when native, available, and a PIN is stored", async () => {
+      mockedIsNativePlatform.mockReturnValue(true);
+      mockedIsNativeBiometricAvailable.mockResolvedValue(true);
+      mockedHasBiometricPinStored.mockResolvedValue(true);
+      renderLockScreen();
+      await waitFor(() => expect(screen.getByTestId("applock-biometric-button")).toBeInTheDocument());
+    });
+
+    it("retrieves the PIN via biometric and unlocks through the same server-verified PIN login", async () => {
+      mockedIsNativePlatform.mockReturnValue(true);
+      mockedIsNativeBiometricAvailable.mockResolvedValue(true);
+      mockedHasBiometricPinStored.mockResolvedValue(true);
+      mockedRetrievePinViaBiometric.mockResolvedValue("9012");
+      mockedApi.pinLogin.mockResolvedValue({
+        accessToken: "at3", refreshToken: "rt3", user, expiresIn: 3600, tokenType: "Bearer",
+      });
+      renderLockScreen();
+
+      await waitFor(() => expect(screen.getByTestId("applock-biometric-button")).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId("applock-biometric-button"));
+
+      await waitFor(() => expect(mockedApi.pinLogin).toHaveBeenCalledWith("rt", "9012"));
+    });
+
+    it("silently ignores a cancelled biometric prompt", async () => {
+      mockedIsNativePlatform.mockReturnValue(true);
+      mockedIsNativeBiometricAvailable.mockResolvedValue(true);
+      mockedHasBiometricPinStored.mockResolvedValue(true);
+      mockedRetrievePinViaBiometric.mockRejectedValue(Object.assign(new Error("cancelled"), { code: "userCancel" }));
+      mockedIsBiometryError.mockReturnValue(true);
+      renderLockScreen();
+
+      await waitFor(() => expect(screen.getByTestId("applock-biometric-button")).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId("applock-biometric-button"));
+
+      await waitFor(() => expect(mockedRetrievePinViaBiometric).toHaveBeenCalled());
+      expect(mockedApi.pinLogin).not.toHaveBeenCalled();
+      expect(toast.error).not.toHaveBeenCalled();
+    });
   });
 });

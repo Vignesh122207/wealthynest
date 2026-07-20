@@ -33,6 +33,12 @@ import {
     usePasskeys,
     useRegisterPasskey,
 } from "@/features/auth/hooks/useAuth";
+import {
+    useDisableBiometricPinUnlock,
+    useEnableBiometricPinUnlock,
+    useNativeBiometricStatus,
+} from "@/features/auth/hooks/useNativeBiometric";
+import {isNativePlatform} from "@/features/auth/utils/nativeBiometric";
 import {useAuthStore} from "@/features/auth/store/auth.store";
 import {isWebAuthnSupported} from "@/features/auth/utils/webauthn";
 import {formatDate} from "@/lib/utils";
@@ -164,6 +170,77 @@ const pinSchema = z.object({
 }).refine(d => d.pin === d.confirmPin, { message: "PINs do not match", path: ["confirmPin"] });
 type PinValues = z.infer<typeof pinSchema>;
 
+// Native-only (see nativeBiometric.ts for why this is scoped to PIN accounts, not passkey ones):
+// lets a device fingerprint stand in for typing the PIN. The PIN itself is stored in Android
+// Keystore-backed secure storage, released only after a fresh biometric check, then submitted
+// through the same server-verified unlock a typed PIN would use — never trusted on its own.
+function BiometricPinToggle() {
+  const { data, isLoading } = useNativeBiometricStatus();
+  const { mutate: enableBiometric, isPending: enabling } = useEnableBiometricPinUnlock();
+  const { mutate: disableBiometric, isPending: disabling } = useDisableBiometricPinUnlock();
+  const [showForm, setShowForm] = useState(false);
+  const [pin, setPin] = useState("");
+
+  if (isLoading || !data?.available) return null;
+
+  if (data.pinStored) {
+    return (
+      <div className="flex items-center justify-between gap-3 pt-3 mt-3 border-t border-border/60">
+        <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+          <Check className="w-3.5 h-3.5" /> Fingerprint unlock is enabled
+        </span>
+        <button onClick={() => disableBiometric()} disabled={disabling} data-testid="security-biometric-disable"
+          className="h-8 px-3 rounded-lg text-xs font-medium bg-muted hover:bg-muted/80 text-muted-foreground">
+          Disable
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pt-3 mt-3 border-t border-border/60">
+      {showForm ? (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            enableBiometric(pin, { onSuccess: () => { setPin(""); setShowForm(false); } });
+          }}
+          className="flex gap-2 items-center"
+        >
+          <input
+            type="password"
+            inputMode="numeric"
+            maxLength={6}
+            autoFocus
+            autoComplete="off"
+            aria-label="Re-enter PIN"
+            value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, ""))}
+            placeholder="Re-enter PIN"
+            data-testid="security-biometric-pin-input"
+            className="flex-1 h-9 px-3 rounded-lg text-center tracking-[0.3em] outline-none transition-all
+              bg-background border border-border text-foreground placeholder:text-muted-foreground
+              focus:border-[#c2703d] focus:ring-2 focus:ring-[#c2703d]/25"
+          />
+          <button type="submit" disabled={enabling || pin.length < 4} data-testid="security-biometric-enable-submit"
+            className="h-9 px-3.5 rounded-xl text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-60 transition-colors flex items-center gap-1.5 shrink-0">
+            {enabling && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Confirm
+          </button>
+          <button type="button" onClick={() => { setShowForm(false); setPin(""); }}
+            className="h-9 w-9 flex items-center justify-center rounded-xl bg-muted hover:bg-muted/80 text-muted-foreground shrink-0">
+            <X className="w-4 h-4" />
+          </button>
+        </form>
+      ) : (
+        <button onClick={() => setShowForm(true)} data-testid="security-biometric-enable-toggle"
+          className="h-9 px-3.5 rounded-xl text-xs font-medium bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 transition-colors flex items-center gap-1.5">
+          <Fingerprint className="w-3.5 h-3.5" /> Enable fingerprint unlock
+        </button>
+      )}
+    </div>
+  );
+}
+
 function PinSection() {
   const { user } = useAuthStore();
   const { mutate: enablePin, isPending: enabling } = useEnablePin();
@@ -212,14 +289,17 @@ function PinSection() {
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-between gap-3">
-            <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-              <Check className="w-3.5 h-3.5" /> PIN unlock is enabled
-            </span>
-            <button onClick={() => setConfirmDisable(true)}
-              className="h-8 px-3 rounded-lg text-xs font-medium bg-muted hover:bg-muted/80 text-muted-foreground">
-              Disable
-            </button>
+          <div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                <Check className="w-3.5 h-3.5" /> PIN unlock is enabled
+              </span>
+              <button onClick={() => setConfirmDisable(true)}
+                className="h-8 px-3 rounded-lg text-xs font-medium bg-muted hover:bg-muted/80 text-muted-foreground">
+                Disable
+              </button>
+            </div>
+            <BiometricPinToggle />
           </div>
         )
       ) : showForm ? (

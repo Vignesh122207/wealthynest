@@ -10,6 +10,7 @@ import {
 import { authApi } from "../api/auth.api";
 import { useAuthStore } from "../store/auth.store";
 import { createPasskey, getPasskeyAssertion } from "../utils/webauthn";
+import { disableBiometricPinUnlock } from "../utils/nativeBiometric";
 import { toast } from "sonner";
 import type { User, AuthResponse } from "../types/auth.types";
 
@@ -27,11 +28,13 @@ vi.mock("../api/auth.api", () => ({
   },
 }));
 vi.mock("../utils/webauthn", () => ({ createPasskey: vi.fn(), getPasskeyAssertion: vi.fn() }));
+vi.mock("../utils/nativeBiometric", () => ({ disableBiometricPinUnlock: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const mockedApi = vi.mocked(authApi);
 const mockedCreatePasskey = vi.mocked(createPasskey);
 const mockedGetPasskeyAssertion = vi.mocked(getPasskeyAssertion);
+const mockedDisableBiometricPinUnlock = vi.mocked(disableBiometricPinUnlock);
 
 const baseUser: User = {
   id: "u1", fullName: "Alice Smith", email: "a@x.com", role: "MEMBER",
@@ -260,6 +263,7 @@ describe("useEnablePin / useDisablePin", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(useAuthStore.getState().user?.pinEnabled).toBe(false);
+    expect(mockedDisableBiometricPinUnlock).toHaveBeenCalled();
   });
 });
 

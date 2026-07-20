@@ -5,6 +5,7 @@ import {toast} from "sonner";
 import {authApi} from "../api/auth.api";
 import {useAuthStore} from "../store/auth.store";
 import {createPasskey, getPasskeyAssertion} from "../utils/webauthn";
+import {disableBiometricPinUnlock} from "../utils/nativeBiometric";
 import type {LoginFormValues, RegisterFormValues} from "../schemas/auth.schema";
 
 type ApiError = { response?: { data?: { message?: string; error?: string } } };
@@ -132,10 +133,16 @@ export function useEnablePin() {
 
 export function useDisablePin() {
   const { user, setUser } = useAuthStore();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: () => authApi.disablePin(),
-    onSuccess: () => {
+    // A PIN disabled server-side but still sitting in native secure storage would just fail
+    // biometric unlock with a stale "incorrect PIN" later — harmless, but worth clearing so state
+    // doesn't linger orphaned. No-op on web.
+    onSuccess: async () => {
       if (user) setUser({ ...user, pinEnabled: false });
+      await disableBiometricPinUnlock();
+      qc.invalidateQueries({ queryKey: ["auth", "nativeBiometric"] });
       toast.success("PIN unlock disabled");
     },
     onError: () => toast.error("Failed to disable PIN"),
