@@ -17,7 +17,7 @@
   "maskableIconUrl": "https://wealthynest.in/icons/icon-maskable-512.png?v=ribbonw-indigo",
   "splashScreenFadeOutDuration": 300,
   "signingKey": {
-    "path": "../keystore/wealthynest-release.jks",
+    "path": "/Users/vikkypriya/Workspace/wealthynest/android/keystore/wealthynest-release.jks",
     "alias": "wealthynest"
   },
   "appVersionName": "1.0.0",

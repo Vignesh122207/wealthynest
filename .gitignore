@@ -22,5 +22,16 @@ target/
 .next/
 node_modules/
 
+# Android TWA build output (Bubblewrap-generated Gradle project + build artifacts) — regenerable
+# from android/twa-manifest.json via `bubblewrap update && bubblewrap build`, not source.
+android/app/build/
+android/app/.cxx/
+android/.gradle/
+android/build/
+android/*.apk
+android/*.apk.idsig
+android/*.aab
+android/local.properties
+
 # Claude Code local files
 .claude/
