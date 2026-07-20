@@ -97,4 +97,38 @@ test.describe("App Lock & PIN", () => {
     await login.loginWithPin("1234");
     await login.expectRedirectedToHome();
   });
+
+  // Regression coverage for a real bug: useAppLockTrigger used to track "went hidden at" only in
+  // an in-memory ref, which dies along with the rest of the JS context on a real tab/app close —
+  // a cold start had nothing left to compare against, so it never locked even though the session
+  // itself resumed straight into the dashboard.
+  test("closing the tab entirely and reopening it locks on the very next load, even though the fresh page never saw its own background/foreground cycle @regression", async () => {
+    test.slow(); // real 31s wait to clear the grace period — needs more than the 30s default
+    await accounts.gotoAccounts();
+    await appLock.goBackground();
+    await page.waitForTimeout(31_000); // > useAppLockTrigger's 30s BACKGROUND_GRACE_MS
+
+    // Closing this Page and opening a fresh one in the same context is the closest a test can get
+    // to a real tab/app close: the new page shares the context's localStorage (where the "went
+    // hidden at" marker lives) but starts with none of the old page's in-memory state.
+    await page.close();
+    page = await context.newPage();
+    appLock = new AppLockScreen(page);
+    accounts = new AccountsPage(page);
+    await page.goto("/accounts");
+
+    await appLock.expectVisible();
+  });
+
+  // The other half of the same bug: isLocked itself is deliberately not persisted (a fresh page
+  // load re-derives it instead), which used to mean a plain refresh while genuinely locked wiped
+  // the lock and admitted the user with no PIN/passkey check at all.
+  test("refreshing the page while the lock screen is up does not bypass it @regression", async () => {
+    await appLock.expectVisible(); // inherited locked state from the previous test
+    await page.reload();
+    await appLock.expectVisible(); // still locked after the reload — no bypass
+
+    await appLock.unlockWithPin("1234");
+    await appLock.expectNotVisible();
+  });
 });

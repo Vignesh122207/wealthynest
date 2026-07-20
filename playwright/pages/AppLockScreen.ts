@@ -9,6 +9,14 @@ import {TEST_IDS} from "../constants/testIds";
 export class AppLockScreen {
   constructor(private readonly page: Page) {}
 
+  /** The overlay itself, not tied to which unlock method(s) it offers — AppLockScreen only
+   * renders the PIN form when the account has a PIN configured and the passkey button when it has
+   * a registered passkey, so a passkey-only (or PIN-only) account never shows both. Asserting
+   * against this instead of e.g. pinInput is what makes expectVisible/expectNotVisible correct
+   * for every account shape, not just PIN-enabled ones. */
+  get dialog(): Locator {
+    return this.page.getByRole("dialog", { name: "Unlock WealthyNest" });
+  }
   get pinInput(): Locator {
     return this.page.getByTestId(TEST_IDS.appLock.pinInput);
   }
@@ -23,10 +31,10 @@ export class AppLockScreen {
   }
 
   async expectVisible(): Promise<void> {
-    await expect(this.pinInput).toBeVisible();
+    await expect(this.dialog).toBeVisible();
   }
   async expectNotVisible(): Promise<void> {
-    await expect(this.pinInput).not.toBeVisible();
+    await expect(this.dialog).not.toBeVisible();
   }
 
   async unlockWithPin(pin: string): Promise<void> {

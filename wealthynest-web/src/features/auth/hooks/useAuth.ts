@@ -4,6 +4,7 @@ import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {authApi} from "../api/auth.api";
 import {useAuthStore} from "../store/auth.store";
+import {clearPersistedHiddenAt} from "../store/appLock.store";
 import {createPasskey, getPasskeyAssertion} from "../utils/webauthn";
 import {disableBiometricPinUnlock} from "../utils/nativeBiometric";
 import type {LoginFormValues, RegisterFormValues} from "../schemas/auth.schema";
@@ -46,7 +47,9 @@ export function useLogout() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => { if (refreshToken) await authApi.logout(refreshToken); },
-    onSettled: () => { qc.clear(); logout(); router.push("/login"); },
+    // Otherwise a stale "went hidden at" marker from this session could immediately re-lock the
+    // very next login on this device, before that account has had any chance to actually go idle.
+    onSettled: () => { qc.clear(); logout(); clearPersistedHiddenAt(); router.push("/login"); },
   });
 }
 
