@@ -95,7 +95,7 @@ export default function SettingsPage() {
             href="/settings/profile"
             className="flex items-center gap-4 bg-card border border-border rounded-2xl p-4 hover:bg-muted/40 transition-colors group"
           >
-            <GlossyBadge gradient={["#6366f1", "#7c3aed"]} size="lg">
+            <GlossyBadge gradient={["#c2703d", "#27272a"]} size="lg">
               <span className="text-xl font-bold text-white select-none">{user ? getInitials(user.fullName) : "?"}</span>
             </GlossyBadge>
             <div className="flex-1 min-w-0">

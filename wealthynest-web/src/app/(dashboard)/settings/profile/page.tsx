@@ -50,7 +50,7 @@ export default function ProfilePage() {
 
           {/* Avatar */}
           <div className="flex flex-col items-center gap-3 bg-card border border-border rounded-2xl py-8">
-            <GlossyBadge gradient={["#6366f1", "#7c3aed"]} size="xl">
+            <GlossyBadge gradient={["#c2703d", "#27272a"]} size="xl">
               <span className="text-xl font-bold text-white select-none">{user ? getInitials(user.fullName) : "?"}</span>
             </GlossyBadge>
             <div className="text-center">
