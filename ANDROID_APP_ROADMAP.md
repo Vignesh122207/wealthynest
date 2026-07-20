@@ -3,9 +3,9 @@
 ## Decision: Capacitor (server mode), not a TWA
 
 WealthyNest was originally packaged as a **Trusted Web Activity** (Bubblewrap-generated Chrome
-shell). That project is retired and kept only for reference/rollback at `android-twa-legacy/`
-(its signing keystore is reused, see below — don't delete that directory). The app is now
-packaged with **[Capacitor](https://capacitorjs.com/)**, generated at `wealthynest-web/android`,
+shell). That project has been removed (its signing keystore was carried forward first — see
+below); this history is recoverable from git if ever needed. The app is now packaged with
+**[Capacitor](https://capacitorjs.com/)**, generated at `wealthynest-web/android`,
 for three things a TWA can't give: a native biometric unlock path (`BiometricPrompt`, not just
 Chrome's WebAuthn UI), first-party Capacitor plugin access for future native-only features, and a
 foundation that supports offline app-shell behavior without depending on Chrome specifically being
@@ -58,10 +58,9 @@ native biometric path is scoped specifically to **PIN-only accounts** (`useNativ
 - `wealthynest-web/android/keystore.properties.example` → copy to `keystore.properties`
   (git-ignored, never commit it) to build a signed release. Points at
   `wealthynest-web/android/keystore/wealthynest-release.jks` — the **same signing keystore** the
-  TWA used, copied over from `android-twa-legacy/keystore/` so this stays the same app identity if
-  it's ever submitted to Play under that key. Back this keystore up somewhere durable outside git;
-  losing it means losing the ability to ever update the Play Store listing.
-- `android-twa-legacy/` — retired TWA project, kept for rollback/reference only.
+  TWA used, so this stays the same app identity if it's ever submitted to Play under that key.
+  Back this keystore up somewhere durable outside git; losing it means losing the ability to ever
+  update the Play Store listing.
 
 ## Known gap: push notifications need re-verifying
 

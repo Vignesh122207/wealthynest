@@ -5,7 +5,6 @@
 
 # Android signing keystore — permanent identity, never commit. Back this up somewhere durable
 # outside git; losing it means losing the ability to ever update the Play Store listing.
-android-twa-legacy/keystore/
 wealthynest-web/android/keystore/
 wealthynest-web/android/keystore.properties
 
@@ -23,18 +22,6 @@ target/
 *.war
 .next/
 node_modules/
-
-# Retired TWA (Bubblewrap) Android project — kept only for reference/rollback and its signing
-# keystore, superseded by the Capacitor project at wealthynest-web/android. See
-# ANDROID_APP_ROADMAP.md.
-android-twa-legacy/app/build/
-android-twa-legacy/app/.cxx/
-android-twa-legacy/.gradle/
-android-twa-legacy/build/
-android-twa-legacy/*.apk
-android-twa-legacy/*.apk.idsig
-android-twa-legacy/*.aab
-android-twa-legacy/local.properties
 
 # Capacitor Android project (native Gradle build output) — regenerable via `npx cap sync android`
 # from wealthynest-web/capacitor.config.ts, not source.
