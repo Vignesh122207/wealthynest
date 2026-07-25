@@ -28,24 +28,28 @@ import type {BrowserContext, Page} from "@playwright/test";
 // project-name skip-guard, just gated on API reachability instead of a Playwright project.
 test.describe.configure({ mode: "serial" });
 
+// GoogleSignInButton.tsx renders its own real, fully-custom button now (see that file's own
+// comment for why — GIS's rendered iframe button couldn't be made to match this app's other
+// buttons) and calls google.accounts.id.prompt() on click instead of relying on a GIS-rendered
+// widget to receive the real click. The mock only needs to stand in for initialize()/prompt(),
+// not renderButton() — the button under test is our own real element
+// (data-testid="google-signin-web-button"), not an injected stand-in.
 const MOCK_GIS_SCRIPT = `
 window.google = {
   accounts: {
     id: {
       initialize(config) { window.__wnGoogleCallback = config.callback; },
-      renderButton(el, opts) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.setAttribute("data-testid", "mock-google-signin-button");
-        btn.textContent = "Continue with Google (test)";
-        btn.style.width = ((opts && opts.width) || 300) + "px";
-        btn.onclick = function () {
-          if (window.__wnGoogleCallback && window.__wnTestIdToken) {
-            window.__wnGoogleCallback({ credential: window.__wnTestIdToken });
-          }
-        };
-        el.innerHTML = "";
-        el.appendChild(btn);
+      prompt(momentListener) {
+        if (window.__wnGoogleCallback && window.__wnTestIdToken) {
+          window.__wnGoogleCallback({ credential: window.__wnTestIdToken });
+        }
+        if (momentListener) {
+          momentListener({
+            isNotDisplayed: function () { return false; },
+            isSkippedMoment: function () { return false; },
+            isDismissedMoment: function () { return true; },
+          });
+        }
       },
     },
   },
@@ -80,9 +84,9 @@ test.describe("Google OAuth (real round trip via backend test double)", () => {
 
     const login = new LoginPage(page);
     await login.goto();
-    await expect(page.getByTestId("mock-google-signin-button")).toBeVisible();
+    await expect(login.googleButton).toBeVisible();
     await page.evaluate((token) => { (window as unknown as { __wnTestIdToken: string }).__wnTestIdToken = token; }, idToken);
-    await page.getByTestId("mock-google-signin-button").click();
+    await login.googleButton.click();
 
     await login.expectRedirectedToHome();
     await new HomePage(page).expectLoaded();
@@ -106,9 +110,9 @@ test.describe("Google OAuth (real round trip via backend test double)", () => {
 
     const login = new LoginPage(page);
     await login.goto();
-    await expect(page.getByTestId("mock-google-signin-button")).toBeVisible();
+    await expect(login.googleButton).toBeVisible();
     await page.evaluate(() => { (window as unknown as { __wnTestIdToken: string }).__wnTestIdToken = "not-a-real-jwt"; });
-    await page.getByTestId("mock-google-signin-button").click();
+    await login.googleButton.click();
 
     await login.expectStillOnLogin();
   });

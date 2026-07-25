@@ -35,7 +35,10 @@ import {AppLockScreen} from "../../pages/AppLockScreen";
 test.describe.configure({ mode: "serial" });
 
 test.describe("WebAuthn / Passkeys", () => {
-  test("registers a passkey and signs back in with it @regression", async ({ browser }) => {
+  // Passkey has no full-login entry point anymore (see LoginPage.ts's own comment) — it's scoped
+  // entirely to the app-lock screen's returning-device unlock, which the next test below covers.
+  // This test is registration only.
+  test("registers a passkey @regression", async ({ browser }) => {
     const TUNNEL_BASE_URL = "https://wealthynest.in";
     const user = await provisionE2EUser();
     const tunnelContext = await browser.newContext({ baseURL: TUNNEL_BASE_URL });
@@ -53,12 +56,6 @@ test.describe("WebAuthn / Passkeys", () => {
       await settings.gotoSecurity();
       await settings.addPasskey(nickname);
       await settings.expectPasskeyVisible(nickname);
-
-      await settings.logout();
-      await expect(tunnelPage).toHaveURL(/\/login$/);
-
-      await login.loginWithPasskey(user.email);
-      await login.expectRedirectedToHome();
     } finally {
       await api.closeAccount(user.auth.accessToken).catch(() => {});
       await tunnelContext.close();
@@ -74,7 +71,9 @@ test.describe("WebAuthn / Passkeys", () => {
   // comment is protecting — only the app-lock unlock's own options+verify calls do, same as the
   // pair the first test already spends on its own passkey login.
   test("the app-lock screen's passkey unlock works @regression", async ({ browser }) => {
-    test.slow(); // real 31s wait to clear the grace period — needs more than the 30s default
+    // useAppLockTrigger's BACKGROUND_GRACE_MS is 90s, so this test needs a real wait past that —
+    // well over Playwright's own 30s default test timeout, hence test.slow() (triples it).
+    test.slow();
     const TUNNEL_BASE_URL = "https://wealthynest.in";
     const user = await provisionE2EUser();
     const tunnelContext = await browser.newContext({ baseURL: TUNNEL_BASE_URL });
@@ -108,11 +107,11 @@ test.describe("WebAuthn / Passkeys", () => {
       await tunnelPage.waitForTimeout(2000);
 
       await appLock.goBackground();
-      await tunnelPage.waitForTimeout(31_000); // > useAppLockTrigger's 30s BACKGROUND_GRACE_MS
+      await tunnelPage.waitForTimeout(91_000); // > useAppLockTrigger's 90s BACKGROUND_GRACE_MS
       await appLock.goForeground();
       await appLock.expectVisible();
 
-      await appLock.passkeyButton.click();
+      await appLock.fingerprintButton.click();
       await appLock.expectNotVisible();
       await expect(tunnelPage).toHaveURL(/\/home$/); // stayed put — no login-flow redirect fired
     } finally {

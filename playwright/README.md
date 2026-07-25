@@ -20,8 +20,9 @@ Phases 15-23 (one pass) closed out nearly every item the "Known gaps" section us
 column-mapping + PDF password + per-row editing (3 tests). Phase 17 — CAS Import depth, PDF
 password + manual-fix-a-row + add-missed-scheme (2 tests). Phase 18 — Stock/Mutual Fund investment
 creation via a mocked LiveSearch result (2 tests). Phase 19 — Dividend suggest/dismiss (2 tests, new
-file, direct-DB seeded). Phase 20 — a real WebAuthn passkey register+login round trip via a
-Chromium CDP virtual authenticator (1 test, new file). Phase 21 — firefox/webkit cross-browser
+file, direct-DB seeded). Phase 20 — a real WebAuthn passkey registration + app-lock-unlock round
+trip via a Chromium CDP virtual authenticator (1 test, new file; passkey's full-login entry point
+was later removed — see webauthn.spec.ts's own comment). Phase 21 — firefox/webkit cross-browser
 support: per-project user provisioning so `tests/regression/` can actually run against another
 browser without the singleton-account collision Phase 9 first documented. Phase 22 — Accessibility
 tightened from critical/serious-only to every axe severity tier (two real moderate findings fixed).

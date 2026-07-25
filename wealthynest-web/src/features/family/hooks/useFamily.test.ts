@@ -35,7 +35,7 @@ const baseUser: User = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useAuthStore.setState({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false, userVersion: 0 });
+  useAuthStore.setState({ user: null, accessToken: null, isAuthenticated: false, userVersion: 0 });
 });
 
 describe("useFamily", () => {

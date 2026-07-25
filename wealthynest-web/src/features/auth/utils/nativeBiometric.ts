@@ -1,11 +1,11 @@
-// Thin wrapper around the Capacitor native biometric + secure-storage plugins — mirrors
-// webauthn.ts's role as the platform-API boundary, kept mockable in tests. Deliberately scoped to
-// PIN-only accounts: a passkey account's WebAuthn ceremony already surfaces Android's native
-// fingerprint prompt on its own (Credential Manager), so gating that behind this plugin too would
-// double-prompt. The PIN itself lives in Android Keystore-backed secure storage (not
-// localStorage/preferences) so only a successful biometric check can retrieve it — see
-// AppLockScreen for how it's then submitted through the same server-verified unlock as a typed
-// PIN, never accepted as proof of identity on its own.
+// Bare fingerprint/face app-lock for the native shell — a purely local UI gate, not a credential.
+// The device's own BiometricPrompt (TEE-backed, checked only against fingerprints the OS owner
+// enrolled in Android/iOS Settings) IS the security boundary here; there's nothing further to
+// prove to the server, because the session behind the lock screen is already valid the whole
+// time it's up (see AppLockScreen's own comment — this is a local re-proof, not a re-login).
+// That's also why this stores no secret at all: "enabling" just remembers a boolean preference
+// after confirming the device can pass a biometric check; "unlocking" just re-runs that same
+// check and, on success, clears the lock screen directly.
 import { Capacitor } from "@capacitor/core";
 import { BiometricAuth, BiometryError, BiometryErrorType } from "@aparajita/capacitor-biometric-auth";
 import { SecureStoragePlugin } from "capacitor-secure-storage-plugin";
@@ -15,46 +15,45 @@ import { SecureStoragePlugin } from "capacitor-secure-storage-plugin";
 // code and out of their test mocks.
 export { BiometryErrorType };
 
-const STORED_PIN_KEY = "wealthynest.applock.pin";
+const ENABLED_KEY = "wealthynest.applock.biometricEnabled";
 
 export function isNativePlatform(): boolean {
   return Capacitor.isNativePlatform();
 }
 
-export async function isNativeBiometricAvailable(): Promise<boolean> {
+export async function isBiometricHardwareAvailable(): Promise<boolean> {
   if (!isNativePlatform()) return false;
   const { isAvailable } = await BiometricAuth.checkBiometry();
   return isAvailable;
 }
 
-export async function hasBiometricPinStored(): Promise<boolean> {
+export async function isBiometricUnlockEnabled(): Promise<boolean> {
   if (!isNativePlatform()) return false;
   try {
-    await SecureStoragePlugin.get({ key: STORED_PIN_KEY });
+    await SecureStoragePlugin.get({ key: ENABLED_KEY });
     return true;
   } catch {
     return false;
   }
 }
 
-/** Confirms the user's biometric identity, then stores the PIN so a future biometric check alone
- * can retrieve it. Throws (as a `BiometryError`) if the biometric prompt fails or is cancelled. */
-export async function enableBiometricPinUnlock(pin: string): Promise<void> {
-  await BiometricAuth.authenticate({ reason: "Confirm it's you to enable fingerprint unlock" });
-  await SecureStoragePlugin.set({ key: STORED_PIN_KEY, value: pin });
+/** Confirms the device can actually pass a biometric check right now, then remembers the
+ * preference. Throws (as a `BiometryError`) if the prompt fails or is cancelled — nothing gets
+ * enabled in that case. */
+export async function enableBiometricUnlock(): Promise<void> {
+  await BiometricAuth.authenticate({ reason: "Enable fingerprint unlock" });
+  await SecureStoragePlugin.set({ key: ENABLED_KEY, value: "true" });
 }
 
-export async function disableBiometricPinUnlock(): Promise<void> {
-  await SecureStoragePlugin.remove({ key: STORED_PIN_KEY });
+export async function disableBiometricUnlock(): Promise<void> {
+  await SecureStoragePlugin.remove({ key: ENABLED_KEY });
 }
 
-/** Prompts for biometric authentication and, on success, returns the PIN stored by
- * `enableBiometricPinUnlock`. The caller still submits this PIN through the normal server-verified
- * unlock — biometric success only proves "this device", not "this account". */
-export async function retrievePinViaBiometric(): Promise<string> {
+/** Prompts biometric and resolves on success. Callers use this to clear the lock screen directly
+ * — no server round trip, no stored secret to retrieve, since the session underneath is already
+ * valid the whole time the screen is up. */
+export async function verifyBiometric(): Promise<void> {
   await BiometricAuth.authenticate({ reason: "Unlock WealthyNest" });
-  const { value } = await SecureStoragePlugin.get({ key: STORED_PIN_KEY });
-  return value;
 }
 
 export function isBiometryError(e: unknown): e is BiometryError {

@@ -17,6 +17,9 @@ public class ErrorResponse {
     private final String message;
     private final String path;
     private final Map<String, String> fieldErrors;
+    /** Structured extras for programmatic handling — e.g. a lockout's {@code lockedUntil} — as
+     * opposed to {@code message}, which is just human-readable copy. See BusinessException. */
+    private final Map<String, String> details;
     @Builder.Default
     private final Instant timestamp = Instant.now();
 }

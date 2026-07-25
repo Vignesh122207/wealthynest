@@ -18,11 +18,6 @@ describe("loginSchema", () => {
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error.flatten().fieldErrors.password).toContain("Password is required");
   });
-
-  it("treats rememberMe as optional", () => {
-    const result = loginSchema.safeParse({ email: "user@example.com", password: "x" });
-    expect(result.success).toBe(true);
-  });
 });
 
 describe("registerSchema", () => {

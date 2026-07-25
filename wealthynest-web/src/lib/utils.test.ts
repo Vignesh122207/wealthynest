@@ -2,6 +2,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   cn,
   apiErrorMessage,
+  apiErrorCode,
+  apiErrorDetails,
+  apiRetryAfterSeconds,
   escapeCsvField,
   pctChange,
   formatTrendDelta,
@@ -45,6 +48,40 @@ describe("apiErrorMessage", () => {
 
   it("falls back for a non-object error value", () => {
     expect(apiErrorMessage("just a string", "fallback")).toBe("fallback");
+  });
+});
+
+describe("apiErrorCode", () => {
+  it("extracts the backend's machine-readable error code", () => {
+    const error = { response: { data: { error: "ACCOUNT_LOCKED" } } };
+    expect(apiErrorCode(error)).toBe("ACCOUNT_LOCKED");
+  });
+
+  it("returns undefined when there's no response payload", () => {
+    expect(apiErrorCode(new Error("network down"))).toBeUndefined();
+  });
+});
+
+describe("apiErrorDetails", () => {
+  it("extracts the structured details map a BusinessException attached", () => {
+    const error = { response: { data: { details: { lockedUntil: "2026-01-01T00:00:00Z" } } } };
+    expect(apiErrorDetails(error)).toEqual({ lockedUntil: "2026-01-01T00:00:00Z" });
+  });
+
+  it("returns undefined when there are no details", () => {
+    const error = { response: { data: {} } };
+    expect(apiErrorDetails(error)).toBeUndefined();
+  });
+});
+
+describe("apiRetryAfterSeconds", () => {
+  it("extracts the rate limiter's retryAfterSeconds", () => {
+    const error = { response: { data: { retryAfterSeconds: 42 } } };
+    expect(apiRetryAfterSeconds(error)).toBe(42);
+  });
+
+  it("returns undefined when absent", () => {
+    expect(apiRetryAfterSeconds({ response: { data: {} } })).toBeUndefined();
   });
 });
 

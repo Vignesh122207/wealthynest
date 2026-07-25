@@ -38,7 +38,7 @@ function VerifyEmailContent() {
     <div className="w-full max-w-md text-center space-y-6">
       {/* Logo */}
       <div className="flex items-center justify-center gap-2.5 mb-8">
-        <BrandMark boxClassName="w-10 h-10" iconClassName="w-5 h-5" />
+        <BrandMark boxClassName="w-10 h-10" iconClassName="w-7 h-7" />
         <span className="text-xl font-bold text-foreground tracking-tight">WealthyNest</span>
       </div>
 

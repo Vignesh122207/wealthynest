@@ -1,6 +1,7 @@
 package com.wealthynest.testsupport;
 
 import com.wealthynest.common.security.JwtTokenProvider;
+import com.wealthynest.common.security.RefreshCookieService;
 import com.wealthynest.common.security.TokenRevocationService;
 import com.wealthynest.config.CorsProperties;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -20,6 +21,10 @@ import static org.mockito.Mockito.mock;
  * header, so JwtAuthenticationFilter's real doFilterInternal short-circuits before touching any
  * of these mocks; SecurityTestUtils.authenticateAs() sets the SecurityContext directly for the
  * "logged in" test cases instead.
+ * <p>
+ * RefreshCookieService is the real bean, not a mock — AuthController/UserController depend on it
+ * directly (not via SecurityConfig), and its cookie-building logic has no external I/O, so
+ * exercising the real thing lets controller tests assert on the actual Set-Cookie header.
  */
 @TestConfiguration
 public class SecurityTestConfig {
@@ -28,4 +33,5 @@ public class SecurityTestConfig {
     @Bean public TokenRevocationService tokenRevocationService() { return mock(TokenRevocationService.class); }
     @Bean public PasswordEncoder passwordEncoder() { return mock(PasswordEncoder.class); }
     @Bean public CorsProperties corsProperties() { return new CorsProperties(); }
+    @Bean public RefreshCookieService refreshCookieService() { return new RefreshCookieService(); }
 }

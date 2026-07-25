@@ -11,4 +11,5 @@ import java.util.UUID;
 public interface VaultItemRepository extends JpaRepository<VaultItem, UUID> {
     List<VaultItem> findByUserIdOrderByFavoriteDescTitleAsc(UUID userId);
     Optional<VaultItem> findByIdAndUserId(UUID id, UUID userId);
+    void deleteByUserId(UUID userId);
 }

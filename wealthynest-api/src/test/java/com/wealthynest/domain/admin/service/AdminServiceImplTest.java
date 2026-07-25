@@ -5,12 +5,14 @@ import com.wealthynest.common.audit.AuditService;
 import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.domain.auth.repository.RefreshTokenRepository;
+import com.wealthynest.domain.auth.repository.WebAuthnCredentialRepository;
 import com.wealthynest.domain.auth.service.AuthService;
 import com.wealthynest.domain.user.dto.response.UserResponse;
 import com.wealthynest.domain.user.entity.User;
 import com.wealthynest.domain.user.entity.UserRole;
 import com.wealthynest.domain.user.mapper.UserMapper;
 import com.wealthynest.domain.user.repository.UserRepository;
+import com.wealthynest.domain.vault.repository.VaultItemRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -33,12 +35,14 @@ import static org.mockito.Mockito.argThat;
 @ExtendWith(MockitoExtension.class)
 class AdminServiceImplTest {
 
-    @Mock private UserRepository         userRepository;
-    @Mock private UserMapper             userMapper;
-    @Mock private RefreshTokenRepository refreshTokenRepository;
-    @Mock private AuthService            authService;
-    @Mock private AuditLogRepository     auditLogRepository;
-    @Mock private AuditService           auditService;
+    @Mock private UserRepository               userRepository;
+    @Mock private UserMapper                   userMapper;
+    @Mock private RefreshTokenRepository       refreshTokenRepository;
+    @Mock private AuthService                  authService;
+    @Mock private AuditLogRepository           auditLogRepository;
+    @Mock private AuditService                 auditService;
+    @Mock private VaultItemRepository          vaultItemRepository;
+    @Mock private WebAuthnCredentialRepository webAuthnCredentialRepository;
 
     @InjectMocks
     private AdminServiceImpl service;
@@ -163,6 +167,23 @@ class AdminServiceImplTest {
             assertThat(user.getEmail()).contains("@removed.invalid").doesNotContain("alice");
             assertThat(user.isActive()).isFalse();
             verify(refreshTokenRepository).revokeAllByUserId(targetId);
+        }
+
+        @Test
+        @DisplayName("wipes the PIN hash and hard-deletes vault items and passkeys — not just name/email")
+        void purgesCredentialsAndSecrets() {
+            User user = withId(User.builder()
+                    .fullName("Alice Real Name").email("alice@real.com").active(true)
+                    .pinHash("some-hash").pinEnabledAt(java.time.Instant.now()).build());
+            when(userRepository.findById(targetId)).thenReturn(Optional.of(user));
+            when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            service.anonymizeUser(targetId, actorId, "ip", "ua");
+
+            assertThat(user.getPinHash()).isNull();
+            assertThat(user.getPinEnabledAt()).isNull();
+            verify(vaultItemRepository).deleteByUserId(targetId);
+            verify(webAuthnCredentialRepository).deleteByUserId(targetId);
         }
     }
 

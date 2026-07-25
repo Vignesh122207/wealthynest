@@ -29,6 +29,7 @@ import {toast} from "sonner";
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 import {GreetingBanner} from "./_components/GreetingBanner";
+import {SecuritySetupPrompt} from "./_components/SecuritySetupPrompt";
 import {StatOverview} from "./_components/StatOverview";
 import {SmartAlerts} from "./_components/SmartAlerts";
 import {NetWorthTrend} from "./_components/NetWorthTrend";
@@ -298,6 +299,9 @@ export default function DashboardPage() {
             onNavigate={navigate}
             savingsRate={data?.savingsRate}
           />
+
+          {/* ── Native-only: nudge toward PIN/fingerprint setup until both are configured ── */}
+          <SecuritySetupPrompt />
 
           {/* ── Core dashboard data failed — the widgets below would otherwise render a silent
               zero-state indistinguishable from a genuinely new account, so this stands in for

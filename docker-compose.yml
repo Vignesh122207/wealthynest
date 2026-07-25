@@ -80,6 +80,11 @@ services:
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       FRONTEND_URL:  ${FRONTEND_URL}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      # Native Android sign-in (Desktop app OAuth client) — see AuthServiceImpl.googleLoginNative
+      # for why the backend, not the app, needs these to exchange an authorization code for an
+      # ID token: Google requires this client secret for that exchange even with PKCE.
+      GOOGLE_NATIVE_CLIENT_ID:     ${GOOGLE_NATIVE_CLIENT_ID:-}
+      GOOGLE_NATIVE_CLIENT_SECRET: ${GOOGLE_NATIVE_CLIENT_SECRET:-}
     networks:
       - wealthynest-net
     healthcheck:
@@ -95,6 +100,12 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${API_URL}
         NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+        # Separate from GOOGLE_CLIENT_ID (a "Web application" OAuth client, used by the browser
+        # GIS flow below) — Google only allows custom-URI-scheme redirects (what the native
+        # Capacitor OAuth flow needs, since it can't use an https redirect) on a "Desktop app"
+        # type OAuth client. Create that as its own client in Google Cloud Console; the two IDs
+        # are not interchangeable.
+        NEXT_PUBLIC_GOOGLE_NATIVE_CLIENT_ID: ${GOOGLE_NATIVE_CLIENT_ID}
     container_name: wealthynest-web
     restart: unless-stopped
     depends_on:

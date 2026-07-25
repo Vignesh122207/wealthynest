@@ -239,7 +239,7 @@ class WebAuthnServiceImplTest {
         @DisplayName("throws UNAUTHORIZED when the login challenge has expired or was never started")
         void throwsWhenChallengeMissing() {
             when(valueOperations.get("webauthn-login-challenge:a@x.com")).thenReturn(null);
-            assertThatThrownBy(() -> service.verifyAuthentication("a@x.com", Map.of(), false, "ip", "ua"))
+            assertThatThrownBy(() -> service.verifyAuthentication("a@x.com", Map.of(), false, null, "ip", "ua"))
                     .isInstanceOf(BusinessException.class);
         }
 
@@ -249,7 +249,7 @@ class WebAuthnServiceImplTest {
             when(valueOperations.get("webauthn-login-challenge:a@x.com"))
                     .thenReturn(java.util.Base64.getEncoder().encodeToString(new byte[32]));
 
-            assertThatThrownBy(() -> service.verifyAuthentication("a@x.com", Map.of("garbage", "data"), false, "ip", "ua"))
+            assertThatThrownBy(() -> service.verifyAuthentication("a@x.com", Map.of("garbage", "data"), false, null, "ip", "ua"))
                     .isInstanceOf(BusinessException.class);
         }
     }

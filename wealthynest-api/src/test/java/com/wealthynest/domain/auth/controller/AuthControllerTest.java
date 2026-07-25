@@ -2,6 +2,7 @@ package com.wealthynest.domain.auth.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthynest.common.exception.BusinessException;
+import com.wealthynest.common.security.RefreshCookieService;
 import com.wealthynest.config.RateLimitConfig;
 import com.wealthynest.config.SecurityConfig;
 import com.wealthynest.domain.auth.dto.request.LoginRequest;
@@ -11,6 +12,7 @@ import com.wealthynest.domain.auth.service.AuthService;
 import com.wealthynest.domain.auth.service.WebAuthnService;
 import com.wealthynest.testsupport.SecurityTestConfig;
 import com.wealthynest.testsupport.SecurityTestUtils;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -30,11 +32,14 @@ import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -69,7 +74,11 @@ class AuthControllerTest {
 
     private AuthResponse sampleAuthResponse() {
         return AuthResponse.builder().accessToken("access").refreshToken("refresh")
-                .expiresIn(3600).tokenType("Bearer").build();
+                .refreshTokenExpiresInMs(2_592_000_000L).expiresIn(3600).tokenType("Bearer").build();
+    }
+
+    private Cookie refreshCookie(String value) {
+        return new Cookie(RefreshCookieService.COOKIE_NAME, value);
     }
 
     @Test
@@ -133,16 +142,34 @@ class AuthControllerTest {
     class ErrorMappingTests {
 
         @Test
-        @DisplayName("registering a duplicate email maps BusinessException to its declared status/code")
-        void duplicateEmailMapsToBusinessExceptionStatus() throws Exception {
+        @DisplayName("a BusinessException from the service maps to its declared status/code")
+        void businessExceptionMapsToItsDeclaredStatus() throws Exception {
             when(authService.register(any()))
-                    .thenThrow(new BusinessException("Email already registered", HttpStatus.CONFLICT, "EMAIL_TAKEN"));
+                    .thenThrow(new BusinessException("Something went wrong", HttpStatus.BAD_REQUEST, "SOME_ERROR"));
 
             mockMvc.perform(post("/api/v1/auth/register")
                             .contentType("application/json")
                             .content(objectMapper.writeValueAsString(validRegisterRequest())))
-                    .andExpect(status().isConflict())
-                    .andExpect(jsonPath("$.error").value("EMAIL_TAKEN"));
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error").value("SOME_ERROR"));
+        }
+
+        @Test
+        @DisplayName("an ACCOUNT_LOCKED BusinessException maps to 423 with the lockedUntil detail exposed")
+        void accountLockedExposesLockedUntilDetail() throws Exception {
+            LoginRequest req = new LoginRequest();
+            ReflectionTestUtils.setField(req, "email", "jane@example.com");
+            ReflectionTestUtils.setField(req, "password", "Passw0rd1");
+            when(authService.login(any(), any(), any())).thenThrow(new BusinessException(
+                    "Too many failed attempts. Please try again later.", HttpStatus.LOCKED, "ACCOUNT_LOCKED",
+                    Map.of("lockedUntil", "2026-01-01T00:00:00Z")));
+
+            mockMvc.perform(post("/api/v1/auth/login")
+                            .contentType("application/json")
+                            .content(objectMapper.writeValueAsString(req)))
+                    .andExpect(status().isLocked())
+                    .andExpect(jsonPath("$.error").value("ACCOUNT_LOCKED"))
+                    .andExpect(jsonPath("$.details.lockedUntil").value("2026-01-01T00:00:00Z"));
         }
 
         @Test
@@ -188,7 +215,7 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("login success returns 200 with the service's AuthResponse")
+    @DisplayName("login success returns 200 with the service's AuthResponse, sets the refresh token as an httpOnly cookie, and never puts it in the response body")
     void loginSuccessReturnsAuthResponse() throws Exception {
         LoginRequest req = new LoginRequest();
         ReflectionTestUtils.setField(req, "email", "jane@example.com");
@@ -199,30 +226,51 @@ class AuthControllerTest {
                         .contentType("application/json")
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.accessToken").value("access"));
+                .andExpect(jsonPath("$.data.accessToken").value("access"))
+                .andExpect(jsonPath("$.data.refreshToken").doesNotExist())
+                .andExpect(cookie().value(RefreshCookieService.COOKIE_NAME, "refresh"))
+                .andExpect(cookie().httpOnly(RefreshCookieService.COOKIE_NAME, true));
     }
 
     @Test
-    @DisplayName("refresh delegates the request and returns the new AuthResponse")
+    @DisplayName("refresh reads the token from the cookie (not a body), delegates to the service, and rotates the cookie")
     void refreshDelegatesToService() throws Exception {
-        when(authService.refresh(any())).thenReturn(sampleAuthResponse());
+        when(authService.refresh(eq("some-token"), any(), any())).thenReturn(sampleAuthResponse());
 
-        mockMvc.perform(post("/api/v1/auth/refresh")
-                        .contentType("application/json")
-                        .content("{\"refreshToken\":\"some-token\"}"))
+        mockMvc.perform(post("/api/v1/auth/refresh").cookie(refreshCookie("some-token")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.accessToken").value("access"));
+                .andExpect(jsonPath("$.data.accessToken").value("access"))
+                .andExpect(cookie().value(RefreshCookieService.COOKIE_NAME, "refresh"));
     }
 
     @Test
-    @DisplayName("logout delegates the raw refresh token and client metadata to the service")
+    @DisplayName("refresh with no cookie at all fails fast with INVALID_TOKEN, before the service is ever called")
+    void refreshWithNoCookieFailsFast() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/refresh"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("INVALID_TOKEN"));
+
+        verifyNoInteractions(authService);
+    }
+
+    @Test
+    @DisplayName("logout reads the token from the cookie, delegates to the service, and clears the cookie")
     void logoutDelegatesToService() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/logout")
-                        .contentType("application/json")
-                        .content("{\"refreshToken\":\"some-token\"}"))
-                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/auth/logout").cookie(refreshCookie("some-token")))
+                .andExpect(status().isOk())
+                .andExpect(cookie().maxAge(RefreshCookieService.COOKIE_NAME, 0));
 
         verify(authService).logout(eq("some-token"), any(), any());
+    }
+
+    @Test
+    @DisplayName("logout with no cookie still clears it and no-ops on the service, rather than erroring")
+    void logoutWithNoCookieNoOps() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/logout"))
+                .andExpect(status().isOk())
+                .andExpect(cookie().maxAge(RefreshCookieService.COOKIE_NAME, 0));
+
+        verifyNoInteractions(authService);
     }
 
     @Test
@@ -278,15 +326,40 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("pinLogin delegates the request and client metadata to the service")
+    @DisplayName("googleLoginNative delegates the request and client metadata to the service")
+    void googleLoginNativeDelegatesToService() throws Exception {
+        when(authService.googleLoginNative(any(), any(), any())).thenReturn(sampleAuthResponse());
+
+        mockMvc.perform(post("/api/v1/auth/google-login-native")
+                        .contentType("application/json")
+                        .content("{\"code\":\"auth-code\",\"redirectUri\":\"com.googleusercontent.apps.test:/oauth2redirect\",\"codeVerifier\":\"verifier\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accessToken").value("access"));
+    }
+
+    @Test
+    @DisplayName("pinLogin reads the anchoring refresh token from the cookie and the PIN from the body")
     void pinLoginDelegatesToService() throws Exception {
-        when(authService.pinLogin(any(), any(), any())).thenReturn(sampleAuthResponse());
+        when(authService.pinLogin(any(), eq("some-token"), any(), any())).thenReturn(sampleAuthResponse());
 
         mockMvc.perform(post("/api/v1/auth/pin-login")
                         .contentType("application/json")
-                        .content("{\"refreshToken\":\"some-token\",\"pin\":\"1234\"}"))
+                        .content("{\"pin\":\"1234\"}")
+                        .cookie(refreshCookie("some-token")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.accessToken").value("access"));
+    }
+
+    @Test
+    @DisplayName("pinLogin with no cookie fails fast with INVALID_TOKEN, before the service is ever called")
+    void pinLoginWithNoCookieFailsFast() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/pin-login")
+                        .contentType("application/json")
+                        .content("{\"pin\":\"1234\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("INVALID_TOKEN"));
+
+        verifyNoInteractions(authService);
     }
 
     @Test
@@ -303,9 +376,9 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("webAuthnLoginVerify extracts email/credential/rememberMe from the raw body and delegates to WebAuthnService")
+    @DisplayName("webAuthnLoginVerify extracts email/credential/rememberMe from the body and delegates to WebAuthnService")
     void webAuthnLoginVerifyDelegatesToService() throws Exception {
-        when(webAuthnService.verifyAuthentication(eq("jane@example.com"), any(), eq(true), any(), any()))
+        when(webAuthnService.verifyAuthentication(eq("jane@example.com"), any(), eq(true), any(), any(), any()))
                 .thenReturn(sampleAuthResponse());
 
         mockMvc.perform(post("/api/v1/auth/webauthn/login/verify")
@@ -314,6 +387,32 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.accessToken").value("access"));
 
-        verify(webAuthnService).verifyAuthentication(eq("jane@example.com"), any(), eq(true), any(), any());
+        verify(webAuthnService).verifyAuthentication(eq("jane@example.com"), any(), eq(true), isNull(), any(), any());
+    }
+
+    @Test
+    @DisplayName("webAuthnLoginVerify rejects a missing email/credential with a clean 400 instead of an NPE-driven 500")
+    void webAuthnLoginVerifyRejectsMissingFields() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/webauthn/login/verify")
+                        .contentType("application/json")
+                        .content("{\"rememberMe\":true}"))
+                .andExpect(status().isUnprocessableEntity());
+
+        verifyNoInteractions(webAuthnService);
+    }
+
+    @Test
+    @DisplayName("webAuthnLoginVerify forwards the previous refresh token when the cookie has one (never from the body)")
+    void webAuthnLoginVerifyForwardsPreviousRefreshToken() throws Exception {
+        when(webAuthnService.verifyAuthentication(eq("jane@example.com"), any(), eq(true), eq("old-token"), any(), any()))
+                .thenReturn(sampleAuthResponse());
+
+        mockMvc.perform(post("/api/v1/auth/webauthn/login/verify")
+                        .contentType("application/json")
+                        .content("{\"email\":\"jane@example.com\",\"rememberMe\":true,\"credential\":{\"id\":\"cred-1\"}}")
+                        .cookie(refreshCookie("old-token")))
+                .andExpect(status().isOk());
+
+        verify(webAuthnService).verifyAuthentication(eq("jane@example.com"), any(), eq(true), eq("old-token"), any(), any());
     }
 }

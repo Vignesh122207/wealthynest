@@ -87,10 +87,12 @@ test.describe("App Lock & PIN", () => {
 
   test("PIN quick-login also works from the /login page itself, while still signed in @regression", async () => {
     // (auth)/layout.tsx has no redirect-away-from-login guard for an already-authenticated
-    // visitor — LoginForm decides what to show purely from the persisted auth store (pinEnabled +
-    // a cached refreshToken), so navigating here directly, without a real sign-out first, is a
-    // faithful stand-in for what a fresh app relaunch would show — confirmed by reading
-    // LoginForm's pinCandidate logic and AuthLayout directly, not assumed.
+    // visitor — LoginForm decides what to show purely from the persisted auth store's pinEnabled
+    // flag (the refresh token that actually anchors PIN login lives only in an httpOnly cookie, so
+    // there's no client-visible value left to gate on — see LoginForm.tsx's own comment), so
+    // navigating here directly, without a real sign-out first, is a faithful stand-in for what a
+    // fresh app relaunch would show — confirmed by reading LoginForm's pinCandidate logic and
+    // AuthLayout directly, not assumed.
     await login.goto();
     await expect(login.pinInput).toBeVisible();
 

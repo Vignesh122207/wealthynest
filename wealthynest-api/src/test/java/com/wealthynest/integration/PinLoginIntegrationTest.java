@@ -2,10 +2,12 @@ package com.wealthynest.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wealthynest.common.security.RefreshCookieService;
 import com.wealthynest.domain.user.repository.UserRepository;
 import com.wealthynest.testsupport.AbstractIntegrationTest;
 import com.wealthynest.testsupport.IntegrationAuthHelper;
 import com.wealthynest.testsupport.IntegrationAuthHelper.AuthResult;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,8 +25,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** Exercises device-local PIN quick-reauth over the real HTTP/security/DB stack: enabling a PIN
- * (requires the real password), logging in with it (rotates the refresh token, same as /refresh),
- * wrong-PIN lockout after 5 attempts, and disabling it. */
+ * (no password step-up — see AuthServiceImpl#enablePin's own comment for why), logging in with it
+ * (rotates the refresh token, same as /refresh), wrong-PIN lockout after 5 attempts, and disabling
+ * it. */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
 class PinLoginIntegrationTest extends AbstractIntegrationTest {
@@ -35,28 +38,21 @@ class PinLoginIntegrationTest extends AbstractIntegrationTest {
 
     private String auth(String token) { return "Bearer " + token; }
 
+    private Cookie refreshCookie(String token) { return new Cookie(RefreshCookieService.COOKIE_NAME, token); }
+
     @Test
-    @DisplayName("enabling a PIN requires the real password, and logging in with it rotates the refresh token and updates the protected profile flag")
+    @DisplayName("enabling a PIN needs no password step-up, and logging in with it rotates the refresh token and updates the protected profile flag")
     void enablePinThenLoginWithItRotatesToken() throws Exception {
         String password = "Passw0rd1";
         AuthResult auth = IntegrationAuthHelper.registerVerifyAndLogin(mockMvc, objectMapper, userRepository,
                 "pin-login-" + UUID.randomUUID() + "@example.com", password);
 
-        // Wrong current password is rejected outright, before the PIN is ever set.
         mockMvc.perform(post("/api/v1/users/me/pin/enable")
                         .header("Authorization", auth(auth.accessToken()))
                         .contentType("application/json")
                         .content("""
-                                {"currentPassword":"wrong-password","pin":"1234"}
+                                {"pin":"1234"}
                                 """))
-                .andExpect(status().isBadRequest());
-
-        mockMvc.perform(post("/api/v1/users/me/pin/enable")
-                        .header("Authorization", auth(auth.accessToken()))
-                        .contentType("application/json")
-                        .content("""
-                                {"currentPassword":"%s","pin":"1234"}
-                                """.formatted(password)))
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/v1/users/me").header("Authorization", auth(auth.accessToken())))
@@ -67,12 +63,13 @@ class PinLoginIntegrationTest extends AbstractIntegrationTest {
         MvcResult pinLoginResult = mockMvc.perform(post("/api/v1/auth/pin-login")
                         .contentType("application/json")
                         .content("""
-                                {"refreshToken":"%s","pin":"1234"}
-                                """.formatted(auth.refreshToken())))
+                                {"pin":"1234"}
+                                """)
+                        .cookie(refreshCookie(auth.refreshToken())))
                 .andExpect(status().isOk())
                 .andReturn();
         JsonNode pinLoginData = objectMapper.readTree(pinLoginResult.getResponse().getContentAsString()).get("data");
-        String newRefreshToken = pinLoginData.get("refreshToken").asText();
+        String newRefreshToken = pinLoginResult.getResponse().getCookie(RefreshCookieService.COOKIE_NAME).getValue();
         assertThat(newRefreshToken).isNotEqualTo(auth.refreshToken());
         assertThat(pinLoginData.get("accessToken").asText()).isNotBlank();
 
@@ -80,8 +77,9 @@ class PinLoginIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/pin-login")
                         .contentType("application/json")
                         .content("""
-                                {"refreshToken":"%s","pin":"1234"}
-                                """.formatted(auth.refreshToken())))
+                                {"pin":"1234"}
+                                """)
+                        .cookie(refreshCookie(auth.refreshToken())))
                 .andExpect(status().isUnauthorized());
 
         // Disabling the PIN clears the profile flag and blocks further PIN logins on this token.
@@ -94,8 +92,9 @@ class PinLoginIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/pin-login")
                         .contentType("application/json")
                         .content("""
-                                {"refreshToken":"%s","pin":"1234"}
-                                """.formatted(newRefreshToken)))
+                                {"pin":"1234"}
+                                """)
+                        .cookie(refreshCookie(newRefreshToken)))
                 .andExpect(status().isBadRequest());
     }
 
@@ -110,16 +109,17 @@ class PinLoginIntegrationTest extends AbstractIntegrationTest {
                         .header("Authorization", auth(auth.accessToken()))
                         .contentType("application/json")
                         .content("""
-                                {"currentPassword":"%s","pin":"5678"}
-                                """.formatted(password)))
+                                {"pin":"5678"}
+                                """))
                 .andExpect(status().isOk());
 
         for (int i = 0; i < 5; i++) {
             mockMvc.perform(post("/api/v1/auth/pin-login")
                             .contentType("application/json")
                             .content("""
-                                    {"refreshToken":"%s","pin":"0000"}
-                                    """.formatted(auth.refreshToken())))
+                                    {"pin":"0000"}
+                                    """)
+                            .cookie(refreshCookie(auth.refreshToken())))
                     .andExpect(status().isUnauthorized());
         }
 
@@ -127,8 +127,9 @@ class PinLoginIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/pin-login")
                         .contentType("application/json")
                         .content("""
-                                {"refreshToken":"%s","pin":"5678"}
-                                """.formatted(auth.refreshToken())))
+                                {"pin":"5678"}
+                                """)
+                        .cookie(refreshCookie(auth.refreshToken())))
                 .andExpect(status().isLocked());
 
         // Password login is a completely separate lockout counter — unaffected by PIN attempts.
@@ -149,8 +150,9 @@ class PinLoginIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/pin-login")
                         .contentType("application/json")
                         .content("""
-                                {"refreshToken":"%s","pin":"1234"}
-                                """.formatted(auth.refreshToken())))
+                                {"pin":"1234"}
+                                """)
+                        .cookie(refreshCookie(auth.refreshToken())))
                 .andExpect(status().isBadRequest());
     }
 }

@@ -6,9 +6,11 @@ import {env} from "../config/env";
 // UI for things that aren't what a given test is actually verifying. Mirrors the shapes in
 // wealthynest-web/src/features/*/api/*.api.ts and features/auth/types/auth.types.ts.
 
+// No refreshToken field — it travels only as an httpOnly Set-Cookie header (RefreshCookieService
+// on the backend), never in the JSON body. See extractRefreshTokenCookie/AuthResult below for how
+// test setup that needs it (seeding a pre-authenticated Playwright storageState) gets it instead.
 export interface AuthResponse {
   accessToken: string;
-  refreshToken: string;
   expiresIn: number;
   tokenType: string;
   user: {
@@ -20,6 +22,23 @@ export interface AuthResponse {
     active: boolean;
     pinEnabled: boolean;
   };
+}
+
+export interface AuthResult extends AuthResponse {
+  refreshTokenCookie: string;
+}
+
+export const REFRESH_COOKIE_NAME = "wn_refresh_token";
+
+/** Node's axios (unlike a browser) never applies Set-Cookie anywhere — it just surfaces the raw
+ * header on the response, unparsed. Pulls the httpOnly refresh-token cookie's value out of that,
+ * for the one thing a Node-side test helper needs it for: seeding a real cookie into a Playwright
+ * storageState/browser context so a provisioned user starts a test already authenticated (see
+ * setUpFixtureUser). */
+function extractRefreshTokenCookie(setCookieHeaders: string[] | undefined): string {
+  const raw = setCookieHeaders?.find((h) => h.startsWith(`${REFRESH_COOKIE_NAME}=`));
+  if (!raw) throw new Error(`Expected a ${REFRESH_COOKIE_NAME} Set-Cookie header, got none`);
+  return decodeURIComponent(raw.slice(REFRESH_COOKIE_NAME.length + 1).split(";")[0]);
 }
 
 export interface Category {
@@ -44,19 +63,22 @@ export const api = {
     }
   },
 
+  // No cookie to extract — AuthServiceImpl#register always returns null/zero tokens regardless of
+  // outcome (a fresh account isn't email-verified yet, and the response is enumeration-safe either
+  // way); the actual authenticated session used by callers here always comes from a later login().
   async register(input: { fullName: string; email: string; password: string }): Promise<AuthResponse> {
     const { data } = await client().post("/auth/register", input);
     return data.data;
   },
 
-  async login(input: { email: string; password: string; rememberMe?: boolean }): Promise<AuthResponse> {
-    const { data } = await client().post("/auth/login", input);
-    return data.data;
+  async login(input: { email: string; password: string; rememberMe?: boolean }): Promise<AuthResult> {
+    const res = await client().post("/auth/login", input);
+    return { ...res.data.data, refreshTokenCookie: extractRefreshTokenCookie(res.headers["set-cookie"]) };
   },
 
-  async googleLogin(idToken: string): Promise<AuthResponse> {
-    const { data } = await client().post("/auth/google-login", { idToken, rememberMe: false });
-    return data.data;
+  async googleLogin(idToken: string): Promise<AuthResult> {
+    const res = await client().post("/auth/google-login", { idToken, rememberMe: false });
+    return { ...res.data.data, refreshTokenCookie: extractRefreshTokenCookie(res.headers["set-cookie"]) };
   },
 
   async createCategory(

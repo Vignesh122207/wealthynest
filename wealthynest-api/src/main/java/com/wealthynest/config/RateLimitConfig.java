@@ -67,11 +67,26 @@ public class RateLimitConfig {
             if (tryConsume(key, limit)) {
                 chain.doFilter(req, res);
             } else {
+                long retryAfterSeconds = resolveRetryAfterSeconds(key);
                 log.warn("Rate limit exceeded for IP: {} on path: {}", ip, path);
                 response.setStatus(429);
+                response.setHeader("Retry-After", String.valueOf(retryAfterSeconds));
                 response.setContentType("application/json");
                 response.getWriter().write(
-                    "{\"success\":false,\"status\":429,\"error\":\"RATE_LIMIT_EXCEEDED\",\"message\":\"Too many requests. Please try again later.\"}");
+                    "{\"success\":false,\"status\":429,\"error\":\"RATE_LIMIT_EXCEEDED\"," +
+                    "\"message\":\"Too many requests. Please try again later.\"," +
+                    "\"retryAfterSeconds\":" + retryAfterSeconds + "}");
+            }
+        }
+
+        // Best-effort — the rejected request already happened regardless of what this returns, so
+        // any failure here just falls back to a flat 60s rather than blocking the 429 response.
+        private long resolveRetryAfterSeconds(String key) {
+            try {
+                Long ttl = redisTemplate.getExpire(key, java.util.concurrent.TimeUnit.SECONDS);
+                return ttl != null && ttl > 0 ? ttl : 60L;
+            } catch (Exception e) {
+                return 60L;
             }
         }
 

@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import {Client} from "pg";
 import {env} from "../config/env";
-import {api, type AuthResponse} from "./api.helper";
+import {api, REFRESH_COOKIE_NAME, type AuthResult} from "./api.helper";
 import {randomCategoryName} from "../test-data/factory";
 
 export interface E2EUserFixtureData {
@@ -119,7 +119,7 @@ export interface E2EUser {
   fullName: string;
   email: string;
   password: string;
-  auth: AuthResponse;
+  auth: AuthResult;
 }
 
 /** Registers a fresh user via the API, verifies their email directly in the DB, then logs in. */
@@ -150,7 +150,7 @@ export async function setUpFixtureUser(storageStatePath: string, userFilePath: s
   fs.writeFileSync(
     storageStatePath,
     JSON.stringify({
-      cookies: [],
+      cookies: [refreshTokenCookieEntry(user.auth.refreshTokenCookie)],
       origins: [{
         origin: env.baseUrl,
         localStorage: [{ name: "wealthynest-auth", value: authStoreLocalStorageValue(user.auth) }],
@@ -172,15 +172,35 @@ export async function setUpFixtureUser(storageStatePath: string, userFilePath: s
 
 /** Shape zustand's `persist` middleware writes to localStorage — see
  * wealthynest-web/src/features/auth/store/auth.store.ts. axios.ts reads accessToken from exactly
- * this path, so a storageState pre-populated with it starts a test already authenticated. */
-export function authStoreLocalStorageValue(auth: AuthResponse): string {
+ * this path, so a storageState pre-populated with it starts a test already authenticated. No
+ * refreshToken here — that's seeded as a real httpOnly cookie instead, see
+ * refreshTokenCookieEntry, since the real store never holds it in JS either. */
+export function authStoreLocalStorageValue(auth: AuthResult): string {
   return JSON.stringify({
     state: {
       user: auth.user,
       accessToken: auth.accessToken,
-      refreshToken: auth.refreshToken,
       isAuthenticated: true,
     },
     version: 0,
   });
+}
+
+/** Mirrors RefreshCookieService's own cookie attributes (httpOnly, SameSite=Lax, path scoped to
+ * /api/v1, host-only — no explicit Domain) so a storageState-seeded "already logged in" test
+ * exercises exactly the same cookie shape a real login response would have set. Domain/secure are
+ * derived from env.apiUrl rather than hardcoded so this keeps working against both local
+ * docker-compose (http://localhost:8080) and a real deployment. */
+function refreshTokenCookieEntry(value: string) {
+  const apiOrigin = new URL(env.apiUrl);
+  return {
+    name: REFRESH_COOKIE_NAME,
+    value,
+    domain: apiOrigin.hostname,
+    path: "/api/v1",
+    expires: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
+    httpOnly: true,
+    secure: apiOrigin.protocol === "https:",
+    sameSite: "Lax" as const,
+  };
 }

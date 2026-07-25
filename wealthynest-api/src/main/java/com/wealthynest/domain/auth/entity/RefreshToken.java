@@ -29,6 +29,15 @@ public class RefreshToken {
     @Builder.Default
     private boolean rememberMe = true;
 
+    /** Captured at mint time (login/refresh/pin-login/passkey/Google) and re-set on every
+     * rotation, so the current row always reflects the device's most recent activity — this is
+     * what powers the "active sessions" list in Security settings (AuthService#listSessions). */
+    @Column(name = "ip_address")
+    private String ipAddress;
+
+    @Column(name = "user_agent")
+    private String userAgent;
+
     @Column(name = "created_at", updatable = false, nullable = false)
     @Builder.Default
     private Instant createdAt = Instant.now();

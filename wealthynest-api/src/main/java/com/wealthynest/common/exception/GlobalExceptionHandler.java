@@ -37,7 +37,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusiness(BusinessException ex, HttpServletRequest req) {
         log.warn("Business rule violation [{}]: {}", ex.getCode(), ex.getMessage());
-        return ResponseEntity.status(ex.getStatus()).body(buildError(ex.getStatus(), ex.getCode(), ex.getMessage(), req));
+        return ResponseEntity.status(ex.getStatus()).body(
+                ErrorResponse.builder().success(false).status(ex.getStatus().value())
+                        .error(ex.getCode()).message(ex.getMessage()).details(ex.getDetails())
+                        .path(req.getRequestURI()).build());
     }
 
     @ExceptionHandler(AccessDeniedException.class)

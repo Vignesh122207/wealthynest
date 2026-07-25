@@ -4,9 +4,9 @@ import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {authApi} from "../api/auth.api";
 import {useAuthStore} from "../store/auth.store";
-import {clearPersistedHiddenAt} from "../store/appLock.store";
+import {clearPasskeyDismissedOnDevice, useAppLockStore} from "../store/appLock.store";
 import {createPasskey, getPasskeyAssertion} from "../utils/webauthn";
-import {disableBiometricPinUnlock} from "../utils/nativeBiometric";
+import {deriveLockoutState} from "../utils/lockout";
 import type {LoginFormValues, RegisterFormValues} from "../schemas/auth.schema";
 
 type ApiError = { response?: { data?: { message?: string; error?: string } } };
@@ -16,15 +16,34 @@ export function useLogin() {
   const router = useRouter();
   const qc = useQueryClient();
   return useMutation({
+    // Always the long-lived session — no "remember me" checkbox to ask, since the PIN/fingerprint/
+    // passkey lock screen (see AppLockScreen/useAppLockTrigger) is the thing actually gating access
+    // on return, the same pattern real banking apps use. A short-lived option only made sense back
+    // when this was the only line of defense.
     mutationFn: (v: LoginFormValues) =>
-      authApi.login({ email: v.email, password: v.password, rememberMe: v.rememberMe ?? false }),
+      authApi.login({ email: v.email, password: v.password, rememberMe: true }),
+    // No success toast — landing on /home, which greets you by name in its own GreetingBanner,
+    // is already the confirmation; a toast on top of that is one more thing competing for
+    // attention during a navigation that's already in flight, not new information.
     onSuccess: (data) => {
       qc.clear();
-      setAuth(data.user, data.accessToken, data.refreshToken);
-      toast.success(`Welcome back, ${data.user.fullName.split(" ")[0]}!`);
+      setAuth(data.user, data.accessToken);
+      // A fresh, successful login should never immediately re-show the app-lock screen — either
+      // because of a "went hidden at" marker left over from an earlier, unrelated session (e.g.
+      // one that ended via axios.ts's forced logout on a failed token refresh, which can't call
+      // the normal useLogout() path — see that call site's own comment), or because `isLocked`
+      // itself is still stale-true from before this login: it's plain in-memory Zustand state, so
+      // it survives an in-app router.push() (unlike a real page reload — and the Capacitor WebView
+      // never does one). Real bug this fixes: sign out from the lock screen via "Use password
+      // instead", log back in with that password, and the session you just proved re-shows the
+      // very lock screen you signed out to get past. unlock() clears both markers in one call.
+      useAppLockStore.getState().unlock();
       router.push("/home");
     },
-    onError: (e: ApiError) => toast.error(e.response?.data?.message ?? "Login failed"),
+    // ACCOUNT_LOCKED/RATE_LIMIT_EXCEEDED are rendered as a LockoutBanner with a live countdown at
+    // the call site instead — see LoginForm's PasswordLoginStep — so skip the toast there to avoid
+    // showing the same "too many attempts" message twice.
+    onError: (e: ApiError) => { if (!deriveLockoutState(e)) toast.error(e.response?.data?.message ?? "Login failed"); },
   });
 }
 
@@ -42,14 +61,16 @@ export function useRegister() {
 }
 
 export function useLogout() {
-  const { refreshToken, logout } = useAuthStore();
+  const { logout } = useAuthStore();
   const router = useRouter();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async () => { if (refreshToken) await authApi.logout(refreshToken); },
-    // Otherwise a stale "went hidden at" marker from this session could immediately re-lock the
-    // very next login on this device, before that account has had any chance to actually go idle.
-    onSettled: () => { qc.clear(); logout(); clearPersistedHiddenAt(); router.push("/login"); },
+    mutationFn: () => authApi.logout(),
+    // unlock() (not just the hidden-at marker) — signing out must also drop the in-memory
+    // `isLocked` flag itself, or it stays stale-true across this in-app navigation to /login and
+    // the very next login on this device (e.g. right after "Use password instead") lands on
+    // /home only to have that stale flag immediately re-show the lock screen it just escaped.
+    onSettled: () => { qc.clear(); logout(); useAppLockStore.getState().unlock(); router.push("/login"); },
   });
 }
 
@@ -124,8 +145,7 @@ export function useResetPassword() {
 export function useEnablePin() {
   const { user, setUser } = useAuthStore();
   return useMutation({
-    mutationFn: ({ currentPassword, pin }: { currentPassword: string; pin: string }) =>
-      authApi.enablePin(currentPassword, pin),
+    mutationFn: (pin: string) => authApi.enablePin(pin),
     onSuccess: () => {
       if (user) setUser({ ...user, pinEnabled: true });
       toast.success("PIN unlock enabled");
@@ -136,16 +156,10 @@ export function useEnablePin() {
 
 export function useDisablePin() {
   const { user, setUser } = useAuthStore();
-  const qc = useQueryClient();
   return useMutation({
     mutationFn: () => authApi.disablePin(),
-    // A PIN disabled server-side but still sitting in native secure storage would just fail
-    // biometric unlock with a stale "incorrect PIN" later — harmless, but worth clearing so state
-    // doesn't linger orphaned. No-op on web.
-    onSuccess: async () => {
+    onSuccess: () => {
       if (user) setUser({ ...user, pinEnabled: false });
-      await disableBiometricPinUnlock();
-      qc.invalidateQueries({ queryKey: ["auth", "nativeBiometric"] });
       toast.success("PIN unlock disabled");
     },
     onError: () => toast.error("Failed to disable PIN"),
@@ -157,15 +171,18 @@ export function usePinLogin() {
   const router = useRouter();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ refreshToken, pin }: { refreshToken: string; pin: string }) =>
-      authApi.pinLogin(refreshToken, pin),
+    // No refreshToken param — the anchoring session is read off the httpOnly cookie server-side.
+    mutationFn: (pin: string) => authApi.pinLogin(pin),
+    // No success toast — see useLogin's comment for why.
     onSuccess: (data) => {
       qc.clear();
-      setAuth(data.user, data.accessToken, data.refreshToken);
-      toast.success(`Welcome back, ${data.user.fullName.split(" ")[0]}!`);
+      setAuth(data.user, data.accessToken);
+      useAppLockStore.getState().unlock(); // see useLogin's own comment for why
       router.push("/home");
     },
-    onError: (e: ApiError) => toast.error(e.response?.data?.message ?? "Incorrect PIN"),
+    // PIN_LOCKED/RATE_LIMIT_EXCEEDED render as a LockoutBanner at the call site instead — see
+    // deriveLockoutState's own comment on useLogin above for why the toast is skipped there.
+    onError: (e: ApiError) => { if (!deriveLockoutState(e)) toast.error(e.response?.data?.message ?? "Incorrect PIN"); },
   });
 }
 
@@ -177,10 +194,11 @@ export function usePinLogin() {
 export function useUnlockWithPin() {
   const { setAuth } = useAuthStore();
   return useMutation({
-    mutationFn: ({ refreshToken, pin }: { refreshToken: string; pin: string }) =>
-      authApi.pinLogin(refreshToken, pin),
-    onSuccess: (data) => setAuth(data.user, data.accessToken, data.refreshToken),
-    onError: (e: ApiError) => toast.error(e.response?.data?.message ?? "Incorrect PIN"),
+    mutationFn: (pin: string) => authApi.pinLogin(pin),
+    onSuccess: (data) => setAuth(data.user, data.accessToken),
+    // PIN_LOCKED/RATE_LIMIT_EXCEEDED render as a LockoutBanner at the call site instead — see
+    // deriveLockoutState's own comment on useLogin above for why the toast is skipped there.
+    onError: (e: ApiError) => { if (!deriveLockoutState(e)) toast.error(e.response?.data?.message ?? "Incorrect PIN"); },
   });
 }
 
@@ -191,9 +209,13 @@ export function useUnlockWithPasskey() {
       if (!user?.email) throw new Error("No active session");
       const options = await authApi.getPasskeyLoginOptions(user.email);
       const credential = await getPasskeyAssertion(options);
+      // This device already has a valid session (that's the whole premise of an app-lock unlock)
+      // — the server reads it off the httpOnly cookie already riding along on this request and
+      // revokes it, instead of leaving it active alongside the freshly-minted one. See
+      // auth.api.ts#passkeyLogin's own comment.
       return authApi.passkeyLogin(user.email, credential, rememberMe);
     },
-    onSuccess: (data) => setAuth(data.user, data.accessToken, data.refreshToken),
+    onSuccess: (data) => setAuth(data.user, data.accessToken),
     onError: (e: unknown) => {
       if (e instanceof DOMException && e.name === "NotAllowedError") return; // user cancelled — silent
       const err = e as ApiError;
@@ -202,10 +224,19 @@ export function useUnlockWithPasskey() {
   });
 }
 
+// Gated on isAuthenticated (not just left to fire and 401) because one of this hook's callers —
+// useAppLockTrigger — mounts unconditionally from DashboardLayout on every cold launch, logged in
+// or not (capacitor.config.ts's server.url always loads /home first). That 401 doesn't just get
+// silently swallowed: /users/me/webauthn/passkeys isn't under the axios interceptor's
+// isAuthEndpoint ("/auth/**") exemption, so a logged-out request to it fell into the refresh-token
+// flow, found no refresh token, and forced a hard `window.location.href = "/login"` reload — the
+// "white flash + something flickers" bug this fixes, not just a wasted request.
 export function usePasskeys() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   return useQuery({
     queryKey: ["auth", "passkeys"],
     queryFn:  authApi.listPasskeys,
+    enabled:  isAuthenticated,
   });
 }
 
@@ -219,6 +250,9 @@ export function useRegisterPasskey() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["auth", "passkeys"] });
+      // This browser just proved it has a working credential store — any earlier "don't show the
+      // fingerprint button on this device" from AppLockScreen is stale as of right now.
+      clearPasskeyDismissedOnDevice();
       toast.success("Passkey added");
     },
     onError: (e: unknown) => {
@@ -240,30 +274,6 @@ export function useDeletePasskey() {
   });
 }
 
-export function usePasskeyLogin() {
-  const { setAuth } = useAuthStore();
-  const router = useRouter();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ email, rememberMe }: { email: string; rememberMe: boolean }) => {
-      const options = await authApi.getPasskeyLoginOptions(email);
-      const credential = await getPasskeyAssertion(options);
-      return authApi.passkeyLogin(email, credential, rememberMe);
-    },
-    onSuccess: (data) => {
-      qc.clear();
-      setAuth(data.user, data.accessToken, data.refreshToken);
-      toast.success(`Welcome back, ${data.user.fullName.split(" ")[0]}!`);
-      router.push("/home");
-    },
-    onError: (e: unknown) => {
-      if (e instanceof DOMException && e.name === "NotAllowedError") return; // user cancelled — silent
-      const err = e as ApiError;
-      toast.error(err.response?.data?.message ?? "Passkey sign-in failed");
-    },
-  });
-}
-
 export function useGoogleLogin() {
   const { setAuth } = useAuthStore();
   const router = useRouter();
@@ -271,13 +281,66 @@ export function useGoogleLogin() {
   return useMutation({
     mutationFn: ({ idToken, rememberMe }: { idToken: string; rememberMe: boolean }) =>
       authApi.googleLogin(idToken, rememberMe),
+    // No success toast — see useLogin's comment for why.
     onSuccess: (data) => {
       qc.clear();
-      setAuth(data.user, data.accessToken, data.refreshToken);
-      toast.success(`Welcome, ${data.user.fullName.split(" ")[0]}!`);
+      setAuth(data.user, data.accessToken);
+      useAppLockStore.getState().unlock(); // see useLogin's own comment for why
       router.push("/home");
     },
     onError: (e: ApiError) => toast.error(e.response?.data?.message ?? "Google sign-in failed"),
+  });
+}
+
+// Native Android counterpart — see auth.api.ts's googleLoginNative comment for why this posts an
+// authorization code + PKCE verifier instead of an ID token.
+export function useGoogleLoginNative() {
+  const { setAuth } = useAuthStore();
+  const router = useRouter();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: authApi.googleLoginNative,
+    onSuccess: (data) => {
+      qc.clear();
+      setAuth(data.user, data.accessToken);
+      useAppLockStore.getState().unlock(); // see useLogin's own comment for why
+      router.push("/home");
+    },
+    onError: (e: ApiError) => toast.error(e.response?.data?.message ?? "Google sign-in failed"),
+  });
+}
+
+// The backend flags which row is "this device" by reading the httpOnly refresh-token cookie
+// already riding along on the request — see auth.api.ts#listSessions and
+// UserController#listSessions.
+export function useSessions() {
+  return useQuery({
+    queryKey: ["auth", "sessions"],
+    queryFn:  () => authApi.listSessions(),
+  });
+}
+
+export function useRevokeSession() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => authApi.revokeSession(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["auth", "sessions"] });
+      toast.success("Device signed out");
+    },
+    onError: () => toast.error("Failed to sign out that device"),
+  });
+}
+
+export function useRevokeOtherSessions() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => authApi.revokeOtherSessions(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["auth", "sessions"] });
+      toast.success("Signed out of all other devices");
+    },
+    onError: () => toast.error("Failed to sign out other devices"),
   });
 }
 

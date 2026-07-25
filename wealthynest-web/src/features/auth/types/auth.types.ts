@@ -12,15 +12,16 @@ export interface User {
   pinEnabled:   boolean;
 }
 
+// No refreshToken field — it travels only as an httpOnly cookie the browser manages
+// automatically (see RefreshCookieService on the backend), never in the response body.
 export interface AuthResponse {
   accessToken:  string;
-  refreshToken: string;
   expiresIn:    number;
   tokenType:    string;
   user:         User;
 }
 
-export interface LoginPayload    { email: string; password: string; rememberMe?: boolean; }
+export interface LoginPayload    { email: string; password: string; rememberMe: boolean; }
 export interface RegisterPayload { fullName: string; email: string; password: string; }
 
 export interface Passkey {
@@ -28,4 +29,13 @@ export interface Passkey {
   nickname?:  string;
   createdAt:  string;
   lastUsedAt?: string;
+}
+
+export interface Session {
+  id:        string;
+  ipAddress?: string;
+  userAgent?: string;
+  createdAt: string;
+  expiresAt: string;
+  current:   boolean;
 }

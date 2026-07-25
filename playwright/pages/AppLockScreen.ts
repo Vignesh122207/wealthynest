@@ -10,10 +10,10 @@ export class AppLockScreen {
   constructor(private readonly page: Page) {}
 
   /** The overlay itself, not tied to which unlock method(s) it offers — AppLockScreen only
-   * renders the PIN form when the account has a PIN configured and the passkey button when it has
-   * a registered passkey, so a passkey-only (or PIN-only) account never shows both. Asserting
-   * against this instead of e.g. pinInput is what makes expectVisible/expectNotVisible correct
-   * for every account shape, not just PIN-enabled ones. */
+   * renders the PIN form when the account has a PIN configured and the fingerprint button when
+   * native biometric or a passkey is available, so an account missing one never shows both.
+   * Asserting against this instead of e.g. pinInput is what makes expectVisible/expectNotVisible
+   * correct for every account shape, not just PIN-enabled ones. */
   get dialog(): Locator {
     return this.page.getByRole("dialog", { name: "Unlock WealthyNest" });
   }
@@ -23,11 +23,15 @@ export class AppLockScreen {
   get pinSubmit(): Locator {
     return this.page.getByTestId(TEST_IDS.appLock.pinSubmit);
   }
-  get passkeyButton(): Locator {
-    return this.page.getByTestId(TEST_IDS.appLock.passkeyButton);
+  // Native BiometricPrompt or a passkey ceremony, whichever this account/platform actually has —
+  // see AppLockScreen.tsx's own fingerprintAvailable comment.
+  get fingerprintButton(): Locator {
+    return this.page.getByTestId(TEST_IDS.appLock.fingerprintButton);
   }
-  get signOutButton(): Locator {
-    return this.page.getByTestId(TEST_IDS.appLock.signOut);
+  // Only ever rendered on the passkey (web) path, and only after a failed attempt — see
+  // AppLockScreen.tsx's own comment on why WebAuthn can't detect this ahead of time.
+  get dismissPasskeyButton(): Locator {
+    return this.page.getByTestId(TEST_IDS.appLock.dismissPasskey);
   }
 
   async expectVisible(): Promise<void> {

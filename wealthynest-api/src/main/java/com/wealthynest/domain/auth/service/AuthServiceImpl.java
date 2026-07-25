@@ -22,20 +22,32 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+
+import com.wealthynest.common.exception.ResourceNotFoundException;
+import com.wealthynest.domain.auth.dto.response.SessionResponse;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -55,6 +67,7 @@ public class AuthServiceImpl implements AuthService {
     private final AuditService                     auditService;
     private final TokenRevocationService           tokenRevocationService;
     private final GoogleIdTokenValidator            googleIdTokenValidator;
+    private final RestClient                        googleOAuthClient; // @Bean("googleOAuthClient") — matched by field name, same as ExternalPriceServiceImpl's RestClient fields
 
     @Value("${wealthynest.mail.frontend-url}")
     private String frontendUrl;
@@ -64,6 +77,12 @@ public class AuthServiceImpl implements AuthService {
 
     @Value("${wealthynest.google.client-id:}")
     private String googleClientId;
+
+    @Value("${wealthynest.google.native.client-id:}")
+    private String googleNativeClientId;
+
+    @Value("${wealthynest.google.native.client-secret:}")
+    private String googleNativeClientSecret;
 
     /** Short session TTL when "remember me" is NOT checked (1 day). */
     private static final long SHORT_REFRESH_TTL_MS = 24L * 60 * 60 * 1000;
@@ -83,12 +102,21 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new BusinessException("Email already registered", HttpStatus.CONFLICT, "EMAIL_EXISTS");
+        String email = request.getEmail().toLowerCase();
+        // Same enumeration posture as forgotPassword/resendVerification: the external response
+        // shape never reveals whether this email was already registered. An existing owner gets a
+        // "someone tried to sign up with your email" notice (with a login/reset link) instead of a
+        // verification email; either way the caller sees the same "check your email" outcome.
+        Optional<User> existing = userRepository.findByEmail(email);
+        if (existing.isPresent()) {
+            emailService.sendAccountExistsEmail(email, existing.get().getFullName());
+            log.info("Registration attempted for an email that's already registered");
+            return AuthResponse.builder().accessToken(null).refreshToken(null).expiresIn(0).tokenType("Bearer").build();
         }
+
         User user = userRepository.save(User.builder()
                 .fullName(request.getFullName())
-                .email(request.getEmail().toLowerCase())
+                .email(email)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .emailVerified(false)
                 .build());
@@ -113,6 +141,22 @@ public class AuthServiceImpl implements AuthService {
     @Transactional(noRollbackFor = BadCredentialsException.class)
     public AuthResponse login(LoginRequest request, String ipAddress, String userAgent) {
         String email = request.getEmail().toLowerCase();
+
+        // Checked explicitly (and first) rather than left to Spring Security's own
+        // UserPrincipal.isAccountNonLocked() pre-auth check: that path throws a generic
+        // LockedException with no timing info, which GlobalExceptionHandler can only turn into a
+        // bare 403 — not enough for the frontend to show a "try again in N minutes" countdown.
+        // isAccountNonLocked() stays in place as a defense-in-depth fallback for the race where a
+        // lockout lands in the instant between this check and authenticate() below.
+        userRepository.findByEmail(email).ifPresent(user -> {
+            if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(Instant.now())) {
+                throw new BusinessException(
+                        "Too many failed attempts. Please try again later.",
+                        HttpStatus.LOCKED, "ACCOUNT_LOCKED",
+                        Map.of("lockedUntil", DateTimeFormatter.ISO_INSTANT.format(user.getLockedUntil())));
+            }
+        });
+
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(email, request.getPassword()));
@@ -134,7 +178,8 @@ public class AuthServiceImpl implements AuthService {
         user.setLastLoginAt(Instant.now());
         userRepository.save(user);
         auditService.log(user.getId(), "LOGIN_SUCCESS", "USER", user.getId(), null, null, ipAddress, userAgent);
-        return buildAuthResponse(user, request.isRememberMe());
+        emailService.sendNewSignInEmail(user.getEmail(), user.getFullName(), ipAddress, userAgent, Instant.now());
+        return buildAuthResponse(user, request.isRememberMe(), ipAddress, userAgent);
     }
 
     // Tracks consecutive bad passwords per account and locks it out for a cooldown
@@ -158,8 +203,8 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public AuthResponse refresh(RefreshTokenRequest request) {
-        String tokenHash = hashToken(request.getRefreshToken());
+    public AuthResponse refresh(String refreshToken, String ipAddress, String userAgent) {
+        String tokenHash = hashToken(refreshToken);
         RefreshToken stored = refreshTokenRepository.findByTokenHash(tokenHash)
                 .orElseThrow(() -> new BusinessException("Invalid refresh token", HttpStatus.UNAUTHORIZED, "INVALID_TOKEN"));
         if (stored.isRevoked() || stored.getExpiresAt().isBefore(Instant.now())) {
@@ -169,7 +214,7 @@ public class AuthServiceImpl implements AuthService {
         refreshTokenRepository.save(stored);
         User user = userRepository.findById(stored.getUserId())
                 .orElseThrow(() -> new BusinessException("User not found", HttpStatus.NOT_FOUND));
-        return buildAuthResponse(user, stored.isRememberMe());
+        return buildAuthResponse(user, stored.isRememberMe(), ipAddress, userAgent);
     }
 
     @Override
@@ -328,14 +373,16 @@ public class AuthServiceImpl implements AuthService {
         auditService.log(user.getId(), "PASSWORD_RESET", "USER", user.getId(), null, null, ipAddress, userAgent);
     }
 
+    // Deliberately no current-password step-up check here (unlike changeEmail/changePassword,
+    // which both verify one) — a conscious product call, not an oversight: whoever already holds
+    // this authenticated session can set up PIN unlock directly. The real cost is that anyone
+    // holding an already-unlocked device for a few seconds could plant their own PIN as a
+    // persistent backdoor, which a password re-entry step would have blocked.
     @Override
     @Transactional
     public void enablePin(UUID userId, EnablePinRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException("User not found", HttpStatus.NOT_FOUND));
-        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
-            throw new BusinessException("Incorrect password", HttpStatus.BAD_REQUEST);
-        }
         user.setPinHash(passwordEncoder.encode(request.getPin()));
         user.setPinEnabledAt(Instant.now());
         user.setPinFailedAttempts(0);
@@ -368,8 +415,8 @@ public class AuthServiceImpl implements AuthService {
     // Spring's default rollback-on-unchecked-exception rule would undo that save, silently
     // disabling the PIN brute-force lockout.
     @Transactional(noRollbackFor = BusinessException.class)
-    public AuthResponse pinLogin(PinLoginRequest request, String ipAddress, String userAgent) {
-        String tokenHash = hashToken(request.getRefreshToken());
+    public AuthResponse pinLogin(PinLoginRequest request, String refreshToken, String ipAddress, String userAgent) {
+        String tokenHash = hashToken(refreshToken);
         RefreshToken stored = refreshTokenRepository.findByTokenHash(tokenHash)
                 .orElseThrow(() -> new BusinessException(
                         "Session expired — please sign in with your password.", HttpStatus.UNAUTHORIZED, "INVALID_TOKEN"));
@@ -385,11 +432,13 @@ public class AuthServiceImpl implements AuthService {
         }
         if (user.getPinLockedUntil() != null && user.getPinLockedUntil().isAfter(Instant.now())) {
             throw new BusinessException(
-                    "Too many incorrect PIN attempts. Please sign in with your password.", HttpStatus.LOCKED);
+                    "Too many incorrect PIN attempts. Please sign in with your password.",
+                    HttpStatus.LOCKED, "PIN_LOCKED",
+                    Map.of("lockedUntil", DateTimeFormatter.ISO_INSTANT.format(user.getPinLockedUntil())));
         }
         if (!passwordEncoder.matches(request.getPin(), user.getPinHash())) {
             registerFailedPin(user, ipAddress, userAgent);
-            throw new BusinessException("Incorrect PIN", HttpStatus.UNAUTHORIZED);
+            throw new BusinessException("Incorrect PIN", HttpStatus.UNAUTHORIZED, "INVALID_PIN");
         }
 
         user.setPinFailedAttempts(0);
@@ -403,7 +452,7 @@ public class AuthServiceImpl implements AuthService {
         refreshTokenRepository.save(stored);
 
         auditService.log(user.getId(), "PIN_LOGIN_SUCCESS", "USER", user.getId(), null, null, ipAddress, userAgent);
-        return buildAuthResponse(user, stored.isRememberMe());
+        return buildAuthResponse(user, stored.isRememberMe(), ipAddress, userAgent);
     }
 
     private void registerFailedPin(User user, String ipAddress, String userAgent) {
@@ -422,12 +471,58 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public AuthResponse issueTokensForVerifiedUser(UUID userId, boolean rememberMe) {
+    public AuthResponse issueTokensForVerifiedUser(UUID userId, boolean rememberMe, String ipAddress, String userAgent, String previousRefreshToken) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException("User not found", HttpStatus.NOT_FOUND));
         user.setLastLoginAt(Instant.now());
         userRepository.save(user);
-        return buildAuthResponse(user, rememberMe);
+        revokeIfOwnedByUser(previousRefreshToken, userId);
+        return buildAuthResponse(user, rememberMe, ipAddress, userAgent);
+    }
+
+    // Best-effort device-session rotation for factors (passkey) that carry no refresh token of
+    // their own through the ceremony the way pinLogin/refresh's token input does — the caller
+    // passes along whatever refresh token this device already had, if any, so that row gets
+    // revoked here instead of quietly accumulating as a duplicate "active session" alongside the
+    // new one. Silently no-ops for a blank/unknown/foreign token — this is a cleanup nicety, not a
+    // security boundary, so it must never fail the login itself.
+    private void revokeIfOwnedByUser(String rawToken, UUID userId) {
+        if (rawToken == null || rawToken.isBlank()) return;
+        refreshTokenRepository.findByTokenHash(hashToken(rawToken))
+                .filter(t -> t.getUserId().equals(userId))
+                .ifPresent(t -> { t.setRevoked(true); refreshTokenRepository.save(t); });
+    }
+
+    @Override
+    public List<SessionResponse> listSessions(UUID userId, String currentRefreshToken) {
+        String currentHash = currentRefreshToken != null && !currentRefreshToken.isBlank()
+                ? hashToken(currentRefreshToken) : null;
+        return refreshTokenRepository.findByUserIdAndRevokedFalseAndExpiresAtAfterOrderByCreatedAtDesc(userId, Instant.now())
+                .stream()
+                .map(t -> SessionResponse.builder()
+                        .id(t.getId())
+                        .ipAddress(t.getIpAddress())
+                        .userAgent(t.getUserAgent())
+                        .createdAt(t.getCreatedAt())
+                        .expiresAt(t.getExpiresAt())
+                        .current(currentHash != null && currentHash.equals(t.getTokenHash()))
+                        .build())
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public void revokeSession(UUID userId, UUID sessionId) {
+        RefreshToken token = refreshTokenRepository.findByIdAndUserId(sessionId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Session", "id", sessionId));
+        token.setRevoked(true);
+        refreshTokenRepository.save(token);
+    }
+
+    @Override
+    @Transactional
+    public void revokeOtherSessions(UUID userId, String currentRefreshToken) {
+        refreshTokenRepository.revokeAllByUserIdExcept(userId, hashToken(currentRefreshToken));
     }
 
     /**
@@ -443,18 +538,79 @@ public class AuthServiceImpl implements AuthService {
         if (googleClientId == null || googleClientId.isBlank()) {
             throw new BusinessException("Google Sign-In isn't configured yet.", HttpStatus.SERVICE_UNAVAILABLE);
         }
-        GoogleIdToken.Payload payload;
+        GoogleIdToken.Payload payload = verifyGoogleIdToken(request.getIdToken());
+        return signInWithGooglePayload(payload, request.isRememberMe(), ipAddress, userAgent);
+    }
+
+    /**
+     * Native Android counterpart to googleLogin. The app can only get an authorization code out
+     * of the Custom Tab (GenericOAuth2's Android side has no way to attach a client secret to its
+     * own token request, and Google requires one for this "Desktop app" client type even with
+     * PKCE enabled — confirmed against Google's own OAuth docs, not an assumption). So the
+     * exchange happens here, server-side, where googleNativeClientSecret can be held safely and
+     * is never shipped in the app.
+     */
+    @Override
+    @Transactional
+    public AuthResponse googleLoginNative(GoogleNativeLoginRequest request, String ipAddress, String userAgent) {
+        if (googleNativeClientId == null || googleNativeClientId.isBlank()
+                || googleNativeClientSecret == null || googleNativeClientSecret.isBlank()) {
+            throw new BusinessException("Google Sign-In isn't configured yet.", HttpStatus.SERVICE_UNAVAILABLE);
+        }
+        String idTokenString = exchangeGoogleAuthorizationCode(request);
+        GoogleIdToken.Payload payload = verifyGoogleIdToken(idTokenString);
+        return signInWithGooglePayload(payload, request.isRememberMe(), ipAddress, userAgent);
+    }
+
+    // ─── Helpers ──────────────────────────────────────────────────────────────
+
+    private GoogleIdToken.Payload verifyGoogleIdToken(String idTokenString) {
         try {
-            payload = googleIdTokenValidator.verify(request.getIdToken());
+            GoogleIdToken.Payload payload = googleIdTokenValidator.verify(idTokenString);
             if (payload == null) {
                 throw new BusinessException("Invalid Google sign-in token.", HttpStatus.UNAUTHORIZED);
             }
+            return payload;
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
             log.warn("Google ID token verification failed: {}", e.getMessage());
             throw new BusinessException("Invalid Google sign-in token.", HttpStatus.UNAUTHORIZED);
         }
+    }
+
+    /** POSTs the authorization code + PKCE verifier to Google's token endpoint, alongside the
+     * client secret Google requires for this client type, and returns the resulting ID token. */
+    @SuppressWarnings("unchecked")
+    private String exchangeGoogleAuthorizationCode(GoogleNativeLoginRequest request) {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("client_id", googleNativeClientId);
+        form.add("client_secret", googleNativeClientSecret);
+        form.add("code", request.getCode());
+        form.add("code_verifier", request.getCodeVerifier());
+        form.add("redirect_uri", request.getRedirectUri());
+        form.add("grant_type", "authorization_code");
+
+        Map<String, Object> tokenResponse;
+        try {
+            tokenResponse = googleOAuthClient.post()
+                    .uri("/token")
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .body(form)
+                    .retrieve()
+                    .body(Map.class);
+        } catch (RestClientException e) {
+            log.warn("Google native token exchange failed: {}", e.getMessage());
+            throw new BusinessException("Google sign-in failed. Please try again.", HttpStatus.UNAUTHORIZED);
+        }
+        Object idToken = tokenResponse == null ? null : tokenResponse.get("id_token");
+        if (!(idToken instanceof String idTokenString) || idTokenString.isBlank()) {
+            throw new BusinessException("Google sign-in failed. Please try again.", HttpStatus.UNAUTHORIZED);
+        }
+        return idTokenString;
+    }
+
+    private AuthResponse signInWithGooglePayload(GoogleIdToken.Payload payload, boolean rememberMe, String ipAddress, String userAgent) {
         if (!Boolean.TRUE.equals(payload.getEmailVerified())) {
             throw new BusinessException("Your Google account's email isn't verified.", HttpStatus.BAD_REQUEST);
         }
@@ -479,10 +635,9 @@ public class AuthServiceImpl implements AuthService {
         user.setLastLoginAt(Instant.now());
         userRepository.save(user);
         auditService.log(user.getId(), "GOOGLE_LOGIN_SUCCESS", "USER", user.getId(), null, null, ipAddress, userAgent);
-        return buildAuthResponse(user, request.isRememberMe());
+        emailService.sendNewSignInEmail(user.getEmail(), user.getFullName(), ipAddress, userAgent, Instant.now());
+        return buildAuthResponse(user, rememberMe, ipAddress, userAgent);
     }
-
-    // ─── Helpers ──────────────────────────────────────────────────────────────
 
     private void sendVerificationEmail(User user) {
         emailVerificationTokenRepository.deleteAllByUserId(user.getId());
@@ -498,7 +653,7 @@ public class AuthServiceImpl implements AuthService {
         emailService.sendVerificationEmail(user.getEmail(), user.getFullName(), link);
     }
 
-    private AuthResponse buildAuthResponse(User user, boolean rememberMe) {
+    private AuthResponse buildAuthResponse(User user, boolean rememberMe, String ipAddress, String userAgent) {
         String accessToken  = jwtTokenProvider.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name());
         long refreshTtlMs   = rememberMe ? jwtProperties.getRefreshTokenExpiryMs() : SHORT_REFRESH_TTL_MS;
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), user.getEmail(), refreshTtlMs);
@@ -507,10 +662,13 @@ public class AuthServiceImpl implements AuthService {
                 .tokenHash(hashToken(refreshToken))
                 .expiresAt(Instant.now().plusMillis(refreshTtlMs))
                 .rememberMe(rememberMe)
+                .ipAddress(ipAddress)
+                .userAgent(userAgent)
                 .build());
         return AuthResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
+                .refreshTokenExpiresInMs(refreshTtlMs)
                 .expiresIn(jwtProperties.getAccessTokenExpiryMs() / 1000)
                 .tokenType("Bearer")
                 .user(userMapper.toResponse(user))

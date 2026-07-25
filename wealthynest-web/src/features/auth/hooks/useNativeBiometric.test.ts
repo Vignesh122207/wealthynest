@@ -1,131 +1,116 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor, act } from "@testing-library/react";
 import { createQueryClientWrapper } from "@/test-utils/queryClientWrapper";
 import {
-  useDisableBiometricPinUnlock,
-  useEnableBiometricPinUnlock,
-  useNativeBiometricStatus,
+  useIsNativePlatform, useNativeBiometricStatus, useEnableBiometricUnlock, useDisableBiometricUnlock,
 } from "./useNativeBiometric";
 import {
-  BiometryErrorType,
-  disableBiometricPinUnlock,
-  enableBiometricPinUnlock,
-  hasBiometricPinStored,
-  isBiometryError,
-  isNativeBiometricAvailable,
-  isNativePlatform,
+  isNativePlatform, isBiometricHardwareAvailable, isBiometricUnlockEnabled,
+  enableBiometricUnlock, disableBiometricUnlock, isBiometryError,
 } from "../utils/nativeBiometric";
 import { toast } from "sonner";
 
 vi.mock("../utils/nativeBiometric", () => ({
   BiometryErrorType: { userCancel: "userCancel", appCancel: "appCancel" },
-  isNativePlatform: vi.fn(),
-  isNativeBiometricAvailable: vi.fn(),
-  hasBiometricPinStored: vi.fn(),
-  enableBiometricPinUnlock: vi.fn(),
-  disableBiometricPinUnlock: vi.fn(),
+  isNativePlatform: vi.fn(() => false),
+  isBiometricHardwareAvailable: vi.fn(() => Promise.resolve(false)),
+  isBiometricUnlockEnabled: vi.fn(() => Promise.resolve(false)),
+  enableBiometricUnlock: vi.fn(),
+  disableBiometricUnlock: vi.fn(),
   isBiometryError: vi.fn(() => false),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const mockedIsNativePlatform = vi.mocked(isNativePlatform);
-const mockedIsNativeBiometricAvailable = vi.mocked(isNativeBiometricAvailable);
-const mockedHasBiometricPinStored = vi.mocked(hasBiometricPinStored);
-const mockedEnable = vi.mocked(enableBiometricPinUnlock);
-const mockedDisable = vi.mocked(disableBiometricPinUnlock);
+const mockedIsBiometricHardwareAvailable = vi.mocked(isBiometricHardwareAvailable);
+const mockedIsBiometricUnlockEnabled = vi.mocked(isBiometricUnlockEnabled);
+const mockedEnableBiometricUnlock = vi.mocked(enableBiometricUnlock);
+const mockedDisableBiometricUnlock = vi.mocked(disableBiometricUnlock);
 const mockedIsBiometryError = vi.mocked(isBiometryError);
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("useNativeBiometricStatus", () => {
-  it("reports unavailable without calling native checks when not on a native platform", async () => {
-    mockedIsNativePlatform.mockReturnValue(false);
-    const { Wrapper } = createQueryClientWrapper();
-
-    const { result } = renderHook(() => useNativeBiometricStatus(), { wrapper: Wrapper });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toEqual({ available: false, pinStored: false });
-    expect(mockedIsNativeBiometricAvailable).not.toHaveBeenCalled();
-    expect(mockedHasBiometricPinStored).not.toHaveBeenCalled();
-  });
-
-  it("reports availability and stored state on native platforms", async () => {
+describe("useIsNativePlatform", () => {
+  it("starts false and resolves to the real platform after mount", async () => {
     mockedIsNativePlatform.mockReturnValue(true);
-    mockedIsNativeBiometricAvailable.mockResolvedValue(true);
-    mockedHasBiometricPinStored.mockResolvedValue(true);
-    const { Wrapper } = createQueryClientWrapper();
-
-    const { result } = renderHook(() => useNativeBiometricStatus(), { wrapper: Wrapper });
-
-    await waitFor(() => expect(result.current.data).toEqual({ available: true, pinStored: true }));
+    const { result } = renderHook(() => useIsNativePlatform());
+    await waitFor(() => expect(result.current).toBe(true));
   });
 });
 
-describe("useEnableBiometricPinUnlock", () => {
-  it("invalidates the status query on success", async () => {
-    mockedEnable.mockResolvedValue(undefined);
+describe("useNativeBiometricStatus", () => {
+  it("returns unavailable/disabled without checking anything on a non-native platform", async () => {
+    mockedIsNativePlatform.mockReturnValue(false);
+    const { Wrapper } = createQueryClientWrapper();
+    const { result } = renderHook(() => useNativeBiometricStatus(), { wrapper: Wrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual({ available: false, enabled: false });
+    expect(mockedIsBiometricHardwareAvailable).not.toHaveBeenCalled();
+  });
+
+  it("reflects hardware availability and the stored enabled flag on native", async () => {
     mockedIsNativePlatform.mockReturnValue(true);
-    mockedIsNativeBiometricAvailable.mockResolvedValue(true);
-    mockedHasBiometricPinStored.mockResolvedValue(true);
+    mockedIsBiometricHardwareAvailable.mockResolvedValue(true);
+    mockedIsBiometricUnlockEnabled.mockResolvedValue(true);
+    const { Wrapper } = createQueryClientWrapper();
+    const { result } = renderHook(() => useNativeBiometricStatus(), { wrapper: Wrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual({ available: true, enabled: true });
+  });
+});
+
+describe("useEnableBiometricUnlock", () => {
+  it("invalidates the status query on success", async () => {
+    mockedEnableBiometricUnlock.mockResolvedValue(undefined);
     const { Wrapper, queryClient } = createQueryClientWrapper();
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 
-    const { result } = renderHook(() => useEnableBiometricPinUnlock(), { wrapper: Wrapper });
-    result.current.mutate("1234");
+    const { result } = renderHook(() => useEnableBiometricUnlock(), { wrapper: Wrapper });
+    act(() => { result.current.mutate(); });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(mockedEnable).toHaveBeenCalledWith("1234");
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["auth", "nativeBiometric"] });
   });
 
-  it("silently ignores a cancelled biometric prompt", async () => {
-    mockedEnable.mockRejectedValue(Object.assign(new Error("cancelled"), { code: "userCancel" }));
+  it("silently does nothing when the user cancels the biometric prompt", async () => {
+    mockedEnableBiometricUnlock.mockRejectedValue(Object.assign(new Error("cancelled"), { code: "userCancel" }));
     mockedIsBiometryError.mockReturnValue(true);
     const { Wrapper } = createQueryClientWrapper();
 
-    const { result } = renderHook(() => useEnableBiometricPinUnlock(), { wrapper: Wrapper });
-    result.current.mutate("1234");
+    const { result } = renderHook(() => useEnableBiometricUnlock(), { wrapper: Wrapper });
+    act(() => { result.current.mutate(); });
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(toast.error).not.toHaveBeenCalled();
   });
 
-  it("shows an error toast for a real failure", async () => {
-    mockedEnable.mockRejectedValue(new Error("secure storage unavailable"));
+  it("shows an error toast for any other failure", async () => {
+    mockedEnableBiometricUnlock.mockRejectedValue(new Error("hardware error"));
     mockedIsBiometryError.mockReturnValue(false);
     const { Wrapper } = createQueryClientWrapper();
 
-    const { result } = renderHook(() => useEnableBiometricPinUnlock(), { wrapper: Wrapper });
-    result.current.mutate("1234");
+    const { result } = renderHook(() => useEnableBiometricUnlock(), { wrapper: Wrapper });
+    act(() => { result.current.mutate(); });
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(toast.error).toHaveBeenCalledWith("Couldn't enable fingerprint unlock");
   });
 });
 
-describe("useDisableBiometricPinUnlock", () => {
-  it("invalidates the status query on success and nothing else", async () => {
-    mockedDisable.mockResolvedValue(undefined);
+describe("useDisableBiometricUnlock", () => {
+  it("invalidates the status query on success", async () => {
+    mockedDisableBiometricUnlock.mockResolvedValue(undefined);
     const { Wrapper, queryClient } = createQueryClientWrapper();
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 
-    const { result } = renderHook(() => useDisableBiometricPinUnlock(), { wrapper: Wrapper });
-    result.current.mutate();
+    const { result } = renderHook(() => useDisableBiometricUnlock(), { wrapper: Wrapper });
+    act(() => { result.current.mutate(); });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["auth", "nativeBiometric"] });
-    expect(toast.error).not.toHaveBeenCalled();
-  });
-});
-
-// Sanity check that our mock's enum stand-in stays wired to what the hook actually compares
-// against — if the real module's BiometryErrorType.userCancel value ever changes, this constant
-// should too.
-describe("BiometryErrorType wiring", () => {
-  it("mocks the same userCancel value the hook checks", () => {
-    expect(BiometryErrorType.userCancel).toBe("userCancel");
   });
 });

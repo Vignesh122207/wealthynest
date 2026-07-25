@@ -1,43 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-
-const {
-  isNativePlatformMock, checkBiometryMock, authenticateMock,
-  storageGetMock, storageSetMock, storageRemoveMock,
-} = vi.hoisted(() => ({
-  isNativePlatformMock: vi.fn(),
-  checkBiometryMock: vi.fn(),
-  authenticateMock: vi.fn(),
-  storageGetMock: vi.fn(),
-  storageSetMock: vi.fn(),
-  storageRemoveMock: vi.fn(),
-}));
+import { Capacitor } from "@capacitor/core";
+import { BiometricAuth, BiometryError, BiometryErrorType } from "@aparajita/capacitor-biometric-auth";
+import { SecureStoragePlugin } from "capacitor-secure-storage-plugin";
+import {
+  isNativePlatform, isBiometricHardwareAvailable, isBiometricUnlockEnabled,
+  enableBiometricUnlock, disableBiometricUnlock, verifyBiometric, isBiometryError,
+} from "./nativeBiometric";
 
 vi.mock("@capacitor/core", () => ({
-  Capacitor: { isNativePlatform: isNativePlatformMock },
+  Capacitor: { isNativePlatform: vi.fn() },
 }));
 vi.mock("@aparajita/capacitor-biometric-auth", () => ({
-  BiometricAuth: { checkBiometry: checkBiometryMock, authenticate: authenticateMock },
-  BiometryError: class BiometryError extends Error {
-    code: string;
-    constructor(message: string, code: string) { super(message); this.code = code; }
-  },
+  BiometricAuth: { checkBiometry: vi.fn(), authenticate: vi.fn() },
+  BiometryError: class extends Error {},
   BiometryErrorType: { userCancel: "userCancel", appCancel: "appCancel" },
 }));
 vi.mock("capacitor-secure-storage-plugin", () => ({
-  SecureStoragePlugin: { get: storageGetMock, set: storageSetMock, remove: storageRemoveMock },
+  SecureStoragePlugin: { get: vi.fn(), set: vi.fn(), remove: vi.fn() },
 }));
 
-import {
-  BiometryErrorType,
-  disableBiometricPinUnlock,
-  enableBiometricPinUnlock,
-  hasBiometricPinStored,
-  isBiometryError,
-  isNativeBiometricAvailable,
-  isNativePlatform,
-  retrievePinViaBiometric,
-} from "./nativeBiometric";
-import { BiometryError } from "@aparajita/capacitor-biometric-auth";
+const mockedIsNativePlatform = vi.mocked(Capacitor.isNativePlatform);
+const mockedCheckBiometry = vi.mocked(BiometricAuth.checkBiometry);
+const mockedAuthenticate = vi.mocked(BiometricAuth.authenticate);
+const mockedGet = vi.mocked(SecureStoragePlugin.get);
+const mockedSet = vi.mocked(SecureStoragePlugin.set);
+const mockedRemove = vi.mocked(SecureStoragePlugin.remove);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -45,98 +32,81 @@ beforeEach(() => {
 
 describe("isNativePlatform", () => {
   it("delegates to Capacitor.isNativePlatform", () => {
-    isNativePlatformMock.mockReturnValue(true);
+    mockedIsNativePlatform.mockReturnValue(true);
     expect(isNativePlatform()).toBe(true);
   });
 });
 
-describe("isNativeBiometricAvailable", () => {
-  it("returns false without checking biometry when not on a native platform", async () => {
-    isNativePlatformMock.mockReturnValue(false);
-    await expect(isNativeBiometricAvailable()).resolves.toBe(false);
-    expect(checkBiometryMock).not.toHaveBeenCalled();
+describe("isBiometricHardwareAvailable", () => {
+  it("returns false without checking hardware on a non-native platform", async () => {
+    mockedIsNativePlatform.mockReturnValue(false);
+    expect(await isBiometricHardwareAvailable()).toBe(false);
+    expect(mockedCheckBiometry).not.toHaveBeenCalled();
   });
 
-  it("returns the device's availability when native", async () => {
-    isNativePlatformMock.mockReturnValue(true);
-    checkBiometryMock.mockResolvedValue({ isAvailable: true });
-    await expect(isNativeBiometricAvailable()).resolves.toBe(true);
-  });
-});
-
-describe("hasBiometricPinStored", () => {
-  it("returns false when not native", async () => {
-    isNativePlatformMock.mockReturnValue(false);
-    await expect(hasBiometricPinStored()).resolves.toBe(false);
-    expect(storageGetMock).not.toHaveBeenCalled();
-  });
-
-  it("returns true when a PIN is stored", async () => {
-    isNativePlatformMock.mockReturnValue(true);
-    storageGetMock.mockResolvedValue({ value: "1234" });
-    await expect(hasBiometricPinStored()).resolves.toBe(true);
-  });
-
-  it("returns false when secure storage has nothing under the key", async () => {
-    isNativePlatformMock.mockReturnValue(true);
-    storageGetMock.mockRejectedValue(new Error("not found"));
-    await expect(hasBiometricPinStored()).resolves.toBe(false);
+  it("reflects checkBiometry's isAvailable on native", async () => {
+    mockedIsNativePlatform.mockReturnValue(true);
+    mockedCheckBiometry.mockResolvedValue({ isAvailable: true } as never);
+    expect(await isBiometricHardwareAvailable()).toBe(true);
   });
 });
 
-describe("enableBiometricPinUnlock", () => {
-  it("authenticates before storing the PIN", async () => {
-    authenticateMock.mockResolvedValue(undefined);
-    storageSetMock.mockResolvedValue({ value: true });
-
-    await enableBiometricPinUnlock("1234");
-
-    expect(authenticateMock).toHaveBeenCalled();
-    expect(storageSetMock).toHaveBeenCalledWith({ key: expect.any(String), value: "1234" });
-    expect(authenticateMock.mock.invocationCallOrder[0]).toBeLessThan(storageSetMock.mock.invocationCallOrder[0]);
+describe("isBiometricUnlockEnabled", () => {
+  it("returns false without reading storage on a non-native platform", async () => {
+    mockedIsNativePlatform.mockReturnValue(false);
+    expect(await isBiometricUnlockEnabled()).toBe(false);
+    expect(mockedGet).not.toHaveBeenCalled();
   });
 
-  it("never stores the PIN when authentication fails", async () => {
-    authenticateMock.mockRejectedValue(new BiometryError("cancelled", BiometryErrorType.userCancel));
-
-    await expect(enableBiometricPinUnlock("1234")).rejects.toThrow();
-    expect(storageSetMock).not.toHaveBeenCalled();
+  it("returns true when the enabled flag is stored", async () => {
+    mockedIsNativePlatform.mockReturnValue(true);
+    mockedGet.mockResolvedValue({ value: "true" } as never);
+    expect(await isBiometricUnlockEnabled()).toBe(true);
   });
-});
 
-describe("disableBiometricPinUnlock", () => {
-  it("removes the stored PIN", async () => {
-    storageRemoveMock.mockResolvedValue({ value: true });
-    await disableBiometricPinUnlock();
-    expect(storageRemoveMock).toHaveBeenCalledWith({ key: expect.any(String) });
+  it("returns false when nothing is stored (a rejected get)", async () => {
+    mockedIsNativePlatform.mockReturnValue(true);
+    mockedGet.mockRejectedValue(new Error("not found"));
+    expect(await isBiometricUnlockEnabled()).toBe(false);
   });
 });
 
-describe("retrievePinViaBiometric", () => {
-  it("authenticates then returns the stored PIN", async () => {
-    authenticateMock.mockResolvedValue(undefined);
-    storageGetMock.mockResolvedValue({ value: "5678" });
-
-    await expect(retrievePinViaBiometric()).resolves.toBe("5678");
-    expect(authenticateMock).toHaveBeenCalled();
+describe("enableBiometricUnlock", () => {
+  it("confirms a biometric check, then stores the enabled flag", async () => {
+    mockedAuthenticate.mockResolvedValue(undefined as never);
+    await enableBiometricUnlock();
+    expect(mockedAuthenticate).toHaveBeenCalledWith({ reason: "Enable fingerprint unlock" });
+    expect(mockedSet).toHaveBeenCalledWith({ key: "wealthynest.applock.biometricEnabled", value: "true" });
   });
 
-  it("never reads storage when authentication fails", async () => {
-    authenticateMock.mockRejectedValue(new BiometryError("cancelled", BiometryErrorType.userCancel));
+  it("stores nothing when the biometric check fails", async () => {
+    mockedAuthenticate.mockRejectedValue(new Error("failed"));
+    await expect(enableBiometricUnlock()).rejects.toThrow();
+    expect(mockedSet).not.toHaveBeenCalled();
+  });
+});
 
-    await expect(retrievePinViaBiometric()).rejects.toThrow();
-    expect(storageGetMock).not.toHaveBeenCalled();
+describe("disableBiometricUnlock", () => {
+  it("removes the stored enabled flag", async () => {
+    await disableBiometricUnlock();
+    expect(mockedRemove).toHaveBeenCalledWith({ key: "wealthynest.applock.biometricEnabled" });
+  });
+});
+
+describe("verifyBiometric", () => {
+  it("runs a biometric check with an unlock-specific reason", async () => {
+    mockedAuthenticate.mockResolvedValue(undefined as never);
+    await verifyBiometric();
+    expect(mockedAuthenticate).toHaveBeenCalledWith({ reason: "Unlock WealthyNest" });
   });
 });
 
 describe("isBiometryError", () => {
-  it("identifies real BiometryError instances", () => {
+  it("identifies a BiometryError instance", () => {
     expect(isBiometryError(new BiometryError("nope", BiometryErrorType.userCancel))).toBe(true);
   });
 
-  it("rejects plain errors and non-errors", () => {
-    expect(isBiometryError(new Error("plain"))).toBe(false);
-    expect(isBiometryError("nope")).toBe(false);
-    expect(isBiometryError(undefined)).toBe(false);
+  it("rejects a plain Error", () => {
+    expect(isBiometryError(new Error("nope"))).toBe(false);
   });
 });

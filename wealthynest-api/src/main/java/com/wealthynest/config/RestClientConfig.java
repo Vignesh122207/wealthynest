@@ -109,4 +109,20 @@ public class RestClientConfig {
             .defaultHeader("User-Agent", "WealthyNest/1.0")
             .build();
     }
+
+    /** Google's OAuth 2.0 token endpoint — used only by the native Android sign-in flow to
+     * exchange an authorization code for an ID token server-side (see AuthServiceImpl.
+     * googleLoginNative). The generic-oauth2 Capacitor plugin driving that flow has no way to
+     * attach a client secret to its own token request, and Google requires one for this client
+     * type even with PKCE — so the exchange happens here instead, where the secret can live
+     * safely. Unlike a soft-fail price source, a failure here must surface as a real error, not
+     * silently continue. */
+    @Bean("googleOAuthClient")
+    public RestClient googleOAuthClient() {
+        return RestClient.builder()
+            .requestFactory(timeoutFactory(Duration.ofSeconds(5), Duration.ofSeconds(10)))
+            .baseUrl("https://oauth2.googleapis.com")
+            .defaultHeader("Accept", "application/json")
+            .build();
+    }
 }

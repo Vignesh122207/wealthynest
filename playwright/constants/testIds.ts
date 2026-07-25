@@ -10,10 +10,7 @@ export const TEST_IDS = {
     title: "page-header-title",
   },
   login: {
-    emailInput:            "login-email-input",
-    rememberMe:            "login-remember-me",
-    passkeyButton:         "login-passkey-button",
-    usePasswordButton:     "login-use-password-button",
+    continueWithEmailButton: "login-continue-with-email-button",
     passwordStepEmail:     "login-password-step-email-input",
     passwordStepPassword:  "login-password-step-password-input",
     passwordSubmit:        "login-password-submit",
@@ -22,15 +19,22 @@ export const TEST_IDS = {
     pinInput:               "login-pin-input",
     pinSubmit:              "login-pin-submit",
     pinUsePassword:         "login-pin-use-password",
-    googleContainer:        "google-signin-container",
+    // A real custom button now (see GoogleSignInButton.tsx), not a container wrapping a
+    // GIS-rendered iframe — renamed from googleContainer to match.
+    googleButton:           "google-signin-web-button",
   },
   appLock: {
-    pinInput:      "applock-pin-input",
-    pinSubmit:     "applock-pin-submit",
-    passkeyButton: "applock-passkey-button",
-    signOut:       "applock-sign-out",
+    pinInput:         "applock-pin-input",
+    pinSubmit:         "applock-pin-submit",
+    // Unified button — native's own BiometricPrompt or a passkey ceremony, whichever this account/
+    // platform actually has (see AppLockScreen.tsx's own comment on fingerprintAvailable).
+    fingerprintButton: "applock-fingerprint-button",
+    // Only ever rendered on the passkey (web) path, and only after a failed attempt — see
+    // AppLockScreen.tsx's own comment on why WebAuthn can't detect this ahead of time.
+    dismissPasskey:    "applock-dismiss-passkey",
   },
   signup: {
+    continueWithEmailButton: "signup-continue-with-email-button",
     fullNameInput:        "signup-fullName-input",
     emailInput:           "signup-email-input",
     passwordInput:        "signup-password-input",

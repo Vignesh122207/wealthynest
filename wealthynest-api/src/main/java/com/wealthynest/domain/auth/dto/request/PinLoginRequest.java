@@ -6,8 +6,5 @@ import lombok.Getter;
 @Getter
 public class PinLoginRequest {
     @NotBlank
-    private String refreshToken;
-
-    @NotBlank
     private String pin;
 }
