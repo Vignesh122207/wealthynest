@@ -4,6 +4,7 @@ import com.wealthynest.common.response.PagedResponse;
 import com.wealthynest.common.security.SecurityUtils;
 import com.wealthynest.domain.support.dto.ReplyRequest;
 import com.wealthynest.domain.support.dto.TicketResponse;
+import com.wealthynest.domain.support.dto.UpdateTicketStatusRequest;
 import com.wealthynest.domain.support.entity.SupportTicket;
 import com.wealthynest.domain.support.service.SupportTicketService;
 import jakarta.validation.Valid;
@@ -49,10 +50,8 @@ public class AdminTicketController {
     @PatchMapping("/{id}/status")
     public ResponseEntity<TicketResponse> updateStatus(
             @PathVariable UUID id,
-            @RequestBody Map<String, String> body) {
-        SupportTicket.Status   status   = body.containsKey("status")   ? SupportTicket.Status.valueOf(body.get("status"))     : null;
-        SupportTicket.Priority priority = body.containsKey("priority") ? SupportTicket.Priority.valueOf(body.get("priority")) : null;
-        return ResponseEntity.ok(service.updateStatus(id, status, priority));
+            @RequestBody UpdateTicketStatusRequest request) {
+        return ResponseEntity.ok(service.updateStatus(id, request.getStatus(), request.getPriority()));
     }
 
     @GetMapping("/count/open")

@@ -27,6 +27,7 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -85,8 +86,8 @@ class AdminTicketControllerTest {
     }
 
     @Test
-    @DisplayName("updateStatus parses status and priority from the raw body map")
-    void updateStatusParsesRawBody() throws Exception {
+    @DisplayName("updateStatus parses status and priority from the request body")
+    void updateStatusParsesBody() throws Exception {
         SecurityTestUtils.authenticateAs(adminId, null, UserRole.ADMIN);
         UUID ticketId = UUID.randomUUID();
         when(supportTicketService.updateStatus(ticketId, SupportTicket.Status.RESOLVED, SupportTicket.Priority.HIGH))
@@ -98,6 +99,20 @@ class AdminTicketControllerTest {
                 .andExpect(status().isOk());
 
         verify(supportTicketService).updateStatus(ticketId, SupportTicket.Status.RESOLVED, SupportTicket.Priority.HIGH);
+    }
+
+    @Test
+    @DisplayName("updateStatus rejects an invalid enum value with a clean 400 instead of a 500")
+    void updateStatusRejectsInvalidEnumValue() throws Exception {
+        SecurityTestUtils.authenticateAs(adminId, null, UserRole.ADMIN);
+        UUID ticketId = UUID.randomUUID();
+
+        mockMvc.perform(patch("/api/v1/admin/tickets/{id}/status", ticketId)
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(Map.of("status", "NOT_A_REAL_STATUS"))))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(supportTicketService);
     }
 
     @Test
