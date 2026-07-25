@@ -29,7 +29,7 @@ class ApplicationIntegrationTest extends AbstractIntegrationTest {
         Integer version = jdbcTemplate.queryForObject(
                 "SELECT MAX(version::int) FROM flyway_schema_history WHERE success = true",
                 Integer.class);
-        assertThat(version).isEqualTo(44);
+        assertThat(version).isEqualTo(45);
 
         Integer supportTicketsExists = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'support_tickets'",
