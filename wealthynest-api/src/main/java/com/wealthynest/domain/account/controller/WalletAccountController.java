@@ -3,6 +3,7 @@ package com.wealthynest.domain.account.controller;
 import com.wealthynest.common.response.ApiResponse;
 import com.wealthynest.common.response.PagedResponse;
 import com.wealthynest.common.security.SecurityUtils;
+import com.wealthynest.domain.account.dto.request.AdjustBalanceRequest;
 import com.wealthynest.domain.account.dto.request.CreateAccountRequest;
 import com.wealthynest.domain.account.dto.request.LoanPaymentRequest;
 import com.wealthynest.domain.account.dto.request.TransferRequest;
@@ -19,9 +20,7 @@ import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -116,10 +115,9 @@ public class WalletAccountController {
 
     @PostMapping("/{id}/adjust-balance")
     public ResponseEntity<ApiResponse<AccountResponse>> adjustBalance(
-            @PathVariable UUID id, @RequestBody Map<String, BigDecimal> body) {
-        BigDecimal target = body.get("targetBalance");
-        return ResponseEntity.ok(ApiResponse.success(
-                accountService.adjustBalance(id, SecurityUtils.requireCurrentUserId(), target)));
+            @PathVariable UUID id, @Valid @RequestBody AdjustBalanceRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(accountService.adjustBalance(
+                id, SecurityUtils.requireCurrentUserId(), request.getTargetBalance())));
     }
 
     @GetMapping("/{id}/statement")

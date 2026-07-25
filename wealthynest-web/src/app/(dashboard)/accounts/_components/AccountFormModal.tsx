@@ -12,6 +12,7 @@ import {ACCOUNT_TYPE_META} from "@/lib/accountTypeMeta";
 import {type CreateAccountForm, LOAN_TYPE_LABELS, LOAN_TYPE_OPTIONS} from "@/features/accounts/schemas/account.schema";
 import {INDIAN_BANKS, STOCK_BROKERS} from "@/lib/constants";
 import {cn, formatCurrency} from "@/lib/utils";
+import {useSidebarOffsetClass} from "@/hooks/useSidebarOffsetClass";
 import type {AccountType, WalletAccount} from "@/features/accounts/types/account.types";
 
 type ModalType = "none" | "create" | "addMoney" | "addExpense" | "transfer" | "edit" | "import";
@@ -65,9 +66,10 @@ export function AccountFormModal({
     : (editBalanceIsPositive ? "Income adjustment" : "Expense adjustment");
 
   const creditLimitField = createForm.register("creditLimit");
+  const sidebarOffset = useSidebarOffsetClass();
 
   return (
-    <div data-testid="modal-overlay-backdrop" className="fixed inset-0 lg:left-60 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+    <div data-testid="modal-overlay-backdrop" className={cn("fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4", sidebarOffset)} onClick={onClose}>
       {/* Same rounded-3xl / gradient-bar / p-5 chrome as ExpenseForm and the other shared
           transaction forms, so creating/editing an account matches the rest of the app. */}
       <div className="rounded-3xl overflow-hidden border border-border shadow-2xl animate-scale-in bg-card w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
