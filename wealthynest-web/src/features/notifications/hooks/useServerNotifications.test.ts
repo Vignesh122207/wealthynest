@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { createQueryClientWrapper } from "@/test-utils/queryClientWrapper";
 import {
-  toAppNotification, useServerNotifications, useMarkAllServerRead, useMergedNotifications,
+  toAppNotification, useServerNotifications, useMarkAllServerRead, useMarkServerRead,
+  useDeleteServerNotification, useNotificationPreferences, useUpdateNotificationPreferences,
+  useMergedNotifications,
 } from "./useServerNotifications";
 import { notificationsApi } from "../api/notifications.api";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -10,16 +12,24 @@ import { useNotificationStore } from "@/store/notification.store";
 import type { ServerNotification } from "../api/notifications.api";
 
 vi.mock("../api/notifications.api", () => ({
-  notificationsApi: { getNotifications: vi.fn(), markAllRead: vi.fn() },
+  notificationsApi: {
+    getNotifications: vi.fn(), markAllRead: vi.fn(), markRead: vi.fn(),
+    deleteNotification: vi.fn(), getPreferences: vi.fn(), updatePreferences: vi.fn(),
+  },
 }));
 vi.mock("@/hooks/useNotifications", () => ({ useNotifications: vi.fn() }));
 
 const mockedApi = vi.mocked(notificationsApi);
 const mockedUseNotifications = vi.mocked(useNotifications);
 
+const allPrefsOn = {
+  budgets: true, income: true, goals: true, maturity: true,
+  lowBalance: true, anomaly: true, debtDue: true, loanEmi: true,
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
-  useNotificationStore.setState({ seenIds: [], prefs: { budgets: true, income: true, goals: true, maturity: true } });
+  useNotificationStore.setState({ seenIds: [], dismissedIds: [], prefs: allPrefsOn });
 });
 
 describe("toAppNotification", () => {
@@ -86,6 +96,87 @@ describe("useMarkAllServerRead", () => {
   });
 });
 
+describe("useMarkServerRead", () => {
+  it("invalidates server-notifications on success", async () => {
+    mockedApi.markRead.mockResolvedValue(undefined as never);
+    const { Wrapper, queryClient } = createQueryClientWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const { result } = renderHook(() => useMarkServerRead(), { wrapper: Wrapper });
+    result.current.mutate("1");
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["server-notifications"] });
+  });
+
+  it("does not invalidate anything on failure", async () => {
+    mockedApi.markRead.mockRejectedValue(new Error("boom"));
+    const { Wrapper, queryClient } = createQueryClientWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const { result } = renderHook(() => useMarkServerRead(), { wrapper: Wrapper });
+    result.current.mutate("1");
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("useDeleteServerNotification", () => {
+  it("invalidates server-notifications on success", async () => {
+    mockedApi.deleteNotification.mockResolvedValue(undefined as never);
+    const { Wrapper, queryClient } = createQueryClientWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const { result } = renderHook(() => useDeleteServerNotification(), { wrapper: Wrapper });
+    result.current.mutate("1");
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["server-notifications"] });
+  });
+
+  it("does not invalidate anything on failure", async () => {
+    mockedApi.deleteNotification.mockRejectedValue(new Error("boom"));
+    const { Wrapper, queryClient } = createQueryClientWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const { result } = renderHook(() => useDeleteServerNotification(), { wrapper: Wrapper });
+    result.current.mutate("1");
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("useNotificationPreferences", () => {
+  it("fetches notification preferences", async () => {
+    mockedApi.getPreferences.mockResolvedValue({
+      budgetAlertEnabled: true, lowBalanceEnabled: true, spendAnomalyEnabled: true,
+      debtDueEnabled: true, loanEmiEnabled: true,
+    } as never);
+    const { Wrapper } = createQueryClientWrapper();
+    const { result } = renderHook(() => useNotificationPreferences(), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  });
+});
+
+describe("useUpdateNotificationPreferences", () => {
+  it("writes the mutation result directly into the notification-preferences cache on success", async () => {
+    const updated = {
+      budgetAlertEnabled: false, lowBalanceEnabled: true, spendAnomalyEnabled: true,
+      debtDueEnabled: true, loanEmiEnabled: true,
+    };
+    mockedApi.updatePreferences.mockResolvedValue(updated as never);
+    const { Wrapper, queryClient } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useUpdateNotificationPreferences(), { wrapper: Wrapper });
+    result.current.mutate(updated);
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(queryClient.getQueryData(["notification-preferences"])).toEqual(updated);
+  });
+});
+
 describe("useMergedNotifications", () => {
   const serverNotif: ServerNotification = {
     id: "s1", type: "BUDGET_EXCEEDED", title: "Groceries over budget", message: "You've spent 110%",
@@ -138,5 +229,20 @@ describe("useMergedNotifications", () => {
     const { result } = renderHook(() => useMergedNotifications(), { wrapper: Wrapper });
     await waitFor(() => expect(result.current.notifications).toHaveLength(1));
     expect(result.current.unreadCount).toBe(0);
+  });
+
+  it("hides a server notification whose type has been turned off in prefs", async () => {
+    const lowBalanceNotif: ServerNotification = {
+      id: "s2", type: "LOW_BALANCE_ALERT", title: "Low balance: HDFC", message: "Balance is low",
+      read: false, createdAt: "2026-07-01T00:00:00Z",
+    } as ServerNotification;
+    mockedApi.getNotifications.mockResolvedValue([lowBalanceNotif] as never);
+    mockedUseNotifications.mockReturnValue({ notifications: [] } as never);
+    useNotificationStore.setState({ prefs: { ...allPrefsOn, lowBalance: false } });
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useMergedNotifications(), { wrapper: Wrapper });
+    await waitFor(() => expect(mockedApi.getNotifications).toHaveBeenCalled());
+    expect(result.current.notifications).toHaveLength(0);
   });
 });

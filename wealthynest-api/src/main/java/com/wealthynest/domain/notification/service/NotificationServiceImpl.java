@@ -1,7 +1,13 @@
 package com.wealthynest.domain.notification.service;
 
+import com.wealthynest.common.exception.AccessDeniedException;
+import com.wealthynest.common.exception.ResourceNotFoundException;
+import com.wealthynest.domain.notification.dto.request.UpdateNotificationPreferenceRequest;
+import com.wealthynest.domain.notification.dto.response.NotificationPreferenceResponse;
 import com.wealthynest.domain.notification.dto.response.NotificationResponse;
 import com.wealthynest.domain.notification.entity.Notification;
+import com.wealthynest.domain.notification.entity.NotificationPreference;
+import com.wealthynest.domain.notification.repository.NotificationPreferenceRepository;
 import com.wealthynest.domain.notification.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -18,6 +24,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class NotificationServiceImpl implements NotificationService {
     private final NotificationRepository notificationRepository;
+    private final NotificationPreferenceRepository notificationPreferenceRepository;
 
     @Override @Transactional(readOnly = true)
     public Page<NotificationResponse> getNotifications(UUID userId, Pageable pageable) {
@@ -39,8 +46,59 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override @Transactional
+    public void markRead(UUID userId, UUID id) {
+        Notification notification = notificationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Notification", "id", id));
+        if (!notification.getUserId().equals(userId)) throw new AccessDeniedException();
+        notification.setRead(true);
+        notificationRepository.save(notification);
+    }
+
+    @Override @Transactional
+    public void delete(UUID userId, UUID id) {
+        Notification notification = notificationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Notification", "id", id));
+        if (!notification.getUserId().equals(userId)) throw new AccessDeniedException();
+        notificationRepository.delete(notification);
+    }
+
+    @Override @Transactional(readOnly = true)
+    public NotificationPreferenceResponse getPreferences(UUID userId) {
+        return toPreferenceResponse(notificationPreferenceRepository.findById(userId)
+                .orElseGet(() -> NotificationPreference.builder().userId(userId).build()));
+    }
+
+    @Override @Transactional
+    public NotificationPreferenceResponse updatePreferences(UUID userId, UpdateNotificationPreferenceRequest request) {
+        NotificationPreference prefs = notificationPreferenceRepository.findById(userId)
+                .orElseGet(() -> NotificationPreference.builder().userId(userId).build());
+        prefs.setBudgetAlertEnabled(request.getBudgetAlertEnabled());
+        prefs.setLowBalanceEnabled(request.getLowBalanceEnabled());
+        prefs.setSpendAnomalyEnabled(request.getSpendAnomalyEnabled());
+        prefs.setDebtDueEnabled(request.getDebtDueEnabled());
+        prefs.setLoanEmiEnabled(request.getLoanEmiEnabled());
+        return toPreferenceResponse(notificationPreferenceRepository.save(prefs));
+    }
+
+    private NotificationPreferenceResponse toPreferenceResponse(NotificationPreference p) {
+        return NotificationPreferenceResponse.builder()
+                .budgetAlertEnabled(p.isBudgetAlertEnabled())
+                .lowBalanceEnabled(p.isLowBalanceEnabled())
+                .spendAnomalyEnabled(p.isSpendAnomalyEnabled())
+                .debtDueEnabled(p.isDebtDueEnabled())
+                .loanEmiEnabled(p.isLoanEmiEnabled())
+                .build();
+    }
+
+    /** Absence of a preference row means every alert type defaults to enabled. */
+    private boolean isEnabled(UUID userId, java.util.function.Predicate<NotificationPreference> getter) {
+        return notificationPreferenceRepository.findById(userId).map(getter::test).orElse(true);
+    }
+
+    @Override @Transactional
     public void createBudgetBreachNotification(UUID userId, String categoryName,
                                                BigDecimal spent, BigDecimal budget, double pct) {
+        if (!isEnabled(userId, NotificationPreference::isBudgetAlertEnabled)) return;
         String title = "Budget Alert: " + categoryName;
         // Deduplicate — one alert per category per day
         Instant startOfDay = Instant.now().truncatedTo(ChronoUnit.DAYS);
@@ -62,6 +120,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override @Transactional
     public void createLowBalanceNotification(UUID userId, String accountName, BigDecimal balance, BigDecimal threshold) {
+        if (!isEnabled(userId, NotificationPreference::isLowBalanceEnabled)) return;
         String title = "Low Balance: " + accountName;
         Instant startOfDay = Instant.now().truncatedTo(ChronoUnit.DAYS);
         boolean alreadySentToday = notificationRepository
@@ -82,6 +141,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override @Transactional
     public void createSpendAnomalyNotification(UUID userId, String categoryName, BigDecimal amount, BigDecimal average) {
+        if (!isEnabled(userId, NotificationPreference::isSpendAnomalyEnabled)) return;
         String title = "Unusual Spend: " + categoryName;
         Instant startOfDay = Instant.now().truncatedTo(ChronoUnit.DAYS);
         boolean alreadySentToday = notificationRepository
@@ -102,6 +162,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override @Transactional
     public void createDebtDueNotification(UUID userId, String contactName, BigDecimal amount, LocalDate dueDate, String debtType) {
+        if (!isEnabled(userId, NotificationPreference::isDebtDueEnabled)) return;
         String title = "Debt Due: " + contactName;
         Instant startOfDay = Instant.now().truncatedTo(ChronoUnit.DAYS);
         boolean alreadySentToday = notificationRepository
@@ -124,6 +185,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override @Transactional
     public void createEmiUpcomingNotification(UUID userId, String loanName, BigDecimal amount, LocalDate dueDate) {
+        if (!isEnabled(userId, NotificationPreference::isLoanEmiEnabled)) return;
         String title = "EMI Due Soon: " + loanName;
         Instant startOfDay = Instant.now().truncatedTo(ChronoUnit.DAYS);
         boolean alreadySentToday = notificationRepository

@@ -27,7 +27,11 @@ beforeEach(() => {
   setupDefaults();
   useNotificationStore.setState({
     seenIds: [],
-    prefs: { budgets: true, income: true, goals: true, maturity: true },
+    dismissedIds: [],
+    prefs: {
+      budgets: true, income: true, goals: true, maturity: true,
+      lowBalance: true, anomaly: true, debtDue: true, loanEmi: true,
+    },
   });
 });
 
@@ -61,7 +65,12 @@ describe("useNotifications — budget alerts", () => {
   });
 
   it("is suppressed entirely when prefs.budgets is off", () => {
-    useNotificationStore.setState({ prefs: { budgets: false, income: true, goals: true, maturity: true } });
+    useNotificationStore.setState({
+      prefs: {
+        budgets: false, income: true, goals: true, maturity: true,
+        lowBalance: true, anomaly: true, debtDue: true, loanEmi: true,
+      },
+    });
     mockedUseDashboard.mockReturnValue({
       data: { budgetSummaries: [{ categoryId: "c1", categoryName: "Dining", overBudget: true, percentUsed: 120, spent: 12000, budgeted: 10000 }] },
     } as never);
@@ -187,5 +196,13 @@ describe("useNotifications — sort order and unread count", () => {
     const { result } = renderHook(() => useNotifications());
     expect(result.current.notifications).toHaveLength(1);
     expect(result.current.unreadCount).toBe(0);
+  });
+
+  it("excludes a notification whose id has been dismissed", () => {
+    mockedUseGoals.mockReturnValue({ data: [{ id: "g1", name: "Done Goal", percentSaved: 100, targetAmount: 1000 }] } as never);
+    useNotificationStore.setState({ dismissedIds: ["goal-done-g1"] });
+
+    const { result } = renderHook(() => useNotifications());
+    expect(result.current.notifications).toHaveLength(0);
   });
 });

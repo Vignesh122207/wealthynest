@@ -31,7 +31,7 @@ export function useNotifications() {
   const { data: goals }           = useGoals();
   const { data: investments = [] } = useInvestments();
 
-  const { seenIds, prefs } = useNotificationStore();
+  const { seenIds, dismissedIds, prefs } = useNotificationStore();
 
   const notifications = useMemo<AppNotification[]>(() => {
     const items: AppNotification[] = [];
@@ -127,8 +127,10 @@ export function useNotifications() {
       }
     }
 
-    return items.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
-  }, [dashboard, incomeHistory, goals, investments, prefs]);
+    return items
+      .filter((n) => !dismissedIds.includes(n.id))
+      .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
+  }, [dashboard, incomeHistory, goals, investments, prefs, dismissedIds]);
 
   const unreadCount = useMemo(
     () => notifications.filter((n) => !seenIds.includes(n.id)).length,
