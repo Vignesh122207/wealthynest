@@ -26,4 +26,10 @@ public interface StockTransactionRepository extends JpaRepository<StockTransacti
     java.math.BigDecimal sumBuyQuantityByInvestmentId(UUID investmentId);
 
     long countByInvestmentId(UUID investmentId);
+
+    /** Batch-load variant for a portfolio list response (InvestmentServiceImpl#enrichAll) — one
+     * grouped query for every stock investment's transaction count, instead of one
+     * countByInvestmentId per row. */
+    @Query("SELECT t.investmentId, COUNT(t) FROM StockTransaction t WHERE t.investmentId IN :investmentIds GROUP BY t.investmentId")
+    List<Object[]> countByInvestmentIdIn(Collection<UUID> investmentIds);
 }

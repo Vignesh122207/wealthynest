@@ -1518,7 +1518,11 @@ class InvestmentServiceImplTest {
                     .lastUpdated(Instant.now()).build();
             when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(inv));
             when(stockPriceCacheRepository.findById("TCS")).thenReturn(Optional.of(cache));
-            when(stockTransactionRepository.countByInvestmentId(investmentId)).thenReturn(3L);
+            // getInvestments batches this via enrichAll (one grouped query for the whole list)
+            // rather than enrich's own single-item countByInvestmentId fallback — see
+            // StockTransactionRepository#countByInvestmentIdIn.
+            when(stockTransactionRepository.countByInvestmentIdIn(List.of(investmentId)))
+                    .thenReturn(java.util.Collections.singletonList(new Object[]{investmentId, 3L}));
 
             InvestmentResponse response = service.getInvestments(userId).get(0);
 
@@ -1627,8 +1631,11 @@ class InvestmentServiceImplTest {
             Investment inv = withId(baseInvestment().investmentType(InvestmentType.PPF)
                     .debitAccountId(debitAccountId).build());
             WalletAccount account = WalletAccount.builder().name("HDFC Savings").build();
+            ReflectionTestUtils.setField(account, "id", debitAccountId);
             when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(inv));
-            when(accountRepository.findById(debitAccountId)).thenReturn(Optional.of(account));
+            // getInvestments batches this via enrichAll (one findAllById for the whole list)
+            // rather than enrich's own single-item findById fallback.
+            when(accountRepository.findAllById(List.of(debitAccountId))).thenReturn(List.of(account));
 
             InvestmentResponse response = service.getInvestments(userId).get(0);
 
