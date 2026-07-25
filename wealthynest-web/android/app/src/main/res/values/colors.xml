@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Mirrors the sidebar-bg/primary CSS variables from src/app/globals.css (light theme) —
+         this is the color Header/MobileNav actually paint at the screen edges, so the native
+         window background behind/around the WebView (visible briefly on launch and under the
+         edge-to-edge system bars) matches instead of showing a default AppCompat white/gray. Keep
+         in sync with globals.css by hand; there's no build step that derives one from the other. -->
+    <color name="colorPrimary">#C2703D</color>
+    <color name="colorPrimaryDark">#FFFFFF</color>
+    <color name="colorAccent">#C2703D</color>
+    <color name="windowBackground">#FFFFFF</color>
+</resources>

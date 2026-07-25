@@ -1,7 +1,11 @@
 import {cn} from "@/lib/utils";
 
 interface FormModalShellProps {
-  /** Tailwind gradient stop classes for the top accent strip, e.g. "from-fuchsia-500 to-pink-600". */
+  /** Tailwind gradient stop classes for the top accent strip, e.g. "from-fuchsia-500 to-pink-600".
+   * Pass "none" to omit the strip entirely — for a caller like Vault whose own header (bled to
+   * the card's edges with negative margins) covers that real estate itself; a transparent
+   * gradient still occupies the strip's height and leaks the card's own background color above
+   * the header instead of actually disappearing. */
   accent: string;
   children: React.ReactNode;
   className?: string;
@@ -14,7 +18,7 @@ interface FormModalShellProps {
 export function FormModalShell({ accent, children, className }: FormModalShellProps) {
   return (
     <div className={cn("rounded-3xl overflow-hidden border border-border shadow-2xl animate-scale-in bg-card", className)}>
-      <div className={cn("h-1.5 bg-gradient-to-r", accent)} />
+      {accent !== "none" && <div className={cn("h-1.5 bg-gradient-to-r", accent)} />}
       <div className="p-5">{children}</div>
     </div>
   );

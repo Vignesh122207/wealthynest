@@ -3,7 +3,6 @@
 import Link from "next/link";
 import {AlertCircle, Bell, CheckCircle2, Download, Eye, EyeOff, Info, Menu, Moon, Sun, X} from "lucide-react";
 import {useTheme} from "next-themes";
-import {usePathname} from "next/navigation";
 import {useEffect, useRef, useState} from "react";
 import {cn, getInitials} from "@/lib/utils";
 import {useUIStore} from "@/store/ui.store";
@@ -12,6 +11,14 @@ import {type AppNotification, type NotifSeverity} from "@/hooks/useNotifications
 import {useNotificationStore} from "@/store/notification.store";
 import {useMergedNotifications} from "@/features/notifications/hooks/useServerNotifications";
 import {usePrivacyStore} from "@/store/privacy.store";
+import {GlossyBadge, PremiumIcon} from "@/components/icons/PremiumIcon";
+import {NAV_GRADIENTS} from "@/components/layout/Sidebar";
+
+// Same copper pair BrandMark's ribbon logo uses for its lightest leg — the bell keys off this
+// instead of PremiumIcon's Apple-tone palette so it reads as *this app's* brand, not a generic
+// system color, and stays in sync with --primary. The avatar takes the sidebar's own Notifications
+// gradient (NAV_GRADIENTS) instead — swapped on purpose, not the "obvious" pairing.
+const BRAND_GRADIENT: [string, string] = ["#e8935f", "#c2703d"];
 
 // ─── Severity helpers ────────────────────────────────────────────────────────
 
@@ -52,7 +59,7 @@ function NotificationPanel({
       <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
         <p className="text-sm font-semibold text-foreground">Notifications</p>
         {newCount > 0 && (
-          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">
             {newCount} new
           </span>
         )}
@@ -99,7 +106,7 @@ function NotificationPanel({
         <Link
           href="/notifications"
           onClick={onClose}
-          className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
+          className="text-xs text-primary hover:underline font-medium"
         >
           View all notifications →
         </Link>
@@ -121,8 +128,6 @@ export function Header({ title, subtitle, onExport }: HeaderProps) {
   const [mounted, setMounted] = useState(false);
   const { toggleMobileMenu }  = useUIStore();
   const { user }              = useAuthStore();
-  const pathname               = usePathname();
-  const isHome                 = pathname === "/home";
 
   const [showNotifs, setShowNotifs] = useState(false);
 
@@ -181,33 +186,14 @@ export function Header({ title, subtitle, onExport }: HeaderProps) {
 
         {/* Hide/show amounts — masks currency figures on every page, not just Home, since
             usePrivacyStore/useAmountFormatter is read app-wide (Accounts, Investments, Budgets…). */}
-        <button
-          onClick={toggleHideAmounts}
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-          aria-label={hideAmounts ? "Show amounts" : "Hide amounts"}
-          aria-pressed={hideAmounts}
-        >
-          {hideAmounts ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        <button onClick={toggleHideAmounts} aria-label={hideAmounts ? "Show amounts" : "Hide amounts"} aria-pressed={hideAmounts}>
+          <PremiumIcon icon={hideAmounts ? EyeOff : Eye} tone="blue" size="xs" interactive className="rounded-full" />
         </button>
 
         {/* Bell */}
         <div ref={notifsRef} className="relative">
-          <button
-            onClick={toggleNotifs}
-            className={cn(
-              "w-8 h-8 rounded-lg flex items-center justify-center relative transition-all",
-              showNotifs
-                ? "text-indigo-600 dark:text-indigo-400 bg-indigo-600/10"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
-            )}
-            aria-label="Notifications"
-            aria-haspopup="true"
-            aria-expanded={showNotifs}
-          >
-            <Bell className="w-4 h-4" />
-            {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 w-2 h-2 bg-indigo-500 rounded-full" />
-            )}
+          <button onClick={toggleNotifs} aria-label="Notifications" aria-haspopup="true" aria-expanded={showNotifs}>
+            <PremiumIcon icon={Bell} gradient={BRAND_GRADIENT} size="xs" interactive selected={showNotifs} badge={unreadCount > 0} className="rounded-full" />
           </button>
           {showNotifs && (
             <NotificationPanel
@@ -220,36 +206,26 @@ export function Header({ title, subtitle, onExport }: HeaderProps) {
 
         {/* Theme toggle */}
         {mounted && (
-          <button
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-            aria-label="Toggle theme"
-          >
-            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle theme">
+            <PremiumIcon icon={theme === "dark" ? Sun : Moon} tone="indigo" size="xs" interactive className="rounded-full" />
           </button>
         )}
 
         {/* Export — only on pages that hand us something to export */}
         {onExport && (
-          <button
-            onClick={onExport}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-            aria-label="Export"
-          >
-            <Download className="w-4 h-4" />
+          <button onClick={onExport} aria-label="Export">
+            <PremiumIcon icon={Download} tone="green" size="xs" interactive className="rounded-full" />
           </button>
         )}
 
-        {/* User avatar — Home only; every other page links back here via Settings in the sidebar */}
-        {isHome && (
-          <Link
-            href="/settings/profile"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold bg-indigo-600/10 text-indigo-600 dark:text-indigo-300 hover:ring-2 hover:ring-indigo-500/30 transition-all ml-1"
-            aria-label="Edit profile"
-          >
-            {user ? getInitials(user.fullName) : "?"}
-          </Link>
-        )}
+        {/* User avatar — persistent across every page; other pages no longer forced you back to
+            Home to reach it. Square, matching BrandMark's own tile shape (both read as "identity"),
+            while the round action buttons around it read as a distinct "utility" family. */}
+        <Link href="/settings/profile" className="ml-1" aria-label="Edit profile">
+          <GlossyBadge gradient={NAV_GRADIENTS["/notifications"]} size="sm" interactive>
+            <span className="relative text-xs font-bold text-white">{user ? getInitials(user.fullName) : "?"}</span>
+          </GlossyBadge>
+        </Link>
 
       </div>
     </header>

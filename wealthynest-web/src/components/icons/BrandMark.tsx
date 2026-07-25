@@ -25,7 +25,9 @@ const W_STOPS: Record<(typeof W_LEGS)[number]["id"], [string, string]> = {
   d: ["#52341f", "#6b4526"],
 };
 
-function RibbonWMark({ className, tone = "duo" }: { className?: string; tone?: "duo" | "mono" }) {
+// Exported so it can also render as a large ghosted watermark (see AuthBrandPanel) — the same
+// glyph, just at a size/opacity BrandMark's own fixed-box API isn't meant for.
+export function RibbonWMark({ className, tone = "duo" }: { className?: string; tone?: "duo" | "mono" }) {
   const uid = useId();
   return (
     <svg viewBox="0 0 200 200" className={className} fill="currentColor" aria-hidden="true">
@@ -79,8 +81,16 @@ export function BrandMark({ variant = "gradient", boxClassName, iconClassName, r
   }
   return (
     <div
-      className={cn(roundedClassName, "relative overflow-hidden flex items-center justify-center shadow-lg shadow-[#c2703d]/25 shrink-0", boxClassName)}
-      style={{background: "radial-gradient(120% 120% at 30% 20%, #27272a 0%, #0a0a0a 70%)"}}
+      className={cn(
+        roundedClassName,
+        "relative overflow-hidden flex items-center justify-center shadow-lg shadow-[#c2703d]/25 shrink-0",
+        // Graphite tile in the app's light theme; flips to a plain white tile in the app's dark
+        // theme (next-themes' .dark class) so the badge doesn't read as a near-black hole against
+        // a dark page background. dark:bg-none clears the gradient background-image so dark:bg-white's
+        // background-color isn't drawn underneath it.
+        "bg-[radial-gradient(120%_120%_at_30%_20%,_#27272a_0%,_#0a0a0a_70%)] dark:bg-none dark:bg-white",
+        boxClassName,
+      )}
     >
       <RibbonWMark tone="duo" className={cn("relative", iconClassName)} />
     </div>

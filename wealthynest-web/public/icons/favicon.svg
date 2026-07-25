@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="25 39 150 150">
+  <!-- Browser-tab favicon: the same ribbon-W glyph used everywhere else in the app (BrandMark's
+       RibbonWMark, tone="duo" — see components/icons/BrandMark.tsx), just the glyph on its own
+       with no background tile and no drop-shadow (those exist only to sit on BrandMark's own
+       badge box, which this favicon deliberately doesn't have). Transparent background — the
+       browser's own tab-bar color shows through, in either light or dark browser chrome, so
+       there's no separate light/dark favicon variant needed here the way there was with a
+       background plate. The viewBox is cropped tight to the glyph's own bounding box (the source
+       geometry below is unchanged — it's positioned for a 200x200 canvas with room for a
+       background tile that doesn't exist here) so the W fills the tab icon edge-to-edge instead
+       of sitting small in the middle of the old canvas, e.g. Gmail's "M" favicon. -->
+  <defs>
+    <linearGradient id="wa" x1="-61.03" y1="0" x2="61.03" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#e8935f"/><stop offset="100%" stop-color="#c2703d"/></linearGradient>
+    <linearGradient id="wb" x1="-39.06" y1="0" x2="39.06" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#c2703d"/><stop offset="100%" stop-color="#e8935f"/></linearGradient>
+    <linearGradient id="wc" x1="-39.06" y1="0" x2="39.06" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#935a35"/><stop offset="100%" stop-color="#52341f"/></linearGradient>
+    <linearGradient id="wd" x1="-61.03" y1="0" x2="61.03" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#52341f"/><stop offset="100%" stop-color="#6b4526"/></linearGradient>
+  </defs>
+  <g transform="translate(63 114) rotate(71.9)"><rect x="-61.03" y="-13" width="122.07" height="26" rx="9" fill="url(#wa)"/></g>
+  <g transform="translate(91 134) rotate(-76.7)"><rect x="-39.06" y="-13" width="78.1" height="26" rx="9" fill="url(#wb)"/></g>
+  <g transform="translate(109 134) rotate(76.7)"><rect x="-39.06" y="-13" width="78.1" height="26" rx="9" fill="url(#wc)"/></g>
+  <g transform="translate(137 114) rotate(-71.9)"><rect x="-61.03" y="-13" width="122.07" height="26" rx="9" fill="url(#wd)"/></g>
+</svg>

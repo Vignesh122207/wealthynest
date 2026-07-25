@@ -1,10 +1,9 @@
 "use client";
 
 import {useMemo, useState} from "react";
-import Link from "next/link";
 import {Header} from "@/components/layout/Header";
 import {PageWrapper} from "@/components/layout/PageWrapper";
-import {AlertTriangle, ArrowLeft, Banknote, Check, Lock, type LucideIcon, Plus, Receipt, Tag} from "lucide-react";
+import {AlertTriangle, Banknote, Check, Lock, type LucideIcon, Plus, Receipt, Tag} from "lucide-react";
 import {cn} from "@/lib/utils";
 import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
 import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
@@ -270,11 +269,6 @@ export default function CategoriesSettingsPage() {
     <div className="flex flex-col flex-1">
       <Header title="Categories" subtitle="Manage expense and income categories" />
       <PageWrapper>
-
-        <Link href="/settings" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <ArrowLeft className="w-3.5 h-3.5" />
-          Settings
-        </Link>
 
         {/* Tab bar — same solid-fill-per-type template as Investments/Accounts/Debts/Transactions,
             colored to match this page's own FAB (Expense=rose, Income=emerald). */}

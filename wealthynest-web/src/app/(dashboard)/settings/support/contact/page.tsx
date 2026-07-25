@@ -1,6 +1,6 @@
 "use client";
 
-import {ArrowLeft, ChevronRight, Clock, HelpCircle, Mail, Ticket} from "lucide-react";
+import {ChevronRight, Clock, HelpCircle, Mail, Ticket} from "lucide-react";
 import Link from "next/link";
 import {Header} from "@/components/layout/Header";
 import {PageWrapper} from "@/components/layout/PageWrapper";
@@ -12,11 +12,6 @@ export default function ContactPage() {
       <Header title="Contact Us" subtitle="Send us a message and we'll get back to you" />
       <PageWrapper>
         <div className="max-w-lg md:max-w-3xl mx-auto space-y-6">
-
-          <Link href="/settings" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Settings
-          </Link>
 
           {/* Page header */}
           <div className="flex items-center gap-3 pb-1">

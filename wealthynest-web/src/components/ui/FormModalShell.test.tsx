@@ -23,4 +23,12 @@ describe("FormModalShell", () => {
     );
     expect(container.firstElementChild?.className).toContain("max-w-md");
   });
+
+  it("omits the accent strip entirely when accent is \"none\"", () => {
+    // A caller with its own full-bleed header (e.g. Vault's VaultModalHeader) needs no strip at
+    // all — even a transparent gradient still occupies the strip's height and leaks the shell's
+    // own background color above the header.
+    const { container } = render(<FormModalShell accent="none">Form fields</FormModalShell>);
+    expect(container.querySelector(".h-1\\.5")).not.toBeInTheDocument();
+  });
 });

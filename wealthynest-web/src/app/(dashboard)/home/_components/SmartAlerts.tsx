@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {Bell, Lightbulb, RefreshCw, X} from "lucide-react";
+import {AlertTriangle, Bell, Lightbulb, RefreshCw, X} from "lucide-react";
 import {cn} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {PremiumIcon} from "@/components/icons/PremiumIcon";
@@ -34,14 +34,18 @@ export function SmartAlerts({
     <div className="space-y-3 animate-fade-in-up delay-225">
       {/* Over-budget alert */}
       {hasAlerts && (
-        <div className="flex items-center gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/8 px-4 py-3">
-          <span className="text-base shrink-0">⚠️</span>
-          <p className="flex-1 text-sm font-medium text-amber-700 dark:text-amber-300">
-            You have {overBudgetCount} budget{overBudgetCount > 1 ? "s" : ""} over limit this month.
-            <Link href="/budgets" className="ml-2 underline underline-offset-2">View budgets →</Link>
-          </p>
+        <div className="flex items-start gap-3 rounded-2xl border border-red-500/30 bg-red-500/8 px-4 py-3">
+          <PremiumIcon icon={AlertTriangle} tone="red" size="xs" className="mt-0.5" />
+          <div className="flex-1 min-w-0 space-y-1">
+            <p className="text-sm font-medium text-red-700 dark:text-red-300">
+              You have {overBudgetCount} budget{overBudgetCount > 1 ? "s" : ""} over limit this month.
+            </p>
+            <Link href="/budgets" className="inline-block text-sm font-semibold text-red-700 dark:text-red-300 underline underline-offset-2">
+              View budgets →
+            </Link>
+          </div>
           <button onClick={onDismissOverBudget}
-            className="text-amber-500 hover:text-amber-600 dark:hover:text-amber-300 transition-colors shrink-0 p-1">
+            className="text-red-500 hover:text-red-600 dark:hover:text-red-300 transition-colors shrink-0 p-1 -m-1">
             <X className="w-4 h-4" />
           </button>
         </div>

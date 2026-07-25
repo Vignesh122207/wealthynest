@@ -13,6 +13,15 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- Matches the WebView's own bg (the sidebar-bg CSS variable) so the native window
+             behind/around it, visible on launch and under the edge-to-edge status/nav bars,
+             doesn't flash or show through as a mismatched default color. DayNight-parented so
+             this (and colors.xml's values-night override) actually follows dark mode; the plain
+             AppTheme this used to sit alongside does not. -->
+        <item name="android:windowBackground">@color/windowBackground</item>
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
     </style>
 
 

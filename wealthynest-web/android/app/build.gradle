@@ -20,6 +20,16 @@ android {
         versionCode 1
         versionName "1.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        // @capacitor-community/generic-oauth2 bundles net.openid:appauth, whose own manifest
+        // contributes a RedirectUriReceiverActivity templated with this placeholder — required
+        // for the manifest merge to succeed at all, regardless of whether native Google sign-in
+        // is otherwise configured.
+        // Must be exactly "com.googleusercontent.apps.<native OAuth client ID>" — confirmed the
+        // hard way: Google's Desktop-app-type OAuth clients reject any other custom scheme for
+        // the redirect_uri with a 400 invalid_request, regardless of what's registered on the
+        // Android side. Must match GoogleSignInButton.tsx's nativeRedirectUrlFor() output, and
+        // gets a new value if GOOGLE_NATIVE_CLIENT_ID (.env) is ever rotated.
+        manifestPlaceholders = [appAuthRedirectScheme: "com.googleusercontent.apps.510219615328-2pspp599ckp92b6kfrrkk8ovkdlj61uj"]
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61

@@ -45,7 +45,7 @@ export function LandingHeroCTA() {
   return (
     <Link href={user ? "/home" : "/signup"}
       className={`inline-flex items-center justify-center gap-2 ${PRIMARY_BTN} px-6 py-3.5 rounded-xl font-semibold text-sm shadow-[0_6px_24px_rgba(194,112,61,0.35)] hover:shadow-[0_8px_30px_rgba(194,112,61,0.5)] hover:-translate-y-0.5`}>
-      {user ? "Go to Home" : "Start free — takes 2 minutes"} <ArrowRight className="w-4 h-4" />
+      {user ? "Go to Home" : "Get started free"} <ArrowRight className="w-4 h-4" />
     </Link>
   );
 }

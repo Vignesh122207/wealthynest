@@ -82,9 +82,20 @@ available where this was scaffolded) — do this locally in Android Studio or vi
       real password (same one in `android/keystore/keystore.env`).
 - [ ] `cd android && ./gradlew assembleRelease` (or open in Android Studio) — confirm it builds
       and installs on a real device or emulator.
-- [ ] Confirm the app loads `https://wealthynest.in` full-screen with no browser chrome, and that
-      the launcher icon/splash screen (regenerated via `npx @capacitor/assets generate --android`
-      from `public/icons/icon-512.png`) look right.
+- [ ] Confirm the app loads full-screen with no browser chrome, and that the launcher icon looks
+      sharp (not blurry) at every density.
+      **Important**: any device testing done against a previously-installed APK is testing a stale
+      build — `server.url` pointing at `/home`, the native Google button, and the icon fix below
+      all require a fresh `./gradlew assembleRelease` (or reinstall from Android Studio) to actually
+      reach the device. The bundled `capacitor.config.json`/resources are baked into the APK at
+      build time, not fetched live.
+- [ ] The launcher icon was blurry because the adaptive-icon foreground/background layers
+      (`mipmap-*/ic_launcher_foreground.png`/`ic_launcher_background.png`) were generated at the
+      *legacy* launcher-icon sizes (48–192px) instead of the larger sizes adaptive icons actually
+      need (108–432px, since the OS composites them from a bigger 108dp canvas) — every density
+      was silently upscaling a too-small image ~2.25x. Regenerated at the correct sizes from
+      `public/icons/icon-512.png`; confirm on-device that the launcher icon is crisp, especially on
+      a high-density (xxxhdpi) screen where the old bug was most visible.
 - [ ] Manually verify the passkey unlock flow surfaces Android's native fingerprint/face UI
       correctly inside the Capacitor WebView — the existing
       `tests/regression/webauthn.spec.ts`/`app-lock.spec.ts` Playwright coverage only exercises
@@ -92,6 +103,47 @@ available where this was scaffolded) — do this locally in Android Studio or vi
 - [ ] Manually verify the new PIN + fingerprint flow end-to-end: enable PIN unlock → enable
       fingerprint unlock in Settings → background the app → confirm the fingerprint button appears
       on `AppLockScreen` and successfully unlocks.
+- [ ] Confirm the app opens straight to `/home` (or `/login` if signed out) — no flash of the
+      marketing landing page — since `capacitor.config.ts`'s `server.url` now points there instead
+      of `/`.
+- [ ] Confirm the status bar and nav bar areas match the app's own background (light and dark) with
+      no mismatched-color strip top or bottom — `colors.xml`/`values-night/colors.xml`,
+      `AppTheme.NoActionBar`'s `windowBackground`, and `nativeStatusBar.ts`'s
+      `StatusBar.setOverlaysWebView` are all new and unverified outside a real device.
+- [ ] From Home (native, signed in, no PIN/fingerprint configured), confirm the new "Secure this
+      device" prompt appears with PIN enabled and fingerprint visibly locked until PIN is set up,
+      and that dismissing it or finishing both setup steps makes it stop reappearing.
+- [ ] Confirm fingerprint fires automatically on `AppLockScreen` (no tap needed) when both PIN and
+      fingerprint are enabled, with "Use PIN instead" as a working fallback if the prompt is
+      cancelled or fails. The screen itself was redesigned to drop the "Welcome back, {name}" text
+      (icon + blurred background only, matching how other apps treat this exact moment) and adds
+      "Use password instead" as a real fallback option, not just a small "sign out" link.
+- [ ] Confirm the mobile "More" nav overlay (Sidebar.tsx) no longer overlaps the status bar
+      icons (clock/battery/wifi) when opened, and that the FAB no longer overlaps MobileNav's
+      "More" button on devices with a large gesture-nav inset — both were missing
+      `env(safe-area-inset-*)` padding, only caught once edge-to-edge was actually tested on a
+      real device rather than a browser dev-tools device emulation.
+- [ ] Confirm scrolling any dashboard page keeps Header pinned at the top instead of scrolling it
+      away — a body-level `padding-top: env(safe-area-inset-top)` added earlier made `body` taller
+      than one viewport, which broke Header's "not actually inside a scroll container" layout.
+      Reverted in favor of padding the `(auth)` and `(dashboard)` layout roots individually instead.
+- [ ] Native Google sign-in (`GoogleSignInButton.tsx`'s native branch, via
+      `@capacitor-community/generic-oauth2`) needs, before it can work at all:
+      1. A **new "Desktop app"-type OAuth 2.0 Client ID** in Google Cloud Console (same project as
+         the existing Web client) — Google only allows custom-URI-scheme redirects on that client
+         type, so the existing `GOOGLE_CLIENT_ID` (Web) can't be reused here.
+      2. Its authorized redirect URI set to `in.wealthynest.app://oauth2redirect`, matching
+         `app/build.gradle`'s `appAuthRedirectScheme` manifest placeholder and
+         `GoogleSignInButton.tsx`'s `NATIVE_REDIRECT_URL` exactly. (No hand-written intent-filter
+         for this in `AndroidManifest.xml` — the redirect-catching activity is contributed by
+         `net.openid:appauth`, a transitive dependency of `generic-oauth2`; the placeholder is what
+         wires our actual scheme into that library-provided activity.)
+      3. That client ID set as `GOOGLE_NATIVE_CLIENT_ID` in `.env` (wired through
+         `docker-compose.yml` → `Dockerfile` → `NEXT_PUBLIC_GOOGLE_NATIVE_CLIENT_ID`).
+      Until all three are done the native Google button stays hidden (same fail-closed pattern the
+      web button already uses when `GOOGLE_CLIENT_ID` is unset). Once configured, verify on a real
+      device: tapping it opens a Custom Tab (not the embedded WebView), completes sign-in, and
+      returns to the app signed in.
 
 ## Phase 2 — Play Store listing prep
 

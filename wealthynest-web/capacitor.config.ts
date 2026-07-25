@@ -11,7 +11,10 @@ const config: CapacitorConfig = {
   appName: "WealthyNest",
   webDir: "public",
   server: {
-    url: "https://wealthynest.in",
+    // `/home` (not `/`) so an installed app never shows the marketing landing page — `/home`
+    // lives under (dashboard)'s layout, which already redirects to `/login` when there's no
+    // session, so this one URL correctly handles both the logged-in and logged-out cases.
+    url: "https://wealthynest.in/home",
     androidScheme: "https",
     cleartext: false,
   },

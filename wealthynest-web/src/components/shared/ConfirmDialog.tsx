@@ -5,6 +5,7 @@ import {AlertTriangle, X} from "lucide-react";
 import {cn} from "@/lib/utils";
 import {Button} from "@/components/ui/Button";
 import {useDialogA11y} from "@/hooks/useDialogA11y";
+import {useSidebarOffsetClass} from "@/hooks/useSidebarOffsetClass";
 
 interface ConfirmDialogProps {
   open:          boolean;
@@ -49,6 +50,7 @@ export function ConfirmDialog({
   // cancelled out from under it — same guard handleConfirm already applies to double-clicks.
   const handleCancel = () => { if (!isBusy) onCancel(); };
   useDialogA11y(containerRef, handleCancel);
+  const sidebarOffset = useSidebarOffsetClass();
 
   if (!open) return null;
 
@@ -59,9 +61,9 @@ export function ConfirmDialog({
   };
 
   return (
-    // lg:left-60 (not inset-0 alone): centering on the full viewport puts this left of the
-    // actual content area's center once the desktop Sidebar (sticky w-60 column) appears at lg:.
-    <div data-testid="modal-overlay-backdrop" className="fixed inset-0 lg:left-60 z-50 flex items-center justify-center p-4">
+    // sidebarOffset (not inset-0 alone): centering on the full viewport puts this left of the
+    // actual content area's center once the desktop Sidebar (a sticky column) appears at lg:.
+    <div data-testid="modal-overlay-backdrop" className={cn("fixed inset-0 z-50 flex items-center justify-center p-4", sidebarOffset)}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCancel} />
       <div
         ref={containerRef}

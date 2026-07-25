@@ -3,7 +3,7 @@
 import {useForm} from "react-hook-form";
 import {zodResolver} from "@hookform/resolvers/zod";
 import {z} from "zod";
-import {ArrowLeft, Loader2, Lock} from "lucide-react";
+import {Loader2, Lock} from "lucide-react";
 import Link from "next/link";
 import {Header} from "@/components/layout/Header";
 import {PageWrapper} from "@/components/layout/PageWrapper";
@@ -42,11 +42,6 @@ export default function ProfilePage() {
       <Header title="Profile" subtitle="Update your personal details and account info" />
       <PageWrapper>
         <div className="max-w-lg md:max-w-3xl mx-auto space-y-6">
-
-          <Link href="/settings" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Settings
-          </Link>
 
           {/* Avatar */}
           <div className="flex flex-col items-center gap-3 bg-card border border-border rounded-2xl py-8">

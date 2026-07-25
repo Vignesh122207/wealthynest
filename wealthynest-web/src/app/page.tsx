@@ -122,7 +122,7 @@ export default function LandingPage() {
       {/* ── Nav ─────────────────────────────────────────────── */}
       <nav className="flex items-center justify-between px-6 lg:px-12 h-16 border-b border-border sticky top-0 bg-background/85 backdrop-blur-md z-30">
         <div className="flex items-center gap-2">
-          <BrandMark boxClassName="w-8 h-8" iconClassName="w-5 h-5" />
+          <BrandMark boxClassName="w-8 h-8" iconClassName="w-6 h-6" />
           <span className="text-base font-bold tracking-tight text-foreground">WealthyNest</span>
         </div>
         <div className="hidden md:flex items-center gap-7 text-sm font-medium text-muted-foreground">
@@ -481,7 +481,7 @@ export default function LandingPage() {
       <footer className="border-t border-border mt-auto">
         <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <BrandMark boxClassName="w-7 h-7" iconClassName="w-4 h-4" roundedClassName="rounded-lg" />
+            <BrandMark boxClassName="w-7 h-7" iconClassName="w-5 h-5" roundedClassName="rounded-lg" />
             <span className="text-sm font-semibold text-foreground">WealthyNest</span>
           </div>
 

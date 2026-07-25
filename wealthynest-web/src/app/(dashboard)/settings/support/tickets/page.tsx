@@ -1,6 +1,6 @@
 "use client";
 
-import {ArrowLeft, ChevronRight, Clock, MessageSquare, Plus, Ticket} from "lucide-react";
+import {ChevronRight, Clock, MessageSquare, Plus, Ticket} from "lucide-react";
 import Link from "next/link";
 import {Header} from "@/components/layout/Header";
 import {PageWrapper} from "@/components/layout/PageWrapper";
@@ -36,12 +36,7 @@ export default function MyTicketsPage() {
       <PageWrapper>
         <div className="max-w-lg md:max-w-4xl mx-auto space-y-5">
 
-          <div className="flex items-center justify-between">
-            <Link href="/settings"
-              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Settings
-            </Link>
+          <div className="flex items-center justify-end">
             <Link href="/settings/support/tickets/new"
               className="inline-flex items-center gap-1.5 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-xl transition-colors">
               <Plus className="w-3.5 h-3.5" />

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Mirrors the sidebar-bg/primary CSS variables from src/app/globals.css (.dark theme) —
+         see the light values/colors.xml comment for why this needs to match the web app's own
+         colors. -->
+    <color name="colorPrimary">#E8935E</color>
+    <color name="colorPrimaryDark">#030C17</color>
+    <color name="colorAccent">#E8935E</color>
+    <color name="windowBackground">#030C17</color>
+</resources>

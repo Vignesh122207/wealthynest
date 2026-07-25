@@ -22,9 +22,26 @@ const config: Config = {
         card:       { DEFAULT: "hsl(var(--card))", foreground: "hsl(var(--card-foreground))" },
         destructive:{ DEFAULT: "hsl(var(--destructive))", foreground: "hsl(var(--destructive-foreground))" },
         accent:     { DEFAULT: "hsl(var(--accent))", foreground: "hsl(var(--accent-foreground))" },
+        // Auth/app-lock copper scale — see globals.css for the token comment. RGB (not HSL)
+        // triplets so `/<opacity>` modifiers (bg-brand-600/10, ring-brand-500/25) work the same
+        // way they already do on primary/border/etc.
+        brand: {
+          100: "rgb(var(--brand-100) / <alpha-value>)",
+          200: "rgb(var(--brand-200) / <alpha-value>)",
+          300: "rgb(var(--brand-300) / <alpha-value>)",
+          400: "rgb(var(--brand-400) / <alpha-value>)",
+          500: "rgb(var(--brand-500) / <alpha-value>)",
+          600: "rgb(var(--brand-600) / <alpha-value>)",
+          700: "rgb(var(--brand-700) / <alpha-value>)",
+          750: "rgb(var(--brand-750) / <alpha-value>)",
+          900: "rgb(var(--brand-900) / <alpha-value>)",
+        },
       },
       borderRadius: { lg: "var(--radius)", md: "calc(var(--radius) - 2px)", sm: "calc(var(--radius) - 4px)" },
-      fontFamily: { sans: ["var(--font-jakarta)", "var(--font-inter)", "system-ui", "sans-serif"] },
+      fontFamily: {
+        sans: ["var(--font-jakarta)", "var(--font-inter)", "system-ui", "sans-serif"],
+        serif: ["var(--font-fraunces)", "ui-serif", "Georgia", "serif"],
+      },
     },
   },
   plugins: [],

@@ -9,6 +9,7 @@ import {authApi} from "@/features/auth/api/auth.api";
 import {useAppLockStore} from "@/features/auth/store/appLock.store";
 import {useAppLockTrigger} from "@/features/auth/hooks/useAppLockTrigger";
 import {AppLockScreen} from "@/features/auth/components/AppLockScreen";
+import {NativeSplashReady} from "@/components/shared/NativeSplashReady";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, setUser } = useAuthStore();
@@ -16,7 +17,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router    = useRouter();
   const [hydrated, setHydrated] = useState(false);
 
-  useAppLockTrigger();
+  const { ready: lockDecisionReady } = useAppLockTrigger();
 
   useEffect(() => { setHydrated(true); }, []);
 
@@ -44,9 +45,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!hydrated) return null;
   if (!isAuthenticated) return null;
+  // Holds off on painting real (unlocked) dashboard content until we know for sure whether this
+  // account should be locked — see useAppLockTrigger's `ready` doc comment. Without this, a
+  // passkey-armed account would flash its actual dashboard on every refresh until the passkeys
+  // list came back from the server and the lock screen caught up a moment later.
+  if (!lockDecisionReady) return null;
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div
+      className="flex min-h-screen bg-background"
+      // Padding-top (not body-level — see globals.css) clears the status bar. This stays within
+      // one viewport because of Tailwind preflight's box-sizing:border-box, which is exactly what
+      // lets Header keep behaving as "pinned, not actually scrolling" the way it already relied on.
+      style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+    >
+      {/* Cold-start entry point when logged in (capacitor.config.ts's server.url always loads
+          /home first) — only reached once isLocked has already been decided, so this never fires
+          a beat before AppLockScreen is actually in the tree. See NativeSplashReady's own comment. */}
+      <NativeSplashReady />
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus:px-4 focus:py-2 focus:rounded-lg focus:bg-primary focus:text-primary-foreground focus:text-sm focus:font-medium"

@@ -1,7 +1,6 @@
 "use client";
 
-import {ArrowLeft, Monitor, Moon, Sun} from "lucide-react";
-import Link from "next/link";
+import {Monitor, Moon, Sun} from "lucide-react";
 import {useTheme} from "next-themes";
 import {useEffect, useState} from "react";
 import {Header} from "@/components/layout/Header";
@@ -27,11 +26,6 @@ export default function AppearancePage() {
       <Header title="Appearance" subtitle="Customize theme and how WealthyNest looks" />
       <PageWrapper>
         <div className="max-w-lg md:max-w-3xl mx-auto space-y-6">
-
-          <Link href="/settings" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Settings
-          </Link>
 
           {/* Icon header */}
           <div className="flex flex-col items-center gap-3 py-2">

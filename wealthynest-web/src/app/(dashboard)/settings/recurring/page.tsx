@@ -1,11 +1,10 @@
 "use client";
 
 import {Suspense, useState} from "react";
-import Link from "next/link";
 import {useRouter, useSearchParams} from "next/navigation";
 import {Header} from "@/components/layout/Header";
 import {PageWrapper} from "@/components/layout/PageWrapper";
-import {ArrowLeft, ArrowLeftRight, Flag, Receipt, TrendingUp} from "lucide-react";
+import {ArrowLeftRight, Flag, Receipt, TrendingUp} from "lucide-react";
 import {cn} from "@/lib/utils";
 import {IncomeTab} from "./_tabs/IncomeTab";
 import {ExpensesTab} from "./_tabs/ExpensesTab";
@@ -54,10 +53,6 @@ function RecurringRulesContent() {
     <div className="flex flex-col flex-1">
       <Header title="Recurring Rules" subtitle="Everything that runs automatically on a schedule" />
       <PageWrapper>
-        <Link href="/settings" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <ArrowLeft className="w-3.5 h-3.5" />
-          Settings
-        </Link>
         <RuleTypeTabs value={tab} onChange={handleChange} />
         {tab === "income"    && <IncomeTab />}
         {tab === "expenses"  && <ExpensesTab />}
