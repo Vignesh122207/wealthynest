@@ -18,6 +18,9 @@ export class VaultPage extends BasePage {
       await this.page.getByLabel("Username / Email").fill(input.username);
     }
     if (input.totpSecret) {
+      // Collapsed by default (VaultItemForm's <details> disclosure) — has to be opened before
+      // its input becomes visible/fillable.
+      await this.page.locator("summary", { hasText: "Add a 2FA code" }).click();
       await this.page.getByTestId("vault-totp-input").fill(input.totpSecret);
     }
     await Promise.all([
@@ -28,8 +31,9 @@ export class VaultPage extends BasePage {
   }
 
   /** Opens the "Generate" panel (PasswordGeneratorPanel) already showing in the create/edit form —
-   * it fills `vault-secret-input` itself on mount and on every option change, so callers just read
-   * that field back rather than this page object owning a duplicate of the generated value. */
+   * it renders a live preview on mount and on every option change but only writes into
+   * `vault-secret-input` once "Use this" is clicked (see useGeneratedSecret) — matches the Vault
+   * redesign prototype's preview-then-confirm generate panel. */
   async openGenerator(): Promise<void> {
     await this.page.getByRole("button", { name: "Generate" }).click();
   }
@@ -38,8 +42,19 @@ export class VaultPage extends BasePage {
     await this.page.getByRole("button", { name: mode }).click();
   }
 
+  /** Reads the generator panel's own live preview — not yet committed to the real password field.
+   * The preview is written by a post-mount effect (React state, not an uncontrolled input ref like
+   * `vault-secret-input` used to be), so the element can be visible a beat before it's populated —
+   * wait for non-empty text rather than reading immediately. */
   async generatedSecret(): Promise<string> {
-    return this.page.getByTestId("vault-secret-input").inputValue();
+    const preview = this.page.getByTestId("vault-generator-preview");
+    await expect(preview).not.toHaveText("", { timeout: 5000 });
+    return preview.innerText();
+  }
+
+  /** Commits the panel's current preview into `vault-secret-input` and closes the panel. */
+  async useGeneratedSecret(): Promise<void> {
+    await this.page.getByTestId("vault-generator-use").click();
   }
 
   /** SECURE_NOTE items skip the LOGIN-only username/URL fields and use a plain textarea

@@ -24,8 +24,13 @@ export function vaultItemSchema(requireSecret: boolean) {
 
 export type VaultItemFormValues = z.infer<typeof baseVaultItemSchema>;
 
-export const revealSchema = z.object({
-  currentPassword: z.string().min(1, "Enter your account password"),
-});
+// Discriminated on `method` so a single form/resolver can validate either shape depending on which
+// step-up credential the user picked — password (always available) or PIN (only offered when the
+// account has one enabled). Native biometric deliberately has no place here: see VaultServiceImpl's
+// class comment for why it isn't accepted as a vault step-up credential at all.
+export const revealSchema = z.discriminatedUnion("method", [
+  z.object({ method: z.literal("password"), currentPassword: z.string().min(1, "Enter your account password") }),
+  z.object({ method: z.literal("pin"), pin: z.string().regex(/^[0-9]{4}$/, "Enter your 4-digit PIN") }),
+]);
 
 export type RevealFormValues = z.infer<typeof revealSchema>;

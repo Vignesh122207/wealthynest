@@ -3,31 +3,38 @@
 import {useEffect, useRef, useState} from "react";
 import {useForm} from "react-hook-form";
 import {zodResolver} from "@hookform/resolvers/zod";
-import {Check, Copy, Eye, EyeOff} from "lucide-react";
+import {Check, Copy, Eye, EyeOff, Lock} from "lucide-react";
 import {toast} from "sonner";
-import {FormInput} from "@/components/forms/FormInput";
 import {Button} from "@/components/ui/Button";
 import {FormModalShell} from "@/components/ui/FormModalShell";
-import {FormModalHeader} from "@/components/transactions/FormModalHeader";
 import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
 import {resolveVaultIcon} from "@/lib/categoryMeta";
+import {cn} from "@/lib/utils";
+import {useAuthStore} from "@/features/auth/store/auth.store";
 import {useRevealVaultSecret} from "../hooks/useVault";
 import {type RevealFormValues, revealSchema} from "../schemas/vault.schema";
 import {useVaultTrustStore} from "../store/vaultTrust.store";
 import type {VaultItem, VaultItemSecret} from "../types/vault.types";
 import {TotpCodeDisplay} from "./TotpCodeDisplay";
+import {VaultModalHeader} from "./VaultModalHeader";
+import {VaultStepUpFields} from "./VaultStepUpFields";
 
 type ApiError = { response?: { status?: number; data?: { message?: string } } };
 
 const CLIPBOARD_CLEAR_MS = 20_000;
 const TRUST_TTL_MINUTES = 5;
-const VAULT_SLATE = "#64748b";
+// See VaultHealthCard for the full brass/graphite "vault door" identity this echoes.
+const VAULT_BRASS = "#d4a72c";
 
 export function RevealSecretModal({ item, accentColor, onClose }: { item: VaultItem; accentColor: string; onClose: () => void }) {
   const [revealed, setRevealed]         = useState<string | null>(null);
   const [revealedTotp, setRevealedTotp] = useState<string | undefined>(undefined);
   const [showSecret, setShowSecret]     = useState(false);
   const [trustDevice, setTrustDevice]   = useState(false);
+  // Bumped on every failed attempt so the password field's wrapper remounts (key change) and
+  // replays the shake animation — a plain boolean wouldn't retrigger the CSS animation on
+  // back-to-back failures since the class would already be applied from the first one.
+  const [shakeKey, setShakeKey]         = useState(0);
   const clipboardTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { mutate: reveal, isPending, error } = useRevealVaultSecret();
 
@@ -37,7 +44,12 @@ export function RevealSecretModal({ item, accentColor, onClose }: { item: VaultI
   const clearTrust = useVaultTrustStore((s) => s.clear);
   const [autoRevealPending, setAutoRevealPending] = useState(() => isTrusted());
 
-  const form = useForm<RevealFormValues>({ resolver: zodResolver(revealSchema) });
+  const pinAvailable = !!useAuthStore((s) => s.user?.pinEnabled);
+  const form = useForm<RevealFormValues>({
+    resolver: zodResolver(revealSchema),
+    defaultValues: { method: "password", currentPassword: "" },
+  });
+  const method = form.watch("method") ?? "password";
 
   useEffect(() => () => { if (clipboardTimer.current) clearTimeout(clipboardTimer.current); }, []);
 
@@ -59,8 +71,9 @@ export function RevealSecretModal({ item, accentColor, onClose }: { item: VaultI
   }, []);
 
   const onSubmit = (v: RevealFormValues) => {
-    reveal({ id: item.id, currentPassword: v.currentPassword }, {
+    reveal({ id: item.id, ...(v.method === "pin" ? { pin: v.pin } : { currentPassword: v.currentPassword }) }, {
       onSuccess: (data) => handleRevealed(data, trustDevice),
+      onError: () => setShakeKey((k) => k + 1),
     });
   };
 
@@ -87,8 +100,10 @@ export function RevealSecretModal({ item, accentColor, onClose }: { item: VaultI
 
   return (
     <TransactionModalOverlay onDismiss={onClose} maxWidth="max-w-sm">
-      <FormModalShell accent="from-[#334155] to-[#64748b]">
-        <FormModalHeader icon={resolveVaultIcon(item)} hex={accentColor} title={item.title} onClose={onClose} />
+      {/* no accent strip — VaultModalHeader's own banner covers this real estate. */}
+      <FormModalShell accent="none">
+        <VaultModalHeader icon={resolveVaultIcon(item)} hex={accentColor} title={item.title}
+          subtitle={item.itemType === "LOGIN" ? "Reveal password" : "Reveal note"} onClose={onClose} />
 
         {revealed === null ? (
           autoRevealPending ? (
@@ -96,21 +111,24 @@ export function RevealSecretModal({ item, accentColor, onClose }: { item: VaultI
           ) : (
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Confirm your account password to view this {item.itemType === "LOGIN" ? "password" : "note"}.
+                Confirm your account {method === "pin" ? "PIN" : "password"} to view this {item.itemType === "LOGIN" ? "password" : "note"}.
               </p>
-              <FormInput type="password" label="Account Password" placeholder="••••••••" autoFocus
-                data-testid="vault-reveal-password-input" autoComplete="current-password"
-                error={form.formState.errors.currentPassword?.message ?? errorMessage}
-                {...form.register("currentPassword")} />
-              <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+              <div key={shakeKey} className={cn(shakeKey > 0 && "animate-shake")}>
+                <VaultStepUpFields form={form} pinAvailable={pinAvailable} idPrefix="vault-reveal" apiErrorMessage={errorMessage} />
+              </div>
+              <label className="flex items-start gap-2.5 text-xs cursor-pointer select-none p-3 rounded-xl"
+                style={{ backgroundColor: VAULT_BRASS + "0f", border: `1px solid ${VAULT_BRASS}30` }}>
                 <input type="checkbox" checked={trustDevice} onChange={(e) => setTrustDevice(e.target.checked)}
-                  data-testid="vault-trust-device-checkbox" style={{ accentColor: VAULT_SLATE }}
-                  className="w-3.5 h-3.5 rounded border-border bg-background cursor-pointer" />
-                Trust this device for {TRUST_TTL_MINUTES} minutes
+                  data-testid="vault-trust-device-checkbox" style={{ accentColor: VAULT_BRASS }}
+                  className="w-3.5 h-3.5 rounded border-border bg-background cursor-pointer mt-0.5 shrink-0" />
+                <span>
+                  <span className="block font-semibold text-foreground">Trust this device for {TRUST_TTL_MINUTES} minutes</span>
+                  <span className="block text-muted-foreground mt-0.5">Skip this confirmation for other items until then.</span>
+                </span>
               </label>
               <div className="flex gap-2 pt-1">
                 <Button type="submit" variant="gradient" loading={isPending} data-testid="vault-reveal-submit"
-                  className="flex-1 bg-gradient-to-r from-[#334155] to-[#64748b] hover:opacity-90 shadow-[#64748b]/25">
+                  className="flex-1 bg-gradient-to-br from-[#f6d776] to-[#a9791a] text-[#241705] hover:brightness-105 shadow-lg shadow-[#a9791a]/30">
                   {isPending ? "Verifying…" : "Reveal"}
                 </Button>
                 <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
@@ -119,19 +137,27 @@ export function RevealSecretModal({ item, accentColor, onClose }: { item: VaultI
           )
         ) : (
           <div className="space-y-4">
-            <div className="relative">
-              <div data-testid="vault-revealed-secret" className="w-full min-h-10 px-3 py-2.5 rounded-xl text-sm bg-muted/40 border border-border font-mono break-all pr-10">
-                {showSecret ? revealed : "•".repeat(Math.min(revealed.length, 24))}
+            <div className="rounded-xl bg-muted/60 px-3.5 py-3">
+              <p className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground mb-1.5">
+                {item.itemType === "LOGIN" ? "Password" : "Note"}
+              </p>
+              <div className="flex items-center justify-between gap-3">
+                <div data-testid="vault-revealed-secret" className="text-sm font-mono break-all flex-1 min-w-0">
+                  {showSecret ? revealed : "•".repeat(Math.min(revealed.length, 24))}
+                </div>
+                <button type="button" onClick={() => setShowSecret(v => !v)} aria-label={showSecret ? "Hide" : "Show"}
+                  className="w-8 h-8 rounded-lg border border-border bg-card flex items-center justify-center text-muted-foreground/70 hover:text-foreground transition-colors shrink-0">
+                  {showSecret ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
               </div>
-              <button type="button" onClick={() => setShowSecret(v => !v)} aria-label={showSecret ? "Hide" : "Show"}
-                className="absolute right-3 top-2.5 text-muted-foreground/60 hover:text-foreground transition-colors">
-                {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
             </div>
             {revealedTotp && <TotpCodeDisplay base32Secret={revealedTotp} />}
+            <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <Lock className="w-3 h-3 shrink-0" /> Copied text clears from your clipboard after 20 seconds.
+            </p>
             <div className="flex gap-2">
               <Button type="button" variant="gradient" onClick={handleCopy}
-                className="flex-1 bg-gradient-to-r from-[#334155] to-[#64748b] hover:opacity-90 shadow-[#64748b]/25">
+                className="flex-1 bg-gradient-to-br from-[#f6d776] to-[#a9791a] text-[#241705] hover:brightness-105 shadow-lg shadow-[#a9791a]/30">
                 <Copy className="w-4 h-4" /> Copy
               </Button>
               <Button type="button" variant="secondary" onClick={onClose}>

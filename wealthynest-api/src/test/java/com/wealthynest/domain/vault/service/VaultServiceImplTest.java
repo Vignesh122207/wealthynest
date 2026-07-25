@@ -315,6 +315,12 @@ class VaultServiceImplTest {
             return req;
         }
 
+        private RevealVaultItemRequest pinRevealRequest(String pin) {
+            RevealVaultItemRequest req = new RevealVaultItemRequest();
+            ReflectionTestUtils.setField(req, "pin", pin);
+            return req;
+        }
+
         @Test
         @DisplayName("returns the decrypted secret and clears the failed-attempt counter on correct password")
         void returnsDecryptedSecretOnSuccess() {
@@ -422,6 +428,65 @@ class VaultServiceImplTest {
             assertThatThrownBy(() -> service.revealSecret(itemId, userId, revealRequest("anything"), "1.2.3.4", "ua"))
                     .isInstanceOf(AccessDeniedException.class);
             verifyNoInteractions(userRepository, passwordEncoder);
+        }
+
+        @Test
+        @DisplayName("returns the decrypted secret on correct PIN, without touching the password at all")
+        void returnsDecryptedSecretOnCorrectPin() {
+            User pinUser = User.builder().passwordHash("hashed-pw").pinHash("hashed-pin").build();
+            when(valueOperations.get(anyString())).thenReturn(null);
+            when(userRepository.findById(userId)).thenReturn(Optional.of(pinUser));
+            when(passwordEncoder.matches("1234", "hashed-pin")).thenReturn(true);
+            when(vaultEncryptionService.decrypt("ct", "iv", 1)).thenReturn("plaintext-secret");
+            when(vaultItemRepository.save(any(VaultItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            VaultItemSecretResponse response = service.revealSecret(itemId, userId, pinRevealRequest("1234"), "1.2.3.4", "ua");
+
+            assertThat(response.getSecret()).isEqualTo("plaintext-secret");
+            verify(passwordEncoder, never()).matches(anyString(), eq("hashed-pw"));
+            verify(redisTemplate).delete(anyString());
+        }
+
+        @Test
+        @DisplayName("throws UNAUTHORIZED and increments the same counter password attempts use, on wrong PIN")
+        void throwsAndIncrementsSharedCounterOnWrongPin() {
+            User pinUser = User.builder().pinHash("hashed-pin").build();
+            when(valueOperations.get(anyString())).thenReturn(null);
+            when(userRepository.findById(userId)).thenReturn(Optional.of(pinUser));
+            when(passwordEncoder.matches("0000", "hashed-pin")).thenReturn(false);
+            when(valueOperations.increment(anyString())).thenReturn(1L);
+
+            assertThatThrownBy(() -> service.revealSecret(itemId, userId, pinRevealRequest("0000"), "1.2.3.4", "ua"))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("Incorrect PIN");
+
+            // Same key a failed password attempt would increment — confirms PIN and password share
+            // one lockout counter per scope rather than each getting their own separate budget.
+            verify(valueOperations).increment("vault-reveal-attempts:" + userId);
+            verifyNoInteractions(vaultEncryptionService);
+        }
+
+        @Test
+        @DisplayName("throws when the account has no PIN enabled")
+        void throwsWhenNoPinEnabled() {
+            when(valueOperations.get(anyString())).thenReturn(null);
+            when(userRepository.findById(userId)).thenReturn(Optional.of(User.builder().pinHash(null).build()));
+
+            assertThatThrownBy(() -> service.revealSecret(itemId, userId, pinRevealRequest("1234"), "1.2.3.4", "ua"))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("PIN unlock isn't enabled");
+            verifyNoInteractions(vaultEncryptionService);
+        }
+
+        @Test
+        @DisplayName("a lockout from failed PIN attempts also blocks a subsequent password attempt")
+        void pinLockoutAlsoBlocksPasswordAttempt() {
+            when(valueOperations.get(anyString())).thenReturn("5"); // already at the max from prior PIN attempts
+
+            assertThatThrownBy(() -> service.revealSecret(itemId, userId, revealRequest("correct"), "1.2.3.4", "ua"))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("Too many incorrect password attempts");
+            verifyNoInteractions(passwordEncoder, userRepository);
         }
     }
 

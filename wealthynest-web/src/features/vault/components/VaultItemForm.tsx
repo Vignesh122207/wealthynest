@@ -3,21 +3,29 @@
 import {useState} from "react";
 import {Controller, useForm} from "react-hook-form";
 import {zodResolver} from "@hookform/resolvers/zod";
-import {Check, Copy, Eye, EyeOff, FileText, KeyRound, Sparkles} from "lucide-react";
+import {Check, ChevronDown, Copy, Eye, EyeOff, FileText, KeyRound, Lock, MoreHorizontal, ShieldCheck, Sparkles} from "lucide-react";
 import {toast} from "sonner";
 import {FormInput} from "@/components/forms/FormInput";
 import {Button} from "@/components/ui/Button";
 import {FormModalShell} from "@/components/ui/FormModalShell";
-import {FormModalHeader} from "@/components/transactions/FormModalHeader";
 import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
 import {PremiumIcon} from "@/components/icons/PremiumIcon";
 import {cn} from "@/lib/utils";
-import {resolveVaultIcon, VAULT_ICON_OPTIONS} from "@/lib/categoryMeta";
+import {getVaultCategoryColor, resolveVaultIcon, VAULT_CATEGORY_META, VAULT_ICON_OPTIONS} from "@/lib/categoryMeta";
 import {type VaultItemFormValues, vaultItemSchema} from "../schemas/vault.schema";
 import {estimatePasswordStrength} from "../lib/passwordStrength";
 import {PasswordGeneratorPanel} from "./PasswordGeneratorPanel";
+import {VaultModalHeader} from "./VaultModalHeader";
 
-const VAULT_TO = "#64748b";
+// Vault's own brass/graphite accent — see VaultHealthCard's "vault door" hero for the full
+// treatment this echoes. VAULT_BRASS colors icon fills/borders/small text accents (PremiumIcon
+// builds its own gradient + white glyph from a hex); VAULT_BRASS_LIGHT/_DEEP are the two gradient
+// stops every solid "brass" control (Save, active segments/chips) uses, paired with
+// VAULT_BRASS_TEXT — a near-black brown reads better on a light gold gradient than white does.
+const VAULT_BRASS = "#d4a72c";
+const VAULT_BRASS_LIGHT = "#f6d776";
+const VAULT_BRASS_DEEP = "#a9791a";
+const VAULT_BRASS_TEXT = "#241705";
 
 const TYPE_TABS = [
   { key: "LOGIN" as const,       label: "Login",       icon: KeyRound },
@@ -63,8 +71,13 @@ export function VaultItemForm({ isCreate, accentColor, defaultValues, hasExistin
     setTotpRemoved(true);
     form.setValue("totpSecret", "", { shouldDirty: true });
   };
+  const title    = form.watch("title");
   const strength = estimatePasswordStrength(secret);
   const previewIcon = resolveVaultIcon({ itemType, icon });
+  // Recolors live as the category changes, so what's picked here already previews the color
+  // this item's row will get — falls back to the parent's cycled accentColor for custom/blank
+  // categories, same as VaultItemRow/page.tsx's own colorFor.
+  const previewColor = getVaultCategoryColor(category, accentColor);
 
   const handleCopySecret = async () => {
     if (!secret) return;
@@ -74,8 +87,12 @@ export function VaultItemForm({ isCreate, accentColor, defaultValues, hasExistin
 
   return (
     <TransactionModalOverlay onDismiss={onCancel}>
-      <FormModalShell accent="from-[#334155] to-[#64748b]">
-        <FormModalHeader icon={previewIcon} hex={accentColor} title={isCreate ? "Add to Vault" : "Edit Item"}
+      {/* no accent strip — VaultModalHeader's own banner covers this real estate; a visible
+          accent line here would just be a redundant gold hairline peeking above the banner. */}
+      <FormModalShell accent="none">
+        <VaultModalHeader icon={previewIcon} hex={previewColor}
+          title={title || (isCreate ? "New item" : "Untitled")}
+          subtitle={isCreate ? "Add to vault" : "Edit item"}
           onDelete={onDelete} onClose={onCancel} />
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
 
@@ -87,8 +104,8 @@ export function VaultItemForm({ isCreate, accentColor, defaultValues, hasExistin
                 className={cn(
                   "flex-1 flex items-center justify-center gap-2 h-10 rounded-xl text-sm font-medium transition-all",
                   itemType === t.key
-                    ? "bg-gradient-to-r from-[#334155] to-[#64748b] text-white shadow-lg shadow-[#64748b]/25"
-                    : "bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted"
+                    ? "bg-gradient-to-br from-[#f6d776] to-[#a9791a] text-[#241705] shadow-lg shadow-[#a9791a]/30"
+                    : "bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}>
                 <t.icon className="w-4 h-4" /> {t.label}
               </button>
@@ -97,14 +114,20 @@ export function VaultItemForm({ isCreate, accentColor, defaultValues, hasExistin
 
           {/* Title + icon picker */}
           <div>
-            <label className="block text-sm font-medium text-muted-foreground mb-1.5">Title</label>
+            <label className="block text-xs font-bold text-foreground mb-1.5">Title</label>
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => setShowIconPicker(v => !v)} title="Change icon"
-                className="shrink-0 rounded-2xl transition-all hover:ring-2 hover:ring-[#64748b]/40">
-                <PremiumIcon icon={previewIcon} hex={accentColor} size="sm" />
+                className="shrink-0 rounded-2xl transition-all hover:ring-2 hover:ring-[#d4a72c]/40">
+                <PremiumIcon icon={previewIcon} hex={previewColor} size="sm" />
               </button>
               <input placeholder="e.g. Gmail, HDFC NetBanking" data-testid="vault-title-input"
-                className="flex-1 h-10 px-3 rounded-xl bg-muted/60 border border-border text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:border-[#64748b] transition-colors"
+                aria-invalid={!!form.formState.errors.title || undefined}
+                className={cn(
+                  "flex-1 h-10 px-3 rounded-xl bg-muted/60 border text-sm text-foreground placeholder-muted-foreground focus:outline-none transition-colors",
+                  form.formState.errors.title
+                    ? "border-red-500/60 focus:border-red-500"
+                    : "border-border focus:border-[#d4a72c]"
+                )}
                 {...form.register("title")} />
             </div>
             {form.formState.errors.title && (
@@ -116,7 +139,7 @@ export function VaultItemForm({ isCreate, accentColor, defaultValues, hasExistin
                   <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Choose an icon</p>
                   {icon && (
                     <button type="button" onClick={() => form.setValue("icon", undefined)}
-                      className="text-[11px] font-medium" style={{ color: VAULT_TO }}>
+                      className="text-[11px] font-medium" style={{ color: VAULT_BRASS }}>
                       Use automatic
                     </button>
                   )}
@@ -125,8 +148,8 @@ export function VaultItemForm({ isCreate, accentColor, defaultValues, hasExistin
                   {VAULT_ICON_OPTIONS.map(({ key, icon: OptIcon }) => (
                     <button key={key} type="button" onClick={() => form.setValue("icon", key)}
                       className={cn("rounded-lg transition-all", icon === key ? "ring-2 ring-offset-2 ring-offset-card" : "opacity-70 hover:opacity-100")}
-                      style={icon === key ? { boxShadow: `0 0 0 2px ${VAULT_TO}` } : undefined}>
-                      <PremiumIcon icon={OptIcon} hex={accentColor} size="xs" />
+                      style={icon === key ? { boxShadow: `0 0 0 2px ${VAULT_BRASS}` } : undefined}>
+                      <PremiumIcon icon={OptIcon} hex={previewColor} size="xs" />
                     </button>
                   ))}
                 </div>
@@ -136,36 +159,56 @@ export function VaultItemForm({ isCreate, accentColor, defaultValues, hasExistin
 
           {isLogin && (
             <div className="grid sm:grid-cols-2 gap-4">
-              <FormInput label="Username / Email" placeholder="you@example.com"
-                {...form.register("username")} />
-              <FormInput label="Website (optional)" placeholder="https://example.com"
-                {...form.register("url")} />
+              {/* Hand-rolled label (not FormInput's built-in one) so it can match the bold, full-
+                  contrast field-label style used throughout this form — `htmlFor`/`id` keep the
+                  same "Username / Email" accessible name the E2E suite's getByLabel relies on. */}
+              <div>
+                <label htmlFor="vault-username-input" className="block text-xs font-bold text-foreground mb-1.5">Username / Email</label>
+                <FormInput id="vault-username-input" placeholder="you@example.com" {...form.register("username")} />
+              </div>
+              <div>
+                <label htmlFor="vault-url-input" className="flex items-center justify-between text-xs font-bold text-foreground mb-1.5">
+                  Website <span className="text-[11px] font-medium text-muted-foreground">optional</span>
+                </label>
+                <FormInput id="vault-url-input" placeholder="https://example.com" {...form.register("url")} />
+              </div>
             </div>
           )}
 
           {/* Category — quick-pick chips, same template as Budgets' custom-category chips */}
           <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-muted-foreground">Category (optional)</label>
+            <label className="flex items-center justify-between text-xs font-bold text-foreground">
+              Category <span className="text-[11px] font-medium text-muted-foreground">optional</span>
+            </label>
             <div className="flex flex-wrap gap-1.5">
-              {CATEGORY_PRESETS.map(c => (
-                <button key={c} type="button"
-                  onClick={() => { setCustomCategory(false); form.setValue("category", c, { shouldValidate: true }); }}
-                  className={cn(
-                    "h-8 px-3 rounded-lg text-xs font-medium transition-all",
-                    !customCategory && category === c
-                      ? "text-white" : "bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted"
-                  )}
-                  style={!customCategory && category === c ? { backgroundColor: VAULT_TO } : undefined}>
-                  {c}
-                </button>
-              ))}
+              {CATEGORY_PRESETS.map(c => {
+                const active = !customCategory && category === c;
+                const meta = VAULT_CATEGORY_META[c];
+                return (
+                  <button key={c} type="button"
+                    onClick={() => {
+                      setCustomCategory(false);
+                      form.setValue("category", c, { shouldValidate: true });
+                      if (meta) form.setValue("icon", meta.iconKey, { shouldValidate: true });
+                    }}
+                    className={cn(
+                      "h-9 pl-1.5 pr-3.5 rounded-full text-xs font-semibold transition-all flex items-center gap-2 shrink-0",
+                      !active && "bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+                    )}
+                    style={active ? { backgroundColor: meta.color + "1c", color: meta.color, boxShadow: `inset 0 0 0 1.5px ${meta.color}` } : undefined}>
+                    <PremiumIcon icon={meta.icon} hex={meta.color} size="xs" />
+                    {c}
+                  </button>
+                );
+              })}
               <button type="button"
                 onClick={() => { setCustomCategory(true); form.setValue("category", "", { shouldValidate: true }); }}
                 className={cn(
-                  "h-8 px-3 rounded-lg text-xs font-medium transition-all",
-                  customCategory ? "text-white" : "bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted"
+                  "h-9 pl-1.5 pr-3.5 rounded-full text-xs font-semibold transition-all flex items-center gap-2 shrink-0",
+                  !customCategory && "bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
-                style={customCategory ? { backgroundColor: VAULT_TO } : undefined}>
+                style={customCategory ? { background: `linear-gradient(135deg, ${VAULT_BRASS_LIGHT}, ${VAULT_BRASS_DEEP})`, color: VAULT_BRASS_TEXT } : undefined}>
+                <PremiumIcon icon={MoreHorizontal} tone="gray" size="xs" />
                 Custom
               </button>
             </div>
@@ -177,22 +220,24 @@ export function VaultItemForm({ isCreate, accentColor, defaultValues, hasExistin
           {isLogin ? (
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-muted-foreground">
-                  Password{isCreate ? "" : " (leave blank to keep unchanged)"}
+                <label className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                  Password
+                  {!isCreate && <span className="text-[11px] font-medium text-muted-foreground">leave blank to keep unchanged</span>}
                 </label>
                 <button type="button" onClick={() => setShowGenerator(v => !v)}
-                  className="flex items-center gap-1 text-xs font-medium transition-colors" style={{ color: VAULT_TO }}>
+                  className="flex items-center gap-1 text-[11.5px] font-bold transition-colors" style={{ color: VAULT_BRASS_DEEP }}>
                   <Sparkles className="w-3.5 h-3.5" /> Generate
                 </button>
               </div>
               {showGenerator && (
-                <PasswordGeneratorPanel onGenerate={(value) => {
+                <PasswordGeneratorPanel onUse={(value) => {
                   form.setValue("secret", value, { shouldValidate: true, shouldDirty: true });
                   setShowSecret(true);
+                  setShowGenerator(false);
                 }} />
               )}
               <FormInput type={showSecret ? "text" : "password"} placeholder={isCreate ? "Enter or generate a password" : "••••••••"}
-                data-testid="vault-secret-input" autoComplete="new-password" className="pr-16"
+                data-testid="vault-secret-input" autoComplete="new-password" className="pr-16 font-mono tracking-wide"
                 error={form.formState.errors.secret?.message}
                 endAdornment={
                   <div className="flex items-center gap-2.5">
@@ -219,35 +264,53 @@ export function VaultItemForm({ isCreate, accentColor, defaultValues, hasExistin
                 </div>
               )}
 
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-muted-foreground">
-                  Two-factor code (TOTP, optional)
-                </label>
-                {showTotpAsSet ? (
+              {showTotpAsSet ? (
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-foreground">
+                    Two-factor code (TOTP)
+                  </label>
                   <div className="flex items-center justify-between px-3 h-10 rounded-xl bg-muted/60 border border-border text-sm text-muted-foreground">
                     <span>2FA is set up for this item</span>
                     <button type="button" onClick={handleRemoveTotp} className="text-xs font-medium text-red-500 hover:text-red-600">
                       Remove
                     </button>
                   </div>
-                ) : (
-                  <FormInput placeholder="Paste base32 secret (e.g. JBSWY3DPEHPK3PXP)"
-                    data-testid="vault-totp-input" autoComplete="off"
-                    error={form.formState.errors.totpSecret?.message}
-                    {...form.register("totpSecret")} />
-                )}
-              </div>
+                </div>
+              ) : (
+                // Collapsed by default — most items never need a TOTP secret, so keeping this a
+                // disclosure rather than an always-visible field keeps the common-case form short.
+                <details className="group border border-dashed border-border rounded-xl px-3.5 py-3">
+                  <summary className="flex items-center justify-between cursor-pointer list-none text-xs font-bold text-foreground">
+                    <span className="flex items-center gap-2">
+                      <ShieldCheck className="w-3.5 h-3.5" style={{ color: VAULT_BRASS }} />
+                      Add a 2FA code (TOTP)
+                    </span>
+                    <ChevronDown className="w-3.5 h-3.5 text-muted-foreground transition-transform group-open:rotate-180" />
+                  </summary>
+                  <div className="mt-3 space-y-2">
+                    <FormInput placeholder="Paste base32 secret (e.g. JBSWY3DPEHPK3PXP)"
+                      data-testid="vault-totp-input" autoComplete="off"
+                      error={form.formState.errors.totpSecret?.message}
+                      {...form.register("totpSecret")} />
+                    <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+                      <Lock className="w-3 h-3 mt-0.5 shrink-0" />
+                      WealthyNest generates live 6-digit codes when you reveal this item — no separate authenticator app needed.
+                    </p>
+                  </div>
+                </details>
+              )}
             </div>
           ) : (
             <div className="space-y-1.5">
-              <label htmlFor="vault-note-body" className="block text-sm font-medium text-muted-foreground">
-                Note{isCreate ? "" : " (leave blank to keep unchanged)"}
+              <label htmlFor="vault-note-body" className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                Note
+                {!isCreate && <span className="text-[11px] font-medium text-muted-foreground">leave blank to keep unchanged</span>}
               </label>
               <Controller control={form.control} name="secret" render={({ field }) => (
                 <textarea id="vault-note-body" rows={5} placeholder="Secure note content…"
                   className="w-full px-3 py-2 rounded-xl text-sm transition-all outline-none resize-none
                     bg-background border border-border text-foreground placeholder:text-muted-foreground
-                    focus:border-[#64748b] focus:ring-2 focus:ring-[#64748b]/20"
+                    focus:border-[#d4a72c] focus:ring-2 focus:ring-[#d4a72c]/20"
                   value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} />
               )} />
               {form.formState.errors.secret?.message && (
@@ -258,7 +321,7 @@ export function VaultItemForm({ isCreate, accentColor, defaultValues, hasExistin
 
           <div className="flex gap-2 pt-1">
             <Button type="submit" variant="gradient" loading={isPending} data-testid="vault-form-submit"
-              className="flex-1 bg-gradient-to-r from-[#334155] to-[#64748b] hover:opacity-90 shadow-[#64748b]/25 disabled:shadow-none">
+              className="flex-1 bg-gradient-to-br from-[#f6d776] to-[#a9791a] text-[#241705] hover:brightness-105 shadow-lg shadow-[#a9791a]/30 disabled:shadow-none">
               <Check className="w-4 h-4" /> {isPending ? "Saving…" : "Save"}
             </Button>
             <Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button>

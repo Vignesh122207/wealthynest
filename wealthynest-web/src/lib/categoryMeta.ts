@@ -269,3 +269,29 @@ export function resolveVaultIcon(item: { itemType: "LOGIN" | "SECURE_NOTE"; icon
   if (item.icon && VAULT_ICON_KEY_MAP[item.icon]) return VAULT_ICON_KEY_MAP[item.icon];
   return item.itemType === "LOGIN" ? KeyRound : FileText;
 }
+
+// ── Vault category palette ────────────────────────────────────────────────────
+// A separate, small map from CATEGORY_MAP above: vault categories describe what
+// *kind of account* an item is (a fixed quick-pick vocabulary — see CATEGORY_PRESETS
+// in VaultItemForm), not a spending category, so "Banking"/"Work" here would either
+// miss CATEGORY_MAP's keyword list entirely or collide with an unrelated match.
+// Every preset also gets a matching key into VAULT_ICON_OPTIONS so picking a category
+// can set the item's icon in one step — `icon` is the same component (for rendering the
+// chip's own glyph directly), `iconKey` is its string form (for writing into the form value).
+export const VAULT_CATEGORY_META: Record<string, { color: string; icon: LucideIcon; iconKey: string }> = {
+  Email:         { color: "#007AFF", icon: Mail,        iconKey: "Mail" },
+  Banking:       { color: "#B8863A", icon: Landmark,    iconKey: "Landmark" },
+  Shopping:      { color: "#FF9500", icon: ShoppingBag, iconKey: "ShoppingBag" },
+  Work:          { color: "#5856D6", icon: Building2,   iconKey: "Building2" },
+  Social:        { color: "#FF2D55", icon: Users,       iconKey: "Users" },
+  Entertainment: { color: "#AF52DE", icon: Clapperboard,iconKey: "Clapperboard" },
+  Utilities:     { color: "#30B0C7", icon: Wifi,        iconKey: "Wifi" },
+};
+
+/** Falls back to `fallback` (the caller's own cycled color) for custom/uncategorized items
+ * rather than a hardcoded gray, so those items stay as visually distinct as they were before
+ * this map existed. */
+export function getVaultCategoryColor(category: string | null | undefined, fallback: string): string {
+  if (!category) return fallback;
+  return VAULT_CATEGORY_META[category]?.color ?? fallback;
+}

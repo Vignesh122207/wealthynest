@@ -5,7 +5,8 @@ import {TOTP, Secret} from "otpauth";
 import {Copy} from "lucide-react";
 import {toast} from "sonner";
 
-const VAULT_SLATE = "#64748b";
+// See VaultHealthCard for the full brass/graphite "vault door" identity this echoes.
+const VAULT_BRASS = "#d4a72c";
 const PERIOD_SECONDS = 30;
 
 /** Renders a rotating 6-digit TOTP code with a countdown ring. The base32 secret only ever
@@ -42,6 +43,8 @@ export function TotpCodeDisplay({ base32Secret }: { base32Secret: string }) {
 
   const progress = secondsLeft / PERIOD_SECONDS;
   const circumference = 2 * Math.PI * 9;
+  // Last 5 seconds turn the ring red — a cue that the code shown is about to rotate.
+  const ringColor = secondsLeft <= 5 ? "#e5484d" : VAULT_BRASS;
 
   return (
     <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-muted/40 border border-border">
@@ -54,9 +57,9 @@ export function TotpCodeDisplay({ base32Secret }: { base32Secret: string }) {
       <div className="flex items-center gap-2">
         <svg width="24" height="24" viewBox="0 0 24 24" className="shrink-0 -rotate-90">
           <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted-foreground/20" />
-          <circle cx="12" cy="12" r="9" fill="none" stroke={VAULT_SLATE} strokeWidth="2"
+          <circle cx="12" cy="12" r="9" fill="none" stroke={ringColor} strokeWidth="2"
             strokeDasharray={circumference} strokeDashoffset={circumference * (1 - progress)}
-            strokeLinecap="round" style={{ transition: "stroke-dashoffset 1s linear" }} />
+            strokeLinecap="round" style={{ transition: "stroke-dashoffset 1s linear, stroke .2s ease" }} />
         </svg>
         <button type="button" onClick={handleCopy} aria-label="Copy code"
           className="text-muted-foreground/60 hover:text-foreground transition-colors">
