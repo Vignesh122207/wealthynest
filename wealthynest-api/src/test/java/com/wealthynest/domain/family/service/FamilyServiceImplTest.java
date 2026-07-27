@@ -6,6 +6,7 @@ import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.domain.asset.repository.AssetRepository;
 import com.wealthynest.domain.budget.repository.BudgetRepository;
 import com.wealthynest.domain.category.repository.CategoryRepository;
+import com.wealthynest.domain.goal.repository.GoalRepository;
 import com.wealthynest.domain.expense.repository.ExpenseRepository;
 import com.wealthynest.domain.family.dto.request.CreateFamilyRequest;
 import com.wealthynest.domain.family.dto.request.JoinFamilyRequest;
@@ -51,6 +52,7 @@ class FamilyServiceImplTest {
     @Mock private ExpenseRepository   expenseRepository;
     @Mock private BudgetRepository    budgetRepository;
     @Mock private CategoryRepository  categoryRepository;
+    @Mock private GoalRepository      goalRepository;
     @Mock private EntityManager       entityManager;
     @Mock private AuditService        auditService;
 
@@ -143,6 +145,7 @@ class FamilyServiceImplTest {
             verify(assetRepository).migrateUserAssetsToFamily(familyId, userId);
             verify(expenseRepository).migrateUserExpensesToFamily(familyId, userId);
             verify(categoryRepository).migrateUserCategoriesToFamily(familyId, userId);
+            verify(goalRepository).migrateUserGoalsToFamily(familyId, userId);
         }
     }
 
@@ -382,6 +385,7 @@ class FamilyServiceImplTest {
 
             verify(assetRepository).clearFamilyId(familyId);
             verify(categoryRepository).clearFamilyId(familyId);
+            verify(goalRepository).clearFamilyId(familyId);
             assertThat(member1.getFamilyId()).isNull();
             assertThat(member1.getRole()).isEqualTo(UserRole.MEMBER);
             assertThat(member2.getRole()).isEqualTo(UserRole.ADMIN); // app-admin preserved
@@ -438,6 +442,7 @@ class FamilyServiceImplTest {
             assertThat(target.getFamilyId()).isNull();
             assertThat(target.getRole()).isEqualTo(UserRole.MEMBER);
             verify(assetRepository).clearFamilyIdForUser(targetId, familyId);
+            verify(goalRepository).clearFamilyIdForUser(targetId, familyId);
         }
     }
 

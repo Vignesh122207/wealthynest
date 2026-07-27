@@ -22,7 +22,7 @@ export default function TermsPage() {
         {/* Header */}
         <div className="text-center mb-12">
           <div className="mx-auto w-fit mb-5">
-            <PremiumIcon icon={ScrollText} tone="emerald" size="md" />
+            <PremiumIcon icon={ScrollText} tone="yellow" size="md" />
           </div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Terms of Service</h1>
           <p className="text-xs text-muted-foreground">Last updated: June 2026</p>

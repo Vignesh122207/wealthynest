@@ -177,7 +177,7 @@ class ExpenseServiceImplTest {
             service.createExpense(userId, null, req);
 
             verify(notificationService).createBudgetBreachNotification(
-                    eq(userId), eq("Groceries"), eq(new BigDecimal("900")), eq(new BigDecimal("1000")), eq(90.0));
+                    eq(userId), eq("Groceries"), eq("MONTHLY"), eq(new BigDecimal("900")), eq(new BigDecimal("1000")), eq(90.0));
         }
 
         @Test
@@ -193,7 +193,7 @@ class ExpenseServiceImplTest {
 
             service.createExpense(userId, null, req);
 
-            verify(notificationService, never()).createBudgetBreachNotification(any(), any(), any(), any(), anyDouble());
+            verify(notificationService, never()).createBudgetBreachNotification(any(), any(), any(), any(), any(), anyDouble());
         }
 
         @Test
@@ -207,7 +207,7 @@ class ExpenseServiceImplTest {
 
             service.createExpense(userId, null, req); // must not throw
 
-            verify(notificationService, never()).createBudgetBreachNotification(any(), any(), any(), any(), anyDouble());
+            verify(notificationService, never()).createBudgetBreachNotification(any(), any(), any(), any(), any(), anyDouble());
         }
 
         @Test
@@ -226,7 +226,7 @@ class ExpenseServiceImplTest {
             service.createExpense(userId, null, req);
 
             verify(notificationService).createBudgetBreachNotification(
-                    eq(userId), eq("Travel"), eq(new BigDecimal("9000")), eq(new BigDecimal("10000")), eq(90.0));
+                    eq(userId), eq("Travel"), eq("YEARLY"), eq(new BigDecimal("9000")), eq(new BigDecimal("10000")), eq(90.0));
             verify(expenseRepository, never()).sumByUserCategoryAndMonth(any(), any(), anyInt(), anyInt());
         }
 
@@ -247,7 +247,7 @@ class ExpenseServiceImplTest {
             service.createExpense(userId, familyId, req);
 
             verify(budgetRepository, never()).findByUserIdAndCategoryId(any(), any());
-            verify(notificationService).createBudgetBreachNotification(any(), any(), any(), any(), anyDouble());
+            verify(notificationService).createBudgetBreachNotification(any(), any(), any(), any(), any(), anyDouble());
         }
 
         @Test
@@ -272,7 +272,7 @@ class ExpenseServiceImplTest {
 
             assertThat(response).isNotNull();
             verify(notificationService).createBudgetBreachNotification(
-                    eq(userId), eq("Groceries"), eq(new BigDecimal("1900")), eq(new BigDecimal("2000")), eq(95.0));
+                    eq(userId), eq("Groceries"), eq("YEARLY"), eq(new BigDecimal("1900")), eq(new BigDecimal("2000")), eq(95.0));
         }
 
         @Test

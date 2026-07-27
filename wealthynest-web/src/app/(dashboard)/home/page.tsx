@@ -25,7 +25,6 @@ import {useAuthStore} from "@/features/auth/store/auth.store";
 import {useChartTheme} from "@/hooks/useChartTheme";
 import {pctChange} from "@/lib/utils";
 import {buildUsageCounts, sortByUsage} from "@/lib/mostUsed";
-import {toast} from "sonner";
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 import {GreetingBanner} from "./_components/GreetingBanner";
@@ -140,7 +139,7 @@ export default function DashboardPage() {
       : accountType === "CREDIT_CARD" ? "CREDIT_CARD" : accountType ? "BANK_ACCOUNT" : undefined;
     createExpense(
       { ...values, amount: Number(values.amount), accountId, paymentMethod },
-      { onSuccess: () => { toast.success("Expense added"); setQuickModal("none"); } }
+      { onSuccess: () => setQuickModal("none") }
     );
   };
 
@@ -157,7 +156,7 @@ export default function DashboardPage() {
           return acc?.accountType === "CASH_WALLET" ? "CASH" : "BANK_ACCOUNT";
         })(),
       },
-      { onSuccess: () => { toast.success("Income recorded"); setQuickModal("none"); } }
+      { onSuccess: () => setQuickModal("none") }
     );
   };
 
@@ -166,7 +165,7 @@ export default function DashboardPage() {
       { fromAccountId: values.fromAccountId, toAccountId: values.toAccountId,
         amount: Number(values.amount), transferDate: values.transferDate,
         description: values.description || undefined },
-      { onSuccess: () => { toast.success("Transfer complete"); setQuickModal("none"); } }
+      { onSuccess: () => setQuickModal("none") }
     );
   };
 

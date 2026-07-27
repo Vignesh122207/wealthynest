@@ -1,10 +1,10 @@
 "use client";
 
+import {useState} from "react";
 import Link from "next/link";
 import {usePathname} from "next/navigation";
 import {
     ArrowLeftRight,
-    Bell,
     ChartNoAxesCombined,
     ChevronLeft,
     ChevronRight,
@@ -25,6 +25,8 @@ import {
     X,
 } from "lucide-react";
 import {FamilyGroupIcon} from "@/components/icons/FamilyGroupIcon";
+import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
+import {Tooltip} from "@/components/ui/Tooltip";
 import {cn} from "@/lib/utils";
 import {useAuthStore} from "@/features/auth/store/auth.store";
 import {useLogout} from "@/features/auth/hooks/useAuth";
@@ -41,10 +43,9 @@ type Gradient = [string, string];
 // Support WealthyNest moved to a warm rose→pink gradient of its own — Family
 // settled on a warm coral/terracotta, reading as "home/hearth", a hue no other
 // item touches). Reports/Settings both end on slate, which is deliberate: Reports
-// keeps a brand-colored starting stop so it reads as "data" (indigo, now copper,
-// lightened a shade from Notifications' own full-strength brand pair so the two
-// don't read as near-duplicates sitting in the same group), Settings stays fully
-// neutral since it's pure utility.
+// keeps a brand-colored starting stop so it reads as "data" (a lightened copper,
+// distinct from the header bell's own full-strength brand pair), Settings stays
+// fully neutral since it's pure utility.
 const NAV_GROUPS = [
   {
     label: "Overview",
@@ -75,7 +76,6 @@ const NAV_GROUPS = [
       { href: "/analytics",     label: "Analytics",     icon: ChartNoAxesCombined, gradient: ["#14b8a6", "#06b6d4"] as Gradient },
       { href: "/family",        label: "Family",        icon: FamilyGroupIcon, gradient: ["#FAA18F", "#D9714E"] as Gradient },
       { href: "/reports",       label: "Reports",       icon: FileText,  gradient: ["#d98a52", "#64748b"] as Gradient },
-      { href: "/notifications", label: "Notifications", icon: Bell,      gradient: ["#c2703d", "#27272a"] as Gradient },
     ],
   },
   {
@@ -116,28 +116,42 @@ function NavItem({ href, label, icon, gradient, active, badge, collapsed, onClic
   href: string; label: string; icon: LucideIcon; gradient: Gradient;
   active: boolean; badge?: number; collapsed?: boolean; onClick?: () => void;
 }) {
-  return (
+  const link = (
     <Link
       href={href}
       data-testid={`nav-link-${href.replace(/^\//, "")}`}
       onClick={onClick}
       aria-current={active ? "page" : undefined}
-      title={collapsed ? label : undefined}
+      aria-label={collapsed ? label : undefined}
       className={cn(
         "relative flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 group",
         collapsed && "justify-center px-0",
-        active
-          ? "bg-primary/10 text-primary dark:bg-primary/15"
-          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+        active && "text-primary",
+        active && !collapsed && "bg-primary/10 dark:bg-primary/15",
+        !active && "text-muted-foreground hover:text-foreground hover:bg-muted"
       )}
     >
-      {active && (
+      {active && !collapsed && (
         <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-primary rounded-r-full" />
       )}
-      <PremiumIcon icon={icon} gradient={gradient} size="xs" interactive selected={active} badge={badge} />
+      {/* Collapsed rows have no room for the left accent bar above. A ring on the row itself
+          (tried first) traced the row's own rounded-xl edge and read as a highlighted rectangle
+          — this scopes a circular copper ring tightly to the icon instead, so the cue is a
+          deliberate round accent distinct from the icon's own rounded-square shape. */}
+      {collapsed ? (
+        <span className={cn("flex items-center justify-center rounded-full p-0.5", active && "ring-2 ring-primary")}>
+          <PremiumIcon icon={icon} gradient={gradient} size="xs" interactive selected={active} badge={badge} />
+        </span>
+      ) : (
+        <PremiumIcon icon={icon} gradient={gradient} size="xs" interactive selected={active} badge={badge} />
+      )}
       {!collapsed && <span>{label}</span>}
     </Link>
   );
+
+  return collapsed
+    ? <Tooltip content={label} side="right" className="flex w-full">{link}</Tooltip>
+    : link;
 }
 
 export function Sidebar() {
@@ -147,11 +161,27 @@ export function Sidebar() {
   const { mobileMenuOpen, closeMobileMenu, sidebarCollapsed, toggleSidebar } = useUIStore();
   const { mutate: logout } = useLogout();
   const { unreadCount }    = useMergedNotifications();
+  const [confirmLogout, setConfirmLogout] = useState(false);
 
   // Mobile's overlay drawer always renders expanded (collapsing a drawer you open on demand just
   // to close it again isn't useful) — only the persistent desktop rail collapses, so this takes
   // `collapsed` as a param instead of reading sidebarCollapsed directly.
   function renderNav(collapsed: boolean) {
+    const signOutButton = (
+      <button
+        data-testid="nav-logout"
+        onClick={() => setConfirmLogout(true)}
+        aria-label={collapsed ? "Sign out" : undefined}
+        className={cn(
+          "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-500/10 transition-all",
+          collapsed && "justify-center px-0"
+        )}
+      >
+        <PremiumIcon icon={LogOut} tone="red" size="xs" />
+        {!collapsed && <span>Sign out</span>}
+      </button>
+    );
+
     return (
       <div className="flex flex-col h-full">
         {/* ── Logo ── */}
@@ -206,18 +236,9 @@ export function Sidebar() {
 
         {/* ── Sign out ── */}
         <div className="px-3 pb-4 pt-3 border-t border-[hsl(var(--sidebar-border))] shrink-0">
-          <button
-            data-testid="nav-logout"
-            onClick={() => { logout(); closeMobileMenu(); }}
-            title={collapsed ? "Sign out" : undefined}
-            className={cn(
-              "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-500/10 transition-all",
-              collapsed && "justify-center px-0"
-            )}
-          >
-            <PremiumIcon icon={LogOut} tone="red" size="xs" />
-            {!collapsed && <span>Sign out</span>}
-          </button>
+          {collapsed
+            ? <Tooltip content="Sign out" side="right" className="flex w-full">{signOutButton}</Tooltip>
+            : signOutButton}
         </div>
       </div>
     );
@@ -256,6 +277,14 @@ export function Sidebar() {
             {renderNav(false)}
           </aside>
         </div>
+      )}
+
+      {confirmLogout && (
+        <ConfirmDialog open title="Sign out?"
+          description="You'll be signed out from this device. You can sign back in at any time."
+          confirmLabel="Sign out" danger
+          onConfirm={() => { logout(); closeMobileMenu(); }}
+          onCancel={() => setConfirmLogout(false)} />
       )}
     </>
   );

@@ -37,6 +37,26 @@ test.describe("Settings", () => {
     await settingsPage.expectCurrencySelected("INR");
   });
 
+  // Sign out / Close account moved from Settings home to Profile (next to the identity they
+  // affect) — this only exercises the client-side dialog behavior, never the real destructive
+  // mutations, since both would break every other regression file's ability to log in/act as
+  // the shared regressionUser for the rest of the run (same reasoning as the password-change
+  // test above).
+  test("profile: danger zone opens sign-out and close-account confirm dialogs @regression", async ({ settingsPage }) => {
+    await settingsPage.gotoProfile();
+    await settingsPage.expectTextVisible("Danger Zone");
+
+    await settingsPage.openSignOutDialog();
+    await settingsPage.expectTextVisible("Sign out?");
+    await settingsPage.cancelConfirmDialog();
+
+    await settingsPage.openCloseAccountDialog();
+    await settingsPage.expectTextVisible("Close your account?");
+    // Type-to-confirm gate — the button stays disabled until "CLOSE" is typed exactly.
+    await expect(settingsPage.confirmDialogConfirmButton).toBeDisabled();
+    await settingsPage.cancelConfirmDialog();
+  });
+
   test("notification preferences: toggling one off then back on @regression", async ({ settingsPage }) => {
     await settingsPage.gotoNotificationPrefs();
     await expect(settingsPage.notifToggle("budgets")).toHaveAttribute("aria-checked", "true");

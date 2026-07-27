@@ -2,14 +2,15 @@ import {create} from "zustand";
 import {persist} from "zustand/middleware";
 
 export interface NotifPrefs {
-  budgets:    boolean;
-  income:     boolean;
-  goals:      boolean;
-  maturity:   boolean;
-  lowBalance: boolean;
-  anomaly:    boolean;
-  debtDue:    boolean;
-  loanEmi:    boolean;
+  budgets:     boolean;
+  income:      boolean;
+  goals:       boolean;
+  maturity:    boolean;
+  lowBalance:  boolean;
+  anomaly:     boolean;
+  debtDue:     boolean;
+  loanEmi:     boolean;
+  sipReminder: boolean;
 }
 
 interface NotificationState {
@@ -28,7 +29,7 @@ export const useNotificationStore = create<NotificationState>()(
       dismissedIds: [],
       prefs: {
         budgets: true, income: true, goals: true, maturity: true,
-        lowBalance: true, anomaly: true, debtDue: true, loanEmi: true,
+        lowBalance: true, anomaly: true, debtDue: true, loanEmi: true, sipReminder: true,
       },
       markSeen: (ids) =>
         set((s) => ({ seenIds: Array.from(new Set([...s.seenIds, ...ids])) })),

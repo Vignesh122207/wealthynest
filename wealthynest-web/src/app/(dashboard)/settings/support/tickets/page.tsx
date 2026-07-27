@@ -38,7 +38,7 @@ export default function MyTicketsPage() {
 
           <div className="flex items-center justify-end">
             <Link href="/settings/support/tickets/new"
-              className="inline-flex items-center gap-1.5 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-xl transition-colors">
+              className="inline-flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-xl transition-colors">
               <Plus className="w-3.5 h-3.5" />
               New ticket
             </Link>
@@ -62,7 +62,7 @@ export default function MyTicketsPage() {
                 description="Open a ticket whenever you hit an issue or have a question."
                 action={
                   <Link href="/settings/support/tickets/new"
-                    className="inline-flex items-center gap-1.5 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl transition-colors">
+                    className="inline-flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl transition-colors">
                     <Plus className="w-3.5 h-3.5" /> Create your first ticket
                   </Link>
                 }

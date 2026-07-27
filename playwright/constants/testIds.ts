@@ -108,6 +108,11 @@ export const TEST_IDS = {
     confirm: "confirm-dialog-confirm",
     cancel:  "confirm-dialog-cancel",
   },
+  profile: {
+    // Danger zone (Sign out / Close account) lives on Profile, not Settings — see profile/page.tsx.
+    signoutTrigger:     "profile-signout-trigger",
+    closeAccountTrigger: "profile-close-account-trigger",
+  },
   asset: {
     nameInput:      "asset-name-input",
     typeSelect:     "asset-type-select",

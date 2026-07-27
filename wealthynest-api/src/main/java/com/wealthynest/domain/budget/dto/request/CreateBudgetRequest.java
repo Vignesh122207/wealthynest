@@ -15,4 +15,5 @@ public class CreateBudgetRequest {
     @Min(2020) @Max(2100) private Integer periodYear;
     @DecimalMin("1") @DecimalMax("100") private BigDecimal alertThreshold;
     private BudgetType budgetType;
+    private boolean rollover;
 }

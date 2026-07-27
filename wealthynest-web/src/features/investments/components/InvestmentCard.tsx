@@ -229,6 +229,15 @@ export function InvestmentCard({ inv, onEdit, dividendRecords, bankAccounts, inv
         </div>
       )}
 
+      {inv.investmentType === "MUTUAL_FUND" && inv.sipAmount && inv.nextSipDate && (
+        <div className="mt-2 pt-2 border-t border-border/60 flex items-center justify-between">
+          <span className="text-xs text-muted-foreground/80">
+            Next SIP · {formatDate(inv.nextSipDate)}
+          </span>
+          <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">{fmt(inv.sipAmount)}</span>
+        </div>
+      )}
+
       {/* SIP section for Mutual Funds */}
       {inv.investmentType === "MUTUAL_FUND" && (
         <div onClick={e => e.stopPropagation()}>

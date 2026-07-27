@@ -85,6 +85,7 @@ services:
       # ID token: Google requires this client secret for that exchange even with PKCE.
       GOOGLE_NATIVE_CLIENT_ID:     ${GOOGLE_NATIVE_CLIENT_ID:-}
       GOOGLE_NATIVE_CLIENT_SECRET: ${GOOGLE_NATIVE_CLIENT_SECRET:-}
+      FCM_SERVICE_ACCOUNT_JSON:    ${FCM_SERVICE_ACCOUNT_JSON:-}
     networks:
       - wealthynest-net
     healthcheck:

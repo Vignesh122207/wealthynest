@@ -116,6 +116,11 @@ wealthynest:
     native:
       client-id: ${GOOGLE_NATIVE_CLIENT_ID:}
       client-secret: ${GOOGLE_NATIVE_CLIENT_SECRET:}
+  fcm:
+    # Base64-encoded Firebase service-account JSON. Blank in local/dev/CI — FirebaseConfig skips
+    # initialization and push sends become a no-op, same fail-closed-when-unset treatment as the
+    # native Google client id above.
+    service-account-json: ${FCM_SERVICE_ACCOUNT_JSON:}
 
 management:
   endpoints:

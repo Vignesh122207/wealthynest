@@ -7,7 +7,7 @@ import {PremiumIcon} from "@/components/icons/PremiumIcon";
 import {getCurrencySymbol} from "@/lib/utils";
 import {expensesApi} from "@/features/expenses/api/expenses.api";
 import {incomeApi} from "@/features/income/api/income.api";
-import {downloadCsv, getYears, MONTH_NAMES, openPrintWindow} from "./reportHelpers";
+import {downloadCsv, getYears, MONTH_NAMES, openPrintWindow} from "@/lib/printReport";
 
 export function AnnualTab() {
   const years   = getYears();

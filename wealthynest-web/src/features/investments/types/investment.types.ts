@@ -18,6 +18,8 @@ export interface Investment {
   gainLossPct:    number;
   sipAmount?:     number;
   sipDay?:        number;
+  /** Next occurrence of sipDay on/after today, clamped to month length — undefined when sipDay isn't set. */
+  nextSipDate?:   string;
   purchaseDate?:  string;
   couponRate?:    number;
   couponFrequency?: string;

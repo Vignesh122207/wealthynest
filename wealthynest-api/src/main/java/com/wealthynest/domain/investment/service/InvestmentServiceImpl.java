@@ -30,6 +30,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -622,6 +623,7 @@ public class InvestmentServiceImpl implements InvestmentService {
             .investedAmount(inv.getInvestedAmount()).currentValue(currentVal)
             .gainLoss(gainLoss).gainLossPct(gainLossPct)
             .sipAmount(inv.getSipAmount()).sipDay(inv.getSipDay())
+            .nextSipDate(computeNextSipDate(inv))
             .purchaseDate(inv.getPurchaseDate())
             .faceValue(inv.getFaceValue())
             .couponRate(inv.getCouponRate()).couponFrequency(inv.getCouponFrequency())
@@ -655,6 +657,25 @@ public class InvestmentServiceImpl implements InvestmentService {
         if (req.getQuantityGrams() != null && req.getCurrentPrice() != null)
             return req.getQuantityGrams().multiply(req.getCurrentPrice()).setScale(2, RoundingMode.HALF_UP);
         return req.getCurrentValue();
+    }
+
+    /** The next occurrence of this investment's SIP day on or after today — rolls into next month
+     *  once this month's (clamped) SIP date has already passed. Null when sipDay isn't set at all. */
+    private LocalDate computeNextSipDate(Investment inv) {
+        // Defensive beyond CreateInvestmentRequest's own @Min(1)@Max(31) — an unstubbed mock (or
+        // any future path that doesn't go through validation) can leave this at 0, which
+        // LocalDate.of would otherwise reject with a DateTimeException.
+        if (inv.getSipDay() == null || inv.getSipDay() < 1 || inv.getSipDay() > 31) return null;
+        LocalDate today = LocalDate.now();
+        LocalDate thisMonth = clampedSipDate(today.getYear(), today.getMonthValue(), inv.getSipDay());
+        if (!thisMonth.isBefore(today)) return thisMonth;
+        LocalDate next = today.plusMonths(1);
+        return clampedSipDate(next.getYear(), next.getMonthValue(), inv.getSipDay());
+    }
+
+    private LocalDate clampedSipDate(int year, int month, int day) {
+        int lastDay = YearMonth.of(year, month).lengthOfMonth();
+        return LocalDate.of(year, month, Math.min(day, lastDay));
     }
 
     private BigDecimal computeFDMaturity(Investment fd) {

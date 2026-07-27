@@ -36,11 +36,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * WalletAccountController has NO class-level or (mostly) method-level @PreAuthorize — every
- * endpoint except downloadStatement relies purely on SecurityConfig's URL-level
- * anyRequest().authenticated() rule. This test proves that URL-level defense actually protects
- * these endpoints, which a @WebMvcTest importing only method-security infra (not the real
- * SecurityConfig/filter chain) would never catch.
+ * WalletAccountController has no class-level or method-level @PreAuthorize — every endpoint
+ * relies purely on SecurityConfig's URL-level anyRequest().authenticated() rule. This test proves
+ * that URL-level defense actually protects these endpoints, which a @WebMvcTest importing only
+ * method-security infra (not the real SecurityConfig/filter chain) would never catch.
  */
 @WebMvcTest(controllers = WalletAccountController.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = RateLimitConfig.RateLimitFilter.class))
@@ -182,19 +181,6 @@ class WalletAccountControllerTest {
                     .andExpect(status().isNoContent());
 
             org.mockito.Mockito.verify(accountService).deleteAccount(accountId, userId, true);
-        }
-
-        @Test
-        @DisplayName("GET /accounts/{id}/statement returns a CSV attachment")
-        void downloadStatementReturnsCsv() throws Exception {
-            SecurityTestUtils.authenticateAs(userId, null);
-            UUID accountId = UUID.randomUUID();
-            when(accountService.generateStatementCsv(accountId, userId)).thenReturn("date,amount\n".getBytes());
-
-            mockMvc.perform(get("/api/v1/accounts/{id}/statement", accountId))
-                    .andExpect(status().isOk())
-                    .andExpect(header().string("Content-Type", "text/csv"))
-                    .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("attachment")));
         }
 
         @Test

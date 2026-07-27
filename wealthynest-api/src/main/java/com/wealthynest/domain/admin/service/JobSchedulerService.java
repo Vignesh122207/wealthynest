@@ -47,6 +47,7 @@ public class JobSchedulerService {
     private final SpendAnomalyScheduler       spendAnomalyScheduler;
     private final DebtReminderScheduler       debtReminderScheduler;
     private final EmiReminderScheduler        emiReminderScheduler;
+    private final SipReminderScheduler        sipReminderScheduler;
     private final RecurringTransferScheduler  recurringTransferScheduler;
     private final RecurringGoalContributionScheduler recurringGoalContributionScheduler;
     private final MfMasterSyncScheduler       mfMasterSyncScheduler;
@@ -188,6 +189,7 @@ public class JobSchedulerService {
             case "SPEND_ANOMALY_CHECK"  -> spendAnomalyScheduler.checkRecentExpenses();
             case "DEBT_DUE_REMINDER"    -> debtReminderScheduler.checkUpcomingDueDates();
             case "LOAN_EMI_REMINDER"    -> emiReminderScheduler.checkUpcomingEmis();
+            case "SIP_REMINDER"         -> sipReminderScheduler.checkUpcomingSips();
             case "RECURRING_TRANSFER"   -> recurringTransferScheduler.processRecurringTransfers();
             case "RECURRING_GOAL_CONTRIBUTION" -> recurringGoalContributionScheduler.processRecurringGoalContributions();
             default -> throw new ResourceNotFoundException("Job", "name", jobName);

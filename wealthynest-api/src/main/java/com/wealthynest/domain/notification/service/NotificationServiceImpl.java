@@ -5,8 +5,10 @@ import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.domain.notification.dto.request.UpdateNotificationPreferenceRequest;
 import com.wealthynest.domain.notification.dto.response.NotificationPreferenceResponse;
 import com.wealthynest.domain.notification.dto.response.NotificationResponse;
+import com.wealthynest.domain.notification.entity.DeviceToken;
 import com.wealthynest.domain.notification.entity.Notification;
 import com.wealthynest.domain.notification.entity.NotificationPreference;
+import com.wealthynest.domain.notification.repository.DeviceTokenRepository;
 import com.wealthynest.domain.notification.repository.NotificationPreferenceRepository;
 import com.wealthynest.domain.notification.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,8 @@ import java.util.UUID;
 public class NotificationServiceImpl implements NotificationService {
     private final NotificationRepository notificationRepository;
     private final NotificationPreferenceRepository notificationPreferenceRepository;
+    private final DeviceTokenRepository deviceTokenRepository;
+    private final PushNotificationSender pushNotificationSender;
 
     @Override @Transactional(readOnly = true)
     public Page<NotificationResponse> getNotifications(UUID userId, Pageable pageable) {
@@ -77,7 +81,22 @@ public class NotificationServiceImpl implements NotificationService {
         prefs.setSpendAnomalyEnabled(request.getSpendAnomalyEnabled());
         prefs.setDebtDueEnabled(request.getDebtDueEnabled());
         prefs.setLoanEmiEnabled(request.getLoanEmiEnabled());
+        prefs.setSipReminderEnabled(request.getSipReminderEnabled());
         return toPreferenceResponse(notificationPreferenceRepository.save(prefs));
+    }
+
+    @Override @Transactional
+    public void registerDeviceToken(UUID userId, String token) {
+        DeviceToken deviceToken = deviceTokenRepository.findByToken(token)
+                .orElseGet(() -> DeviceToken.builder().userId(userId).token(token).build());
+        deviceToken.setUserId(userId);
+        deviceToken.setLastSeenAt(Instant.now());
+        deviceTokenRepository.save(deviceToken);
+    }
+
+    @Override @Transactional
+    public void unregisterDeviceToken(String token) {
+        deviceTokenRepository.deleteByToken(token);
     }
 
     private NotificationPreferenceResponse toPreferenceResponse(NotificationPreference p) {
@@ -87,6 +106,7 @@ public class NotificationServiceImpl implements NotificationService {
                 .spendAnomalyEnabled(p.isSpendAnomalyEnabled())
                 .debtDueEnabled(p.isDebtDueEnabled())
                 .loanEmiEnabled(p.isLoanEmiEnabled())
+                .sipReminderEnabled(p.isSipReminderEnabled())
                 .build();
     }
 
@@ -96,19 +116,24 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override @Transactional
-    public void createBudgetBreachNotification(UUID userId, String categoryName,
+    public void createBudgetBreachNotification(UUID userId, String categoryName, String budgetType,
                                                BigDecimal spent, BigDecimal budget, double pct) {
         if (!isEnabled(userId, NotificationPreference::isBudgetAlertEnabled)) return;
-        String title = "Budget Alert: " + categoryName;
-        // Deduplicate — one alert per category per day
+        // A category can have both a MONTHLY and a YEARLY budget breached by the same expense —
+        // the period must be part of the title, both so the two read as distinct alerts (not a
+        // duplicate) and so the per-day dedup below doesn't collapse two real, different breaches
+        // into one because their titles happened to collide.
+        String period = "YEARLY".equals(budgetType) ? "Yearly" : "Monthly";
+        String title = "Budget Alert: " + categoryName + " (" + period + ")";
+        // Deduplicate — one alert per category+period per day
         Instant startOfDay = Instant.now().truncatedTo(ChronoUnit.DAYS);
         boolean alreadySentToday = notificationRepository
                 .existsByUserIdAndTypeAndTitleAndCreatedAtAfter(userId, "BUDGET_ALERT", title, startOfDay);
         if (alreadySentToday) return;
 
         String message = String.format(
-            "You've used %.0f%% of your %s budget (spent ₹%.0f of ₹%.0f).",
-            pct, categoryName, spent, budget);
+            "You've used %.0f%% of your %s %s budget (spent ₹%.0f of ₹%.0f).",
+            pct, categoryName, period.toLowerCase(), spent, budget);
 
         notificationRepository.save(Notification.builder()
                 .userId(userId)
@@ -116,6 +141,7 @@ public class NotificationServiceImpl implements NotificationService {
                 .title(title)
                 .message(message)
                 .build());
+        pushNotificationSender.send(userId, title, message);
     }
 
     @Override @Transactional
@@ -137,6 +163,7 @@ public class NotificationServiceImpl implements NotificationService {
                 .title(title)
                 .message(message)
                 .build());
+        pushNotificationSender.send(userId, title, message);
     }
 
     @Override @Transactional
@@ -158,6 +185,7 @@ public class NotificationServiceImpl implements NotificationService {
                 .title(title)
                 .message(message)
                 .build());
+        pushNotificationSender.send(userId, title, message);
     }
 
     @Override @Transactional
@@ -181,6 +209,7 @@ public class NotificationServiceImpl implements NotificationService {
                 .title(title)
                 .message(message)
                 .build());
+        pushNotificationSender.send(userId, title, message);
     }
 
     @Override @Transactional
@@ -201,5 +230,27 @@ public class NotificationServiceImpl implements NotificationService {
                 .title(title)
                 .message(message)
                 .build());
+        pushNotificationSender.send(userId, title, message);
+    }
+
+    @Override @Transactional
+    public void createSipUpcomingNotification(UUID userId, String fundName, BigDecimal amount, LocalDate dueDate) {
+        if (!isEnabled(userId, NotificationPreference::isSipReminderEnabled)) return;
+        String title = "SIP Due Soon: " + fundName;
+        Instant startOfDay = Instant.now().truncatedTo(ChronoUnit.DAYS);
+        boolean alreadySentToday = notificationRepository
+                .existsByUserIdAndTypeAndTitleAndCreatedAtAfter(userId, "SIP_UPCOMING", title, startOfDay);
+        if (alreadySentToday) return;
+
+        String message = String.format(
+            "Your %s SIP of ₹%.0f is due on %s.", fundName, amount, dueDate);
+
+        notificationRepository.save(Notification.builder()
+                .userId(userId)
+                .type("SIP_UPCOMING")
+                .title(title)
+                .message(message)
+                .build());
+        pushNotificationSender.send(userId, title, message);
     }
 }

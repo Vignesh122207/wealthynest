@@ -10,4 +10,5 @@ public class NotificationPreferenceResponse {
     private boolean spendAnomalyEnabled;
     private boolean debtDueEnabled;
     private boolean loanEmiEnabled;
+    private boolean sipReminderEnabled;
 }

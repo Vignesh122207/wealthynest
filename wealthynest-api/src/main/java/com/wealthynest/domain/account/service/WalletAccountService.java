@@ -27,7 +27,6 @@ public interface WalletAccountService {
     TransferResponse                updateTransfer(UUID transferId, UUID userId, UpdateTransferRequest request);
     void                            deleteTransfer(UUID transferId, UUID userId);
     PagedResponse<TransferResponse> getTransfers(UUID userId, Pageable pageable);
-    byte[]                          generateStatementCsv(UUID accountId, UUID userId);
     AccountResponse                 adjustBalance(UUID id, UUID userId, BigDecimal targetBalance);
     AccountResponse                 setPrimary(UUID id, UUID userId);
     void                            checkLowBalance(UUID accountId, UUID userId);

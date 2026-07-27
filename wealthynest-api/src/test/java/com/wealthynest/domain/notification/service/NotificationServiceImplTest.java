@@ -3,8 +3,10 @@ package com.wealthynest.domain.notification.service;
 import com.wealthynest.common.exception.AccessDeniedException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.domain.notification.dto.request.UpdateNotificationPreferenceRequest;
+import com.wealthynest.domain.notification.entity.DeviceToken;
 import com.wealthynest.domain.notification.entity.Notification;
 import com.wealthynest.domain.notification.entity.NotificationPreference;
+import com.wealthynest.domain.notification.repository.DeviceTokenRepository;
 import com.wealthynest.domain.notification.repository.NotificationPreferenceRepository;
 import com.wealthynest.domain.notification.repository.NotificationRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -34,6 +36,8 @@ class NotificationServiceImplTest {
 
     @Mock private NotificationRepository notificationRepository;
     @Mock private NotificationPreferenceRepository notificationPreferenceRepository;
+    @Mock private DeviceTokenRepository deviceTokenRepository;
+    @Mock private PushNotificationSender pushNotificationSender;
 
     @InjectMocks
     private NotificationServiceImpl service;
@@ -58,9 +62,10 @@ class NotificationServiceImplTest {
             when(notificationRepository.existsByUserIdAndTypeAndTitleAndCreatedAtAfter(
                     eq(userId), eq("BUDGET_ALERT"), any(), any())).thenReturn(true);
 
-            service.createBudgetBreachNotification(userId, "Groceries", new BigDecimal("900"), new BigDecimal("1000"), 90.0);
+            service.createBudgetBreachNotification(userId, "Groceries", "MONTHLY", new BigDecimal("900"), new BigDecimal("1000"), 90.0);
 
             verify(notificationRepository, never()).save(any());
+            verify(pushNotificationSender, never()).send(any(), any(), any());
         }
 
         @Test
@@ -72,6 +77,7 @@ class NotificationServiceImplTest {
             service.createLowBalanceNotification(userId, "HDFC Savings", new BigDecimal("50"), new BigDecimal("500"));
 
             verify(notificationRepository, never()).save(any());
+            verify(pushNotificationSender, never()).send(any(), any(), any());
         }
 
         @Test
@@ -106,6 +112,18 @@ class NotificationServiceImplTest {
 
             verify(notificationRepository, never()).save(any());
         }
+
+        @Test
+        @DisplayName("SIP upcoming: skips saving when the same alert already fired today")
+        void sipUpcomingSkipsWhenAlreadySentToday() {
+            when(notificationRepository.existsByUserIdAndTypeAndTitleAndCreatedAtAfter(
+                    eq(userId), eq("SIP_UPCOMING"), any(), any())).thenReturn(true);
+
+            service.createSipUpcomingNotification(userId, "Axis Bluechip Fund", new BigDecimal("5000"), LocalDate.now().plusDays(2));
+
+            verify(notificationRepository, never()).save(any());
+            verify(pushNotificationSender, never()).send(any(), any(), any());
+        }
     }
 
     // ─── content correctness ─────────────────────────────────────────────────────
@@ -115,17 +133,53 @@ class NotificationServiceImplTest {
     class ContentTests {
 
         @Test
-        @DisplayName("budget breach message reports the percentage and both amounts")
+        @DisplayName("budget breach message reports the percentage, both amounts, and the budget period")
         void budgetBreachMessageContent() {
             when(notificationRepository.existsByUserIdAndTypeAndTitleAndCreatedAtAfter(any(), any(), any(), any())).thenReturn(false);
             ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
 
-            service.createBudgetBreachNotification(userId, "Groceries", new BigDecimal("900"), new BigDecimal("1000"), 90.0);
+            service.createBudgetBreachNotification(userId, "Groceries", "MONTHLY", new BigDecimal("900"), new BigDecimal("1000"), 90.0);
 
             verify(notificationRepository).save(captor.capture());
             assertThat(captor.getValue().getType()).isEqualTo("BUDGET_ALERT");
-            assertThat(captor.getValue().getTitle()).isEqualTo("Budget Alert: Groceries");
-            assertThat(captor.getValue().getMessage()).contains("90%").contains("900").contains("1000");
+            assertThat(captor.getValue().getTitle()).isEqualTo("Budget Alert: Groceries (Monthly)");
+            assertThat(captor.getValue().getMessage()).contains("90%").contains("900").contains("1000").contains("monthly");
+            verify(pushNotificationSender).send(userId, captor.getValue().getTitle(), captor.getValue().getMessage());
+        }
+
+        @Test
+        @DisplayName("budget breach title differs by period, so a MONTHLY and YEARLY breach on the same category+day are distinct, not deduped away")
+        void budgetBreachTitleDiffersByPeriod() {
+            when(notificationRepository.existsByUserIdAndTypeAndTitleAndCreatedAtAfter(any(), any(), any(), any())).thenReturn(false);
+            ArgumentCaptor<Notification> monthlyCaptor = ArgumentCaptor.forClass(Notification.class);
+            service.createBudgetBreachNotification(userId, "Groceries", "MONTHLY", new BigDecimal("900"), new BigDecimal("1000"), 90.0);
+            verify(notificationRepository).save(monthlyCaptor.capture());
+
+            reset(notificationRepository);
+            when(notificationRepository.existsByUserIdAndTypeAndTitleAndCreatedAtAfter(any(), any(), any(), any())).thenReturn(false);
+            ArgumentCaptor<Notification> yearlyCaptor = ArgumentCaptor.forClass(Notification.class);
+            service.createBudgetBreachNotification(userId, "Groceries", "YEARLY", new BigDecimal("9000"), new BigDecimal("10000"), 90.0);
+            verify(notificationRepository).save(yearlyCaptor.capture());
+
+            assertThat(monthlyCaptor.getValue().getTitle()).isEqualTo("Budget Alert: Groceries (Monthly)");
+            assertThat(yearlyCaptor.getValue().getTitle()).isEqualTo("Budget Alert: Groceries (Yearly)");
+            assertThat(monthlyCaptor.getValue().getTitle()).isNotEqualTo(yearlyCaptor.getValue().getTitle());
+        }
+
+        @Test
+        @DisplayName("SIP upcoming message reports the fund name, amount, and due date")
+        void sipUpcomingMessageContent() {
+            when(notificationRepository.existsByUserIdAndTypeAndTitleAndCreatedAtAfter(any(), any(), any(), any())).thenReturn(false);
+            ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+            LocalDate dueDate = LocalDate.now().plusDays(2);
+
+            service.createSipUpcomingNotification(userId, "Axis Bluechip Fund", new BigDecimal("5000"), dueDate);
+
+            verify(notificationRepository).save(captor.capture());
+            assertThat(captor.getValue().getType()).isEqualTo("SIP_UPCOMING");
+            assertThat(captor.getValue().getTitle()).isEqualTo("SIP Due Soon: Axis Bluechip Fund");
+            assertThat(captor.getValue().getMessage()).contains("5000").contains(dueDate.toString());
+            verify(pushNotificationSender).send(userId, captor.getValue().getTitle(), captor.getValue().getMessage());
         }
 
         @Test
@@ -264,7 +318,7 @@ class NotificationServiceImplTest {
         }
 
         @Test
-        @DisplayName("updatePreferences persists all five flags and returns the saved state")
+        @DisplayName("updatePreferences persists all six flags and returns the saved state")
         void updatePreferencesPersistsAllFlags() {
             when(notificationPreferenceRepository.findById(userId)).thenReturn(Optional.empty());
             when(notificationPreferenceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -275,6 +329,7 @@ class NotificationServiceImplTest {
             req.setSpendAnomalyEnabled(true);
             req.setDebtDueEnabled(false);
             req.setLoanEmiEnabled(true);
+            req.setSipReminderEnabled(false);
 
             var result = service.updatePreferences(userId, req);
 
@@ -283,6 +338,7 @@ class NotificationServiceImplTest {
             assertThat(result.isSpendAnomalyEnabled()).isTrue();
             assertThat(result.isDebtDueEnabled()).isFalse();
             assertThat(result.isLoanEmiEnabled()).isTrue();
+            assertThat(result.isSipReminderEnabled()).isFalse();
 
             ArgumentCaptor<NotificationPreference> captor = ArgumentCaptor.forClass(NotificationPreference.class);
             verify(notificationPreferenceRepository).save(captor.capture());
@@ -302,10 +358,11 @@ class NotificationServiceImplTest {
             when(notificationPreferenceRepository.findById(userId))
                     .thenReturn(Optional.of(NotificationPreference.builder().userId(userId).budgetAlertEnabled(false).build()));
 
-            service.createBudgetBreachNotification(userId, "Groceries", new BigDecimal("900"), new BigDecimal("1000"), 90.0);
+            service.createBudgetBreachNotification(userId, "Groceries", "MONTHLY", new BigDecimal("900"), new BigDecimal("1000"), 90.0);
 
             verify(notificationRepository, never()).save(any());
             verify(notificationRepository, never()).existsByUserIdAndTypeAndTitleAndCreatedAtAfter(any(), any(), any(), any());
+            verify(pushNotificationSender, never()).send(any(), any(), any());
         }
 
         @Test
@@ -317,6 +374,7 @@ class NotificationServiceImplTest {
             service.createLowBalanceNotification(userId, "HDFC Savings", new BigDecimal("50"), new BigDecimal("500"));
 
             verify(notificationRepository, never()).save(any());
+            verify(pushNotificationSender, never()).send(any(), any(), any());
         }
 
         @Test
@@ -328,6 +386,7 @@ class NotificationServiceImplTest {
             service.createSpendAnomalyNotification(userId, "Dining", new BigDecimal("5000"), new BigDecimal("1000"));
 
             verify(notificationRepository, never()).save(any());
+            verify(pushNotificationSender, never()).send(any(), any(), any());
         }
 
         @Test
@@ -339,6 +398,7 @@ class NotificationServiceImplTest {
             service.createDebtDueNotification(userId, "Alice", new BigDecimal("500"), LocalDate.now(), "LENT");
 
             verify(notificationRepository, never()).save(any());
+            verify(pushNotificationSender, never()).send(any(), any(), any());
         }
 
         @Test
@@ -350,6 +410,62 @@ class NotificationServiceImplTest {
             service.createEmiUpcomingNotification(userId, "Car Loan", new BigDecimal("15000"), LocalDate.now().plusDays(3));
 
             verify(notificationRepository, never()).save(any());
+            verify(pushNotificationSender, never()).send(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("SIP upcoming is skipped when SIP-reminder alerts are disabled")
+        void sipUpcomingSkippedWhenDisabled() {
+            when(notificationPreferenceRepository.findById(userId))
+                    .thenReturn(Optional.of(NotificationPreference.builder().userId(userId).sipReminderEnabled(false).build()));
+
+            service.createSipUpcomingNotification(userId, "Axis Bluechip Fund", new BigDecimal("5000"), LocalDate.now().plusDays(2));
+
+            verify(notificationRepository, never()).save(any());
+            verify(pushNotificationSender, never()).send(any(), any(), any());
+        }
+    }
+
+    // ─── device tokens (push registration) ───────────────────────────────────────
+
+    @Nested
+    @DisplayName("device tokens")
+    class DeviceTokenTests {
+
+        @Test
+        @DisplayName("registerDeviceToken saves a new token against the calling user")
+        void registerDeviceTokenSavesNewToken() {
+            when(deviceTokenRepository.findByToken("tok-1")).thenReturn(Optional.empty());
+            ArgumentCaptor<DeviceToken> captor = ArgumentCaptor.forClass(DeviceToken.class);
+
+            service.registerDeviceToken(userId, "tok-1");
+
+            verify(deviceTokenRepository).save(captor.capture());
+            assertThat(captor.getValue().getUserId()).isEqualTo(userId);
+            assertThat(captor.getValue().getToken()).isEqualTo("tok-1");
+        }
+
+        @Test
+        @DisplayName("registerDeviceToken re-owns an existing token and bumps lastSeenAt instead of duplicating it")
+        void registerDeviceTokenReownsExistingToken() {
+            UUID otherUser = UUID.randomUUID();
+            DeviceToken existing = DeviceToken.builder().id(UUID.randomUUID()).userId(otherUser).token("tok-1").build();
+            when(deviceTokenRepository.findByToken("tok-1")).thenReturn(Optional.of(existing));
+            ArgumentCaptor<DeviceToken> captor = ArgumentCaptor.forClass(DeviceToken.class);
+
+            service.registerDeviceToken(userId, "tok-1");
+
+            verify(deviceTokenRepository).save(captor.capture());
+            assertThat(captor.getValue().getId()).isEqualTo(existing.getId());
+            assertThat(captor.getValue().getUserId()).isEqualTo(userId);
+        }
+
+        @Test
+        @DisplayName("unregisterDeviceToken deletes by token")
+        void unregisterDeviceTokenDeletesByToken() {
+            service.unregisterDeviceToken("tok-1");
+
+            verify(deviceTokenRepository).deleteByToken("tok-1");
         }
     }
 

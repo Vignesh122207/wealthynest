@@ -8,6 +8,7 @@ import com.wealthynest.domain.expense.repository.ExpenseRepository;
 import com.wealthynest.domain.income.entity.IncomeEntry;
 import com.wealthynest.domain.income.entity.IncomeSource;
 import com.wealthynest.domain.income.repository.IncomeRepository;
+import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.domain.report.dto.ReportCsv;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -24,6 +26,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
@@ -168,6 +171,16 @@ class ReportServiceImplTest {
 
             assertThat(csv).contains("Total Expenses,,,,0");
             assertThat(csv).contains("Net Savings,0");
+        }
+
+        @Test
+        @DisplayName("an out-of-range month (e.g. 13) is rejected with a clean 400, not a raw DateTimeException")
+        void rejectsOutOfRangeMonth() {
+            assertThatThrownBy(() -> service.generateMonthlyReport(userId, 2026, 13))
+                    .isInstanceOf(BusinessException.class)
+                    .satisfies(ex -> assertThat(((BusinessException) ex).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+            assertThatThrownBy(() -> service.generateMonthlyReport(userId, 2026, 0))
+                    .isInstanceOf(BusinessException.class);
         }
     }
 

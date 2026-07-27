@@ -7,6 +7,7 @@ import com.wealthynest.domain.asset.repository.AssetRepository;
 import com.wealthynest.domain.budget.repository.BudgetRepository;
 import com.wealthynest.domain.category.repository.CategoryRepository;
 import com.wealthynest.domain.expense.repository.ExpenseRepository;
+import com.wealthynest.domain.goal.repository.GoalRepository;
 import com.wealthynest.domain.family.dto.request.CreateFamilyRequest;
 import com.wealthynest.domain.family.dto.request.JoinFamilyRequest;
 import com.wealthynest.domain.family.dto.request.RenameFamilyRequest;
@@ -44,6 +45,7 @@ public class FamilyServiceImpl implements FamilyService {
     private final ExpenseRepository   expenseRepository;
     private final BudgetRepository    budgetRepository;
     private final CategoryRepository  categoryRepository;
+    private final GoalRepository      goalRepository;
     private final EntityManager       entityManager;
     private final AuditService        auditService;
 
@@ -170,6 +172,7 @@ public class FamilyServiceImpl implements FamilyService {
         expenseRepository.clearFamilyId(familyId);
         budgetRepository.clearFamilyId(familyId);
         categoryRepository.clearFamilyId(familyId);
+        goalRepository.clearFamilyId(familyId);
 
         // Detach all members
         userRepository.findByFamilyId(familyId).forEach(member -> {
@@ -285,6 +288,7 @@ public class FamilyServiceImpl implements FamilyService {
         expenseRepository.migrateUserExpensesToFamily(familyId, userId);
         budgetRepository.migrateUserBudgetsToFamily(familyId, userId);
         categoryRepository.migrateUserCategoriesToFamily(familyId, userId);
+        goalRepository.migrateUserGoalsToFamily(familyId, userId);
         log.info("Migrated existing data for user {} to family {}", userId, familyId);
     }
 
@@ -300,6 +304,7 @@ public class FamilyServiceImpl implements FamilyService {
         expenseRepository.clearFamilyIdForUser(userId, familyId);
         budgetRepository.clearFamilyIdForUser(userId, familyId);
         categoryRepository.clearFamilyIdForUser(userId, familyId);
+        goalRepository.clearFamilyIdForUser(userId, familyId);
         log.info("Detached data of user {} from family {}", userId, familyId);
     }
 

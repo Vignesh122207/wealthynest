@@ -105,7 +105,13 @@ class BudgetServiceImplTest {
                 .amount(budget.getAmount()).budgetType(budget.getBudgetType())
                 .alertThreshold(budget.getAlertThreshold())
                 .shared(budget.getFamilyId() != null)
+                .rollover(budget.isRollover()).createdAt(budget.getCreatedAt())
                 .build();
+    }
+
+    private Budget withCreatedAt(Budget budget, java.time.Instant createdAt) {
+        ReflectionTestUtils.setField(budget, "createdAt", createdAt);
+        return budget;
     }
 
     @BeforeEach
@@ -646,6 +652,162 @@ class BudgetServiceImplTest {
             List<BudgetResponse> result = service.getBudgetsForCategory(userId, categoryId, thisYear, thisMonth);
 
             assertThat(result).isEmpty();
+        }
+    }
+
+    // ─── budget rollover (one month only, never compounds) ───────────────────────────
+
+    @Nested
+    @DisplayName("budget rollover")
+    class RolloverTests {
+
+        private Budget rolloverBudget(BigDecimal amount, boolean rollover, java.time.Instant createdAt) {
+            Budget budget = Budget.builder().userId(userId).categoryId(categoryId)
+                    .amount(amount).budgetType(BudgetType.MONTHLY).alertThreshold(new BigDecimal("80"))
+                    .periodMonth(0).periodYear(0).rollover(rollover).build();
+            ReflectionTestUtils.setField(budget, "id", budgetId);
+            return withCreatedAt(budget, createdAt);
+        }
+
+        // Comfortably before any period this class's tests roll over from.
+        private final java.time.Instant longAgo = LocalDate.of(2020, 1, 1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+
+        @Test
+        @DisplayName("rollover off: last month's underspend is never added, even though it exists")
+        void rolloverOffIgnoresLastMonthsUnderspend() {
+            Budget budget = rolloverBudget(new BigDecimal("1000"), false, longAgo);
+            when(budgetRepository.findByUserId(userId)).thenReturn(List.of(budget));
+            when(categoryRepository.findAllById(Set.of(categoryId))).thenReturn(List.of(buildCategory()));
+            // June: 400 spent. May (the "previous month" the feature would look at): 200 spent, i.e. 800 underspent.
+            when(expenseRepository.sumByUserCategoryAndMonth(userId, categoryId, 2026, 6)).thenReturn(new BigDecimal("400"));
+            when(expenseRepository.sumByUserCategoryAndYear(any(), any(), anyInt())).thenReturn(new BigDecimal("400"));
+
+            BudgetResponse response = service.getBudgets(userId, null, 2026, 6).get(0);
+
+            assertThat(response.getRolloverAmount()).isEqualByComparingTo("0");
+            assertThat(response.getRemaining()).isEqualByComparingTo("600"); // 1000 - 400, no rollover
+            verify(expenseRepository, never()).sumByUserCategoryAndMonth(userId, categoryId, 2026, 5);
+        }
+
+        @Test
+        @DisplayName("rollover on: last month's underspend is added to this month's effective limit")
+        void rolloverOnAddsLastMonthsUnderspend() {
+            Budget budget = rolloverBudget(new BigDecimal("1000"), true, longAgo);
+            when(budgetRepository.findByUserId(userId)).thenReturn(List.of(budget));
+            when(categoryRepository.findAllById(Set.of(categoryId))).thenReturn(List.of(buildCategory()));
+            when(expenseRepository.sumByUserCategoryAndMonth(userId, categoryId, 2026, 6)).thenReturn(new BigDecimal("400"));
+            when(expenseRepository.sumByUserCategoryAndMonth(userId, categoryId, 2026, 5)).thenReturn(new BigDecimal("200"));
+            when(expenseRepository.sumByUserCategoryAndYear(any(), any(), anyInt())).thenReturn(new BigDecimal("400"));
+
+            BudgetResponse response = service.getBudgets(userId, null, 2026, 6).get(0);
+
+            // May: budgeted 1000, spent 200 -> 800 rolls into June.
+            assertThat(response.getRolloverAmount()).isEqualByComparingTo("800");
+            assertThat(response.getRemaining()).isEqualByComparingTo("1400"); // (1000 + 800) - 400
+            assertThat(response.isOverBudget()).isFalse();
+        }
+
+        @Test
+        @DisplayName("never compounds: the second month's rollover is still based only on the base amount, not on any rollover the first month received")
+        void rolloverDoesNotCompoundAcrossTwoMonths() {
+            Budget budget = rolloverBudget(new BigDecimal("1000"), true, longAgo);
+            when(budgetRepository.findByUserId(userId)).thenReturn(List.of(budget));
+            when(categoryRepository.findAllById(Set.of(categoryId))).thenReturn(List.of(buildCategory()));
+            // April: spent 100 (900 underspent) -> would roll into May.
+            // May: spent 200 -> May's OWN rollover into June is (1000 - 200) = 800, never (1000 + 900's-effect - 200).
+            when(expenseRepository.sumByUserCategoryAndMonth(userId, categoryId, 2026, 6)).thenReturn(BigDecimal.ZERO);
+            when(expenseRepository.sumByUserCategoryAndMonth(userId, categoryId, 2026, 5)).thenReturn(new BigDecimal("200"));
+            when(expenseRepository.sumByUserCategoryAndYear(any(), any(), anyInt())).thenReturn(BigDecimal.ZERO);
+
+            BudgetResponse response = service.getBudgets(userId, null, 2026, 6).get(0);
+
+            assertThat(response.getRolloverAmount()).isEqualByComparingTo("800");
+            verify(expenseRepository, never()).sumByUserCategoryAndMonth(userId, categoryId, 2026, 4);
+        }
+
+        @Test
+        @DisplayName("last month's overspend never produces a negative rollover")
+        void overspendLastMonthYieldsZeroRollover() {
+            Budget budget = rolloverBudget(new BigDecimal("1000"), true, longAgo);
+            when(budgetRepository.findByUserId(userId)).thenReturn(List.of(budget));
+            when(categoryRepository.findAllById(Set.of(categoryId))).thenReturn(List.of(buildCategory()));
+            when(expenseRepository.sumByUserCategoryAndMonth(userId, categoryId, 2026, 6)).thenReturn(new BigDecimal("400"));
+            when(expenseRepository.sumByUserCategoryAndMonth(userId, categoryId, 2026, 5)).thenReturn(new BigDecimal("1500"));
+            when(expenseRepository.sumByUserCategoryAndYear(any(), any(), anyInt())).thenReturn(new BigDecimal("400"));
+
+            BudgetResponse response = service.getBudgets(userId, null, 2026, 6).get(0);
+
+            assertThat(response.getRolloverAmount()).isEqualByComparingTo("0");
+            assertThat(response.getRemaining()).isEqualByComparingTo("600");
+        }
+
+        @Test
+        @DisplayName("YEARLY budgets ignore the rollover flag entirely")
+        void yearlyBudgetIgnoresRollover() {
+            Budget budget = Budget.builder().userId(userId).categoryId(categoryId)
+                    .amount(new BigDecimal("50000")).budgetType(BudgetType.YEARLY).alertThreshold(new BigDecimal("80"))
+                    .periodMonth(0).periodYear(0).rollover(true).build();
+            ReflectionTestUtils.setField(budget, "id", budgetId);
+            withCreatedAt(budget, longAgo);
+            when(budgetRepository.findByUserId(userId)).thenReturn(List.of(budget));
+            when(categoryRepository.findAllById(Set.of(categoryId))).thenReturn(List.of(buildCategory()));
+            when(expenseRepository.sumByUserCategoryAndYear(any(), any(), anyInt())).thenReturn(new BigDecimal("10000"));
+
+            BudgetResponse response = service.getBudgets(userId, null, 2026, 6).get(0);
+
+            assertThat(response.getRolloverAmount()).isEqualByComparingTo("0");
+            verify(expenseRepository, never()).sumByUserCategoryAndMonth(any(), any(), anyInt(), anyInt());
+        }
+
+        @Test
+        @DisplayName("a budget created this month has no prior-month baseline — rollover is zero even with rollover=true")
+        void newlyCreatedBudgetHasNoRolloverYet() {
+            java.time.Instant createdThisMonth = LocalDate.of(2026, 6, 15).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+            Budget budget = rolloverBudget(new BigDecimal("1000"), true, createdThisMonth);
+            when(budgetRepository.findByUserId(userId)).thenReturn(List.of(budget));
+            when(categoryRepository.findAllById(Set.of(categoryId))).thenReturn(List.of(buildCategory()));
+            when(expenseRepository.sumByUserCategoryAndMonth(userId, categoryId, 2026, 6)).thenReturn(new BigDecimal("100"));
+            when(expenseRepository.sumByUserCategoryAndYear(any(), any(), anyInt())).thenReturn(new BigDecimal("100"));
+
+            BudgetResponse response = service.getBudgets(userId, null, 2026, 6).get(0);
+
+            assertThat(response.getRolloverAmount()).isEqualByComparingTo("0");
+            verify(expenseRepository, never()).sumByUserCategoryAndMonth(userId, categoryId, 2026, 5);
+        }
+
+        @Test
+        @DisplayName("January correctly rolls over from December of the previous year")
+        void januaryRollsOverFromPreviousDecember() {
+            Budget budget = rolloverBudget(new BigDecimal("1000"), true, longAgo);
+            when(budgetRepository.findByUserId(userId)).thenReturn(List.of(budget));
+            when(categoryRepository.findAllById(Set.of(categoryId))).thenReturn(List.of(buildCategory()));
+            when(expenseRepository.sumByUserCategoryAndMonth(userId, categoryId, 2026, 1)).thenReturn(new BigDecimal("50"));
+            when(expenseRepository.sumByUserCategoryAndMonth(userId, categoryId, 2025, 12)).thenReturn(new BigDecimal("300"));
+            when(expenseRepository.sumByUserCategoryAndYear(any(), any(), anyInt())).thenReturn(new BigDecimal("50"));
+
+            BudgetResponse response = service.getBudgets(userId, null, 2026, 1).get(0);
+
+            assertThat(response.getRolloverAmount()).isEqualByComparingTo("700"); // 1000 - 300
+        }
+
+        @Test
+        @DisplayName("family-shared rollover budgets roll over using family-wide spend, not the creator's own")
+        void familySharedBudgetRollsOverUsingFamilySpend() {
+            Budget budget = Budget.builder().userId(userId).familyId(familyId).categoryId(categoryId)
+                    .amount(new BigDecimal("1000")).budgetType(BudgetType.MONTHLY).alertThreshold(new BigDecimal("80"))
+                    .periodMonth(0).periodYear(0).rollover(true).build();
+            ReflectionTestUtils.setField(budget, "id", budgetId);
+            withCreatedAt(budget, longAgo);
+            when(budgetRepository.findByFamilyId(familyId)).thenReturn(List.of(budget));
+            when(categoryRepository.findAllById(Set.of(categoryId))).thenReturn(List.of(buildCategory()));
+            when(expenseRepository.sumByFamilyCategoryAndMonth(familyId, categoryId, 2026, 6)).thenReturn(new BigDecimal("400"));
+            when(expenseRepository.sumByFamilyCategoryAndMonth(familyId, categoryId, 2026, 5)).thenReturn(new BigDecimal("250"));
+            when(expenseRepository.sumByFamilyCategoryAndYear(any(), any(), anyInt())).thenReturn(new BigDecimal("400"));
+
+            BudgetResponse response = service.getBudgets(userId, familyId, 2026, 6).get(0);
+
+            assertThat(response.getRolloverAmount()).isEqualByComparingTo("750"); // 1000 - 250
+            verify(expenseRepository, never()).sumByUserCategoryAndMonth(any(), any(), anyInt(), anyInt());
         }
     }
 

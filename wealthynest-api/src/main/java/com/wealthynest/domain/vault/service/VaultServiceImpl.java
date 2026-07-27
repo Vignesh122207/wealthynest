@@ -6,6 +6,7 @@ import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.common.security.VaultEncryptionService;
 import com.wealthynest.common.security.VaultSecretHasher;
+import com.wealthynest.common.util.CsvSanitizer;
 import com.wealthynest.domain.user.entity.User;
 import com.wealthynest.domain.user.repository.UserRepository;
 import com.wealthynest.domain.vault.dto.request.RevealVaultItemRequest;
@@ -191,15 +192,20 @@ public class VaultServiceImpl implements VaultService {
                 .setHeader("Title", "Type", "Username", "URL", "Category", "Password/Note", "TOTP Secret")
                 .build())) {
             for (VaultItem item : items) {
+                // Every field here is user-supplied (title/username/url/category) or a decrypted
+                // secret — neutralize CSV formula injection the same way ReportServiceImpl does,
+                // since a vault entry can easily contain a "=..." title/note like a phishing URL.
                 printer.printRecord(
-                        item.getTitle(),
+                        CsvSanitizer.neutralizeFormula(item.getTitle()),
                         item.getItemType().name(),
-                        item.getUsername(),
-                        item.getUrl(),
-                        item.getCategory(),
-                        vaultEncryptionService.decrypt(item.getSecretCiphertext(), item.getSecretIv(), item.getKeyVersion()),
+                        CsvSanitizer.neutralizeFormula(item.getUsername()),
+                        CsvSanitizer.neutralizeFormula(item.getUrl()),
+                        CsvSanitizer.neutralizeFormula(item.getCategory()),
+                        CsvSanitizer.neutralizeFormula(
+                                vaultEncryptionService.decrypt(item.getSecretCiphertext(), item.getSecretIv(), item.getKeyVersion())),
                         item.getTotpCiphertext() == null ? ""
-                                : vaultEncryptionService.decrypt(item.getTotpCiphertext(), item.getTotpIv(), item.getKeyVersion()));
+                                : CsvSanitizer.neutralizeFormula(
+                                        vaultEncryptionService.decrypt(item.getTotpCiphertext(), item.getTotpIv(), item.getKeyVersion())));
             }
         } catch (IOException e) {
             // StringWriter never throws IOException in practice — CSVPrinter's signature requires it.

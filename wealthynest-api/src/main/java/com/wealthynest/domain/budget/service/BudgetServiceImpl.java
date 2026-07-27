@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -52,6 +53,7 @@ public class BudgetServiceImpl implements BudgetService {
         budget.setBudgetType(type);
         budget.setPeriodMonth(0);
         budget.setPeriodYear(0);
+        budget.setRollover(request.isRollover());
         if (request.getAlertThreshold() != null) budget.setAlertThreshold(request.getAlertThreshold());
 
         LocalDate now = LocalDate.now();
@@ -65,6 +67,7 @@ public class BudgetServiceImpl implements BudgetService {
 
         if (request.getAmount() != null)          budget.setAmount(request.getAmount());
         if (request.getAlertThreshold() != null)  budget.setAlertThreshold(request.getAlertThreshold());
+        if (request.getRollover() != null)        budget.setRollover(request.getRollover());
         if (request.getCategoryId() != null) {
             categoryOwnershipGuard.validateCategoryOwnership(request.getCategoryId(), userId, familyId);
             budget.setCategoryId(request.getCategoryId());
@@ -141,9 +144,13 @@ public class BudgetServiceImpl implements BudgetService {
         }
         if (spent == null) spent = BigDecimal.ZERO;
         if (annualSpent == null) annualSpent = BigDecimal.ZERO;
-        BigDecimal remaining = r.getAmount().subtract(spent);
-        double pct = r.getAmount().compareTo(BigDecimal.ZERO) > 0
-            ? spent.divide(r.getAmount(), 4, RoundingMode.HALF_UP)
+
+        BigDecimal rolloverAmount = computeRolloverAmount(r, userId, familyId, year, month);
+        BigDecimal effectiveAmount = r.getAmount().add(rolloverAmount);
+
+        BigDecimal remaining = effectiveAmount.subtract(spent);
+        double pct = effectiveAmount.compareTo(BigDecimal.ZERO) > 0
+            ? spent.divide(effectiveAmount, 4, RoundingMode.HALF_UP)
                    .multiply(BigDecimal.valueOf(100)).doubleValue()
             : 0.0;
         BigDecimal threshold = r.getAlertThreshold() != null ? r.getAlertThreshold() : BigDecimal.valueOf(80);
@@ -159,6 +166,35 @@ public class BudgetServiceImpl implements BudgetService {
             .alertTriggered(pct >= threshold.doubleValue())
             .budgetType(r.getBudgetType() != null ? r.getBudgetType() : BudgetType.MONTHLY)
             .shared(r.isShared())
+            .rollover(r.isRollover())
+            .rolloverAmount(rolloverAmount)
+            .createdAt(r.getCreatedAt())
             .build();
+    }
+
+    /**
+     * Unspent amount carried forward from last month only — never compounds, since it's always
+     * computed as (this same template's amount) minus (last month's actual spend), never against
+     * an already-rolled total. Budgets have no per-period row (see class doc), so "did this budget
+     * exist last month" is approximated via createdAt: a budget created mid-way through last month
+     * (or this month) has no real prior-month baseline to roll from.
+     */
+    private BigDecimal computeRolloverAmount(BudgetResponse r, UUID userId, UUID familyId, int year, int month) {
+        if (!r.isRollover() || r.getBudgetType() == BudgetType.YEARLY || r.getCreatedAt() == null) {
+            return BigDecimal.ZERO;
+        }
+        int prevMonth = month == 1 ? 12 : month - 1;
+        int prevYear  = month == 1 ? year - 1 : year;
+        LocalDate prevPeriodStart = LocalDate.of(prevYear, prevMonth, 1);
+        boolean existedLastMonth = !LocalDate.ofInstant(r.getCreatedAt(), ZoneOffset.UTC).isAfter(prevPeriodStart);
+        if (!existedLastMonth) return BigDecimal.ZERO;
+
+        BigDecimal prevSpent = familyId != null
+            ? expenseRepository.sumByFamilyCategoryAndMonth(familyId, r.getCategoryId(), prevYear, prevMonth)
+            : expenseRepository.sumByUserCategoryAndMonth(userId, r.getCategoryId(), prevYear, prevMonth);
+        if (prevSpent == null) prevSpent = BigDecimal.ZERO;
+
+        BigDecimal prevUnspent = r.getAmount().subtract(prevSpent);
+        return prevUnspent.compareTo(BigDecimal.ZERO) > 0 ? prevUnspent : BigDecimal.ZERO;
     }
 }

@@ -121,6 +121,13 @@
             <version>1.47.0</version>
         </dependency>
 
+        <!-- Push notifications (Firebase Cloud Messaging, Android app) -->
+        <dependency>
+            <groupId>com.google.firebase</groupId>
+            <artifactId>firebase-admin</artifactId>
+            <version>9.4.1</version>
+        </dependency>
+
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>

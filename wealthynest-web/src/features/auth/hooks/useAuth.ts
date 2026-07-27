@@ -8,6 +8,8 @@ import {clearPasskeyDismissedOnDevice, useAppLockStore} from "../store/appLock.s
 import {createPasskey, getPasskeyAssertion} from "../utils/webauthn";
 import {deriveLockoutState} from "../utils/lockout";
 import type {LoginFormValues, RegisterFormValues} from "../schemas/auth.schema";
+import {notificationsApi} from "@/features/notifications/api/notifications.api";
+import {getLastRegisteredPushToken} from "@/features/notifications/utils/nativePush";
 
 type ApiError = { response?: { data?: { message?: string; error?: string } } };
 
@@ -65,7 +67,14 @@ export function useLogout() {
   const router = useRouter();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => authApi.logout(),
+    mutationFn: () => {
+      // Fire-and-forget, not awaited — a native device's push token shouldn't block logout, and a
+      // token left behind past this session is harmless (see nativePush.ts's own comment; it just
+      // gets pruned server-side the next time a push to it comes back UNREGISTERED).
+      const token = getLastRegisteredPushToken();
+      if (token) notificationsApi.unregisterDeviceToken(token).catch(() => {});
+      return authApi.logout();
+    },
     // unlock() (not just the hidden-at marker) — signing out must also drop the in-memory
     // `isLocked` flag itself, or it stays stale-true across this in-app navigation to /login and
     // the very next login on this device (e.g. right after "Use password instead") lands on

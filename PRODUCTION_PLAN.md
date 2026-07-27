@@ -91,6 +91,7 @@ Dedicated Year-over-Year Comparison chart (this year vs. last year, monthly) alr
 ### Mobile App Specific
 - [x] Splash screen — shipped (see recent commit fixing the blank-rectangle bug)
 - [ ] **Push notifications** — not built. No `@capacitor/push-notifications` or Firebase dependency in `package.json`. Confirmed still an open item, matches `ANDROID_APP_ROADMAP.md`'s own "known gap."
+- [x] Push notifications — implemented via `@capacitor/push-notifications` + Firebase Cloud Messaging (`FcmPushNotificationSender`, `device_tokens` table, `useNativePush.ts`) — wired into the same 5 alert types as in-app notifications. Firebase project setup and on-device delivery are still unverified; see `ANDROID_APP_ROADMAP.md`'s "Push notifications" section for the setup steps and its Phase 1 checklist for the verification list.
 - [x] Offline screen — `public/offline.html` + `public/sw.js` shipped
 - [ ] **Android back button handling** — no explicit `App.addListener("backButton", ...)` found. Capacitor's default WebView back-navigation may already be adequate; hasn't been deliberately verified either way.
 
@@ -108,7 +109,7 @@ Dedicated Year-over-Year Comparison chart (this year vs. last year, monthly) alr
 1. Confirm the host firewall blocks direct access to ports 8080/3000 (Cloudflare Tunnel bypass risk).
 2. Structured JSON logging for real observability.
 3. Wire up (or deliberately remove) the orphaned per-account statement endpoint.
-4. A deliberate yes/no on: generic onboarding wizard, budget rollover, SIP due-date reminder, shared family goals, Android back-button handling, push notifications.
+4. A deliberate yes/no on: generic onboarding wizard, budget rollover, SIP due-date reminder, shared family goals, Android back-button handling. (Push notifications are decided and implemented — what's left there is Firebase project setup and on-device verification, not a product decision; see `ANDROID_APP_ROADMAP.md`.)
 5. Verify rate limiting under genuine concurrent multi-device load, not just local dev traffic.
 
 None of these are launch-blocking in the way the original checklist implied — the actual blocking-page work (landing, legal, notifications, reports, onboarding-adjacent empty states) is done.

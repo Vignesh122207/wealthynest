@@ -19,6 +19,7 @@ public class NotificationPreference {
     @Column(name = "spend_anomaly_enabled", nullable = false) @Builder.Default private boolean spendAnomalyEnabled = true;
     @Column(name = "debt_due_enabled", nullable = false)      @Builder.Default private boolean debtDueEnabled = true;
     @Column(name = "loan_emi_enabled", nullable = false)      @Builder.Default private boolean loanEmiEnabled = true;
+    @Column(name = "sip_reminder_enabled", nullable = false)  @Builder.Default private boolean sipReminderEnabled = true;
 
     @Column(name = "created_at", updatable = false, nullable = false)
     @Builder.Default private Instant createdAt = Instant.now();

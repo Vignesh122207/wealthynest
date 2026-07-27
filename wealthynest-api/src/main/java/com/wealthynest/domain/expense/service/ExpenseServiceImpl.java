@@ -195,7 +195,7 @@ public class ExpenseServiceImpl implements ExpenseService {
                     String catName = categoryRepository.findById(categoryId)
                             .map(Category::getName).orElse("Unknown");
                     notificationService.createBudgetBreachNotification(
-                            userId, catName, spent, budget.getAmount(), pct);
+                            userId, catName, budget.getBudgetType().name(), spent, budget.getAmount(), pct);
                 }
             } catch (Exception e) {
                 log.warn("Budget breach check failed for user={} category={}: {}", userId, categoryId, e.getMessage());

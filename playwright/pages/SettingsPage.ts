@@ -1,6 +1,7 @@
 import {expect} from "@playwright/test";
 import {BasePage} from "./BasePage";
 import {waitForApiResponse} from "../helpers/wait.helper";
+import {TEST_IDS} from "../constants/testIds";
 
 /** Models the smaller wealthynest-web /settings/* subpages — Profile, Security (validation path
  * only; see README for why a real password-change mutation isn't exercised against the shared
@@ -33,8 +34,33 @@ export class SettingsPage extends BasePage {
     ]);
   }
 
+  // ── Danger zone (relocated from Settings to Profile) ──────────────────────
+  async openSignOutDialog(): Promise<void> {
+    await this.page.getByTestId(TEST_IDS.profile.signoutTrigger).click();
+  }
+
+  async openCloseAccountDialog(): Promise<void> {
+    await this.page.getByTestId(TEST_IDS.profile.closeAccountTrigger).click();
+  }
+
+  async cancelConfirmDialog(): Promise<void> {
+    await this.page.getByTestId(TEST_IDS.confirmDialog.cancel).click();
+  }
+
+  get confirmDialogConfirmButton() {
+    return this.page.getByTestId(TEST_IDS.confirmDialog.confirm);
+  }
+
   // ── Security ────────────────────────────────────────────────────────────
+  /** The password form is collapsed behind a row by default (see security/page.tsx's own
+   * comment on why: it's a rare action, demoted below the unlock-methods card) — expand it
+   * before either password flow below tries to fill the now-hidden fields. */
+  async expandPasswordForm(): Promise<void> {
+    await this.page.getByTestId("security-password-toggle").click();
+  }
+
   async attemptPasswordChangeWithMismatch(current: string, newPassword: string, confirmPassword: string): Promise<void> {
+    await this.expandPasswordForm();
     await this.page.getByTestId("security-current-password-input").fill(current);
     await this.page.getByTestId("security-new-password-input").fill(newPassword);
     await this.page.getByTestId("security-confirm-password-input").fill(confirmPassword);
@@ -45,6 +71,7 @@ export class SettingsPage extends BasePage {
    * (see security.spec.ts), never regressionUser/e2eUser: it changes the credential every other
    * regression file relies on being able to log in with. */
   async changePassword(current: string, newPassword: string): Promise<void> {
+    await this.expandPasswordForm();
     await this.page.getByTestId("security-current-password-input").fill(current);
     await this.page.getByTestId("security-new-password-input").fill(newPassword);
     await this.page.getByTestId("security-confirm-password-input").fill(newPassword);

@@ -3,13 +3,15 @@
 import {useForm} from "react-hook-form";
 import {zodResolver} from "@hookform/resolvers/zod";
 import {z} from "zod";
-import {Loader2, Lock} from "lucide-react";
+import {Loader2, Lock, LogOut, Trash2} from "lucide-react";
 import Link from "next/link";
+import {useState} from "react";
 import {Header} from "@/components/layout/Header";
 import {PageWrapper} from "@/components/layout/PageWrapper";
-import {GlossyBadge} from "@/components/icons/PremiumIcon";
+import {GlossyBadge, PremiumIcon} from "@/components/icons/PremiumIcon";
+import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
 import {useAuthStore} from "@/features/auth/store/auth.store";
-import {useUpdateProfile} from "@/features/auth/hooks/useAuth";
+import {useCloseAccount, useLogout, useUpdateProfile} from "@/features/auth/hooks/useAuth";
 import {getInitials} from "@/lib/utils";
 
 const schema = z.object({
@@ -29,6 +31,10 @@ function roleBadge(role?: string) {
 export default function ProfilePage() {
   const { user } = useAuthStore();
   const { mutate: updateProfile, isPending } = useUpdateProfile();
+  const { mutate: logout } = useLogout();
+  const { mutate: closeAccount } = useCloseAccount();
+  const [showLogout, setShowLogout] = useState(false);
+  const [showClose, setShowClose] = useState(false);
 
   const form = useForm<Values>({
     resolver: zodResolver(schema),
@@ -97,7 +103,11 @@ export default function ProfilePage() {
                 type="submit"
                 disabled={isPending}
                 data-testid="profile-form-submit"
-                className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors mt-2"
+                className="w-full flex items-center justify-center gap-2 h-11 rounded-xl text-sm font-semibold transition-all mt-2
+                  bg-gradient-to-br from-brand-600 to-brand-500 text-white
+                  shadow-[0_10px_24px_-10px_rgb(var(--brand-500)/65%),inset_0_1px_0_rgba(255,255,255,0.18)]
+                  hover:shadow-[0_14px_28px_-10px_rgb(var(--brand-500)/75%),inset_0_1px_0_rgba(255,255,255,0.22)] hover:-translate-y-0.5
+                  disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0"
               >
                 {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 Save changes
@@ -105,8 +115,54 @@ export default function ProfilePage() {
             </form>
           </div>
 
+          {/* ── Danger zone — relocated here from Settings, next to the identity it affects ── */}
+          <div>
+            <p className="text-[11px] font-semibold text-red-600 dark:text-red-400 uppercase tracking-widest px-1 mb-1.5">Danger Zone</p>
+            <div className="bg-card border border-red-500/20 rounded-2xl overflow-hidden divide-y divide-border/60">
+              <button
+                onClick={() => setShowLogout(true)}
+                data-testid="profile-signout-trigger"
+                className="w-full flex items-center gap-3.5 px-4 py-3.5 hover:bg-red-500/5 transition-colors text-left"
+              >
+                <PremiumIcon icon={LogOut} tone="red" size="sm" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-red-600 dark:text-red-400">Sign out</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Sign out of your account on this device</p>
+                </div>
+              </button>
+              <button
+                onClick={() => setShowClose(true)}
+                data-testid="profile-close-account-trigger"
+                className="w-full flex items-center gap-3.5 px-4 py-3.5 hover:bg-red-500/5 transition-colors text-left"
+              >
+                <PremiumIcon icon={Trash2} tone="red" size="sm" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-red-600 dark:text-red-400">Close account</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Deactivate your account — data retained, admin must reactivate</p>
+                </div>
+              </button>
+            </div>
+          </div>
+
         </div>
       </PageWrapper>
+
+      {showLogout && (
+        <ConfirmDialog open title="Sign out?"
+          description="You'll be signed out from this device. You can sign back in at any time."
+          confirmLabel="Sign out" danger
+          onConfirm={() => logout()}
+          onCancel={() => setShowLogout(false)} />
+      )}
+
+      {showClose && (
+        <ConfirmDialog open title="Close your account?"
+          description="Your account will be deactivated immediately and you will be signed out. Your data is retained. Only an admin can reactivate your account."
+          confirmLabel="Yes, close account" danger
+          typeToConfirm="CLOSE"
+          onConfirm={() => closeAccount()}
+          onCancel={() => setShowClose(false)} />
+      )}
     </div>
   );
 }

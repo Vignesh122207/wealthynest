@@ -6,7 +6,7 @@ import {useForm} from "react-hook-form";
 import {zodResolver} from "@hookform/resolvers/zod";
 import {z} from "zod";
 import {
-    Check,
+    ChevronRight,
     Eye,
     EyeOff,
     Fingerprint,
@@ -14,7 +14,7 @@ import {
     Loader2,
     Mail,
     Monitor,
-    ShieldCheck,
+    Smartphone,
     Trash2,
     X
 } from "lucide-react";
@@ -24,6 +24,7 @@ import {PageWrapper} from "@/components/layout/PageWrapper";
 import {PremiumIcon} from "@/components/icons/PremiumIcon";
 import {InfoTooltip} from "@/components/ui/Tooltip";
 import {FormInput} from "@/components/forms/FormInput";
+import {Toggle} from "@/components/ui/Toggle";
 import {
     useChangeEmail,
     useChangePassword,
@@ -43,8 +44,8 @@ import {
 } from "@/features/auth/hooks/useNativeBiometric";
 import {useAuthStore} from "@/features/auth/store/auth.store";
 import {useWebAuthnSupport} from "@/features/auth/hooks/useWebAuthnSupport";
-import {formatDate} from "@/lib/utils";
-import {parseUserAgent} from "@/lib/parseUserAgent";
+import {cn, formatDate} from "@/lib/utils";
+import {isMobileUserAgent, parseUserAgent} from "@/lib/parseUserAgent";
 
 const PASSWORD_TIPS = [
   "At least 8 characters",
@@ -94,13 +95,304 @@ function PasswordField({ label, reg, error, placeholder, testId }: {
   );
 }
 
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest px-1">{children}</p>;
+}
+
+// Row-level status pill — same on/off convention as the hero's StatusChip, but sized for a card row.
+function StatusPill({ on, children }: { on: boolean; children: React.ReactNode }) {
+  return (
+    <span className={cn(
+      "text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap",
+      on ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-muted text-muted-foreground"
+    )}>
+      {children}
+    </span>
+  );
+}
+
+// ─── Unlock this device — PIN + fingerprint/passkey merged into one card ────
+// These used to be up to three separate always-rendered-or-null cards (PIN, web passkeys, native
+// biometric). On any given device only one of the latter two can ever actually render — a phone
+// gets native biometric, a browser gets passkeys, never both — so the old 3-card layout was
+// scaffolding for a case that never happens on screen. Grouping them (and putting this ahead of
+// the password form) puts the thing a phone user actually taps daily first.
+
+function PinRow() {
+  const { user } = useAuthStore();
+  const { mutate: disablePin } = useDisablePin();
+  const enabled = !!user?.pinEnabled;
+
+  const icon = <PremiumIcon icon={KeyRound} hex="#c2703d" size="sm" />;
+  const meta = (
+    <div className="flex-1 min-w-0">
+      <p className="text-sm font-semibold text-foreground flex items-center gap-2 flex-wrap">
+        PIN unlock
+        <StatusPill on={enabled}>{enabled ? "ENABLED" : "NOT SET UP"}</StatusPill>
+      </p>
+      <p className="text-xs text-muted-foreground mt-0.5">Quick 4-digit unlock for this device</p>
+    </div>
+  );
+
+  if (!enabled) {
+    return (
+      <Link href="/settings/security/pin" data-testid="security-pin-setup-link"
+        className="flex items-center gap-3.5 px-4 py-4 min-h-[64px] hover:bg-muted/40 transition-colors">
+        {icon}{meta}
+        <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" />
+      </Link>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-3.5 px-4 py-4 min-h-[64px]">
+      {icon}{meta}
+      <Toggle checked onChange={() => disablePin()} testId="security-pin-disable-toggle" />
+    </div>
+  );
+}
+
+// Native only — a bare fingerprint/face toggle with nothing stored behind it (see the original
+// NativeBiometricSection's own reasoning, preserved here: this is a local re-proof on an
+// already-valid session, not a remote credential, so "enable" just confirms the device can pass a
+// biometric check and remembers that preference).
+function NativeBiometricRow() {
+  const { data, isLoading } = useNativeBiometricStatus();
+  const { mutate: enable, isPending: enabling } = useEnableBiometricUnlock();
+  const { mutate: disable, isPending: disabling } = useDisableBiometricUnlock();
+
+  if (isLoading || !data?.available) return null;
+
+  return (
+    <div className="flex items-center gap-3.5 px-4 py-4 min-h-[64px]">
+      <PremiumIcon icon={Fingerprint} hex={data.enabled ? "#34C759" : "#8E8E93"} size="sm" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-foreground flex items-center gap-2 flex-wrap">
+          Fingerprint &amp; face unlock
+          <StatusPill on={data.enabled}>{data.enabled ? "ENABLED" : "NOT SET UP"}</StatusPill>
+        </p>
+        <p className="text-xs text-muted-foreground mt-0.5">Unlock instantly — no typing needed</p>
+      </div>
+      <Toggle
+        checked={data.enabled}
+        disabled={enabling || disabling}
+        onChange={(v) => (v ? enable() : disable())}
+        testId={data.enabled ? "security-biometric-disable" : "security-biometric-enable-toggle"}
+      />
+    </div>
+  );
+}
+
+// Web/desktop only — WebAuthn passkeys, potentially several (one per enrolled device), so unlike
+// the native row above this can't collapse to a single on/off switch: each entry needs its own
+// remove action and there's a real "add another" flow. Kept expanded by default (matches the
+// original PasskeysSection) rather than gated behind a second click, since fingerprint/face is
+// exactly the feature this redesign is meant to promote, not bury further.
+function PasskeyRow() {
+  const { data: passkeys = [], isLoading } = usePasskeys();
+  const { mutate: registerPasskey, isPending: registering } = useRegisterPasskey();
+  const { mutate: deletePasskey } = useDeletePasskey();
+  const [nickname, setNickname] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const enabled = passkeys.length > 0;
+
+  const handleAdd = () => {
+    registerPasskey(nickname.trim() || "This device", { onSuccess: () => { setNickname(""); setShowAdd(false); } });
+  };
+
+  return (
+    <div className="px-4 py-4 space-y-3">
+      <div className="flex items-center gap-3.5">
+        <PremiumIcon icon={Fingerprint} hex={enabled ? "#34C759" : "#8E8E93"} size="sm" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-foreground flex items-center gap-2 flex-wrap">
+            Fingerprint &amp; face unlock
+            <StatusPill on={enabled}>{enabled ? `${passkeys.length} DEVICE${passkeys.length === 1 ? "" : "S"}` : "NOT SET UP"}</StatusPill>
+            {passkeys.length > 0 && (
+              <InfoTooltip content={
+                <p>
+                  Each entry below is tied to one specific device — a passkey added on your laptop
+                  won&apos;t offer to unlock this account on your phone, even though both are listed
+                  here. Add a passkey separately on each device you want fast unlock on.
+                </p>
+              } />
+            )}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">Unlock instantly with your fingerprint, face, or screen lock</p>
+        </div>
+      </div>
+
+      {!isLoading && passkeys.length > 0 && (
+        <div className="space-y-2 sm:pl-[46px]">
+          {passkeys.map(p => (
+            <div key={p.id} className="flex items-center justify-between gap-3 bg-muted/40 rounded-xl px-3 py-2.5">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-foreground truncate">{p.nickname || "This device"}</p>
+                <p className="text-[11px] text-muted-foreground/70">
+                  Added {formatDate(p.createdAt)}{p.lastUsedAt ? ` · Last used ${formatDate(p.lastUsedAt)}` : ""}
+                </p>
+              </div>
+              <button onClick={() => deletePasskey(p.id)} title="Remove" data-testid="security-passkey-delete"
+                className="text-muted-foreground/60 hover:text-red-500 transition-colors shrink-0 p-2 -m-2 rounded-lg">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="sm:pl-[46px]">
+        {showAdd ? (
+          <div className="flex gap-2 items-start">
+            <div className="flex-1">
+              <FormInput
+                value={nickname}
+                onChange={e => setNickname(e.target.value)}
+                placeholder="e.g. My phone"
+                className="h-9"
+                aria-label="Device name"
+                data-testid="security-passkey-nickname-input"
+              />
+            </div>
+            <button onClick={handleAdd} disabled={registering} data-testid="security-passkey-submit"
+              className="h-9 px-3.5 rounded-xl text-xs font-medium bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-60 transition-colors flex items-center gap-1.5">
+              {registering && <Loader2 className="w-3.5 h-3.5 animate-spin" />} {registering ? "Follow your device's prompt…" : "Continue"}
+            </button>
+            <button onClick={() => setShowAdd(false)}
+              className="h-9 w-9 flex items-center justify-center rounded-xl bg-muted hover:bg-muted/80 text-muted-foreground shrink-0">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => setShowAdd(true)} data-testid="security-passkey-add-toggle"
+            className="h-10 px-3.5 rounded-xl text-xs font-medium bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 dark:text-brand-300 border border-brand-500/20 transition-colors">
+            {enabled ? "Add another device" : "Enable fingerprint unlock"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Chooses which biometric row applies to this platform — never both (see AppLockScreen's own
+// comment for why: native's plain BiometricPrompt and a browser passkey both claim the same
+// physical sensor, so offering both on one platform would be a confusing, redundant choice).
+function BiometricRow() {
+  const isNative = useIsNativePlatform();
+  const supported = useWebAuthnSupport();
+
+  if (isNative) return <NativeBiometricRow />;
+  if (!supported) return null;
+  return <PasskeyRow />;
+}
+
+function UnlockMethodsCard() {
+  return (
+    <div>
+      <SectionLabel>Unlock this device</SectionLabel>
+      <div className="bg-card border border-border rounded-2xl overflow-hidden divide-y divide-border mt-2">
+        <PinRow />
+        <BiometricRow />
+      </div>
+    </div>
+  );
+}
+
+// ─── Password & email — demoted below unlock methods since it's a rare action, collapsed by
+// default instead of an always-open form taking up the top of the page ─────────────────────────
+
+function PasswordRow() {
+  const { mutate: changePassword, isPending } = useChangePassword();
+  const [open, setOpen] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  const form = useForm<Values>({
+    resolver: zodResolver(schema),
+    defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" },
+  });
+
+  function onSubmit(values: Values) {
+    changePassword(
+      { currentPassword: values.currentPassword, newPassword: values.newPassword },
+      { onSuccess: () => { form.reset(); setSuccess(true); setOpen(false); setTimeout(() => setSuccess(false), 4000); } }
+    );
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        data-testid="security-password-toggle"
+        aria-expanded={open}
+        className="w-full flex items-center gap-3.5 px-4 py-4 min-h-[64px] text-left hover:bg-muted/40 transition-colors"
+      >
+        <PremiumIcon icon={KeyRound} hex="#c2703d" size="sm" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-foreground">Password</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Use a strong password with letters, numbers, and symbols</p>
+        </div>
+        <ChevronRight className={cn("w-4 h-4 text-muted-foreground/50 shrink-0 transition-transform", open && "rotate-90")} />
+      </button>
+
+      {success && (
+        <div className="mx-4 mb-3 text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded-xl px-3 py-2.5 text-center font-medium">
+          Password updated successfully!
+        </div>
+      )}
+
+      {open && (
+        <form onSubmit={form.handleSubmit(onSubmit)} className="px-4 pb-4 space-y-3 border-t border-border pt-3.5">
+          <PasswordField
+            label="Current password"
+            reg={form.register("currentPassword")}
+            error={form.formState.errors.currentPassword?.message}
+            testId="security-current-password-input"
+          />
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground block">New password</label>
+              <InfoTooltip content={
+                <ul className="space-y-1">
+                  {PASSWORD_TIPS.map(tip => <li key={tip}>· {tip}</li>)}
+                </ul>
+              } />
+            </div>
+            <PasswordField
+              reg={form.register("newPassword")}
+              error={form.formState.errors.newPassword?.message}
+              placeholder="At least 8 characters"
+              testId="security-new-password-input"
+            />
+          </div>
+          <PasswordField
+            label="Confirm new password"
+            reg={form.register("confirmPassword")}
+            error={form.formState.errors.confirmPassword?.message}
+            testId="security-confirm-password-input"
+          />
+          <button
+            type="submit"
+            disabled={isPending}
+            data-testid="security-password-submit"
+            className="w-full flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-60 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors"
+          >
+            {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Update password
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+
 const emailSchema = z.object({
   newEmail:        z.string().email("Invalid email address"),
   currentPassword: z.string().min(1, "Required"),
 });
 type EmailValues = z.infer<typeof emailSchema>;
 
-function EmailChangeSection() {
+function EmailRow() {
   const { user } = useAuthStore();
   const { mutate: changeEmail, isPending } = useChangeEmail();
   const [showForm, setShowForm] = useState(false);
@@ -115,17 +407,19 @@ function EmailChangeSection() {
   };
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
-      <div className="flex items-center gap-2.5">
-        <PremiumIcon icon={Mail} hex="#c2703d" size="xs" />
-        <div>
-          <p className="text-sm font-semibold text-foreground">Email address</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{user?.email}</p>
+    <div className="px-4 py-4 space-y-3">
+      <div className="flex items-center gap-3.5">
+        <PremiumIcon icon={Mail} hex="#c2703d" size="sm" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+            Email address <StatusPill on>VERIFIED</StatusPill>
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">{user?.email}</p>
         </div>
       </div>
 
       {user?.pendingEmail && (
-        <div className="flex items-center gap-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2.5">
+        <div className="flex items-center gap-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2.5 sm:ml-[46px]">
           <Loader2 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
           <p className="text-xs text-amber-700 dark:text-amber-300">
             Verification link sent to <strong>{user.pendingEmail}</strong> — check that inbox to confirm the change.
@@ -133,399 +427,151 @@ function EmailChangeSection() {
         </div>
       )}
 
-      {showForm ? (
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-          <FormInput
-            {...form.register("newEmail")}
-            label="New email address"
-            type="email"
-            placeholder="you@example.com"
-            className="h-auto py-2.5"
-            error={form.formState.errors.newEmail?.message}
-          />
-          <PasswordField label="Current password" reg={form.register("currentPassword")}
-            error={form.formState.errors.currentPassword?.message} />
-          <div className="flex gap-2">
-            <button type="submit" disabled={isPending}
-              className="flex-1 flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-60 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors">
-              {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Send verification link
-            </button>
-            <button type="button" onClick={() => { setShowForm(false); form.reset(); }}
-              className="h-10 w-10 flex items-center justify-center rounded-xl bg-muted hover:bg-muted/80 text-muted-foreground shrink-0">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </form>
-      ) : (
-        <button onClick={() => setShowForm(true)}
-          className="h-9 px-3.5 rounded-xl text-xs font-medium bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 dark:text-brand-300 border border-brand-500/20 transition-colors">
-          {user?.pendingEmail ? "Change to a different email" : "Change email"}
-        </button>
-      )}
+      <div className="sm:pl-[46px]">
+        {showForm ? (
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
+            <FormInput
+              {...form.register("newEmail")}
+              label="New email address"
+              type="email"
+              placeholder="you@example.com"
+              className="h-auto py-2.5"
+              error={form.formState.errors.newEmail?.message}
+            />
+            <PasswordField label="Current password" reg={form.register("currentPassword")}
+              error={form.formState.errors.currentPassword?.message} />
+            <div className="flex gap-2">
+              <button type="submit" disabled={isPending}
+                className="flex-1 flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-60 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors">
+                {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Send verification link
+              </button>
+              <button type="button" onClick={() => { setShowForm(false); form.reset(); }}
+                className="h-10 w-10 flex items-center justify-center rounded-xl bg-muted hover:bg-muted/80 text-muted-foreground shrink-0">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </form>
+        ) : (
+          <button onClick={() => setShowForm(true)}
+            className="h-9 px-3.5 rounded-xl text-xs font-medium bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 dark:text-brand-300 border border-brand-500/20 transition-colors">
+            {user?.pendingEmail ? "Change to a different email" : "Change email"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
+function PasswordEmailCard() {
+  return (
+    <div>
+      <SectionLabel>Password &amp; email</SectionLabel>
+      <div className="bg-card border border-border rounded-2xl overflow-hidden divide-y divide-border mt-2">
+        <PasswordRow />
+        <EmailRow />
+      </div>
+    </div>
+  );
+}
+
+// ─── Active sessions ─────────────────────────────────────────────────────────
 // One row per signed-in device (see AuthService#listSessions on the backend for why a
 // non-revoked, non-expired refresh token maps 1:1 to an active session). "This device" is
-// resolved server-side from the refresh token this page's own session already holds — see
-// useSessions.
-function SessionsSection() {
+// resolved server-side from the refresh token this page's own session already holds.
+function SessionsCard() {
   const { data: sessions = [], isLoading } = useSessions();
   const { mutate: revoke, isPending: revoking } = useRevokeSession();
   const { mutate: revokeOthers, isPending: revokingOthers } = useRevokeOtherSessions();
   const [confirmRevokeOthers, setConfirmRevokeOthers] = useState(false);
 
   const otherSessionCount = sessions.filter(s => !s.current).length;
+  // Current device first — the account holder's own device is what they care about confirming,
+  // not whatever order the API happens to return.
+  const ordered = [...sessions].sort((a, b) => Number(b.current) - Number(a.current));
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <PremiumIcon icon={Monitor} hex="#c2703d" size="xs" />
-          <div>
-            <p className="text-sm font-semibold text-foreground">Active sessions</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Devices currently signed in to your account.</p>
-          </div>
-        </div>
+    <div>
+      <div className="flex items-center justify-between px-1 mb-2 gap-3">
+        <SectionLabel>Active sessions</SectionLabel>
         {otherSessionCount > 0 && !confirmRevokeOthers && (
           <button onClick={() => setConfirmRevokeOthers(true)} data-testid="security-sessions-revoke-others-toggle"
-            className="h-8 px-3 rounded-lg text-xs font-medium bg-muted hover:bg-muted/80 text-muted-foreground shrink-0">
+            className="text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors">
             Sign out others
           </button>
         )}
       </div>
-
-      {confirmRevokeOthers && (
-        <div className="flex items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2.5">
-          <p className="text-xs text-amber-600 dark:text-amber-400">
-            Sign out of {otherSessionCount} other {otherSessionCount === 1 ? "device" : "devices"}?
-          </p>
-          <div className="flex gap-2 shrink-0">
-            <button
-              onClick={() => revokeOthers(undefined, { onSuccess: () => setConfirmRevokeOthers(false) })}
-              disabled={revokingOthers} data-testid="security-sessions-revoke-others-confirm"
-              className="h-7 px-2.5 rounded-lg text-xs font-medium bg-red-600 hover:bg-red-500 text-white disabled:opacity-60"
-            >
-              Sign out
-            </button>
-            <button onClick={() => setConfirmRevokeOthers(false)}
-              className="h-7 px-2.5 rounded-lg text-xs font-medium bg-muted hover:bg-muted/80 text-muted-foreground">
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-
-      {isLoading ? (
-        <div className="flex justify-center py-2"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>
-      ) : (
-        <div className="space-y-2">
-          {sessions.map(s => (
-            <div key={s.id} data-testid="security-session-row" className="flex items-center justify-between gap-3 bg-muted/40 rounded-xl px-3 py-2.5">
-              <div className="min-w-0">
-                <p className="text-xs font-medium text-foreground truncate flex items-center gap-1.5">
-                  {parseUserAgent(s.userAgent)}
-                  {s.current && (
-                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full shrink-0">
-                      This device
-                    </span>
-                  )}
-                </p>
-                <p className="text-[11px] text-muted-foreground/70">
-                  {s.ipAddress ? `${s.ipAddress} · ` : ""}Last active {formatDate(s.createdAt)}
-                </p>
-              </div>
-              {!s.current && (
-                <button onClick={() => revoke(s.id)} disabled={revoking} title="Sign out this device"
-                  data-testid="security-session-revoke" className="text-muted-foreground/60 hover:text-red-500 transition-colors shrink-0 disabled:opacity-60">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Setup itself lives on its own screen now (/settings/security/pin) — a dedicated choose/confirm
-// PIN flow, not an inline form here. This card just shows status + the entry point / disable.
-function PinSection() {
-  const { user } = useAuthStore();
-  const { mutate: disablePin, isPending: disabling } = useDisablePin();
-  const [confirmDisable, setConfirmDisable] = useState(false);
-
-  return (
-    <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <PremiumIcon icon={KeyRound} hex="#c2703d" size="xs" />
-          <div>
-            <p className="text-sm font-semibold text-foreground">PIN unlock</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Quick 4-digit unlock for this device.</p>
-          </div>
-        </div>
-      </div>
-
-      {user?.pinEnabled ? (
-        confirmDisable ? (
-          <div className="flex items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2.5">
-            <p className="text-xs text-amber-600 dark:text-amber-400">Disable PIN unlock on this account?</p>
+      <div className="bg-card border border-border rounded-2xl overflow-hidden divide-y divide-border">
+        {confirmRevokeOthers && (
+          <div className="flex items-center justify-between gap-3 bg-amber-500/10 border-b border-amber-500/20 px-4 py-3">
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              Sign out of {otherSessionCount} other {otherSessionCount === 1 ? "device" : "devices"}?
+            </p>
             <div className="flex gap-2 shrink-0">
-              <button onClick={() => disablePin(undefined, { onSuccess: () => setConfirmDisable(false) })} disabled={disabling}
-                className="h-7 px-2.5 rounded-lg text-xs font-medium bg-red-600 hover:bg-red-500 text-white disabled:opacity-60">
-                Disable
+              <button
+                onClick={() => revokeOthers(undefined, { onSuccess: () => setConfirmRevokeOthers(false) })}
+                disabled={revokingOthers} data-testid="security-sessions-revoke-others-confirm"
+                className="h-7 px-2.5 rounded-lg text-xs font-medium bg-red-600 hover:bg-red-500 text-white disabled:opacity-60"
+              >
+                Sign out
               </button>
-              <button onClick={() => setConfirmDisable(false)}
+              <button onClick={() => setConfirmRevokeOthers(false)}
                 className="h-7 px-2.5 rounded-lg text-xs font-medium bg-muted hover:bg-muted/80 text-muted-foreground">
                 Cancel
               </button>
             </div>
           </div>
+        )}
+
+        {isLoading ? (
+          <div className="flex justify-center py-6"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>
         ) : (
-          <div className="flex items-center justify-between gap-3">
-            <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-              <Check className="w-3.5 h-3.5" /> PIN unlock is enabled
-            </span>
-            <button onClick={() => setConfirmDisable(true)}
-              className="h-8 px-3 rounded-lg text-xs font-medium bg-muted hover:bg-muted/80 text-muted-foreground">
-              Disable
-            </button>
-          </div>
-        )
-      ) : (
-        <Link href="/settings/security/pin" data-testid="security-pin-setup-link"
-          className="inline-block h-9 px-3.5 rounded-xl text-xs font-medium bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 dark:text-brand-300 border border-brand-500/20 transition-colors leading-9">
-          Set up PIN unlock
-        </Link>
-      )}
-    </div>
-  );
-}
-
-// Web/desktop only — native gets NativeBiometricSection's bare fingerprint toggle instead, not
-// both. A native shell can pass useWebAuthnSupport() too (Credential Manager exists there), but
-// showing the two together would be a confusing, redundant choice for the same physical sensor.
-function PasskeysSection() {
-  const supported = useWebAuthnSupport();
-  const isNative = useIsNativePlatform();
-  const { data: passkeys = [], isLoading } = usePasskeys();
-  const { mutate: registerPasskey, isPending: registering } = useRegisterPasskey();
-  const { mutate: deletePasskey } = useDeletePasskey();
-  const [nickname, setNickname] = useState("");
-  const [showAdd, setShowAdd] = useState(false);
-
-  if (!supported || isNative) return null;
-
-  const handleAdd = () => {
-    registerPasskey(nickname.trim() || "This device", { onSuccess: () => { setNickname(""); setShowAdd(false); } });
-  };
-
-  return (
-    <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
-      <div className="flex items-center gap-2.5">
-        <PremiumIcon icon={Fingerprint} hex="#c2703d" size="xs" />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <p className="text-sm font-semibold text-foreground">Fingerprint &amp; face unlock</p>
-            {passkeys.length > 0 && (
-              <InfoTooltip content={
-                <p>
-                  Each entry below is tied to one specific device — a passkey added on your laptop
-                  won&apos;t offer to unlock this account on your phone, even though both are listed
-                  here. Add a passkey separately on each device you want fast unlock on.
-                </p>
-              } />
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground mt-0.5">Unlock instantly with your fingerprint, face, or screen lock.</p>
-        </div>
-      </div>
-
-      {!isLoading && passkeys.length > 0 && (
-        <div className="space-y-2">
-          {passkeys.map(p => (
-            <div key={p.id} className="flex items-center justify-between gap-3 bg-muted/40 rounded-xl px-3 py-2.5">
-              <div className="min-w-0">
-                <p className="text-xs font-medium text-foreground truncate">{p.nickname || "This device"}</p>
-                <p className="text-[11px] text-muted-foreground/70">
-                  Added {formatDate(p.createdAt)}{p.lastUsedAt ? ` · Last used ${formatDate(p.lastUsedAt)}` : ""}
-                </p>
+          ordered.map(s => {
+            const DeviceIcon = isMobileUserAgent(s.userAgent) ? Smartphone : Monitor;
+            return (
+              <div key={s.id} data-testid="security-session-row" className="flex items-center gap-3.5 px-4 py-4 min-h-[64px]">
+                <div className="w-9 h-9 rounded-xl bg-muted/60 flex items-center justify-center shrink-0">
+                  <DeviceIcon className="w-4 h-4 text-muted-foreground" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground truncate flex items-center gap-1.5">
+                    {parseUserAgent(s.userAgent)}
+                    {s.current && (
+                      <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full shrink-0">
+                        THIS DEVICE
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                    {s.ipAddress ? `${s.ipAddress} · ` : ""}Last active {formatDate(s.createdAt)}
+                  </p>
+                </div>
+                {!s.current && (
+                  <button onClick={() => revoke(s.id)} disabled={revoking} title="Sign out this device"
+                    data-testid="security-session-revoke" className="text-muted-foreground/60 hover:text-red-500 transition-colors shrink-0 disabled:opacity-60 p-2.5 -m-2.5 rounded-xl">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
-              <button onClick={() => deletePasskey(p.id)} title="Remove" data-testid="security-passkey-delete"
-                className="text-muted-foreground/60 hover:text-red-500 transition-colors shrink-0">
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {showAdd ? (
-        <div className="flex gap-2 items-start">
-          <div className="flex-1">
-            <FormInput
-              value={nickname}
-              onChange={e => setNickname(e.target.value)}
-              placeholder="e.g. My phone"
-              className="h-9"
-              aria-label="Device name"
-              data-testid="security-passkey-nickname-input"
-            />
-          </div>
-          <button onClick={handleAdd} disabled={registering} data-testid="security-passkey-submit"
-            className="h-9 px-3.5 rounded-xl text-xs font-medium bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-60 transition-colors flex items-center gap-1.5">
-            {registering && <Loader2 className="w-3.5 h-3.5 animate-spin" />} {registering ? "Follow your device's prompt…" : "Continue"}
-          </button>
-          <button onClick={() => setShowAdd(false)}
-            className="h-9 w-9 flex items-center justify-center rounded-xl bg-muted hover:bg-muted/80 text-muted-foreground shrink-0">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      ) : (
-        <button onClick={() => setShowAdd(true)} data-testid="security-passkey-add-toggle"
-          className="h-9 px-3.5 rounded-xl text-xs font-medium bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 dark:text-brand-300 border border-brand-500/20 transition-colors">
-          Enable fingerprint unlock
-        </button>
-      )}
-    </div>
-  );
-}
-
-// Native only — a bare fingerprint/face toggle with nothing stored behind it. Unlike
-// PasskeysSection's WebAuthn ceremony (server-verified, needed since a browser passkey is a real
-// remote credential), this lock screen is a local re-proof on top of a session that's already
-// valid the whole time it's up (see AppLockScreen's own comment) — so "enable" just confirms the
-// device can pass a biometric check and remembers that preference, no password step, no PIN
-// dependency. See nativeBiometric.ts for the full reasoning.
-function NativeBiometricSection() {
-  const { data, isLoading } = useNativeBiometricStatus();
-  const { mutate: enable, isPending: enabling } = useEnableBiometricUnlock();
-  const { mutate: disable, isPending: disabling } = useDisableBiometricUnlock();
-
-  if (isLoading || !data?.available) return null;
-
-  return (
-    <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
-      <div className="flex items-center gap-2.5">
-        <PremiumIcon icon={Fingerprint} hex="#c2703d" size="xs" />
-        <div>
-          <p className="text-sm font-semibold text-foreground">Fingerprint &amp; face unlock</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Unlock instantly with this device&apos;s fingerprint or face.</p>
-        </div>
+            );
+          })
+        )}
       </div>
-
-      {data.enabled ? (
-        <div className="flex items-center justify-between gap-3">
-          <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-            <Check className="w-3.5 h-3.5" /> Fingerprint unlock is enabled
-          </span>
-          <button onClick={() => disable()} disabled={disabling} data-testid="security-biometric-disable"
-            className="h-8 px-3 rounded-lg text-xs font-medium bg-muted hover:bg-muted/80 text-muted-foreground">
-            Disable
-          </button>
-        </div>
-      ) : (
-        <button onClick={() => enable()} disabled={enabling} data-testid="security-biometric-enable-toggle"
-          className="h-9 px-3.5 rounded-xl text-xs font-medium bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 dark:text-brand-300 border border-brand-500/20 transition-colors flex items-center gap-1.5">
-          {enabling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Fingerprint className="w-3.5 h-3.5" />}
-          Enable fingerprint unlock
-        </button>
-      )}
     </div>
   );
 }
 
 export default function SecurityPage() {
-  const { mutate: changePassword, isPending } = useChangePassword();
-  const [success, setSuccess] = useState(false);
-
-  const form = useForm<Values>({
-    resolver: zodResolver(schema),
-    defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" },
-  });
-
-  function onSubmit(values: Values) {
-    changePassword(
-      { currentPassword: values.currentPassword, newPassword: values.newPassword },
-      { onSuccess: () => { form.reset(); setSuccess(true); setTimeout(() => setSuccess(false), 4000); } }
-    );
-  }
-
   return (
     <div className="flex flex-col flex-1">
-      <Header title="Security" subtitle="Password, sessions, and account security" />
+      <Header title="Security" subtitle="Your account's protection, at a glance" />
       <PageWrapper>
         <div className="max-w-lg md:max-w-3xl mx-auto space-y-6">
 
-          {/* Icon header */}
-          <div className="flex flex-col items-center gap-3 py-2">
-            <PremiumIcon icon={ShieldCheck} tone="gray" size="xl" />
-            <div className="text-center">
-              <p className="text-base font-semibold text-foreground">Change Password</p>
-              <p className="text-xs text-muted-foreground mt-1">Use a strong password with letters, numbers and symbols.</p>
-            </div>
-          </div>
+          <UnlockMethodsCard />
 
-          {success && (
-            <div className="text-sm bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded-xl px-4 py-3 text-center font-medium">
-              Password updated successfully!
-            </div>
-          )}
+          <PasswordEmailCard />
 
-          <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <PasswordField
-                label="Current password"
-                reg={form.register("currentPassword")}
-                error={form.formState.errors.currentPassword?.message}
-                testId="security-current-password-input"
-              />
-              <div className="space-y-1">
-                <div className="flex items-center gap-1.5">
-                  <label className="text-xs font-medium text-muted-foreground block">New password</label>
-                  <InfoTooltip content={
-                    <ul className="space-y-1">
-                      {PASSWORD_TIPS.map(tip => <li key={tip}>· {tip}</li>)}
-                    </ul>
-                  } />
-                </div>
-                <PasswordField
-                  reg={form.register("newPassword")}
-                  error={form.formState.errors.newPassword?.message}
-                  placeholder="At least 8 characters"
-                  testId="security-new-password-input"
-                />
-              </div>
-              <PasswordField
-                label="Confirm new password"
-                reg={form.register("confirmPassword")}
-                error={form.formState.errors.confirmPassword?.message}
-                testId="security-confirm-password-input"
-              />
-              <button
-                type="submit"
-                disabled={isPending}
-                data-testid="security-password-submit"
-                className="w-full flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-60 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors"
-              >
-                {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                Update password
-              </button>
-            </form>
-          </div>
-
-          <EmailChangeSection />
-
-          <SessionsSection />
-
-          <PasskeysSection />
-
-          <PinSection />
-
-          <NativeBiometricSection />
+          <SessionsCard />
 
         </div>
       </PageWrapper>

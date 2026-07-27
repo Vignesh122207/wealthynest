@@ -3,9 +3,10 @@
 import {useState} from "react";
 import {useForm} from "react-hook-form";
 import {zodResolver} from "@hookform/resolvers/zod";
-import {Pencil, PieChart, Receipt, Users} from "lucide-react";
+import {Pencil, PieChart, Receipt, Repeat, Users} from "lucide-react";
 import {FormModalShell} from "@/components/ui/FormModalShell";
 import {Button} from "@/components/ui/Button";
+import {Toggle} from "@/components/ui/Toggle";
 import {FormSelect} from "@/components/forms/FormSelect";
 import {BigAmountInput} from "@/components/transactions/BigAmountInput";
 import {CategoryPicker} from "@/components/transactions/CategoryPicker";
@@ -54,14 +55,16 @@ export function BudgetDetailModal({ budget, onClose, onDelete }: {
   const [selectedCategoryId, setSelectedCategoryId] = useState(budget.categoryId);
   const form = useForm<EditBudgetFormValues>({
     resolver: zodResolver(editBudgetSchema),
-    defaultValues: { amount: budget.amount, alertThreshold: budget.alertThreshold ?? 80 },
+    defaultValues: { amount: budget.amount, alertThreshold: budget.alertThreshold ?? 80, rollover: budget.rollover },
   });
+  const watchedRollover = form.watch("rollover");
   const onSubmit = (v: EditBudgetFormValues) =>
     updateBudget(
       { id: budget.id, payload: {
         amount: Number(v.amount),
         alertThreshold: v.alertThreshold ? Number(v.alertThreshold) : undefined,
         categoryId: selectedCategoryId !== budget.categoryId ? selectedCategoryId : undefined,
+        rollover: budget.budgetType === "MONTHLY" ? v.rollover : undefined,
       } },
       { onSuccess: onClose }
     );
@@ -109,7 +112,7 @@ export function BudgetDetailModal({ budget, onClose, onDelete }: {
               style={{ width: `${Math.min(100, budget.percentUsed)}%` }} />
           </div>
           <p className="text-xs text-muted-foreground/80 mt-1">
-            {fmt(budget.spent)} of {fmt(budget.amount)} · Alert fires at {alert}%
+            {fmt(budget.spent)} of {fmt(budget.amount)}{budget.rolloverAmount > 0 && ` + ${fmt(budget.rolloverAmount)} rolled over`} · Alert fires at {alert}%
           </p>
         </div>
 
@@ -133,6 +136,18 @@ export function BudgetDetailModal({ budget, onClose, onDelete }: {
             <BigAmountInput colorClass="text-amber-500 dark:text-amber-400" testId="budget-edit-amount-input"
               error={form.formState.errors.amount?.message} inputProps={form.register("amount")} />
             <FormSelect label="Alert At (%)" options={ALERT_OPTIONS} error={form.formState.errors.alertThreshold?.message} {...form.register("alertThreshold")} />
+            {budget.budgetType === "MONTHLY" && (
+              <div className="flex items-center justify-between gap-3 bg-muted/40 rounded-xl p-3">
+                <div className="min-w-0 flex items-center gap-2">
+                  <Repeat className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">Roll over unused amount</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Unspent budget carries into next month only — it never compounds further.</p>
+                  </div>
+                </div>
+                <Toggle checked={!!watchedRollover} onChange={v => form.setValue("rollover", v)} testId="budget-edit-rollover-toggle" />
+              </div>
+            )}
             <div className="flex gap-2 pt-1">
               <Button type="submit" data-testid="budget-edit-submit" variant="gradient" loading={isPending}
                 className="flex-1 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 shadow-amber-500/25 disabled:shadow-none">

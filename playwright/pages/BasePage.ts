@@ -29,8 +29,12 @@ export class BasePage {
     await expect(toastLocator(this.page, text).first()).toBeVisible();
   }
 
+  /** The nav's "Sign out" opens a confirm dialog rather than firing immediately (previously
+   * didn't, inconsistent with every other sign-out entry point in the app) — confirm before the
+   * redirect actually happens. */
   async logout(): Promise<void> {
     await this.page.getByTestId(TEST_IDS.nav.logout).click();
+    await this.page.getByTestId(TEST_IDS.confirmDialog.confirm).click();
   }
 
   navLink(href: string): Locator {

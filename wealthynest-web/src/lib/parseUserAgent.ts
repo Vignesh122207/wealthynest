@@ -33,3 +33,10 @@ export function parseUserAgent(ua?: string | null): string {
   if (isAndroidWebView(ua)) return `WealthyNest app on ${os}`;
   return `${detectBrowser(ua)} on ${os}`;
 }
+
+/** Phone vs. desktop glyph for the Security sessions list — a coarser signal than detectOs, since
+ * a tablet/phone distinction isn't worth a third icon there. */
+export function isMobileUserAgent(ua?: string | null): boolean {
+  if (!ua) return false;
+  return /Android|iPhone|iPad|iPod/i.test(ua);
+}

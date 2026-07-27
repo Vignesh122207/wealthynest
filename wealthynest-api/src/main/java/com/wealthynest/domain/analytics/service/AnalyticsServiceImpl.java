@@ -100,6 +100,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                     .categoryName(cat != null ? cat.getName() : "Unknown")
                     .categoryColor(cat != null ? cat.getColor() : "#6366f1")
                     .categoryIcon(cat != null ? cat.getIcon()  : "more-horizontal")
+                    .budgetType(b.getBudgetType())
                     .budgeted(b.getAmount()).spent(spent)
                     .percentUsed(pct).overBudget(pct > 100).build();
         }).toList();

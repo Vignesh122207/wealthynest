@@ -10,6 +10,7 @@ import {useAppLockStore} from "@/features/auth/store/appLock.store";
 import {useAppLockTrigger} from "@/features/auth/hooks/useAppLockTrigger";
 import {AppLockScreen} from "@/features/auth/components/AppLockScreen";
 import {NativeSplashReady} from "@/components/shared/NativeSplashReady";
+import {useRegisterNativePush} from "@/features/notifications/hooks/useNativePush";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, setUser } = useAuthStore();
@@ -20,6 +21,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { ready: lockDecisionReady } = useAppLockTrigger();
 
   useEffect(() => { setHydrated(true); }, []);
+
+  useRegisterNativePush(hydrated && isAuthenticated);
 
   // Sync user profile from server on every dashboard load so familyId / role
   // are always fresh (prevents stale persisted store after joining a family).

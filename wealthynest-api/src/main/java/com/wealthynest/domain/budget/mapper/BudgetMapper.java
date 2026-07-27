@@ -29,6 +29,7 @@ public interface BudgetMapper {
     @Mapping(target = "percentUsed",   ignore = true)
     @Mapping(target = "overBudget",    ignore = true)
     @Mapping(target = "alertTriggered",ignore = true)
+    @Mapping(target = "rolloverAmount", ignore = true)
     @Mapping(target = "shared", expression = "java(budget.getFamilyId() != null)")
     BudgetResponse toResponse(Budget budget);
 }

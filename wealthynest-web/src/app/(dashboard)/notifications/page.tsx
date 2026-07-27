@@ -13,6 +13,7 @@ import {
     Flame,
     Info,
     Landmark,
+    LineChart,
     type LucideIcon,
     Target,
     TrendingUp,
@@ -33,6 +34,7 @@ import {
     useMergedNotifications,
     useServerNotifications
 } from "@/features/notifications/hooks/useServerNotifications";
+import {TabBar, type TabBarItem} from "@/components/ui/TabBar";
 import {cn} from "@/lib/utils";
 
 const SEVERITY_ICON: Record<NotifSeverity, LucideIcon> = {
@@ -58,9 +60,10 @@ const TYPE_LABELS: Record<AppNotification["type"], string> = {
   anomaly:    "Unusual Spend",
   debtDue:    "Debt Due",
   loanEmi:    "Loan EMI",
+  sipReminder: "SIP Reminder",
 };
 
-const TYPE_ICON: Record<AppNotification["type"], React.ElementType> = {
+const TYPE_ICON: Record<AppNotification["type"], LucideIcon> = {
   budget:     Target,
   income:     TrendingUp,
   goal:       Flag,
@@ -69,6 +72,7 @@ const TYPE_ICON: Record<AppNotification["type"], React.ElementType> = {
   anomaly:    Flame,
   debtDue:    CalendarClock,
   loanEmi:    Landmark,
+  sipReminder: LineChart,
 };
 
 const TYPE_HREF: Record<AppNotification["type"], string> = {
@@ -80,6 +84,7 @@ const TYPE_HREF: Record<AppNotification["type"], string> = {
   anomaly:    "/expenses",
   debtDue:    "/debts",
   loanEmi:    "/accounts",
+  sipReminder: "/investments",
 };
 
 type Filter = "all" | AppNotification["type"];
@@ -95,6 +100,22 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: "debtDue",    label: "Debt Due"      },
   { value: "loanEmi",    label: "Loan EMI"      },
 ];
+
+// One color per alert type — reuses each type's own domain color from elsewhere in the app
+// (Budgets=amber, Income=emerald, Debts=rose, etc.) rather than the flat single-color chips this
+// page used before.
+const FILTER_COLOR: Record<Filter, string> = {
+  all:        "#475569",
+  budget:     "#d97706",
+  goal:       "#c026d3",
+  income:     "#059669",
+  maturity:   "#7c3aed",
+  lowBalance: "#dc2626",
+  anomaly:    "#db2777",
+  debtDue:    "#e11d48",
+  loanEmi:    "#0284c7",
+  sipReminder: "#0284c7",
+};
 
 function formatNotifDate(dateStr?: string) {
   if (!dateStr) return "Today";
@@ -247,23 +268,16 @@ export default function NotificationsPage() {
             )}
           </div>
 
-          {/* Filters */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {FILTERS.map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => setFilter(value)}
-                className={cn(
-                  "text-xs font-medium px-3 py-1.5 rounded-full border transition-all",
-                  filter === value
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-card text-muted-foreground border-border hover:text-foreground"
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          {/* Filters — shared TabBar template, same as every other section's filter tabs. */}
+          <TabBar
+            items={FILTERS.map(({ value, label }): TabBarItem<Filter> => ({
+              key: value, label, icon: value === "all" ? Bell : TYPE_ICON[value], color: FILTER_COLOR[value],
+              count: value === "all" ? undefined : allNotifs.filter(n => n.type === value).length,
+            }))}
+            value={filter}
+            onChange={setFilter}
+            testIdPrefix="notification-filter"
+          />
 
           {/* List */}
           {isLoading ? (

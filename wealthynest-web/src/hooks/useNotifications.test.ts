@@ -30,7 +30,7 @@ beforeEach(() => {
     dismissedIds: [],
     prefs: {
       budgets: true, income: true, goals: true, maturity: true,
-      lowBalance: true, anomaly: true, debtDue: true, loanEmi: true,
+      lowBalance: true, anomaly: true, debtDue: true, loanEmi: true, sipReminder: true,
     },
   });
 });
@@ -64,11 +64,32 @@ describe("useNotifications — budget alerts", () => {
     expect(result.current.notifications).toHaveLength(0);
   });
 
+  it("gives a MONTHLY and a YEARLY breach on the same category distinct ids and titles, instead of colliding into one", () => {
+    // Regression: a category can have both budget types at once; without budgetType in the id
+    // and title, these read as the exact same alert shown twice.
+    mockedUseDashboard.mockReturnValue({
+      data: {
+        budgetSummaries: [
+          { categoryId: "c1", categoryName: "Groceries", budgetType: "MONTHLY", overBudget: true, percentUsed: 120, spent: 1200, budgeted: 1000 },
+          { categoryId: "c1", categoryName: "Groceries", budgetType: "YEARLY",  overBudget: true, percentUsed: 105, spent: 10500, budgeted: 10000 },
+        ],
+      },
+    } as never);
+
+    const { result } = renderHook(() => useNotifications());
+    expect(result.current.notifications).toHaveLength(2);
+    const [monthly, yearly] = result.current.notifications;
+    expect(monthly.id).not.toBe(yearly.id);
+    expect(monthly.title).not.toBe(yearly.title);
+    expect(monthly.title).toBe("Budget exceeded: Groceries (Monthly)");
+    expect(yearly.title).toBe("Budget exceeded: Groceries (Yearly)");
+  });
+
   it("is suppressed entirely when prefs.budgets is off", () => {
     useNotificationStore.setState({
       prefs: {
         budgets: false, income: true, goals: true, maturity: true,
-        lowBalance: true, anomaly: true, debtDue: true, loanEmi: true,
+        lowBalance: true, anomaly: true, debtDue: true, loanEmi: true, sipReminder: true,
       },
     });
     mockedUseDashboard.mockReturnValue({

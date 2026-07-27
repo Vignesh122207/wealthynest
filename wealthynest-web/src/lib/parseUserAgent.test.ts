@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseUserAgent } from "./parseUserAgent";
+import { parseUserAgent, isMobileUserAgent } from "./parseUserAgent";
 
 describe("parseUserAgent", () => {
   it("returns 'Unknown device' when there's no user-agent string", () => {
@@ -30,5 +30,27 @@ describe("parseUserAgent", () => {
 
   it("falls back gracefully for an unrecognized user-agent", () => {
     expect(parseUserAgent("SomeBot/1.0")).toBe("a browser on an unknown OS");
+  });
+});
+
+describe("isMobileUserAgent", () => {
+  it("returns false when there's no user-agent string", () => {
+    expect(isMobileUserAgent(undefined)).toBe(false);
+    expect(isMobileUserAgent(null)).toBe(false);
+    expect(isMobileUserAgent("")).toBe(false);
+  });
+
+  it("identifies Android as mobile", () => {
+    expect(isMobileUserAgent("Mozilla/5.0 (Linux; Android 14; Pixel 8)")).toBe(true);
+  });
+
+  it("identifies iPhone/iPad as mobile", () => {
+    expect(isMobileUserAgent("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)")).toBe(true);
+    expect(isMobileUserAgent("Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X)")).toBe(true);
+  });
+
+  it("treats desktop OSes as not mobile", () => {
+    expect(isMobileUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64)")).toBe(false);
+    expect(isMobileUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)")).toBe(false);
   });
 });

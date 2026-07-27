@@ -157,6 +157,13 @@
 
 @layer utilities {
   .tabular-nums { font-variant-numeric: tabular-nums; }
+  /* Hides the scrollbar entirely on an otherwise-scrollable element — Firefox honors
+     scrollbar-width directly; Chrome/Safari/Edge only listen to ::-webkit-scrollbar, which can't
+     be reached via an inline style at all, so the base ::-webkit-scrollbar rule above (a visible
+     thin gray thumb, the app-wide default) was still painting on every horizontally-scrollable
+     tab rail even where scrollbarWidth:"none" was set inline for Firefox. */
+  .no-scrollbar { scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
   /* Subtle depth texture for the auth pages' colored brand panels — sits under the existing blur
      circles, low enough opacity to read as texture rather than a pattern. */
   .bg-dot-grid {

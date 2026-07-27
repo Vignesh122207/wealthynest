@@ -119,7 +119,7 @@ class RecurringGoalContributionServiceImplTest {
             service.processScheduled();
 
             ArgumentCaptor<UpdateGoalRequest> captor = ArgumentCaptor.forClass(UpdateGoalRequest.class);
-            verify(goalService).update(eq(goalId), eq(userId), captor.capture());
+            verify(goalService).update(eq(goalId), eq(userId), any(), captor.capture());
             assertThat(captor.getValue().getSavedAmount()).isEqualByComparingTo("1500"); // 1000 + 500
             assertThat(rule.getLastContributedMonth()).isEqualTo(yyyymm);
         }
@@ -136,7 +136,7 @@ class RecurringGoalContributionServiceImplTest {
             service.processScheduled();
 
             ArgumentCaptor<UpdateGoalRequest> captor = ArgumentCaptor.forClass(UpdateGoalRequest.class);
-            verify(goalService).update(eq(goalId), eq(userId), captor.capture());
+            verify(goalService).update(eq(goalId), eq(userId), any(), captor.capture());
             assertThat(captor.getValue().getSavedAmount()).isEqualByComparingTo("5000"); // capped, not 5300
         }
 

@@ -4,11 +4,11 @@ import {useState} from "react";
 import {Header} from "@/components/layout/Header";
 import {PageWrapper} from "@/components/layout/PageWrapper";
 import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
-import {ArrowDownLeft, ArrowUpRight, Handshake, type LucideIcon, Wallet} from "lucide-react";
+import {ArrowDownLeft, ArrowUpRight, Handshake, Wallet} from "lucide-react";
 import {EmptyState} from "@/components/shared/EmptyState";
 import {QueryErrorState} from "@/components/shared/QueryErrorState";
 import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
-import {cn} from "@/lib/utils";
+import {TabBar, type TabBarItem} from "@/components/ui/TabBar";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {
     useCreateDebt,
@@ -29,11 +29,11 @@ import {Summary} from "./_components/Summary";
 type Tab = "ALL" | "LENT" | "BORROWED";
 
 // Matches this page's own FAB action colors ("I Lent"=emerald, "I Borrowed"=rose) — same
-// per-type solid-fill template as Investments/Accounts/Transactions.
-const TAB_ACTIVE_BG: Record<Tab, string> = {
-  ALL:      "bg-slate-600",
-  LENT:     "bg-emerald-600",
-  BORROWED: "bg-rose-600",
+// per-type template as Investments/Accounts/Transactions.
+const TAB_COLOR: Record<Tab, string> = {
+  ALL:      "#475569",
+  LENT:     "#059669",
+  BORROWED: "#e11d48",
 };
 type Modal = null
   | { mode: "create"; defaultType: DebtType }
@@ -59,10 +59,10 @@ export default function DebtsPage() {
   const payDebt  = debts.find(d => d.id === paymentId);
   const delDebt  = debts.find(d => d.id === deleteId);
 
-  const tabs: { id: Tab; label: string; icon: LucideIcon; count: number }[] = [
-    { id: "ALL",      label: "All",      icon: Wallet,        count: debts.length },
-    { id: "LENT",     label: "Lent",     icon: ArrowUpRight,  count: debts.filter(d => d.type === "LENT").length },
-    { id: "BORROWED", label: "Borrowed", icon: ArrowDownLeft, count: debts.filter(d => d.type === "BORROWED").length },
+  const tabs: TabBarItem<Tab>[] = [
+    { key: "ALL",      label: "All",      icon: Wallet,        color: TAB_COLOR.ALL },
+    { key: "LENT",     label: "Lent",     icon: ArrowUpRight,  color: TAB_COLOR.LENT,     count: debts.filter(d => d.type === "LENT").length },
+    { key: "BORROWED", label: "Borrowed", icon: ArrowDownLeft, color: TAB_COLOR.BORROWED, count: debts.filter(d => d.type === "BORROWED").length },
   ];
 
   return (
@@ -72,27 +72,8 @@ export default function DebtsPage() {
 
         {debts.length > 0 && <Summary debts={debts} />}
 
-        {/* Tabs — same template as the Investments page's tab bar. */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex gap-1 overflow-x-auto max-w-full" style={{ scrollbarWidth: "none" }}>
-            {tabs.map(t => (
-              <button key={t.id} data-testid={`debt-tab-${t.id}`} onClick={() => setTab(t.id)}
-                className={cn(
-                  "flex items-center gap-2 h-9 px-4 rounded-xl text-xs font-medium whitespace-nowrap transition-all shrink-0",
-                  tab === t.id ? cn(TAB_ACTIVE_BG[t.id], "text-white") : "bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted"
-                )}>
-                <t.icon className="w-3.5 h-3.5" />
-                {t.label}
-                {t.id !== "ALL" && t.count > 0 && (
-                  <span className={cn("text-xs px-1.5 py-0.5 rounded-full font-bold",
-                    tab === t.id ? "bg-white/20 text-white" : "bg-muted text-muted-foreground")}>
-                    {t.count}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* Tabs — shared TabBar template, same as Investments/Accounts/Transactions. */}
+        <TabBar items={tabs} value={tab} onChange={setTab} testIdPrefix="debt-tab" />
 
         {/* List */}
         {isLoading ? (

@@ -17,4 +17,6 @@ public class UpdateBudgetRequest {
     private BigDecimal alertThreshold;
 
     private UUID categoryId;
+
+    private Boolean rollover;
 }

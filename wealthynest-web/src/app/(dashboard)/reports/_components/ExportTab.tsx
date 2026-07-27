@@ -9,7 +9,7 @@ import {accountsApi} from "@/features/accounts/api/accounts.api";
 import {investmentsApi} from "@/features/investments/api/investments.api";
 import {incomeApi} from "@/features/income/api/income.api";
 import type {IncomeEntry} from "@/features/income/types/income.types";
-import {getYears, triggerLocalCsv} from "./reportHelpers";
+import {getYears, triggerLocalCsv} from "@/lib/printReport";
 
 export function ExportTab() {
   const years  = getYears();

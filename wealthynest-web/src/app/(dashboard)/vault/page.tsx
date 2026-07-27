@@ -9,7 +9,7 @@ import {EmptyState} from "@/components/shared/EmptyState";
 import {QueryErrorState} from "@/components/shared/QueryErrorState";
 import {Card} from "@/components/ui/Card";
 import {FormInput} from "@/components/forms/FormInput";
-import {cn} from "@/lib/utils";
+import {TabBar, type TabBarItem} from "@/components/ui/TabBar";
 import {GOAL_COLORS, getVaultCategoryColor} from "@/lib/categoryMeta";
 import {
   useCreateVaultItem, useDeleteVaultItem, useToggleVaultFavorite,
@@ -31,8 +31,7 @@ const VaultDeleteConfirm = dynamic(() => import("@/features/vault/components/Vau
 const VAULT_BRASS = "#d4a72c";
 const VAULT_BRASS_DEEP = "#a9791a";
 
-// Same template as the Accounts page's AccountFilterTabs: solid-fill pill per tab (colored when
-// active), count badge, horizontally scrollable with a hidden scrollbar.
+// Shared TabBar template, same as Accounts' AccountFilterTabs.
 const TYPE_FILTERS = [
   { key: "all" as const,      label: "All",        icon: LayoutGrid },
   { key: "LOGIN" as const,    label: "Logins",     icon: KeyRound },
@@ -41,11 +40,11 @@ const TYPE_FILTERS = [
 ];
 type TypeFilter = (typeof TYPE_FILTERS)[number]["key"];
 
-const TYPE_FILTER_ACTIVE_BG: Record<TypeFilter, string> = {
-  all:      "bg-slate-600",
-  LOGIN:    "bg-blue-600",
-  NOTE:     "bg-violet-600",
-  FAVORITE: "bg-amber-500",
+const TYPE_FILTER_COLOR: Record<TypeFilter, string> = {
+  all:      "#475569",
+  LOGIN:    "#2563eb",
+  NOTE:     "#7c3aed",
+  FAVORITE: "#f59e0b",
 };
 
 export default function VaultPage() {
@@ -173,29 +172,22 @@ export default function VaultPage() {
                     item shrink to the row's real available width on mobile so the tabs become a
                     genuine horizontal scroller instead of spilling past the card and getting
                     silently clipped by its overflow-hidden, with Favorites unreachable. */}
-                <div className="flex gap-1 overflow-x-auto min-w-0 w-full sm:w-auto" style={{ scrollbarWidth: "none" }}>
-                  {TYPE_FILTERS.map(f => {
-                    const count = f.key === "all" ? items.length
+                <TabBar
+                  className="min-w-0 w-full sm:w-auto"
+                  items={TYPE_FILTERS.map((f): TabBarItem<TypeFilter> => ({
+                    key: f.key, label: f.label, icon: f.icon, color: TYPE_FILTER_COLOR[f.key],
+                    // "All" stays uncounted, same convention as every other TabBar's neutral
+                    // item (Accounts, Debts, Investments, Admin) — only the real categories show
+                    // a count.
+                    count: f.key === "all" ? undefined
                       : f.key === "LOGIN" ? loginCount
                       : f.key === "NOTE" ? noteCount
-                      : favoriteCount;
-                    const active = typeFilter === f.key;
-                    return (
-                      <button key={f.key} type="button" onClick={() => setTypeFilter(f.key)}
-                        className={cn(
-                          "flex items-center gap-2 h-9 px-3.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all shrink-0",
-                          active ? cn(TYPE_FILTER_ACTIVE_BG[f.key], "text-white") : "bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted"
-                        )}>
-                        <f.icon className="w-3.5 h-3.5" />
-                        {f.label}
-                        <span className={cn("text-xs px-1.5 py-0.5 rounded-full font-bold",
-                          active ? "bg-white/20 text-white" : "bg-muted text-muted-foreground")}>
-                          {count}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                      : favoriteCount,
+                  }))}
+                  value={typeFilter}
+                  onChange={setTypeFilter}
+                  testIdPrefix="vault-type-filter"
+                />
                 <div className="ml-auto flex items-center gap-3 w-full sm:w-auto">
                   <button type="button" onClick={() => setShowExport(true)} data-testid="vault-export-open"
                     className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0">

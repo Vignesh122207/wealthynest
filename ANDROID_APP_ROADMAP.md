@@ -62,15 +62,40 @@ native biometric path is scoped specifically to **PIN-only accounts** (`useNativ
   Back this keystore up somewhere durable outside git; losing it means losing the ability to ever
   update the Play Store listing.
 
-## Known gap: push notifications need re-verifying
+## Push notifications (implemented, needs on-device verification)
 
 The TWA's notification path (`DelegationService`, Chrome's Trusted Web Activity notification
-delegation) doesn't carry over to Capacitor — a WebView is not Chrome, and Web Push support inside
+delegation) didn't carry over to Capacitor — a WebView is not Chrome, and Web Push support inside
 `android.webkit.WebView` is version-dependent and not guaranteed the way it is in a real Chrome
-Custom Tab. If push notifications are needed, the correct fix is `@capacitor/push-notifications` +
-Firebase Cloud Messaging (a real native plugin, not relying on the WebView's own Push API) — not
-yet implemented. Treat this as unverified/likely-broken until tested on a real device, not
-something this migration already solved.
+Custom Tab. Implemented with `@capacitor/push-notifications` + Firebase Cloud Messaging (a real
+native plugin, not the WebView's own Push API):
+
+- **Backend**: `device_tokens` table (`V48__device_tokens.sql`), `FcmPushNotificationSender`
+  (`domain/notification/service/`) sends via the Firebase Admin SDK and self-heals by deleting a
+  token on an `UNREGISTERED`/`INVALID_ARGUMENT` response. Wired into the same 5 alert types that
+  already create in-app notifications (`NotificationServiceImpl`'s `create*Notification` methods)
+  — push follows the exact same per-type preference toggles and once-per-day dedup, no separate
+  push-specific settings. Opt-in infra: `FCM_SERVICE_ACCOUNT_JSON` unset means push is silently a
+  no-op (app still starts fine), same fail-closed treatment as the native Google OAuth client id.
+- **Frontend**: `features/notifications/utils/nativePush.ts` + `hooks/useNativePush.ts` request
+  permission and register the FCM token once per authenticated session (`(dashboard)/layout.tsx`,
+  same spot as `<NativeSplashReady />`); `useLogout()` best-effort unregisters the token. Tapping a
+  notification opens `/notifications`, same destination as the Header bell.
+- **Android project**: `google-services` Gradle plugin was already wired up in `build.gradle` /
+  `app/build.gradle` (applies conditionally only if `google-services.json` is present — safe when
+  it isn't, e.g. this repo before the file is dropped in). `npx cap sync android` registered the
+  plugin; `AndroidManifest.xml` got the default notification icon/color `meta-data` entries.
+
+**Setup required before this actually works** (can't be done from this repo alone):
+1. Create a Firebase project, add an Android app with package name `in.wealthynest.app`.
+2. Download `google-services.json` → `wealthynest-web/android/app/google-services.json`
+   (git-ignored, never commit it — same treatment as `keystore.properties`).
+3. Generate a service-account key (Firebase Console → Project Settings → Service Accounts →
+   Generate new private key), base64-encode it, set as `FCM_SERVICE_ACCOUNT_JSON` in `.env`.
+4. `npx cap sync android`, rebuild, install on a real device — see the Phase 1 checklist below.
+
+Treat on-device push delivery as unverified until tested for real — nothing about it can be
+checked from this sandboxed environment.
 
 ## Phase 1 — Build & sign, verify on a real device
 
@@ -144,6 +169,15 @@ available where this was scaffolded) — do this locally in Android Studio or vi
       web button already uses when `GOOGLE_CLIENT_ID` is unset). Once configured, verify on a real
       device: tapping it opens a Custom Tab (not the embedded WebView), completes sign-in, and
       returns to the app signed in.
+- [ ] Push notifications — after completing the Firebase setup steps above and rebuilding: confirm
+      the OS permission prompt appears on first authenticated launch; trigger a real alert (e.g.
+      drop a wallet account below its low-balance threshold) and confirm a notification arrives
+      both foregrounded and backgrounded; confirm tapping it opens the app to `/notifications`;
+      confirm the default notification icon/color don't render as a blank/wrong-color blob in the
+      status bar (the `meta-data` entries reuse the launcher icon directly rather than a dedicated
+      white/silhouette notification icon — may need a proper one if it looks wrong); confirm
+      turning a per-type toggle off in Settings → Notifications actually stops that type's push,
+      not just its in-app row.
 
 ## Phase 2 — Play Store listing prep
 
@@ -180,8 +214,10 @@ Unchanged from the TWA plan — standalone from engineering, needs product/conte
 - **Launch scope** — family/invite-only soft launch via Internal/Closed testing first, or straight
   to Production. Given the app handles real financial data, a longer closed-testing window is the
   safer default.
-- **Push notifications** — worth the FCM setup cost, or defer indefinitely given the app doesn't
-  have one today even on web.
+- ~~**Push notifications** — worth the FCM setup cost, or defer indefinitely given the app doesn't
+  have one today even on web.~~ Decided: implemented (see "Push notifications" section above) — the
+  only remaining decision is *when* to actually create the Firebase project and drop in
+  credentials, which is on you.
 
 ## Known infra ceiling (worth knowing, not a blocker)
 

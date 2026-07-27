@@ -120,15 +120,4 @@ public class WalletAccountController {
                 id, SecurityUtils.requireCurrentUserId(), request.getTargetBalance())));
     }
 
-    @GetMapping("/{id}/statement")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<byte[]> downloadStatement(@PathVariable UUID id) {
-        UUID userId = SecurityUtils.requireCurrentUserId();
-        byte[] csv  = accountService.generateStatementCsv(id, userId);
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.parseMediaType("text/csv"));
-        headers.setContentDisposition(
-            ContentDisposition.attachment().filename("account-statement-" + id + ".csv").build());
-        return ResponseEntity.ok().headers(headers).body(csv);
-    }
 }

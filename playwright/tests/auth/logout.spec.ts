@@ -9,7 +9,11 @@ test.describe("Auth — Logout", () => {
     await authenticatedPage.goto(ROUTES.home);
     await expect(authenticatedPage).toHaveURL(new RegExp(`${ROUTES.home}$`));
 
+    // The nav's "Sign out" now opens a confirm dialog (previously fired logout() directly,
+    // inconsistent with every other sign-out entry point in the app) — confirm before the
+    // redirect actually happens.
     await authenticatedPage.getByTestId("nav-logout").click();
+    await authenticatedPage.getByTestId("confirm-dialog-confirm").click();
     await expect(authenticatedPage).toHaveURL(new RegExp(`${ROUTES.login}$`));
 
     // Logged-out state must actually stick — reloading a protected route shouldn't silently

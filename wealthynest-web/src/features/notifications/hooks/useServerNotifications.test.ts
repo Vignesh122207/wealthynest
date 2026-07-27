@@ -24,7 +24,7 @@ const mockedUseNotifications = vi.mocked(useNotifications);
 
 const allPrefsOn = {
   budgets: true, income: true, goals: true, maturity: true,
-  lowBalance: true, anomaly: true, debtDue: true, loanEmi: true,
+  lowBalance: true, anomaly: true, debtDue: true, loanEmi: true, sipReminder: true,
 };
 
 beforeEach(() => {
@@ -164,7 +164,7 @@ describe("useUpdateNotificationPreferences", () => {
   it("writes the mutation result directly into the notification-preferences cache on success", async () => {
     const updated = {
       budgetAlertEnabled: false, lowBalanceEnabled: true, spendAnomalyEnabled: true,
-      debtDueEnabled: true, loanEmiEnabled: true,
+      debtDueEnabled: true, loanEmiEnabled: true, sipReminderEnabled: true,
     };
     mockedApi.updatePreferences.mockResolvedValue(updated as never);
     const { Wrapper, queryClient } = createQueryClientWrapper();
@@ -194,6 +194,83 @@ describe("useMergedNotifications", () => {
 
     await waitFor(() => expect(result.current.notifications[0]?.id).toBe("server-s1"));
     expect(result.current.notifications).toHaveLength(1);
+  });
+
+  it("dedupes a budget alert even when the client and server wording don't match", async () => {
+    // Regression test: the client computes "Budget exceeded: X" live from dashboard data, while
+    // the server persists "Budget Alert: X" when an expense crosses the threshold — same event,
+    // different wording, so an exact title+message match alone would show both.
+    const serverBudgetAlert: ServerNotification = {
+      id: "s2", type: "BUDGET_EXCEEDED", title: "Budget Alert: Groceries",
+      message: "You've used 120% of your Groceries budget (spent ₹12000 of ₹10000).",
+      read: false, createdAt: "2026-07-01T00:00:00Z",
+    } as ServerNotification;
+    mockedApi.getNotifications.mockResolvedValue([serverBudgetAlert] as never);
+    mockedUseNotifications.mockReturnValue({
+      notifications: [{
+        id: "budget-over-c1", type: "budget", title: "Budget exceeded: Groceries",
+        message: "Spent ₹12,000 of ₹10,000 budget", severity: "error",
+      }],
+    } as never);
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useMergedNotifications(), { wrapper: Wrapper });
+
+    await waitFor(() => expect(result.current.notifications[0]?.id).toBe("server-s2"));
+    expect(result.current.notifications).toHaveLength(1);
+  });
+
+  it("dedupes a period-qualified budget alert, but keeps the other period's alert for the same category distinct", async () => {
+    // Regression: a category can have both a MONTHLY and a YEARLY budget breached at once.
+    // Both server and client now suffix the title with "(Monthly)"/"(Yearly)" so the two don't
+    // collide into one indistinguishable alert — the server-confirmed Monthly one should still
+    // dedupe against its matching local entry, while the still-unconfirmed Yearly one stays.
+    const serverMonthlyAlert: ServerNotification = {
+      id: "s4", type: "BUDGET_EXCEEDED", title: "Budget Alert: Groceries (Monthly)",
+      message: "You've used 120% of your Groceries monthly budget (spent ₹12000 of ₹10000).",
+      read: false, createdAt: "2026-07-01T00:00:00Z",
+    } as ServerNotification;
+    mockedApi.getNotifications.mockResolvedValue([serverMonthlyAlert] as never);
+    mockedUseNotifications.mockReturnValue({
+      notifications: [
+        {
+          id: "budget-over-c1-MONTHLY", type: "budget", title: "Budget exceeded: Groceries (Monthly)",
+          message: "Spent ₹12,000 of ₹10,000 monthly budget", severity: "error",
+        },
+        {
+          id: "budget-over-c1-YEARLY", type: "budget", title: "Budget exceeded: Groceries (Yearly)",
+          message: "Spent ₹90,000 of ₹80,000 yearly budget", severity: "error",
+        },
+      ],
+    } as never);
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useMergedNotifications(), { wrapper: Wrapper });
+
+    await waitFor(() => expect(result.current.notifications.some((n) => n.id === "server-s4")).toBe(true));
+    const titles = result.current.notifications.map((n) => n.title);
+    expect(result.current.notifications).toHaveLength(2);
+    expect(titles).toContain("Budget Alert: Groceries (Monthly)");
+    expect(titles).toContain("Budget exceeded: Groceries (Yearly)");
+  });
+
+  it("keeps a local budget alert for a different category than the server one", async () => {
+    const serverBudgetAlert: ServerNotification = {
+      id: "s3", type: "BUDGET_EXCEEDED", title: "Budget Alert: Groceries", message: "over budget",
+      read: false, createdAt: "2026-07-01T00:00:00Z",
+    } as ServerNotification;
+    mockedApi.getNotifications.mockResolvedValue([serverBudgetAlert] as never);
+    mockedUseNotifications.mockReturnValue({
+      notifications: [{
+        id: "budget-over-c2", type: "budget", title: "Budget exceeded: Dining",
+        message: "Spent ₹5,000 of ₹4,000 budget", severity: "error",
+      }],
+    } as never);
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useMergedNotifications(), { wrapper: Wrapper });
+
+    await waitFor(() => expect(result.current.notifications).toHaveLength(2));
   });
 
   it("keeps a local notification that doesn't match any server one", async () => {

@@ -11,4 +11,5 @@ public class UpdateNotificationPreferenceRequest {
     @NotNull private Boolean spendAnomalyEnabled;
     @NotNull private Boolean debtDueEnabled;
     @NotNull private Boolean loanEmiEnabled;
+    @NotNull private Boolean sipReminderEnabled;
 }

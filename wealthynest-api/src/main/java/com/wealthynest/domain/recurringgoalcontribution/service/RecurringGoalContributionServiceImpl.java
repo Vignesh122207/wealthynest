@@ -100,7 +100,7 @@ public class RecurringGoalContributionServiceImpl implements RecurringGoalContri
                 if (goal == null || goal.getSavedAmount().compareTo(goal.getTargetAmount()) >= 0) continue;
 
                 BigDecimal newSaved = goal.getSavedAmount().add(rule.getAmount()).min(goal.getTargetAmount());
-                goalService.update(rule.getGoalId(), rule.getUserId(), buildUpdateRequest(newSaved));
+                goalService.update(rule.getGoalId(), rule.getUserId(), null, buildUpdateRequest(newSaved));
 
                 rule.setLastContributedMonth(yyyymm);
                 rule.setLastContributedAt(LocalDateTime.now());

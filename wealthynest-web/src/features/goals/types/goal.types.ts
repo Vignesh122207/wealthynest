@@ -11,6 +11,7 @@ export interface Goal {
   accountId?:    string;
   accountName?:  string;
   paused?:       boolean;
+  shared?:       boolean;
 }
 
 export interface CreateGoalPayload {

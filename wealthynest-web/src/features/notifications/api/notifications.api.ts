@@ -16,6 +16,7 @@ export interface NotificationPreferences {
   spendAnomalyEnabled: boolean;
   debtDueEnabled:      boolean;
   loanEmiEnabled:      boolean;
+  sipReminderEnabled:  boolean;
 }
 
 export const notificationsApi = {
@@ -39,4 +40,12 @@ export const notificationsApi = {
 
   updatePreferences: async (prefs: NotificationPreferences): Promise<NotificationPreferences> =>
     (await apiClient.put<ApiResponse<NotificationPreferences>>("/notifications/preferences", prefs)).data.data,
+
+  registerDeviceToken: async (token: string): Promise<void> => {
+    await apiClient.post("/notifications/device-tokens", { token });
+  },
+
+  unregisterDeviceToken: async (token: string): Promise<void> => {
+    await apiClient.delete("/notifications/device-tokens", { params: { token } });
+  },
 };

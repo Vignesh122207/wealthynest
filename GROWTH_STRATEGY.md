@@ -43,9 +43,10 @@ This is genuinely more complete than most indie finance apps. The family angle i
 
 ### Gaps (honest assessment, re-checked 2026-07-25)
 - An Android app exists (Capacitor, server-mode WebView against the live site — see
-  `ANDROID_APP_ROADMAP.md`), with native biometric unlock for PIN accounts. It is **not** yet
-  verified on a real device, and push notifications aren't built. Closer than "no mobile app,"
-  but not a finished native experience either.
+  `ANDROID_APP_ROADMAP.md`), with native biometric unlock for PIN accounts and push notifications
+  (FCM) implemented end-to-end. Neither is yet verified on a real device — push additionally needs
+  a Firebase project created and credentials dropped in before it can fire at all. Closer than "no
+  mobile app," but not a finished native experience either.
 - No bank account linking via India's Account Aggregator framework — still the real gap. CSV and
   CAS-PDF import exist as manual stopgaps, and the CAS parser itself is untuned against a real
   statement.

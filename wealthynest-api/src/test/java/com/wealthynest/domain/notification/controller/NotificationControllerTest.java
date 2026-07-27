@@ -174,12 +174,12 @@ class NotificationControllerTest {
         SecurityTestUtils.authenticateAs(userId, null);
         when(notificationService.updatePreferences(eq(userId), any())).thenReturn(NotificationPreferenceResponse.builder()
                 .budgetAlertEnabled(false).lowBalanceEnabled(true).spendAnomalyEnabled(true)
-                .debtDueEnabled(true).loanEmiEnabled(true).build());
+                .debtDueEnabled(true).loanEmiEnabled(true).sipReminderEnabled(true).build());
 
         mockMvc.perform(put("/api/v1/notifications/preferences")
                         .contentType("application/json")
                         .content("""
-                                {"budgetAlertEnabled":false,"lowBalanceEnabled":true,"spendAnomalyEnabled":true,"debtDueEnabled":true,"loanEmiEnabled":true}"""))
+                                {"budgetAlertEnabled":false,"lowBalanceEnabled":true,"spendAnomalyEnabled":true,"debtDueEnabled":true,"loanEmiEnabled":true,"sipReminderEnabled":true}"""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.budgetAlertEnabled").value(false));
 
@@ -196,5 +196,42 @@ class NotificationControllerTest {
                         .content("""
                                 {"lowBalanceEnabled":true,"spendAnomalyEnabled":true,"debtDueEnabled":true,"loanEmiEnabled":true}"""))
                 .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    @DisplayName("POST /notifications/device-tokens delegates the authenticated userId and token")
+    void registerDeviceTokenDelegatesUserIdAndToken() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null);
+
+        mockMvc.perform(post("/api/v1/notifications/device-tokens")
+                        .contentType("application/json")
+                        .content("""
+                                {"token":"fcm-token-123"}"""))
+                .andExpect(status().isOk());
+
+        verify(notificationService).registerDeviceToken(userId, "fcm-token-123");
+    }
+
+    @Test
+    @DisplayName("POST /notifications/device-tokens rejects a blank token")
+    void registerDeviceTokenRejectsBlankToken() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null);
+
+        mockMvc.perform(post("/api/v1/notifications/device-tokens")
+                        .contentType("application/json")
+                        .content("""
+                                {"token":""}"""))
+                .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    @DisplayName("DELETE /notifications/device-tokens delegates the token")
+    void unregisterDeviceTokenDelegatesToken() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null);
+
+        mockMvc.perform(delete("/api/v1/notifications/device-tokens").param("token", "fcm-token-123"))
+                .andExpect(status().isOk());
+
+        verify(notificationService).unregisterDeviceToken("fcm-token-123");
     }
 }

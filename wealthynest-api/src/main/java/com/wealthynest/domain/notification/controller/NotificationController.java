@@ -3,6 +3,7 @@ package com.wealthynest.domain.notification.controller;
 import com.wealthynest.common.response.ApiResponse;
 import com.wealthynest.common.response.PagedResponse;
 import com.wealthynest.common.security.SecurityUtils;
+import com.wealthynest.domain.notification.dto.request.RegisterDeviceTokenRequest;
 import com.wealthynest.domain.notification.dto.request.UpdateNotificationPreferenceRequest;
 import com.wealthynest.domain.notification.dto.response.NotificationPreferenceResponse;
 import com.wealthynest.domain.notification.dto.response.NotificationResponse;
@@ -73,5 +74,19 @@ public class NotificationController {
             @Valid @RequestBody UpdateNotificationPreferenceRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 notificationService.updatePreferences(SecurityUtils.requireCurrentUserId(), request)));
+    }
+
+    @PostMapping("/device-tokens")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> registerDeviceToken(@Valid @RequestBody RegisterDeviceTokenRequest request) {
+        notificationService.registerDeviceToken(SecurityUtils.requireCurrentUserId(), request.getToken());
+        return ResponseEntity.ok(ApiResponse.noContent());
+    }
+
+    @DeleteMapping("/device-tokens")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> unregisterDeviceToken(@RequestParam String token) {
+        notificationService.unregisterDeviceToken(token);
+        return ResponseEntity.ok(ApiResponse.noContent());
     }
 }

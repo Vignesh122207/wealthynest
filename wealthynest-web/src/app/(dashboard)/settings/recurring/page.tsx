@@ -5,7 +5,7 @@ import {useRouter, useSearchParams} from "next/navigation";
 import {Header} from "@/components/layout/Header";
 import {PageWrapper} from "@/components/layout/PageWrapper";
 import {ArrowLeftRight, Flag, Receipt, TrendingUp} from "lucide-react";
-import {cn} from "@/lib/utils";
+import {TabBar, type TabBarItem} from "@/components/ui/TabBar";
 import {IncomeTab} from "./_tabs/IncomeTab";
 import {ExpensesTab} from "./_tabs/ExpensesTab";
 import {TransfersTab} from "./_tabs/TransfersTab";
@@ -13,27 +13,15 @@ import {GoalsTab} from "./_tabs/GoalsTab";
 
 type RuleType = "income" | "expenses" | "transfers" | "goals";
 
-const TABS: { key: RuleType; label: string; icon: React.ElementType; activeBg: string }[] = [
-  { key: "income",    label: "Income",    icon: TrendingUp,     activeBg: "bg-emerald-600" },
-  { key: "expenses",  label: "Expenses",  icon: Receipt,        activeBg: "bg-rose-600" },
-  { key: "transfers", label: "Transfers", icon: ArrowLeftRight, activeBg: "bg-indigo-600" },
-  { key: "goals",     label: "Goals",     icon: Flag,           activeBg: "bg-fuchsia-600" },
+const TABS: TabBarItem<RuleType>[] = [
+  { key: "income",    label: "Income",    icon: TrendingUp,     color: "#059669" },
+  { key: "expenses",  label: "Expenses",  icon: Receipt,        color: "#e11d48" },
+  { key: "transfers", label: "Transfers", icon: ArrowLeftRight, color: "#4f46e5" },
+  { key: "goals",     label: "Goals",     icon: Flag,           color: "#c026d3" },
 ];
 
 function RuleTypeTabs({ value, onChange }: { value: RuleType; onChange: (t: RuleType) => void }) {
-  return (
-    <div className="flex gap-1 overflow-x-auto max-w-full" style={{ scrollbarWidth: "none" }}>
-      {TABS.map(t => (
-        <button key={t.key} onClick={() => onChange(t.key)}
-          className={cn(
-            "flex items-center gap-2 h-9 px-4 rounded-xl text-xs font-medium whitespace-nowrap transition-all shrink-0",
-            value === t.key ? cn(t.activeBg, "text-white") : "bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted"
-          )}>
-          <t.icon className="w-3.5 h-3.5" /> {t.label}
-        </button>
-      ))}
-    </div>
-  );
+  return <TabBar items={TABS} value={value} onChange={onChange} testIdPrefix="recurring-type-tab" />;
 }
 
 function RecurringRulesContent() {
