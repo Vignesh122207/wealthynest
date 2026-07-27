@@ -16,14 +16,14 @@ test.describe("Auth — Invalid login", () => {
 
   test("malformed email is rejected client-side before any request fires", async ({ page, loginPage }) => {
     await loginPage.goto();
-    await loginPage.emailInput.fill("not-an-email");
-    await loginPage.usePasswordButton.click();
-    // The password step's email input is type="email" — the browser's own constraint validation
+    await loginPage.continueWithEmail();
+    await loginPage.passwordStepEmailInput.fill("not-an-email");
+    // The combined step's email input is type="email" — the browser's own constraint validation
     // intercepts the submit event before React Hook Form's zod resolver ever runs, so neither its
     // inline error paragraph nor a network request fires for this case. That's correct behavior,
-    // just enforced one layer earlier (native) than the schema-level validation this suite exercises
-    // via loginPage.emailInput elsewhere (an empty-string case, which the native check doesn't
-    // reject the same way) — assert against what actually intercepts it here.
+    // just enforced one layer earlier (native) than the schema-level validation this suite would
+    // otherwise exercise (an empty-string case, which the native check doesn't reject the same
+    // way) — assert against what actually intercepts it here.
     let requestFired = false;
     page.on("request", (req) => { if (req.url().includes("/auth/login")) requestFired = true; });
     await loginPage.passwordStepPasswordInput.fill("SomePassword1");

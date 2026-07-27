@@ -5,6 +5,7 @@ import {Controller, useForm} from "react-hook-form";
 import {zodResolver} from "@hookform/resolvers/zod";
 import {FormCurrencyInput} from "@/components/forms/FormCurrencyInput";
 import {FormDatePicker} from "@/components/forms/FormDatePicker";
+import {FormInput} from "@/components/forms/FormInput";
 import {AccountPicker} from "@/components/transactions/AccountPicker";
 import {LiveSearch, SelectedChip} from "../LiveSearch";
 import {FormButtons} from "./FormButtons";
@@ -78,6 +79,11 @@ export function MFForm({ defaultValues, onSubmit, onCancel, isPending, bankAccou
                 bankAccounts={bankAccounts} value={field.value ?? ""} onChange={field.onChange} />
             )} />
           )}
+          <FormCurrencyInput label="Monthly SIP Amount (optional)" data-testid="mf-sip-amount-input"
+            {...form.register("sipAmount")} error={form.formState.errors.sipAmount?.message} />
+          <FormInput label="SIP Day of Month (1–31)" type="number" min="1" max="31" placeholder="e.g. 5"
+            data-testid="mf-sip-day-input"
+            {...form.register("sipDay")} error={form.formState.errors.sipDay?.message} />
           {!isEditing && (bankAccounts.length > 0 || investmentAccounts.length > 0) && (
             <Controller control={form.control} name="debitAccountId" render={({ field }) => (
               <AccountPicker label="Debit from Account (optional)" placeholder="None (no debit)" allowClear

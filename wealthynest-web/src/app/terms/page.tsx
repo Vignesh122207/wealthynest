@@ -1,6 +1,7 @@
 import type {Metadata} from "next";
 import {ScrollText} from "lucide-react";
 import {LegalPageChrome} from "@/components/layout/LegalPageChrome";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
 
 export const metadata: Metadata = { title: "Terms of Service" };
 
@@ -20,8 +21,8 @@ export default function TermsPage() {
 
         {/* Header */}
         <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-emerald-500/10 mb-5">
-            <ScrollText className="w-6 h-6 text-emerald-500" />
+          <div className="mx-auto w-fit mb-5">
+            <PremiumIcon icon={ScrollText} tone="yellow" size="md" />
           </div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Terms of Service</h1>
           <p className="text-xs text-muted-foreground">Last updated: June 2026</p>
@@ -80,7 +81,7 @@ export default function TermsPage() {
           <Section title="6. Data and privacy">
             <p>
               Your use of the App is also governed by our{" "}
-              <a href="/privacy" className="text-indigo-500 hover:underline">Privacy Policy</a>,
+              <a href="/privacy" className="text-[#c2703d] hover:underline">Privacy Policy</a>,
               which is incorporated into these Terms by reference.
             </p>
           </Section>
@@ -141,7 +142,7 @@ export default function TermsPage() {
           <div className="pt-4 border-t border-border">
             <p className="text-sm text-muted-foreground">
               Questions about these terms?{" "}
-              <a href="mailto:support@wealthynest.in" className="text-indigo-500 hover:underline">
+              <a href="mailto:support@wealthynest.in" className="text-[#c2703d] hover:underline">
                 support@wealthynest.in
               </a>
             </p>

@@ -1,9 +1,12 @@
 package com.wealthynest.domain.user.controller;
 
+import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.response.ApiResponse;
+import com.wealthynest.common.security.RefreshCookieService;
 import com.wealthynest.common.security.SecurityUtils;
 import com.wealthynest.domain.auth.dto.request.ChangeEmailRequest;
 import com.wealthynest.domain.auth.dto.request.EnablePinRequest;
+import com.wealthynest.domain.auth.dto.response.SessionResponse;
 import com.wealthynest.domain.auth.service.AuthService;
 import com.wealthynest.domain.user.dto.request.ChangePasswordRequest;
 import com.wealthynest.domain.user.dto.request.UpdateProfileRequest;
@@ -12,9 +15,13 @@ import com.wealthynest.domain.user.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -22,6 +29,7 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
     private final UserService userService;
     private final AuthService authService;
+    private final RefreshCookieService refreshCookieService;
 
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
@@ -77,6 +85,36 @@ public class UserController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> disablePin() {
         authService.disablePin(SecurityUtils.requireCurrentUserId());
+        return ResponseEntity.ok(ApiResponse.noContent());
+    }
+
+    // POST (not GET) kept for route stability even though there's no body anymore — "which row is
+    // this device" now comes from the httpOnly refresh cookie riding along on the request itself,
+    // not a client-supplied value. Missing/unrecognized cookie is fine here: the list still
+    // returns, just with nothing flagged current.
+    @PostMapping("/me/sessions")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<List<SessionResponse>>> listSessions(HttpServletRequest httpRequest) {
+        String currentRefreshToken = refreshCookieService.read(httpRequest).orElse(null);
+        return ResponseEntity.ok(ApiResponse.success(
+                authService.listSessions(SecurityUtils.requireCurrentUserId(), currentRefreshToken)));
+    }
+
+    @DeleteMapping("/me/sessions/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> revokeSession(@PathVariable UUID id) {
+        authService.revokeSession(SecurityUtils.requireCurrentUserId(), id);
+        return ResponseEntity.ok(ApiResponse.noContent());
+    }
+
+    @PostMapping("/me/sessions/revoke-others")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> revokeOtherSessions(HttpServletRequest httpRequest) {
+        // Required here (unlike listSessions above) — excluding nothing would be indistinguishable
+        // from revoking everything, including the caller's own session.
+        String currentRefreshToken = refreshCookieService.read(httpRequest)
+                .orElseThrow(() -> new BusinessException("Invalid refresh token", HttpStatus.UNAUTHORIZED, "INVALID_TOKEN"));
+        authService.revokeOtherSessions(SecurityUtils.requireCurrentUserId(), currentRefreshToken);
         return ResponseEntity.ok(ApiResponse.noContent());
     }
 }

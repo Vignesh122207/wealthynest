@@ -14,8 +14,11 @@ export class NotificationsPage extends BasePage {
     await expect(this.headerTitle).toHaveText("Notifications");
   }
 
+  // TabBar renders each filter as role="tab" (not the default implicit "button" role), with
+  // selection state on aria-selected rather than a color class — the active tab's fill lives on
+  // a separate sliding indicator element behind the button, not a class on the button itself.
   filterButton(label: string) {
-    return this.page.getByRole("button", { name: label, exact: true });
+    return this.page.getByRole("tab", { name: label, exact: true });
   }
 
   async selectFilter(label: string): Promise<void> {
@@ -23,6 +26,6 @@ export class NotificationsPage extends BasePage {
   }
 
   async expectFilterActive(label: string): Promise<void> {
-    await expect(this.filterButton(label)).toHaveClass(/bg-indigo-600/);
+    await expect(this.filterButton(label)).toHaveAttribute("aria-selected", "true");
   }
 }

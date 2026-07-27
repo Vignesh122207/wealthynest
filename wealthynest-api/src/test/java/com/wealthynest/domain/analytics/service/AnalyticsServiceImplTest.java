@@ -217,6 +217,11 @@ class AnalyticsServiceImplTest {
             assertThat(monthlySummary.getSpent()).isEqualByComparingTo("300");
             assertThat(yearlySummary.getSpent()).isEqualByComparingTo("40000");
             assertThat(yearlySummary.isOverBudget()).isFalse();
+            // budgetType must be on the response — a category can have both a MONTHLY and
+            // YEARLY budget, and callers (e.g. the breach-notification dedup) need it to tell
+            // the two summaries apart instead of colliding on categoryId alone.
+            assertThat(monthlySummary.getBudgetType()).isEqualTo(BudgetType.MONTHLY);
+            assertThat(yearlySummary.getBudgetType()).isEqualTo(BudgetType.YEARLY);
         }
 
         @Test

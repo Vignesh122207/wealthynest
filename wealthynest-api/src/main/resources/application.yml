@@ -95,6 +95,12 @@ wealthynest:
     rate-limit:
       auth-requests-per-minute: 10
       api-requests-per-minute: 200
+      trusted-proxies: ${RATE_LIMIT_TRUSTED_PROXIES:}
+  cookie:
+    # Must be true for the httpOnly refresh-token cookie in any environment served over HTTPS —
+    # a Secure cookie is silently dropped by the browser over plain HTTP, so this is false only in
+    # application-dev.yml (local docker-compose, no TLS).
+    secure: ${COOKIE_SECURE:true}
   pagination:
     default-page-size: 20
     max-page-size: 100
@@ -107,6 +113,14 @@ wealthynest:
     rp-name: WealthyNest
   google:
     client-id: ${GOOGLE_CLIENT_ID:}
+    native:
+      client-id: ${GOOGLE_NATIVE_CLIENT_ID:}
+      client-secret: ${GOOGLE_NATIVE_CLIENT_SECRET:}
+  fcm:
+    # Base64-encoded Firebase service-account JSON. Blank in local/dev/CI — FirebaseConfig skips
+    # initialization and push sends become a no-op, same fail-closed-when-unset treatment as the
+    # native Google client id above.
+    service-account-json: ${FCM_SERVICE_ACCOUNT_JSON:}
 
 management:
   endpoints:

@@ -2,19 +2,18 @@
 
 import {useMemo, useState} from "react";
 import dynamic from "next/dynamic";
-import {Download, FileText, KeyRound, Search, Star} from "lucide-react";
+import {Download, FileText, KeyRound, LayoutGrid, Search, Star} from "lucide-react";
 import {Header} from "@/components/layout/Header";
 import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
 import {EmptyState} from "@/components/shared/EmptyState";
 import {QueryErrorState} from "@/components/shared/QueryErrorState";
-import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
 import {Card} from "@/components/ui/Card";
-import {PremiumIcon} from "@/components/icons/PremiumIcon";
 import {FormInput} from "@/components/forms/FormInput";
-import {GOAL_COLORS} from "@/lib/categoryMeta";
+import {TabBar, type TabBarItem} from "@/components/ui/TabBar";
+import {GOAL_COLORS, getVaultCategoryColor} from "@/lib/categoryMeta";
 import {
   useCreateVaultItem, useDeleteVaultItem, useToggleVaultFavorite,
-  useUpdateVaultItem, useVaultItems,
+  useUpdateVaultItem, useVaultHealth, useVaultItems,
 } from "@/features/vault/hooks/useVault";
 import {useVaultAutoLock} from "@/features/vault/hooks/useVaultAutoLock";
 import {VaultItemRow} from "@/features/vault/components/VaultItemRow";
@@ -22,41 +21,83 @@ import {VaultHealthCard} from "@/features/vault/components/VaultHealthCard";
 import type {VaultItem, VaultItemPayload} from "@/features/vault/types/vault.types";
 import type {VaultItemFormValues} from "@/features/vault/schemas/vault.schema";
 
-const VaultItemForm     = dynamic(() => import("@/features/vault/components/VaultItemForm").then(m => m.VaultItemForm), { ssr: false });
-const RevealSecretModal = dynamic(() => import("@/features/vault/components/RevealSecretModal").then(m => m.RevealSecretModal), { ssr: false });
-const ExportVaultModal  = dynamic(() => import("@/features/vault/components/ExportVaultModal").then(m => m.ExportVaultModal), { ssr: false });
+const VaultItemForm      = dynamic(() => import("@/features/vault/components/VaultItemForm").then(m => m.VaultItemForm), { ssr: false });
+const RevealSecretModal  = dynamic(() => import("@/features/vault/components/RevealSecretModal").then(m => m.RevealSecretModal), { ssr: false });
+const ExportVaultModal   = dynamic(() => import("@/features/vault/components/ExportVaultModal").then(m => m.ExportVaultModal), { ssr: false });
+const VaultDeleteConfirm = dynamic(() => import("@/features/vault/components/VaultDeleteConfirm").then(m => m.VaultDeleteConfirm), { ssr: false });
 
-const VAULT_COPPER = "#c2703d";
+// Vault's own brass/graphite accent — replaces the old flat slate, see VaultHealthCard for the
+// full "vault door" treatment this echoes.
+const VAULT_BRASS = "#d4a72c";
+const VAULT_BRASS_DEEP = "#a9791a";
+
+// Shared TabBar template, same as Accounts' AccountFilterTabs.
+const TYPE_FILTERS = [
+  { key: "all" as const,      label: "All",        icon: LayoutGrid },
+  { key: "LOGIN" as const,    label: "Logins",     icon: KeyRound },
+  { key: "NOTE" as const,     label: "Notes",      icon: FileText },
+  { key: "FAVORITE" as const, label: "Favorites",  icon: Star },
+];
+type TypeFilter = (typeof TYPE_FILTERS)[number]["key"];
+
+const TYPE_FILTER_COLOR: Record<TypeFilter, string> = {
+  all:      "#475569",
+  LOGIN:    "#2563eb",
+  NOTE:     "#7c3aed",
+  FAVORITE: "#f59e0b",
+};
 
 export default function VaultPage() {
   useVaultAutoLock();
   const [search, setSearch]         = useState("");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [showCreate, setShowCreate] = useState(false);
   const [editItem, setEditItem]     = useState<VaultItem | null>(null);
-  const [revealItem, setRevealItem] = useState<VaultItem | null>(null);
-  const [confirmId, setConfirmId]   = useState<string | null>(null);
-  const [showExport, setShowExport] = useState(false);
+  const [revealItem, setRevealItem]   = useState<VaultItem | null>(null);
+  const [confirmItem, setConfirmItem] = useState<VaultItem | null>(null);
+  const [showExport, setShowExport]   = useState(false);
 
   const { data: items = [], isLoading, isError, refetch } = useVaultItems();
+  const { data: health }                                  = useVaultHealth();
   const { mutate: createItem, isPending: creating } = useCreateVaultItem();
   const { mutate: updateItem, isPending: updating } = useUpdateVaultItem();
   const { mutate: deleteItem }                      = useDeleteVaultItem();
   const { mutate: toggleFavorite }                  = useToggleVaultFavorite();
 
   // Stable per-item accent, cycled by position in the full (unfiltered) list —
-  // same approach GoalsPage uses for GoalCard's goalColor, so a row's color
-  // doesn't shift around as search/sort narrows the visible set.
+  // same approach GoalsPage uses for GoalCard's goalColor — but a recognized vault category
+  // (Banking, Work…) wins first so every item in that category reads as the same color instead
+  // of drifting with list position.
   const colorIndex = new Map(items.map((it, i) => [it.id, i]));
-  const colorFor = (it: VaultItem) => GOAL_COLORS[(colorIndex.get(it.id) ?? 0) % GOAL_COLORS.length];
+  const colorFor = (it: VaultItem) =>
+    getVaultCategoryColor(it.category, GOAL_COLORS[(colorIndex.get(it.id) ?? 0) % GOAL_COLORS.length]);
+
+  // Worst issue per item (breached > weak > reused, applied in that order so a later set
+  // overwrites) — mirrors VaultHealthCard's own lists so a row carries the same signal without
+  // needing the health card expanded.
+  const healthFlagFor = useMemo(() => {
+    const map = new Map<string, "reused" | "weak" | "breached">();
+    if (health) {
+      health.reusedItems.forEach((i) => map.set(i.id, "reused"));
+      health.weakItems.forEach((i) => map.set(i.id, "weak"));
+      health.breachedItems.forEach((i) => map.set(i.id, "breached"));
+    }
+    return map;
+  }, [health]);
 
   const filtered = useMemo(() => {
+    let list = items;
+    if (typeFilter === "LOGIN") list = list.filter(i => i.itemType === "LOGIN");
+    else if (typeFilter === "NOTE") list = list.filter(i => i.itemType === "SECURE_NOTE");
+    else if (typeFilter === "FAVORITE") list = list.filter(i => i.favorite);
+
     const q = search.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(i =>
+    if (!q) return list;
+    return list.filter(i =>
       i.title.toLowerCase().includes(q) ||
       i.username?.toLowerCase().includes(q) ||
       i.category?.toLowerCase().includes(q));
-  }, [items, search]);
+  }, [items, search, typeFilter]);
 
   const loginCount    = items.filter(i => i.itemType === "LOGIN").length;
   const noteCount     = items.filter(i => i.itemType === "SECURE_NOTE").length;
@@ -83,16 +124,14 @@ export default function VaultPage() {
     <div className="flex flex-col flex-1">
       <Header title="Vault" subtitle="Passwords and secure notes, encrypted at rest" />
 
-      {confirmId && (
-        <ConfirmDialog open title="Delete Item"
-          description="This item will be permanently deleted and cannot be recovered."
-          confirmLabel="Delete" danger
-          onConfirm={() => { deleteItem(confirmId); setConfirmId(null); }}
-          onCancel={() => setConfirmId(null)} />
+      {confirmItem && (
+        <VaultDeleteConfirm item={confirmItem}
+          onConfirm={() => { deleteItem(confirmItem.id); setConfirmItem(null); }}
+          onCancel={() => setConfirmItem(null)} />
       )}
 
       {showCreate && (
-        <VaultItemForm isCreate accentColor={VAULT_COPPER}
+        <VaultItemForm isCreate accentColor={VAULT_BRASS}
           onSubmit={onCreateSubmit} onCancel={() => setShowCreate(false)} isPending={creating} />
       )}
 
@@ -109,7 +148,7 @@ export default function VaultPage() {
           }}
           hasExistingTotp={editItem.hasTotp}
           onSubmit={onUpdateSubmit} onCancel={() => setEditItem(null)} isPending={updating}
-          onDelete={() => { setConfirmId(editItem.id); setEditItem(null); }} />
+          onDelete={() => { setConfirmItem(editItem); setEditItem(null); }} />
       )}
 
       {revealItem && (
@@ -125,37 +164,30 @@ export default function VaultPage() {
             <VaultHealthCard items={items} onEditItem={(item) => { setEditItem(item); setShowCreate(false); }} />
           )}
 
-          {items.length > 0 && (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <Card className="p-4">
-                <PremiumIcon icon={KeyRound} hex={VAULT_COPPER} size="xs" className="mb-2" />
-                <p className="text-xs text-muted-foreground mb-1">Total Items</p>
-                <p className="text-lg font-bold text-foreground tabular-nums">{items.length}</p>
-              </Card>
-              <Card className="p-4">
-                <PremiumIcon icon={KeyRound} hex={VAULT_COPPER} size="xs" className="mb-2" />
-                <p className="text-xs text-muted-foreground mb-1">Logins</p>
-                <p className="text-lg font-bold text-foreground tabular-nums">{loginCount}</p>
-              </Card>
-              <Card className="p-4">
-                <PremiumIcon icon={FileText} hex={VAULT_COPPER} size="xs" className="mb-2" />
-                <p className="text-xs text-muted-foreground mb-1">Secure Notes</p>
-                <p className="text-lg font-bold text-foreground tabular-nums">{noteCount}</p>
-              </Card>
-              <Card className="p-4">
-                <PremiumIcon icon={Star} tone="yellow" size="xs" className="mb-2" />
-                <p className="text-xs text-muted-foreground mb-1">Favorites</p>
-                <p className="text-lg font-bold text-foreground tabular-nums">{favoriteCount}</p>
-              </Card>
-            </div>
-          )}
-
           <Card className="overflow-hidden">
             {items.length > 0 && (
               <div className="px-5 py-3 border-b border-border flex items-center gap-3 flex-wrap">
-                <PremiumIcon icon={KeyRound} hex={VAULT_COPPER} size="xs" />
-                <span className="font-semibold text-foreground text-sm">Vault Items</span>
-                <span className="text-xs text-muted-foreground">{filtered.length}</span>
+                {/* min-w-0 + w-full (not shrink-0, which pinned this to its full intrinsic content
+                    width and left overflow-x-auto nothing to actually scroll) — lets this flex
+                    item shrink to the row's real available width on mobile so the tabs become a
+                    genuine horizontal scroller instead of spilling past the card and getting
+                    silently clipped by its overflow-hidden, with Favorites unreachable. */}
+                <TabBar
+                  className="min-w-0 w-full sm:w-auto"
+                  items={TYPE_FILTERS.map((f): TabBarItem<TypeFilter> => ({
+                    key: f.key, label: f.label, icon: f.icon, color: TYPE_FILTER_COLOR[f.key],
+                    // "All" stays uncounted, same convention as every other TabBar's neutral
+                    // item (Accounts, Debts, Investments, Admin) — only the real categories show
+                    // a count.
+                    count: f.key === "all" ? undefined
+                      : f.key === "LOGIN" ? loginCount
+                      : f.key === "NOTE" ? noteCount
+                      : favoriteCount,
+                  }))}
+                  value={typeFilter}
+                  onChange={setTypeFilter}
+                  testIdPrefix="vault-type-filter"
+                />
                 <div className="ml-auto flex items-center gap-3 w-full sm:w-auto">
                   <button type="button" onClick={() => setShowExport(true)} data-testid="vault-export-open"
                     className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0">
@@ -181,17 +213,20 @@ export default function VaultPage() {
                 description="Save passwords and secure notes here — encrypted, and only revealed after you confirm your account password."
                 action={
                   <button onClick={() => setShowCreate(true)}
-                    className="flex items-center gap-2 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all"
-                    style={{ backgroundColor: VAULT_COPPER }}>
+                    className="flex items-center gap-2 px-4 h-9 rounded-xl text-sm font-semibold transition-all hover:brightness-105"
+                    style={{ background: `linear-gradient(135deg, #f6d776, ${VAULT_BRASS_DEEP})`, color: "#241705" }}>
                     <KeyRound className="w-4 h-4" /> Add First Item
                   </button>
                 } />
             ) : filtered.length === 0 ? (
-              <div className="p-10 text-center text-sm text-muted-foreground">No items match &ldquo;{search}&rdquo;.</div>
+              <div className="p-10 text-center text-sm text-muted-foreground">
+                {search ? <>No items match &ldquo;{search}&rdquo;.</> : "No items in this view."}
+              </div>
             ) : (
               <div className="divide-y divide-border/40">
                 {filtered.map(item => (
                   <VaultItemRow key={item.id} item={item} accentColor={colorFor(item)}
+                    healthFlag={healthFlagFor.get(item.id)}
                     onReveal={() => setRevealItem(item)}
                     onEdit={() => setEditItem(item)}
                     onToggleFavorite={() => toggleFavorite(item.id)} />
@@ -203,7 +238,7 @@ export default function VaultPage() {
       </main>
 
       <FloatingActionButton actions={[
-        { icon: KeyRound, label: "Add to Vault", color: "copper", testId: "fab-add-vault-item",
+        { icon: KeyRound, label: "Add to Vault", color: "vaultBrass", testId: "fab-add-vault-item",
           onClick: () => { setShowCreate(true); setEditItem(null); } },
       ]} />
     </div>

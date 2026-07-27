@@ -5,7 +5,7 @@ export const ROUTES = {
   login:              "/login",
   signup:             "/signup",
   forgotPassword:     "/forgot-password",
-  dashboard:          "/dashboard",
+  home:               "/home",
   accounts:           "/accounts",
   transactions:       "/expenses",
   budgets:            "/budgets",

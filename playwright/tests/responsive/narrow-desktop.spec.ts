@@ -22,13 +22,13 @@ test.describe("Responsive (narrow-desktop viewport)", () => {
   // sidebar should render and the mobile hamburger should not, proving the desktop layout holds up
   // at a genuinely narrow desktop/laptop width, not just a full-size monitor or tablet-landscape.
   test("dashboard shows the desktop sidebar, not the mobile menu toggle @responsive", async ({ accountsPage }) => {
-    await accountsPage.goto(ROUTES.dashboard);
+    await accountsPage.goto(ROUTES.home);
     await expect(accountsPage.navLink(ROUTES.accounts)).toBeVisible();
     await expect(accountsPage.byTestId(TEST_IDS.nav.mobileMenuToggle)).toBeHidden();
   });
 
   test("key pages have no horizontal overflow at narrow-desktop width @responsive", async ({ accountsPage }) => {
-    for (const route of [ROUTES.dashboard, ROUTES.accounts, ROUTES.transactions, ROUTES.investments]) {
+    for (const route of [ROUTES.home, ROUTES.accounts, ROUTES.transactions, ROUTES.investments]) {
       await accountsPage.goto(route);
       await accountsPage.expectNoHorizontalOverflow();
     }

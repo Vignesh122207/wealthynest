@@ -6,6 +6,7 @@ import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.common.security.VaultEncryptionService;
 import com.wealthynest.common.security.VaultSecretHasher;
+import com.wealthynest.common.util.CsvSanitizer;
 import com.wealthynest.domain.user.entity.User;
 import com.wealthynest.domain.user.repository.UserRepository;
 import com.wealthynest.domain.vault.dto.request.RevealVaultItemRequest;
@@ -44,9 +45,12 @@ import java.util.stream.Collectors;
 /**
  * Vault items are server-side encrypted (see {@link VaultEncryptionService}), so a valid JWT alone
  * is enough to list/edit metadata — but revealing the decrypted secret additionally requires
- * re-confirming the account password ("step-up" auth), so a leaked/stolen access token can't be
- * used alone to dump every stored password. Failed reveal attempts are rate-limited per user via
- * Redis, mirroring {@code TokenRevocationService}'s use of Redis for auth-adjacent state.
+ * re-confirming the account password or PIN ("step-up" auth), so a leaked/stolen access token
+ * can't be used alone to dump every stored password. Native biometric deliberately isn't accepted
+ * here — see nativeBiometric.ts on the frontend — it proves nothing to the server, unlike password
+ * and PIN, which are both checked against a real stored hash. Failed reveal attempts are
+ * rate-limited per user via Redis, mirroring {@code TokenRevocationService}'s use of Redis for
+ * auth-adjacent state.
  */
 @Slf4j
 @Service
@@ -188,15 +192,20 @@ public class VaultServiceImpl implements VaultService {
                 .setHeader("Title", "Type", "Username", "URL", "Category", "Password/Note", "TOTP Secret")
                 .build())) {
             for (VaultItem item : items) {
+                // Every field here is user-supplied (title/username/url/category) or a decrypted
+                // secret — neutralize CSV formula injection the same way ReportServiceImpl does,
+                // since a vault entry can easily contain a "=..." title/note like a phishing URL.
                 printer.printRecord(
-                        item.getTitle(),
+                        CsvSanitizer.neutralizeFormula(item.getTitle()),
                         item.getItemType().name(),
-                        item.getUsername(),
-                        item.getUrl(),
-                        item.getCategory(),
-                        vaultEncryptionService.decrypt(item.getSecretCiphertext(), item.getSecretIv(), item.getKeyVersion()),
+                        CsvSanitizer.neutralizeFormula(item.getUsername()),
+                        CsvSanitizer.neutralizeFormula(item.getUrl()),
+                        CsvSanitizer.neutralizeFormula(item.getCategory()),
+                        CsvSanitizer.neutralizeFormula(
+                                vaultEncryptionService.decrypt(item.getSecretCiphertext(), item.getSecretIv(), item.getKeyVersion())),
                         item.getTotpCiphertext() == null ? ""
-                                : vaultEncryptionService.decrypt(item.getTotpCiphertext(), item.getTotpIv(), item.getKeyVersion()));
+                                : CsvSanitizer.neutralizeFormula(
+                                        vaultEncryptionService.decrypt(item.getTotpCiphertext(), item.getTotpIv(), item.getKeyVersion())));
             }
         } catch (IOException e) {
             // StringWriter never throws IOException in practice — CSVPrinter's signature requires it.
@@ -364,12 +373,19 @@ public class VaultServiceImpl implements VaultService {
 
     /** Authenticates a step-up action (reveal/export): a valid, unexpired {@code stepUpToken}
      * (opt-in "trust this device", issued by a prior successful reveal) short-circuits straight
-     * through without touching the password or lockout state at all; otherwise falls back to the
-     * normal password re-confirmation, rate-limited under its own {@code scope} counter. */
+     * through without touching the password/PIN or lockout state at all. Otherwise falls back to
+     * whichever credential the request actually carries — PIN if present, else password — both
+     * rate-limited under the same {@code scope} counter, since either one is an attempt at the
+     * same sensitive action regardless of which credential was used to make it. */
     private void requireStepUp(String scope, UUID userId, RevealVaultItemRequest request,
                                 String ipAddress, String userAgent) {
         String token = request.getStepUpToken();
         if (token != null && !token.isBlank() && isValidStepUpToken(userId, token)) {
+            return;
+        }
+        String pin = request.getPin();
+        if (pin != null && !pin.isBlank()) {
+            requireStepUpPin(scope, userId, pin, ipAddress, userAgent);
             return;
         }
         String currentPassword = request.getCurrentPassword();
@@ -398,6 +414,31 @@ public class VaultServiceImpl implements VaultService {
         if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
             registerFailedAttempt(scope, userId, ipAddress, userAgent);
             throw new BusinessException("Incorrect password", HttpStatus.UNAUTHORIZED);
+        }
+        clearFailedAttempts(scope, userId);
+    }
+
+    /** PIN counterpart to {@code requireStepUpPassword} — same {@code scope} lockout counter (a
+     * failed PIN attempt counts the same as a failed password attempt toward the shared limit, and
+     * a success clears it for both). Deliberately does NOT touch {@code user.pinFailedAttempts}/
+     * {@code pinLockedUntil} — those back AuthService#pinLogin, a different feature (minting a
+     * fresh session from a refresh token) with its own lockout; this is gating an already-valid,
+     * already-authenticated session the same way password step-up does, not issuing new tokens, so
+     * it doesn't need pinLogin's refresh-token anchor — the caller already proved session validity
+     * to reach this endpoint at all. */
+    private void requireStepUpPin(String scope, UUID userId, String pin, String ipAddress, String userAgent) {
+        if (isLockedOut(scope, userId)) {
+            throw new BusinessException(
+                    "Too many incorrect attempts. Please try again in 15 minutes.", HttpStatus.LOCKED);
+        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException("User not found", HttpStatus.NOT_FOUND));
+        if (user.getPinHash() == null) {
+            throw new BusinessException("PIN unlock isn't enabled for this account.", HttpStatus.BAD_REQUEST);
+        }
+        if (!passwordEncoder.matches(pin, user.getPinHash())) {
+            registerFailedAttempt(scope, userId, ipAddress, userAgent);
+            throw new BusinessException("Incorrect PIN", HttpStatus.UNAUTHORIZED);
         }
         clearFailedAttempts(scope, userId);
     }

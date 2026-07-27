@@ -18,6 +18,11 @@ export interface Budget {
   alertTriggered: boolean;
   budgetType:     BudgetType;
   shared:         boolean;
+  rollover:       boolean;
+  /** Unspent amount carried in from last month only (never compounds) — 0 when rollover is off,
+   *  the budget is YEARLY, or the budget didn't exist for the whole of last month. Already
+   *  factored into remaining/percentUsed/overBudget/alertTriggered. */
+  rolloverAmount: number;
 }
 
 export interface CreateBudgetPayload {
@@ -25,10 +30,12 @@ export interface CreateBudgetPayload {
   amount:          number;
   alertThreshold?: number;
   budgetType:      BudgetType;
+  rollover?:       boolean;
 }
 
 export interface UpdateBudgetPayload {
   amount:          number;
   alertThreshold?: number;
   categoryId?:     string;
+  rollover?:       boolean;
 }

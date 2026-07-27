@@ -19,7 +19,11 @@ const apiOrigin = (() => {
 const csp = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' https://accounts.google.com",
-  "style-src 'self' 'unsafe-inline'",
+  // Missing accounts.google.com here (script-src/connect-src/frame-src already allow it) blocks
+  // GIS's own https://accounts.google.com/gsi/style stylesheet — the button still renders, but the
+  // degraded iframe falls back to a plain window.open() with no popup dimensions, which most
+  // browsers then show as a full new tab instead of GIS's normal compact popup.
+  "style-src 'self' 'unsafe-inline' https://accounts.google.com",
   "img-src 'self' data: https:",
   `connect-src 'self' ${apiOrigin} https://accounts.google.com`,
   "frame-src https://accounts.google.com",
@@ -34,6 +38,11 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: "standalone",
   images: { remotePatterns: [{ protocol: "https", hostname: "**" }] },
+  // /dashboard renamed to /home — keeps existing bookmarks and already-installed PWA shortcuts
+  // (which cached the old start_url) working instead of 404ing.
+  async redirects() {
+    return [{ source: "/dashboard", destination: "/home", permanent: true }];
+  },
   async headers() {
     return [{
       source: "/(.*)",

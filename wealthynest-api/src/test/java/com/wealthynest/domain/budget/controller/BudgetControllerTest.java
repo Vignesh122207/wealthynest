@@ -183,4 +183,34 @@ class BudgetControllerTest {
 
         verify(budgetService).deleteBudget(eq(budgetId), eq(userId), eq(null));
     }
+
+    @Test
+    @DisplayName("PUT /budgets/{id} passes the path id, authenticated userId, and server-resolved familyId through")
+    void updateDelegatesToService() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, familyId);
+        UUID budgetId = UUID.randomUUID();
+        com.wealthynest.domain.budget.dto.request.UpdateBudgetRequest req =
+                new com.wealthynest.domain.budget.dto.request.UpdateBudgetRequest();
+        ReflectionTestUtils.setField(req, "amount", new BigDecimal("6000"));
+        when(budgetService.updateBudget(eq(budgetId), eq(userId), eq(familyId), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(sampleResponse());
+
+        mockMvc.perform(put("/api/v1/budgets/{id}", budgetId)
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("GET /budgets/for-category defaults year/month to the current period when omitted")
+    void forCategoryDefaultsToCurrentPeriod() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null);
+        java.time.LocalDate now = java.time.LocalDate.now();
+        when(budgetService.getBudgetsForCategory(userId, categoryId, now.getYear(), now.getMonthValue()))
+                .thenReturn(List.of(sampleResponse()));
+
+        mockMvc.perform(get("/api/v1/budgets/for-category").param("categoryId", categoryId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1));
+    }
 }

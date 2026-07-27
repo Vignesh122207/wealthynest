@@ -15,6 +15,7 @@ import {TransactionModalOverlay} from "@/components/transactions/TransactionModa
 import {BigAmountInput} from "@/components/transactions/BigAmountInput";
 import {GOAL_COLORS, GOAL_ICON_OPTIONS, GOAL_PRESETS, resolveGoalIcon} from "@/lib/categoryMeta";
 import {useAccounts} from "@/features/accounts/hooks/useAccounts";
+import {useAuthStore} from "@/features/auth/store/auth.store";
 import type {Goal} from "@/features/goals/types/goal.types";
 import {cn} from "@/lib/utils";
 import {type GoalFormValues, goalSchema} from "./goalSchema";
@@ -40,6 +41,8 @@ export function GoalForm({ goal, goalColor, isCreate, onSubmit, onCancel, onClos
   const [showIconPicker, setShowIconPicker] = useState(false);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
   const { data: accounts = [] } = useAccounts();
+  const { user } = useAuthStore();
+  const inFamily = !!user?.familyId;
   // Credit cards aren't a sensible savings-goal destination; Emergency Fund
   // accounts very much are (it's one of the goal presets) and were part of the
   // original "any account except credit card" set, so keep those linkable too.
@@ -63,6 +66,11 @@ export function GoalForm({ goal, goalColor, isCreate, onSubmit, onCancel, onClos
     <TransactionModalOverlay onDismiss={onClose}>
       <FormModalShell accent="from-fuchsia-400 to-purple-500">
           <FormModalHeader icon={Flag} tone="purple" title={goal ? `Edit — ${goal.name}` : "New Goal"} onDelete={onDelete} onClose={onClose} />
+          {isCreate && inFamily && (
+            <p className="text-xs text-muted-foreground -mt-3 mb-4">
+              Since you&apos;re in a family group, this goal will be shared — every member can see it and add to its progress.
+            </p>
+          )}
 
           {isCreate && (
             <div className="mb-4">

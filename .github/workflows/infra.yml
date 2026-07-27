@@ -1,0 +1,78 @@
+name: Deploy Infrastructure (AWS CDK)
+
+# Prerequisite this workflow can't do for itself: `cdk bootstrap` must be run once, manually, by
+# someone with real (not this workflow's scoped-down) AWS credentials — it provisions the
+# cdk-hnb659fds-* roles that InfraDeployRole is only ever allowed to assume. See
+# docs/deployment-guide.md. Everything after that one-time step is this workflow's job.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infrastructure/**"
+      - ".github/workflows/infra.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "infrastructure/**"
+      - ".github/workflows/infra.yml"
+
+concurrency:
+  group: infra-deploy
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # required for AWS OIDC federation
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+
+jobs:
+  infra:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infrastructure
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: mvn clean verify
+        run: mvn -B clean verify
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install AWS CDK CLI
+        run: npm install --global aws-cdk
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_INFRA_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # InfraDeployRole carries no direct permissions of its own - it can only assume the CDK
+      # bootstrap roles (see CicdStack). The CDK CLI does that assumption automatically once
+      # `cdk bootstrap` has been run for this account/region, using the role ARNs embedded in
+      # each stack's own synthesized template.
+      - name: cdk synth
+        run: cdk synth --all
+
+      - name: cdk diff
+        if: github.event_name == 'pull_request'
+        run: cdk diff --all
+
+      - name: cdk deploy
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: cdk deploy --all --require-approval never --concurrency 4

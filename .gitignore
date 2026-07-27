@@ -3,6 +3,11 @@
 .env.*
 !.env.example
 
+# Android signing keystore — permanent identity, never commit. Back this up somewhere durable
+# outside git; losing it means losing the ability to ever update the Play Store listing.
+wealthynest-web/android/keystore/
+wealthynest-web/android/keystore.properties
+
 # macOS
 .DS_Store
 
@@ -17,6 +22,17 @@ target/
 *.war
 .next/
 node_modules/
+
+# Capacitor Android project (native Gradle build output) — regenerable via `npx cap sync android`
+# from wealthynest-web/capacitor.config.ts, not source.
+wealthynest-web/android/app/build/
+wealthynest-web/android/app/.cxx/
+wealthynest-web/android/.gradle/
+wealthynest-web/android/build/
+wealthynest-web/android/*.apk
+wealthynest-web/android/*.apk.idsig
+wealthynest-web/android/*.aab
+wealthynest-web/android/local.properties
 
 # Claude Code local files
 .claude/

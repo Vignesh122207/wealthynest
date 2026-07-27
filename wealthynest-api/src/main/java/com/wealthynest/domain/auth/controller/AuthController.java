@@ -1,11 +1,14 @@
 package com.wealthynest.domain.auth.controller;
 
+import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.response.ApiResponse;
+import com.wealthynest.common.security.RefreshCookieService;
 import com.wealthynest.domain.auth.dto.request.*;
 import com.wealthynest.domain.auth.dto.response.AuthResponse;
 import com.wealthynest.domain.auth.service.AuthService;
 import com.wealthynest.domain.auth.service.WebAuthnService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -22,6 +25,7 @@ import java.util.Map;
 public class AuthController {
     private final AuthService authService;
     private final WebAuthnService webAuthnService;
+    private final RefreshCookieService refreshCookieService;
 
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest request) {
@@ -30,21 +34,22 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<AuthResponse>> login(
-            @Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
-        return ResponseEntity.ok(ApiResponse.success(authService.login(request,
-                httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"))));
+            @Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
+        return ok(authService.login(request, httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent")), httpResponse);
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<ApiResponse<AuthResponse>> refresh(@Valid @RequestBody RefreshTokenRequest request) {
-        return ResponseEntity.ok(ApiResponse.success(authService.refresh(request)));
+    public ResponseEntity<ApiResponse<AuthResponse>> refresh(
+            HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
+        return ok(authService.refresh(requireRefreshCookie(httpRequest),
+                httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent")), httpResponse);
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout(
-            @Valid @RequestBody RefreshTokenRequest request, HttpServletRequest httpRequest) {
-        authService.logout(request.getRefreshToken(),
-                httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"));
+    public ResponseEntity<ApiResponse<Void>> logout(HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
+        refreshCookieService.read(httpRequest).ifPresent(token ->
+                authService.logout(token, httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent")));
+        refreshCookieService.clear(httpResponse);
         return ResponseEntity.ok(ApiResponse.noContent());
     }
 
@@ -76,16 +81,21 @@ public class AuthController {
 
     @PostMapping("/google-login")
     public ResponseEntity<ApiResponse<AuthResponse>> googleLogin(
-            @Valid @RequestBody GoogleLoginRequest request, HttpServletRequest httpRequest) {
-        return ResponseEntity.ok(ApiResponse.success(authService.googleLogin(request,
-                httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"))));
+            @Valid @RequestBody GoogleLoginRequest request, HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
+        return ok(authService.googleLogin(request, httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent")), httpResponse);
+    }
+
+    @PostMapping("/google-login-native")
+    public ResponseEntity<ApiResponse<AuthResponse>> googleLoginNative(
+            @Valid @RequestBody GoogleNativeLoginRequest request, HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
+        return ok(authService.googleLoginNative(request, httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent")), httpResponse);
     }
 
     @PostMapping("/pin-login")
     public ResponseEntity<ApiResponse<AuthResponse>> pinLogin(
-            @Valid @RequestBody PinLoginRequest request, HttpServletRequest httpRequest) {
-        return ResponseEntity.ok(ApiResponse.success(authService.pinLogin(request,
-                httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"))));
+            @Valid @RequestBody PinLoginRequest request, HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
+        return ok(authService.pinLogin(request, requireRefreshCookie(httpRequest),
+                httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent")), httpResponse);
     }
 
     @PostMapping("/webauthn/login/options")
@@ -95,13 +105,30 @@ public class AuthController {
 
     @PostMapping("/webauthn/login/verify")
     public ResponseEntity<ApiResponse<AuthResponse>> webAuthnLoginVerify(
-            @RequestBody Map<String, Object> body, HttpServletRequest httpRequest) {
-        String email = (String) body.get("email");
-        boolean rememberMe = Boolean.TRUE.equals(body.get("rememberMe"));
-        @SuppressWarnings("unchecked")
-        Map<String, Object> credential = (Map<String, Object>) body.get("credential");
-        return ResponseEntity.ok(ApiResponse.success(webAuthnService.verifyAuthentication(
-                email, credential, rememberMe,
-                httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"))));
+            @Valid @RequestBody WebAuthnLoginVerifyRequest request, HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
+        // Optional (unlike refresh/pin-login, which require an existing session by definition) —
+        // see WebAuthnService#verifyAuthentication for why this lets the server revoke this
+        // device's prior session instead of leaving it to accumulate as a duplicate.
+        String previousRefreshToken = refreshCookieService.read(httpRequest).orElse(null);
+        return ok(webAuthnService.verifyAuthentication(
+                request.getEmail(), request.getCredential(), request.isRememberMe(), previousRefreshToken,
+                httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent")), httpResponse);
+    }
+
+    // ─── helpers ──────────────────────────────────────────────────────────────
+
+    private String requireRefreshCookie(HttpServletRequest httpRequest) {
+        return refreshCookieService.read(httpRequest)
+                .orElseThrow(() -> new BusinessException("Invalid refresh token", HttpStatus.UNAUTHORIZED, "INVALID_TOKEN"));
+    }
+
+    /** Every token-issuing endpoint funnels through here: write the rotated refresh token as an
+     * httpOnly cookie, then return the response as-is — AuthResponse#refreshToken is
+     * {@code @JsonIgnore}d, so it never reaches the response body regardless. */
+    private ResponseEntity<ApiResponse<AuthResponse>> ok(AuthResponse authResponse, HttpServletResponse httpResponse) {
+        if (authResponse.getRefreshToken() != null) {
+            refreshCookieService.write(httpResponse, authResponse.getRefreshToken(), authResponse.getRefreshTokenExpiresInMs());
+        }
+        return ResponseEntity.ok(ApiResponse.success(authResponse));
     }
 }

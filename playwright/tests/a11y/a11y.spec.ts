@@ -37,7 +37,7 @@ test.describe("Accessibility (axe)", () => {
   });
 
   for (const [name, route] of [
-    ["dashboard", ROUTES.dashboard],
+    ["home", ROUTES.home],
     ["accounts", ROUTES.accounts],
     ["transactions", ROUTES.transactions],
     ["investments", ROUTES.investments],

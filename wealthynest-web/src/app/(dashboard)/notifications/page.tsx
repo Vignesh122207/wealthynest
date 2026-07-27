@@ -13,6 +13,7 @@ import {
     Flame,
     Info,
     Landmark,
+    LineChart,
     type LucideIcon,
     Target,
     TrendingUp,
@@ -27,10 +28,13 @@ import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
 import {type AppNotification, type NotifSeverity} from "@/hooks/useNotifications";
 import {useNotificationStore} from "@/store/notification.store";
 import {
+    useDeleteServerNotification,
     useMarkAllServerRead,
+    useMarkServerRead,
     useMergedNotifications,
     useServerNotifications
 } from "@/features/notifications/hooks/useServerNotifications";
+import {TabBar, type TabBarItem} from "@/components/ui/TabBar";
 import {cn} from "@/lib/utils";
 
 const SEVERITY_ICON: Record<NotifSeverity, LucideIcon> = {
@@ -56,9 +60,10 @@ const TYPE_LABELS: Record<AppNotification["type"], string> = {
   anomaly:    "Unusual Spend",
   debtDue:    "Debt Due",
   loanEmi:    "Loan EMI",
+  sipReminder: "SIP Reminder",
 };
 
-const TYPE_ICON: Record<AppNotification["type"], React.ElementType> = {
+const TYPE_ICON: Record<AppNotification["type"], LucideIcon> = {
   budget:     Target,
   income:     TrendingUp,
   goal:       Flag,
@@ -67,6 +72,7 @@ const TYPE_ICON: Record<AppNotification["type"], React.ElementType> = {
   anomaly:    Flame,
   debtDue:    CalendarClock,
   loanEmi:    Landmark,
+  sipReminder: LineChart,
 };
 
 const TYPE_HREF: Record<AppNotification["type"], string> = {
@@ -78,6 +84,7 @@ const TYPE_HREF: Record<AppNotification["type"], string> = {
   anomaly:    "/expenses",
   debtDue:    "/debts",
   loanEmi:    "/accounts",
+  sipReminder: "/investments",
 };
 
 type Filter = "all" | AppNotification["type"];
@@ -93,6 +100,22 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: "debtDue",    label: "Debt Due"      },
   { value: "loanEmi",    label: "Loan EMI"      },
 ];
+
+// One color per alert type — reuses each type's own domain color from elsewhere in the app
+// (Budgets=amber, Income=emerald, Debts=rose, etc.) rather than the flat single-color chips this
+// page used before.
+const FILTER_COLOR: Record<Filter, string> = {
+  all:        "#475569",
+  budget:     "#d97706",
+  goal:       "#c026d3",
+  income:     "#059669",
+  maturity:   "#7c3aed",
+  lowBalance: "#dc2626",
+  anomaly:    "#db2777",
+  debtDue:    "#e11d48",
+  loanEmi:    "#0284c7",
+  sipReminder: "#0284c7",
+};
 
 function formatNotifDate(dateStr?: string) {
   if (!dateStr) return "Today";
@@ -115,10 +138,11 @@ function getDateGroup(dateStr?: string): string {
 const GROUP_ORDER = ["Today", "Yesterday", "This Week", "Older"];
 
 function NotifRow({
-  n, isNew, onDismiss,
+  n, isNew, onOpen, onDismiss,
 }: {
   n: AppNotification;
   isNew: boolean;
+  onOpen: () => void;
   onDismiss: () => void;
 }) {
   const SeverityIcon = SEVERITY_ICON[n.severity];
@@ -126,7 +150,7 @@ function NotifRow({
   const href         = TYPE_HREF[n.type];
 
   return (
-    <Link href={href} className={cn(
+    <Link href={href} onClick={onOpen} className={cn(
       "flex gap-4 px-5 py-4 rounded-xl border transition-colors group",
       isNew
         ? "bg-indigo-500/5 border-indigo-500/20 hover:bg-indigo-500/8"
@@ -180,8 +204,10 @@ export default function NotificationsPage() {
 
   const { data: serverNotifs = [], isLoading, isError, refetch } = useServerNotifications();
   const { notifications: allNotifs, unreadCount }  = useMergedNotifications();
-  const { seenIds, markSeen }                      = useNotificationStore();
+  const { seenIds, markSeen, dismiss }             = useNotificationStore();
   const markAllServer                              = useMarkAllServerRead();
+  const markServerRead                             = useMarkServerRead();
+  const deleteServerNotif                          = useDeleteServerNotification();
 
   const filtered = filter === "all"
     ? allNotifs
@@ -200,8 +226,19 @@ export default function NotificationsPage() {
     markAllServer.mutate();
   }
 
-  function handleDismiss(n: AppNotification) {
+  function handleOpen(n: AppNotification) {
     markSeen([n.id]);
+    if (n.id.startsWith("server-")) {
+      markServerRead.mutate(n.id.slice("server-".length));
+    }
+  }
+
+  function handleDismiss(n: AppNotification) {
+    if (n.id.startsWith("server-")) {
+      deleteServerNotif.mutate(n.id.slice("server-".length));
+    } else {
+      dismiss(n.id);
+    }
   }
 
   return (
@@ -231,23 +268,16 @@ export default function NotificationsPage() {
             )}
           </div>
 
-          {/* Filters */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {FILTERS.map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => setFilter(value)}
-                className={cn(
-                  "text-xs font-medium px-3 py-1.5 rounded-full border transition-all",
-                  filter === value
-                    ? "bg-indigo-600 text-white border-indigo-600"
-                    : "bg-card text-muted-foreground border-border hover:text-foreground"
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          {/* Filters — shared TabBar template, same as every other section's filter tabs. */}
+          <TabBar
+            items={FILTERS.map(({ value, label }): TabBarItem<Filter> => ({
+              key: value, label, icon: value === "all" ? Bell : TYPE_ICON[value], color: FILTER_COLOR[value],
+              count: value === "all" ? undefined : allNotifs.filter(n => n.type === value).length,
+            }))}
+            value={filter}
+            onChange={setFilter}
+            testIdPrefix="notification-filter"
+          />
 
           {/* List */}
           {isLoading ? (
@@ -277,6 +307,7 @@ export default function NotificationsPage() {
                           key={n.id}
                           n={n}
                           isNew={isNew}
+                          onOpen={() => handleOpen(n)}
                           onDismiss={() => handleDismiss(n)}
                         />
                       );

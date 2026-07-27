@@ -31,23 +31,27 @@ public class GoalServiceImpl implements GoalService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<GoalResponse> getAll(UUID userId) {
-        Map<UUID, AccountResponse> accountMap = walletAccountService.getAccounts(userId).stream()
-                .collect(Collectors.toMap(AccountResponse::getId, a -> a));
-        return goalRepository.findByUserIdOrderByCreatedAtAsc(userId)
-                .stream().map(g -> toResponse(g, accountMap)).toList();
+    public List<GoalResponse> getAll(UUID userId, UUID familyId) {
+        Map<UUID, AccountResponse> accountMap = buildAccountMap(userId);
+        List<Goal> goals = familyId != null
+                ? goalRepository.findByFamilyIdOrderByCreatedAtAsc(familyId)
+                : goalRepository.findByUserIdOrderByCreatedAtAsc(userId);
+        return goals.stream().map(g -> toResponse(g, accountMap)).toList();
     }
 
     @Override
     @Transactional
-    public GoalResponse create(UUID userId, CreateGoalRequest req) {
+    public GoalResponse create(UUID userId, UUID familyId, CreateGoalRequest req) {
         BigDecimal saved = req.getSavedAmount() != null ? req.getSavedAmount() : BigDecimal.ZERO;
         if (saved.compareTo(req.getTargetAmount()) > 0)
             throw new BusinessException("Amount already saved cannot exceed the target amount", HttpStatus.BAD_REQUEST);
         accountOwnershipGuard.validateAccountOwnership(req.getAccountId(), userId);
 
+        // A goal is family-shared whenever its creator currently belongs to a family — same
+        // convention as Budget/Category/Expense/Asset/Liability (see CategoryServiceImpl.createCategory).
         Goal goal = Goal.builder()
                 .userId(userId)
+                .familyId(familyId)
                 .name(req.getName())
                 .icon(req.getIcon())
                 .color(req.getColor())
@@ -61,10 +65,8 @@ public class GoalServiceImpl implements GoalService {
 
     @Override
     @Transactional
-    public GoalResponse update(UUID id, UUID userId, UpdateGoalRequest req) {
-        Goal goal = goalRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Goal", "id", id));
-        if (!goal.getUserId().equals(userId)) throw new AccessDeniedException();
+    public GoalResponse update(UUID id, UUID userId, UUID familyId, UpdateGoalRequest req) {
+        Goal goal = findAndValidateOwner(id, userId, familyId);
 
         if (req.getName()         != null) goal.setName(req.getName());
         if (req.getIcon()         != null) goal.setIcon(req.getIcon());
@@ -89,11 +91,20 @@ public class GoalServiceImpl implements GoalService {
 
     @Override
     @Transactional
-    public void delete(UUID id, UUID userId) {
+    public void delete(UUID id, UUID userId, UUID familyId) {
+        Goal goal = findAndValidateOwner(id, userId, familyId);
+        goalRepository.delete(goal);
+    }
+
+    /** Any family member (not just the creator) can update/delete a family-shared goal — mirrors
+     *  BudgetServiceImpl.findAndValidateOwner. */
+    private Goal findAndValidateOwner(UUID id, UUID userId, UUID familyId) {
         Goal goal = goalRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Goal", "id", id));
-        if (!goal.getUserId().equals(userId)) throw new AccessDeniedException();
-        goalRepository.delete(goal);
+        boolean owned = (familyId != null && familyId.equals(goal.getFamilyId()))
+                     || (userId   != null && userId.equals(goal.getUserId()));
+        if (!owned) throw new AccessDeniedException();
+        return goal;
     }
 
     private Map<UUID, AccountResponse> buildAccountMap(UUID userId) {
@@ -127,6 +138,7 @@ public class GoalServiceImpl implements GoalService {
                 .accountId(g.getAccountId())
                 .accountName(accountName)
                 .paused(g.isPaused())
+                .shared(g.getFamilyId() != null)
                 .build();
     }
 }

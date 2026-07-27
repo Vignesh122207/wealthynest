@@ -122,4 +122,46 @@ class RecurringIncomeControllerTest {
 
         verify(service).delete(id, userId);
     }
+
+    @Test
+    @DisplayName("GET /recurring-income delegates the authenticated userId and returns the service's list")
+    void getAllDelegatesToService() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null);
+        when(service.getAll(userId)).thenReturn(java.util.List.of(
+                RecurringIncomeResponse.builder().id(UUID.randomUUID()).build()));
+
+        mockMvc.perform(get("/api/v1/recurring-income"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1));
+    }
+
+    @Test
+    @DisplayName("PUT /recurring-income/{id} passes the path id and authenticated userId through")
+    void updateDelegatesToService() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null);
+        UUID id = UUID.randomUUID();
+        com.wealthynest.domain.recurringincome.dto.request.UpdateRecurringIncomeRequest req =
+                new com.wealthynest.domain.recurringincome.dto.request.UpdateRecurringIncomeRequest();
+        ReflectionTestUtils.setField(req, "amount", new BigDecimal("60000"));
+        when(service.update(eq(id), eq(userId), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(RecurringIncomeResponse.builder().id(id).build());
+
+        mockMvc.perform(put("/api/v1/recurring-income/{id}", id)
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(id.toString()));
+    }
+
+    @Test
+    @DisplayName("PATCH /recurring-income/{id}/toggle delegates the path id and authenticated userId")
+    void toggleDelegatesToService() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null);
+        UUID id = UUID.randomUUID();
+        when(service.toggleActive(id, userId)).thenReturn(RecurringIncomeResponse.builder().id(id).build());
+
+        mockMvc.perform(patch("/api/v1/recurring-income/{id}/toggle", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(id.toString()));
+    }
 }

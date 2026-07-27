@@ -118,7 +118,7 @@ class GoalControllerTest {
         @DisplayName("POST /goals creates and returns 201 with the created goal")
         void createReturns201() throws Exception {
             SecurityTestUtils.authenticateAs(userId, null);
-            when(goalService.create(eq(userId), org.mockito.ArgumentMatchers.any()))
+            when(goalService.create(eq(userId), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
                     .thenReturn(GoalResponse.builder().id(UUID.randomUUID()).name("Emergency Fund").build());
 
             mockMvc.perform(post("/api/v1/goals")
@@ -137,7 +137,7 @@ class GoalControllerTest {
             mockMvc.perform(delete("/api/v1/goals/{id}", goalId))
                     .andExpect(status().isOk());
 
-            verify(goalService).delete(goalId, userId);
+            verify(goalService).delete(goalId, userId, null);
         }
     }
 }

@@ -1,436 +1,115 @@
-# WealthyNest — Production-Ready Design Plan
+# WealthyNest — Production Readiness Status
+
+> Re-verified directly against the codebase on 2026-07-25. The previous version of this
+> document was a pre-implementation plan and had drifted significantly out of date — most of
+> what it listed as "critical missing" has since shipped. This version replaces it with the
+> actual current state, so it stops being cited as a gap list for work that's already done.
 
 ## Current Navigation (9 tabs)
 
 ```
 Dashboard · Accounts · Expenses · Budgets · Goals
-Investments · Net Worth · Analytics · Family
+Investments · Net Worth (Assets) · Analytics · Family
 ── Settings (footer) · Admin (conditional)
 ```
 
 ---
 
-## Part 1 — Critical Missing Pages
+## Part 1 — Pages that were "critical missing" — now checked against the repo
 
-These pages do not exist yet and are required before any public launch.
-
----
-
-### 1. Landing Page (`/`)
-
-Currently `/` redirects to `/login`. A public-facing homepage is required for anyone who hears about the app.
-
-**Sections:**
-```
-┌─────────────────────────────────────────────────────────┐
-│  NAVBAR                                                 │
-│  Logo | Features | Support    Login  Get Started →      │
-├─────────────────────────────────────────────────────────┤
-│  HERO                                                   │
-│  "Your Family's Financial Command Center"               │
-│  "Track, Budget, Invest — Together"                     │
-│  [Get Started Free]  [See Demo]                         │
-│  App screenshot / mockup                                │
-├─────────────────────────────────────────────────────────┤
-│  FEATURES (3 columns)                                   │
-│  Family Budgeting | Investment Tracking | Smart Goals   │
-├─────────────────────────────────────────────────────────┤
-│  SCREENSHOTS / FEATURE WALKTHROUGH                      │
-├─────────────────────────────────────────────────────────┤
-│  "Free Forever. No Ads. Ever."                          │
-│  [Create Free Account]                                  │
-├─────────────────────────────────────────────────────────┤
-│  FOOTER                                                 │
-│  Privacy Policy | Terms of Service | Support | GitHub   │
-└─────────────────────────────────────────────────────────┘
-```
-
-**Implementation notes:**
-- Shared layout separate from `(auth)` and `(dashboard)` route groups
-- Add Open Graph meta tags for social sharing previews
-- No auth required to view
+| Page | Status | Evidence |
+|---|---|---|
+| Landing page (`/`) | **Shipped** | `app/page.tsx` — real hero, 5 feature groups, security band, honest "no VC funding" note, footer linking Support/Privacy/Terms. Not a redirect to `/login` anymore. |
+| Support page | **Shipped** | Public `app/support/page.tsx` (linked from landing footer, no auth) plus an in-app authenticated version and FAQ/contact/tickets under `settings/support/*`. |
+| Privacy Policy (`/privacy`) | **Shipped** | `app/privacy/page.tsx`, 136 lines. |
+| Terms of Service (`/terms`) | **Shipped** | `app/terms/page.tsx`, 155 lines. |
+| Onboarding wizard | **Partial** | `family/_components/NoFamilyOnboarding.tsx` onboards someone into a *family*. There's no generic "first account / first budget" wizard for a brand-new solo user — every page's own empty state (e.g. Analytics' "Nothing to analyze yet" with direct links) substitutes for it today. Decide if a dedicated flow is still worth building, or if empty-state CTAs are sufficient. |
+| Notifications page | **Shipped** | Header bell with unread badge + dropdown panel (`Header.tsx`, `useMergedNotifications`) and a full `(dashboard)/notifications/page.tsx`. |
+| Reports page | **Shipped** | `(dashboard)/reports/` — Monthly, Annual, and raw-data Export tabs (CSV for expenses/income/transfers/accounts/investments/investment-income). |
 
 ---
 
-### 2. Support Page (`/support`)
+## Part 2 — Tab-by-tab, re-checked
 
-**Sections:**
-```
-┌─────────────────────────────────────────────────────────┐
-│  HEADER                                                 │
-│  "How can we help?"                                     │
-│  Search bar (client-side filter on FAQ items)           │
-├─────────────────────────────────────────────────────────┤
-│  FAQ (accordion)                                        │
-│  ├── How do I add a family member?                      │
-│  ├── How do I set up recurring expenses?                │
-│  ├── How do I track investments?                        │
-│  ├── Is my financial data safe?                         │
-│  ├── How do I export my data?                           │
-│  ├── Does WealthyNest connect to my bank?               │
-│  └── How do I delete my account?                        │
-├─────────────────────────────────────────────────────────┤
-│  CONTACT                                                │
-│  Email: support@wealthynest.in                          │
-│  Response time: within 48 hours                         │
-├─────────────────────────────────────────────────────────┤
-│  ☕ BUY ME A COFFEE                                     │
-│  "WealthyNest is free forever, no ads.                  │
-│   If it's helped your family, a coffee keeps            │
-│   the servers running!"                                 │
-│  [Support the Developer →]  (buymeacoffee.com link)    │
-└─────────────────────────────────────────────────────────┘
-```
+### Dashboard — all 3 original asks shipped
+Notification bell (Header), upcoming-bills + smart spending-delta insight (`SmartAlerts.tsx`), over-budget alert banner. Nothing open here.
 
-**Implementation notes:**
-- Static page, no API calls needed
-- Accessible without login (link from landing page footer)
-- Also add link in sidebar footer (below Settings)
-- Buy Me a Coffee: create account at buymeacoffee.com, use their link button
-
-```tsx
-<a
-  href="https://buymeacoffee.com/YOUR_USERNAME"
-  target="_blank"
-  rel="noopener noreferrer"
-  className="inline-flex items-center gap-2 bg-yellow-400 text-black
-             px-4 py-2 rounded-lg font-medium hover:bg-yellow-300 transition-colors"
->
-  ☕ Buy Me a Coffee
-</a>
-```
-
----
-
-### 3. Privacy Policy (`/privacy`)
-
-**Required for:** Google Play Store, Apple App Store, any data collection
-
-- Generate from privacypolicygenerator.info or similar
-- Must cover: data collected, how stored, third-party sharing, deletion rights
-- Link from: landing page footer, signup page, support page, app store listing
-- Static page, no auth required
-
----
-
-### 4. Terms of Service (`/terms`)
-
-**Required for:** Google Play Store, Apple App Store
-
-- Covers: acceptable use, no warranties, account termination, governing law (India)
-- Link from: landing page footer, signup page
-- Static page, no auth required
-
----
-
-### 5. Onboarding Wizard (post-signup flow)
-
-After signup → email verify → instead of empty dashboard, guide user through setup.
-
-**Steps:**
-```
-Step 1 — "What's your primary goal?"
-  ○ Track family expenses
-  ○ Save for a goal
-  ○ Track investments
-  ○ All of the above
-
-Step 2 — "Set up your first account"
-  → Create bank / cash account with opening balance
-  → (Can skip)
-
-Step 3 — "Set your monthly budget" (optional)
-  → Set total monthly spending limit
-
-Step 4 — "Invite your family?" (optional)
-  → Show family invite code
-  → Or skip to dashboard
-
-→ Land on Dashboard with first data already present
-```
-
-**Implementation notes:**
-- Multi-step form at `/onboarding`
-- Redirect here after email verification if user has no accounts yet
-- After completion, set a `onboardingComplete` flag on the user record
-- Skip link on every step
-
----
-
-### 6. Notifications Page (`/notifications`)
-
-Backend already built (`NotificationService`, budget breach dedup). Need UI.
-
-**Header bell icon (all pages):**
-```
-Header → 🔔 badge with unread count
-       → Click → dropdown with latest 5 notifications
-       → "View All" link → /notifications
-```
-
-**Full notifications page:**
-```
-┌─────────────────────────────────────────────────────────┐
-│  Notifications          [Mark all as read]              │
-├─────────────────────────────────────────────────────────┤
-│  Filter: All | Budget Alerts | Goals | System           │
-├─────────────────────────────────────────────────────────┤
-│  TODAY                                                  │
-│  🔴 Budget Alert — Food budget 92% used    2h ago  ●   │
-│  🟢 Goal reached — Emergency Fund         5h ago      │
-│                                                         │
-│  YESTERDAY                                             │
-│  🔴 Budget Alert — Shopping over budget   1d ago      │
-└─────────────────────────────────────────────────────────┘
-```
-
-**Backend additions needed:**
-- `GET /api/v1/notifications` — paginated, unread first
-- `PUT /api/v1/notifications/read-all`
-- `PUT /api/v1/notifications/{id}/read`
-- `GET /api/v1/notifications/unread-count` — for bell badge polling
-
----
-
-### 7. Reports Page (`/reports`)
-
-Downloadable monthly and annual financial reports.
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  Reports                                                │
-├─────────────────────────────────────────────────────────┤
-│  MONTHLY REPORTS                                        │
-│  June 2026    [Download PDF] [Download CSV]             │
-│  May 2026     [Download PDF] [Download CSV]             │
-│  April 2026   [Download PDF] [Download CSV]             │
-├─────────────────────────────────────────────────────────┤
-│  ANNUAL REPORTS                                         │
-│  2026 (Jan–Jun so far)  [Download PDF]                  │
-│  2025                   [Download PDF]                  │
-└─────────────────────────────────────────────────────────┘
-```
-
-**PDF report contents:**
-- Income vs expenses summary
-- Budget performance per category
-- Top 10 expenses
-- Savings rate
-- Net worth snapshot
-- Investment performance
-
-**Implementation notes:**
-- Generate PDF server-side using iText or JasperReports (Spring Boot)
-- Stream directly to client — no S3 needed
-- CSV already exists on Expenses page; expand to full financial export here
-
----
-
-## Part 2 — Tab-by-Tab Improvements
-
-### Dashboard — 3 Additions
-
-| What to Add | Detail |
+### Accounts — 1 item orphaned, not missing
+| What | Status |
 |---|---|
-| Notification bell | 🔔 icon in header, badge with unread count, dropdown on click |
-| Upcoming this week | Section showing recurring expenses due in next 7 days |
-| Smart insight card | One sentence: "You spent ₹3,200 more on dining vs last month" |
+| Per-account statement download | **Backend done, frontend never wired up.** `WalletAccountController` has a real `GET /accounts/{id}/statement` endpoint (`WalletAccountService.generateStatementCsv`, streams CSV with a proper `Content-Disposition`). No frontend code calls it — no `downloadStatement` API method, no button on `AccountsGrid`/`AccountCard`. Same "working endpoint the UI never reached" pattern as the expense-split per-split settle endpoint the Playwright suite found. Either wire up a download button or remove the dead backend endpoint — it shouldn't stay silently unreachable. |
 
----
+### Expenses — done, different location than originally sketched
+Recurring rule management shipped as `settings/recurring` (Income/Expenses/Transfers/Goals tabs) rather than as a tab inside the Expenses page itself. Functionally equivalent to the original ask.
 
-### Accounts — 1 Addition
-
-| What to Add | Detail |
+### Budgets — 1 item still open
+| What | Status |
 |---|---|
-| Per-account statement | Download PDF/CSV for a single account with date range filter |
+| Rollover toggle (unspent carries to next month) | **Not built.** No `rollover`/`carryOver` field anywhere in the budget entity or schema. Still a real gap if users are asking for it. |
 
-Users need this for tax filing and bank reconciliation.
+### Goals — shipped
+`accountId` is wired end-to-end (`Goal` entity, `CreateGoalRequest`/`UpdateGoalRequest`, `GoalResponse`) — a goal can link to a specific account.
 
----
-
-### Expenses — 1 New Tab: Recurring
-
-Backend scheduler exists, no management UI exists yet.
-
-**Add tab inside Expenses page:**
-```
-Expenses page tabs:  All Expenses  |  Recurring
-
-Recurring tab:
-┌─────────────────────────────────────────────────────────┐
-│  Recurring Expenses                  [+ Add Recurring]  │
-├─────────────────────────────────────────────────────────┤
-│  Netflix Subscription                                   │
-│  ₹649 · Monthly · Next: Jul 1, 2026   [Edit] [Delete]  │
-│                                                         │
-│  House Rent                                             │
-│  ₹15,000 · Monthly · Next: Jul 5, 2026  [Edit] [Delete]│
-└─────────────────────────────────────────────────────────┘
-```
-
----
-
-### Budgets — 1 Addition
-
-| What to Add | Detail |
+### Investments — 1 item still open
+| What | Status |
 |---|---|
-| Rollover toggle | Per-budget toggle: unspent amount carries forward to next month |
+| SIP reminder (next due date surfaced) | **Not built.** `SipSection.tsx` exists for logging SIP contributions but doesn't surface a "next SIP due" date anywhere. |
 
----
+### Net Worth — shipped
+`NetWorthHistoryChart.tsx` on the Assets page plus a trend widget on Home, backed by a real `GET /net-worth/history` endpoint.
 
-### Goals — 1 Addition
+### Analytics — shipped
+Dedicated Year-over-Year Comparison chart (this year vs. last year, monthly) already on the page — not a toggle as originally sketched, but the same information.
 
-| What to Add | Detail |
+### Family — 2 of 3 shipped
+| What | Status |
 |---|---|
-| Link to account | Link a goal to a specific account (Emergency Fund goal → Emergency Fund account) so balance auto-syncs to goal progress |
+| Combined family expense feed | **Shipped** — `SharedActivityFeed.tsx` |
+| Per-member spending chart | **Shipped** — `MemberSpendingChart.tsx` |
+| Shared family goals (whole family contributes, visible to all) | **Not built.** No `sharedGoal`/`familyGoal` concept anywhere — goals today are still per-user. |
+
+### Settings — shipped, via UPI instead of Buy Me a Coffee
+`(dashboard)/support-wealthynest/page.tsx` is a dedicated in-app page with a UPI pay link/QR (`upi://pay?pa=...&pn=WealthyNest&tn=Support%20WealthyNest`) positioned as supporting the developer — a better fit for the Indian market than a buymeacoffee.com link would have been. Not in Settings itself as originally sketched, but the same ask, shipped.
 
 ---
 
-### Investments — 1 Addition
+## Part 4 — Production readiness checklist, re-verified
 
-| What to Add | Detail |
-|---|---|
-| SIP reminder | Show next SIP date per mutual fund, mark as logged when recurring expense fires |
+### Must-fix-before-launch — all resolved except one
+- [x] `/not-found.tsx` — shipped
+- [x] `error.tsx` global boundary — shipped
+- [x] Loading skeletons — shared `LoadingSkeleton.tsx`, used in 11+ places, not just spinners
+- [x] PWA manifest — `manifest.json` with 192/512 + maskable icons, install shortcuts for Add Expense/Dashboard
+- [x] App icons (192×192, 512×512) — shipped
+- [x] Favicon + apple-touch-icon — handled via Next's metadata API (`layout.tsx`'s `icons` block), not static files — actually a better pattern than the original ask
+- [x] Open Graph tags — `opengraph-image.tsx` + `twitter-image.tsx`, dynamically generated
+- [ ] **HTTPS enforced** — no in-app enforcement (no HSTS/redirect-to-https in Spring config); relies entirely on the Cloudflare Tunnel terminating TLS. That's a valid pattern **only if** nothing else can reach the origin directly — see the open infra item below.
+- [x] CORS locked down — driven by `CorsProperties`/`wealthynest.security.cors.allowed-origins`, not a hardcoded wildcard. Just confirm the deployed `.env`'s `CORS_ORIGINS` is the real production domain, not `localhost:3000`.
 
----
-
-### Net Worth — 1 Addition
-
-| What to Add | Detail |
-|---|---|
-| Historical trend chart | Monthly net worth snapshots stored via scheduler, displayed as line chart |
-
-**Backend additions needed:**
-- `net_worth_snapshots` table (user_id, snapshot_date, total_assets, total_liabilities, net_worth)
-- Scheduled job: run on 1st of each month, store snapshot
-- `GET /api/v1/net-worth/history` endpoint
-
----
-
-### Analytics — 1 Addition
-
-| What to Add | Detail |
-|---|---|
-| Year-over-year view | Toggle between "Monthly view" and "Year comparison" (this year vs last year bars side by side) |
-
----
-
-### Family — 3 Additions
-
-Currently too minimal for a family-first app.
-
-| What to Add | Detail |
-|---|---|
-| Family expense feed | Combined feed of all members' recent expenses in one view |
-| Per-member spending chart | Pie/bar chart showing each member's spend this month |
-| Shared family goals | Goals the whole family contributes to, visible to all members |
-
----
-
-### Settings — 1 Addition
-
-Add a **"Support the App"** section after the existing sections:
-
-```
-─── Support the App ──────────────────────────────────────
-WealthyNest is free forever with no ads.
-If it helps your family, a coffee keeps it running.
-
-[☕ Buy Me a Coffee]    [★ Star on GitHub]
-```
-
----
-
-## Part 3 — Updated Sidebar
-
-```
-  Dashboard
-  Accounts
-  Expenses
-  Budgets
-  Goals
-  Investments
-  Net Worth
-  Analytics
-  ─────────────
-  Family
-  Reports          ← NEW
-  ─────────────
-  Admin            ← conditional (ADMIN role only)
-
-Footer:
-  [Avatar] Name · Role
-  Settings
-  Support          ← NEW link
-  Sign out
-```
-
-**Mobile bottom nav (5 slots — unchanged):**
-```
-Home  |  Accounts  |  Expenses  |  Budgets  |  Goals
-```
-
-Notifications lives in the **header bell icon**, not the bottom nav.
-
----
-
-## Part 4 — Production Readiness Checklist
-
-### Must Fix Before Launch
-
-- [ ] `/not-found.tsx` — friendly 404 page with link back to dashboard
-- [ ] `error.tsx` — global error boundary with "Something went wrong, try again" message
-- [ ] Loading skeletons — replace all spinners with skeleton screens
-- [ ] PWA manifest — `manifest.json` with name, icons, theme_color (makes app installable on Android from browser)
-- [ ] App icons — 192×192 and 512×512 PNG icons for PWA and Play Store
-- [ ] Favicon — proper favicon.ico + apple-touch-icon
-- [ ] Open Graph tags — on landing page for social sharing previews
-- [ ] HTTPS enforced — Spring Boot must reject plain HTTP in production
-- [ ] CORS locked down — only allow wealthynest.in origin, not wildcard
+**Open infra check, not a code fix**: `docker-compose.yml` maps `wealthynest-api` (`8080:8080`) and `wealthynest-web` (`3000:3000`) to all interfaces, unlike Postgres/Redis which are pinned to `127.0.0.1`. Confirm the host's firewall/security group actually blocks public inbound 8080/3000 — otherwise the Cloudflare Tunnel's TLS termination can be bypassed entirely by hitting the origin's IP directly over plain HTTP.
 
 ### Mobile App Specific
-
-- [ ] Splash screen — shown while Capacitor app loads
-- [ ] Push notifications — Firebase Cloud Messaging for budget alerts
-- [ ] Offline screen — friendly message instead of broken API errors
-- [ ] Android back button handling — Capacitor needs explicit back navigation
+- [x] Splash screen — shipped (see recent commit fixing the blank-rectangle bug)
+- [ ] **Push notifications** — not built. No `@capacitor/push-notifications` or Firebase dependency in `package.json`. Confirmed still an open item, matches `ANDROID_APP_ROADMAP.md`'s own "known gap."
+- [x] Push notifications — implemented via `@capacitor/push-notifications` + Firebase Cloud Messaging (`FcmPushNotificationSender`, `device_tokens` table, `useNativePush.ts`) — wired into the same 5 alert types as in-app notifications. Firebase project setup and on-device delivery are still unverified; see `ANDROID_APP_ROADMAP.md`'s "Push notifications" section for the setup steps and its Phase 1 checklist for the verification list.
+- [x] Offline screen — `public/offline.html` + `public/sw.js` shipped
+- [ ] **Android back button handling** — no explicit `App.addListener("backButton", ...)` found. Capacitor's default WebView back-navigation may already be adequate; hasn't been deliberately verified either way.
 
 ### Backend / API
-
-- [ ] Health check endpoint — `GET /actuator/health` (already in Spring Boot, just expose it)
-- [ ] API versioning — already at `/api/v1/` (good)
-- [ ] Rate limiting tuned for production — check trusted-proxies config before deploy
-- [ ] Database connection pooling — verify HikariCP settings for production load
-- [ ] Logs — structured JSON logging for CloudWatch/Grafana
-
----
-
-## Part 5 — Implementation Order
-
-```
-Week 1:   Landing page (/, navbar, hero, features, footer)
-Week 2:   Privacy Policy + Terms of Service (static pages)
-Week 3:   Support page + Buy Me a Coffee
-Week 4:   Notifications backend endpoints + bell icon + /notifications page
-Week 5:   Onboarding wizard (/onboarding, 4 steps)
-Week 6:   Recurring expense management UI (tab in Expenses)
-Week 7:   Family page improvements (feed, per-member chart, shared goals)
-Week 8:   Reports page (PDF/CSV generation)
-Week 9:   Net worth history (DB table + scheduler + chart)
-Week 10:  404 + error pages + loading skeletons + PWA manifest
-Week 11:  Settings: Support the App section + Buy Me a Coffee
-Week 12:  Mobile app (Capacitor wrapper + splash screen + push notifications)
-```
+- [x] Health check endpoint — `/actuator/health` exposed (`management.endpoints.web.exposure.include: health,info,metrics`), already wired into the Docker healthcheck
+- [x] API versioning — `/api/v1/` throughout
+- [x] Rate limiting — real two-tier config (`RateLimitConfig`, trusted-proxy aware); Playwright's own README flags that concurrent-real-device load under the Cloudflare Tunnel hasn't been stress-tested yet — worth a real check before a public launch, not just local dev traffic
+- [x] Database connection pooling — HikariCP configured (`maximum-pool-size: 20`, `minimum-idle: 5`, `connection-timeout: 30000`)
+- [ ] **Structured JSON logging** — not built. `application.yml` only sets log *levels*, no JSON encoder (no `logback-spring.xml` with a structured layout). Still a real gap for CloudWatch/Grafana-style ingestion.
 
 ---
 
-## Buy Me a Coffee — Setup Steps
+## What's actually left (the real list, not the old one)
 
-1. Go to buymeacoffee.com → create account
-2. Set your page name (e.g. `buymeacoffee.com/wealthynest`)
-3. Add profile photo and short description
-4. Connect bank account for payouts
-5. Use the link in `/support` and `/settings`
-6. No backend code needed — it's just a link
+1. Confirm the host firewall blocks direct access to ports 8080/3000 (Cloudflare Tunnel bypass risk).
+2. Structured JSON logging for real observability.
+3. Wire up (or deliberately remove) the orphaned per-account statement endpoint.
+4. A deliberate yes/no on: generic onboarding wizard, budget rollover, SIP due-date reminder, shared family goals, Android back-button handling. (Push notifications are decided and implemented — what's left there is Firebase project setup and on-device verification, not a product decision; see `ANDROID_APP_ROADMAP.md`.)
+5. Verify rate limiting under genuine concurrent multi-device load, not just local dev traffic.
 
-When a user clicks and buys a coffee (₹149 / $5 equivalent), you get notified by email and the money hits your bank account within 3–5 days.
+None of these are launch-blocking in the way the original checklist implied — the actual blocking-page work (landing, legal, notifications, reports, onboarding-adjacent empty states) is done.

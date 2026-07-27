@@ -41,11 +41,23 @@ This is genuinely more complete than most indie finance apps. The family angle i
 - **No vendor lock-in** — not tied to one bank or broker like Fi or Groww
 - **Enterprise-ready stack** (Spring Boot 3 / Java 21 / PostgreSQL)
 
-### Gaps (honest assessment)
-- No mobile app (Next.js web only right now)
-- No bank account linking (requires manual entry)
-- No MF/investment execution (you track but can't transact)
-- No network effects yet
+### Gaps (honest assessment, re-checked 2026-07-25)
+- An Android app exists (Capacitor, server-mode WebView against the live site — see
+  `ANDROID_APP_ROADMAP.md`), with native biometric unlock for PIN accounts and push notifications
+  (FCM) implemented end-to-end. Neither is yet verified on a real device — push additionally needs
+  a Firebase project created and credentials dropped in before it can fire at all. Closer than "no
+  mobile app," but not a finished native experience either.
+- No bank account linking via India's Account Aggregator framework — still the real gap. CSV and
+  CAS-PDF import exist as manual stopgaps, and the CAS parser itself is untuned against a real
+  statement.
+- No MF/investment execution (you track but can't transact) — unchanged.
+- No network effects yet, but the family feature itself is further along than this doc implied:
+  shared activity feed, per-member spending chart, and shared budgets already ship (see
+  `family/_components/SharedActivityFeed.tsx`, `MemberSpendingChart.tsx`). What's still missing
+  is *goals* the whole family contributes to — goals today are still per-user.
+- Landing page, Privacy Policy, and Terms of Service — listed as Phase 1 work below — are also
+  already shipped, not still pending. See `PRODUCTION_PLAN.md`'s current version for the full
+  re-verified status.
 
 ---
 
@@ -59,11 +71,11 @@ This is exactly how INDmoney and ET Money make money — without ads or paywalli
 
 **Goal: 1,000 active family units. Zero revenue. All investment.**
 
-- Add a **mobile-responsive PWA** (your Next.js app is 80% there already)
-- Add **CSV/OFX import** for bank statements (biggest friction point for new users)
-- Build a **family invite flow** — email a member, they join your family unit
-- Launch on Reddit (`r/IndiaInvestments`, `r/personalfinanceindia`), Twitter/X, Product Hunt
-- Write honest comparison posts: *"Why I built WealthyNest after Mint died"*
+- ~~Add a mobile-responsive PWA~~ — **done**: `manifest.json`, install icons, offline shell, service worker all shipped.
+- ~~Add CSV/OFX import~~ — **done**: CSV statement import and CAS PDF import both ship, though the CAS parser still needs tuning against a real-world statement (see `PRODUCTION_PLAN.md`).
+- Build a **family invite flow** — invite-code join already works; still no *shared family goals*, only shared budgets/activity.
+- Launch on Reddit (`r/IndiaInvestments`, `r/personalfinanceindia`), Twitter/X, Product Hunt — **not started**, this is still the real bottleneck, not the product.
+- Write honest comparison posts: *"Why I built WealthyNest after Mint died"* — **not started**.
 
 ---
 

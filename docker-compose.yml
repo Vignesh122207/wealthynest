@@ -72,6 +72,7 @@ services:
       VAULT_ENCRYPTION_KEY: ${VAULT_ENCRYPTION_KEY}
       VAULT_HASH_PEPPER:    ${VAULT_HASH_PEPPER}
       CORS_ORIGINS:        ${CORS_ORIGINS}
+      RATE_LIMIT_TRUSTED_PROXIES: ${RATE_LIMIT_TRUSTED_PROXIES:-}
       PORT:         8080
       MAIL_HOST:     ${MAIL_HOST}
       MAIL_PORT:     ${MAIL_PORT}
@@ -79,6 +80,12 @@ services:
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       FRONTEND_URL:  ${FRONTEND_URL}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      # Native Android sign-in (Desktop app OAuth client) — see AuthServiceImpl.googleLoginNative
+      # for why the backend, not the app, needs these to exchange an authorization code for an
+      # ID token: Google requires this client secret for that exchange even with PKCE.
+      GOOGLE_NATIVE_CLIENT_ID:     ${GOOGLE_NATIVE_CLIENT_ID:-}
+      GOOGLE_NATIVE_CLIENT_SECRET: ${GOOGLE_NATIVE_CLIENT_SECRET:-}
+      FCM_SERVICE_ACCOUNT_JSON:    ${FCM_SERVICE_ACCOUNT_JSON:-}
     networks:
       - wealthynest-net
     healthcheck:
@@ -94,6 +101,12 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${API_URL}
         NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+        # Separate from GOOGLE_CLIENT_ID (a "Web application" OAuth client, used by the browser
+        # GIS flow below) — Google only allows custom-URI-scheme redirects (what the native
+        # Capacitor OAuth flow needs, since it can't use an https redirect) on a "Desktop app"
+        # type OAuth client. Create that as its own client in Google Cloud Console; the two IDs
+        # are not interchangeable.
+        NEXT_PUBLIC_GOOGLE_NATIVE_CLIENT_ID: ${GOOGLE_NATIVE_CLIENT_ID}
     container_name: wealthynest-web
     restart: unless-stopped
     depends_on:
@@ -124,6 +137,14 @@ services:
 networks:
   wealthynest-net:
     driver: bridge
+    # Pinned (matches the subnet Docker had already auto-assigned) rather than left to dynamic
+    # allocation — RATE_LIMIT_TRUSTED_PROXIES (.env) trusts this exact range so the rate limiter
+    # can tell the `tunnel` container's traffic apart from a request that reached the API
+    # directly; an unpinned subnet could drift to a different range on a network recreation and
+    # silently break that trust check.
+    ipam:
+      config:
+        - subnet: 172.19.0.0/16
 
 volumes:
   wealthynest-postgres-data:

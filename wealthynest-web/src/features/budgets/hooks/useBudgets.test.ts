@@ -22,7 +22,7 @@ const mockedApi = vi.mocked(budgetsApi);
 const sampleBudget: Budget = {
   id: "b1", categoryId: "c1", amount: 1000, spent: 200, annualSpent: 200, remaining: 800,
   percentUsed: 20, overBudget: false, periodMonth: 6, periodYear: 2026, alertThreshold: 80,
-  alertTriggered: false, budgetType: "MONTHLY", shared: false,
+  alertTriggered: false, budgetType: "MONTHLY", shared: false, rollover: false, rolloverAmount: 0,
 };
 
 beforeEach(() => {

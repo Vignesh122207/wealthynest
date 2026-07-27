@@ -53,6 +53,18 @@ describe("budgetSchema", () => {
       expect(result.data.alertThreshold).toBe(50);
     }
   });
+
+  it("defaults rollover to false when omitted", () => {
+    const result = budgetSchema.safeParse({ categoryId: validUuid, amount: 1000 });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.rollover).toBe(false);
+  });
+
+  it("accepts an explicit rollover value", () => {
+    const result = budgetSchema.safeParse({ categoryId: validUuid, amount: 1000, rollover: true });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.rollover).toBe(true);
+  });
 });
 
 describe("editBudgetSchema", () => {
@@ -66,5 +78,11 @@ describe("editBudgetSchema", () => {
 
   it("rejects an out-of-range alertThreshold", () => {
     expect(editBudgetSchema.safeParse({ amount: 500, alertThreshold: 150 }).success).toBe(false);
+  });
+
+  it("defaults rollover to false when omitted", () => {
+    const result = editBudgetSchema.safeParse({ amount: 500 });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.rollover).toBe(false);
   });
 });

@@ -217,7 +217,7 @@ public class WebAuthnServiceImpl implements WebAuthnService {
     @Override
     @Transactional
     public AuthResponse verifyAuthentication(String email, Map<String, Object> credential, boolean rememberMe,
-                                              String ipAddress, String userAgent) {
+                                              String previousRefreshToken, String ipAddress, String userAgent) {
         String normalizedEmail = email.toLowerCase();
         String challengeB64 = redisTemplate.opsForValue().get(loginChallengeKey(normalizedEmail));
         if (challengeB64 == null) {
@@ -259,7 +259,7 @@ public class WebAuthnServiceImpl implements WebAuthnService {
         stored.setLastUsedAt(Instant.now());
         credentialRepository.save(stored);
 
-        return authService.issueTokensForVerifiedUser(stored.getUserId(), rememberMe);
+        return authService.issueTokensForVerifiedUser(stored.getUserId(), rememberMe, ipAddress, userAgent, previousRefreshToken);
     }
 
     // ─── helpers ──────────────────────────────────────────────────────────────

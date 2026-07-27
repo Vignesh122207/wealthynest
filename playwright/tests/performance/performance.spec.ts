@@ -90,7 +90,7 @@ async function loadEventEndMs(page: Page): Promise<number> {
 
 test.describe("Performance (smoke thresholds)", () => {
   for (const [name, route] of [
-    ["dashboard", ROUTES.dashboard],
+    ["home", ROUTES.home],
     ["accounts", ROUTES.accounts],
     ["transactions", ROUTES.transactions],
     ["investments", ROUTES.investments],

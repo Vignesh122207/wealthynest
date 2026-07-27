@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls", "delegate_permission/common.get_login_creds"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "in.wealthynest.app",
+      "sha256_cert_fingerprints": [
+        "CA:89:E1:47:78:7B:0B:02:8F:1D:72:93:44:6C:9C:4F:10:52:2C:0D:38:34:61:AA:62:71:18:6E:66:C4:2B:59"
+      ]
+    }
+  }
+]

@@ -1,14 +1,14 @@
 "use client";
 
 import {useMemo, useState} from "react";
-import Link from "next/link";
 import {Header} from "@/components/layout/Header";
 import {PageWrapper} from "@/components/layout/PageWrapper";
-import {AlertTriangle, ArrowLeft, Banknote, Check, Lock, type LucideIcon, Plus, Receipt, Tag} from "lucide-react";
+import {AlertTriangle, Banknote, Check, Lock, type LucideIcon, Plus, Receipt, Tag} from "lucide-react";
 import {cn} from "@/lib/utils";
 import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
 import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
 import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {TabBar, type TabBarItem} from "@/components/ui/TabBar";
 import {FormModalHeader} from "@/components/transactions/FormModalHeader";
 import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
 import {
@@ -100,7 +100,7 @@ function CategoryFormModal({
               onChange={e => setName(e.target.value)}
               placeholder={isIncome ? "e.g. Rental Income" : "e.g. Gym & Fitness"}
               data-testid="category-name-input"
-              className="w-full h-10 px-3 rounded-xl text-sm bg-background border border-border text-foreground placeholder-muted-foreground/40 outline-none focus:border-indigo-500 transition-all"
+              className="w-full h-10 px-3 rounded-xl text-sm bg-background border border-border text-foreground placeholder-muted-foreground/40 outline-none focus:border-purple-500 transition-all"
             />
             {name.trim().length > 0 && name.trim().length < 2 && (
               <p className="text-[10px] text-red-500 mt-1">Minimum 2 characters</p>
@@ -144,7 +144,7 @@ function CategoryFormModal({
                       return (
                         <button key={k} type="button" onClick={() => setIcon(k)}
                           title={usedBy.length > 0 ? `${label} — also used by ${usedBy.map(u => u.name).join(", ")}` : label}
-                          className={cn("relative rounded-xl transition-all", icon === k ? "ring-2 ring-indigo-500 ring-offset-2 ring-offset-card" : "opacity-70 hover:opacity-100")}>
+                          className={cn("relative rounded-xl transition-all", icon === k ? "ring-2 ring-purple-500 ring-offset-2 ring-offset-card" : "opacity-70 hover:opacity-100")}>
                           <PremiumIcon icon={Icon} hex={icon === k ? color : "#8E8E93"} size="sm" />
                           {usedBy.length > 0 && icon !== k && (
                             <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-card" />
@@ -271,32 +271,19 @@ export default function CategoriesSettingsPage() {
       <Header title="Categories" subtitle="Manage expense and income categories" />
       <PageWrapper>
 
-        <Link href="/settings" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <ArrowLeft className="w-3.5 h-3.5" />
-          Settings
-        </Link>
-
-        {/* Tab bar — same solid-fill-per-type template as Investments/Accounts/Debts/Transactions,
-            colored to match this page's own FAB (Expense=rose, Income=emerald). */}
-        <div className="flex gap-1 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-          {([
-            { key: "EXPENSE", label: "Expense", icon: Receipt,  bg: "bg-rose-600" },
-            { key: "INCOME",  label: "Income",   icon: Banknote, bg: "bg-emerald-600" },
-          ] as const).map(t => (
-            <button key={t.key} onClick={() => switchTab(t.key)} data-testid={`category-tab-${t.key}`}
-              className={cn(
-                "flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium whitespace-nowrap transition-all shrink-0",
-                tab === t.key ? cn(t.bg, "text-white") : "bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted"
-              )}>
-              <t.icon className="w-3.5 h-3.5" />
-              {t.label}
-              <span className={cn("text-xs px-1.5 py-0.5 rounded-full font-bold",
-                tab === t.key ? "bg-white/20 text-white" : "bg-muted text-muted-foreground")}>
-                {allCategories.filter(c => c.type === t.key).length}
-              </span>
-            </button>
-          ))}
-        </div>
+        {/* Tab bar — shared TabBar template, colored to match this page's own FAB
+            (Expense=rose, Income=emerald). */}
+        <TabBar
+          items={([
+            { key: "EXPENSE", label: "Expense", icon: Receipt,  color: "#e11d48" },
+            { key: "INCOME",  label: "Income",   icon: Banknote, color: "#059669" },
+          ] as const).map((t): TabBarItem<"EXPENSE" | "INCOME"> => ({
+            ...t, count: allCategories.filter(c => c.type === t.key).length,
+          }))}
+          value={tab}
+          onChange={switchTab}
+          testIdPrefix="category-tab"
+        />
 
         {/* Info banner */}
         <div className="flex items-start gap-2.5 bg-muted/40 border border-border rounded-xl px-3.5 py-2.5 text-xs text-muted-foreground">
@@ -363,7 +350,7 @@ export default function CategoriesSettingsPage() {
                   Create your first custom {isExpense ? "expense" : "income"} category to organise your finances.
                 </p>
                 <button onClick={() => setFormMode("create")}
-                  className="mt-4 flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-all">
+                  className="mt-4 flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-purple-600 hover:bg-purple-500 text-white transition-all">
                   <Plus className="w-4 h-4" /> Create First Category
                 </button>
               </div>
@@ -374,7 +361,7 @@ export default function CategoriesSettingsPage() {
               <div className="px-4 py-4 border-t border-border text-center">
                 <p className="text-xs text-muted-foreground">
                   No custom {isExpense ? "expense" : "income"} categories.{" "}
-                  <button onClick={() => setFormMode("create")} className="text-indigo-500 hover:text-indigo-400 font-medium transition-colors">
+                  <button onClick={() => setFormMode("create")} className="text-purple-500 hover:text-purple-400 font-medium transition-colors">
                     Add one
                   </button>
                 </p>

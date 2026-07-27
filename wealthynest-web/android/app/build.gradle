@@ -1,0 +1,85 @@
+apply plugin: 'com.android.application'
+
+// Reuses the same signing identity as the retired TWA project (../../android-twa-legacy/keystore)
+// so this stays the same app to the Play Store if it's ever submitted under that key. Copy
+// keystore.properties.example to keystore.properties (git-ignored, never commit it) and fill in
+// the real password to build a signed release.
+def keystorePropsFile = rootProject.file('keystore.properties')
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) {
+    keystoreProps.load(new FileInputStream(keystorePropsFile))
+}
+
+android {
+    namespace = "in.wealthynest.app"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "in.wealthynest.app"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        // @capacitor-community/generic-oauth2 bundles net.openid:appauth, whose own manifest
+        // contributes a RedirectUriReceiverActivity templated with this placeholder — required
+        // for the manifest merge to succeed at all, regardless of whether native Google sign-in
+        // is otherwise configured.
+        // Must be exactly "com.googleusercontent.apps.<native OAuth client ID>" — confirmed the
+        // hard way: Google's Desktop-app-type OAuth clients reject any other custom scheme for
+        // the redirect_uri with a 400 invalid_request, regardless of what's registered on the
+        // Android side. Must match GoogleSignInButton.tsx's nativeRedirectUrlFor() output, and
+        // gets a new value if GOOGLE_NATIVE_CLIENT_ID (.env) is ever rotated.
+        manifestPlaceholders = [appAuthRedirectScheme: "com.googleusercontent.apps.510219615328-2pspp599ckp92b6kfrrkk8ovkdlj61uj"]
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        release {
+            if (keystorePropsFile.exists()) {
+                storeFile rootProject.file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig keystorePropsFile.exists() ? signingConfigs.release : null
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

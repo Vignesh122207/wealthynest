@@ -26,14 +26,15 @@ public class GoalController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<GoalResponse>>> getAll() {
         return ResponseEntity.ok(ApiResponse.success(
-                goalService.getAll(SecurityUtils.requireCurrentUserId())));
+                goalService.getAll(SecurityUtils.requireCurrentUserId(), SecurityUtils.getCurrentFamilyId().orElse(null))));
     }
 
     @PostMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<GoalResponse>> create(@Valid @RequestBody CreateGoalRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.created(goalService.create(SecurityUtils.requireCurrentUserId(), request)));
+                .body(ApiResponse.created(goalService.create(
+                        SecurityUtils.requireCurrentUserId(), SecurityUtils.getCurrentFamilyId().orElse(null), request)));
     }
 
     @PutMapping("/{id}")
@@ -41,13 +42,13 @@ public class GoalController {
     public ResponseEntity<ApiResponse<GoalResponse>> update(
             @PathVariable UUID id, @Valid @RequestBody UpdateGoalRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
-                goalService.update(id, SecurityUtils.requireCurrentUserId(), request)));
+                goalService.update(id, SecurityUtils.requireCurrentUserId(), SecurityUtils.getCurrentFamilyId().orElse(null), request)));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
-        goalService.delete(id, SecurityUtils.requireCurrentUserId());
+        goalService.delete(id, SecurityUtils.requireCurrentUserId(), SecurityUtils.getCurrentFamilyId().orElse(null));
         return ResponseEntity.ok(ApiResponse.noContent());
     }
 }

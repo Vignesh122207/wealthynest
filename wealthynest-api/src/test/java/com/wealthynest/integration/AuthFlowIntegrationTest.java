@@ -2,9 +2,11 @@ package com.wealthynest.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wealthynest.common.security.RefreshCookieService;
 import com.wealthynest.domain.user.entity.User;
 import com.wealthynest.domain.user.repository.UserRepository;
 import com.wealthynest.testsupport.AbstractIntegrationTest;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +20,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -40,6 +43,12 @@ class AuthFlowIntegrationTest extends AbstractIntegrationTest {
     private ObjectMapper objectMapper;
     @Autowired
     private UserRepository userRepository;
+
+    /** The refresh token travels as an httpOnly cookie, not in the JSON body — see
+     * AuthResponse#refreshToken's own @JsonIgnore and RefreshCookieService. */
+    private static String refreshTokenCookie(MvcResult result) {
+        return result.getResponse().getCookie(RefreshCookieService.COOKIE_NAME).getValue();
+    }
 
     @Test
     @DisplayName("register (unverified, no tokens) -> blocked login -> verify -> login -> access protected resource -> refresh rotates tokens -> logout revokes -> reuse fails")
@@ -71,7 +80,8 @@ class AuthFlowIntegrationTest extends AbstractIntegrationTest {
         user.setEmailVerified(true);
         userRepository.save(user);
 
-        // 4. Login now succeeds and returns real, working tokens
+        // 4. Login now succeeds and returns real, working tokens — access token in the body,
+        // refresh token as an httpOnly cookie (never in JSON, see AuthResponse#refreshToken).
         MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType("application/json")
                         .content("""
@@ -79,12 +89,14 @@ class AuthFlowIntegrationTest extends AbstractIntegrationTest {
                                 """.formatted(email, password)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.accessToken").exists())
-                .andExpect(jsonPath("$.data.refreshToken").exists())
+                .andExpect(jsonPath("$.data.refreshToken").doesNotExist())
+                .andExpect(cookie().exists(RefreshCookieService.COOKIE_NAME))
+                .andExpect(cookie().httpOnly(RefreshCookieService.COOKIE_NAME, true))
                 .andReturn();
 
         JsonNode loginData = objectMapper.readTree(loginResult.getResponse().getContentAsString()).get("data");
         String accessToken = loginData.get("accessToken").asText();
-        String refreshToken = loginData.get("refreshToken").asText();
+        String refreshToken = refreshTokenCookie(loginResult);
 
         // 5. The access token authenticates a protected endpoint
         mockMvc.perform(get("/api/v1/expenses").header("Authorization", "Bearer " + accessToken))
@@ -96,40 +108,28 @@ class AuthFlowIntegrationTest extends AbstractIntegrationTest {
 
         // 7. Refresh rotates the token: issues a new pair and revokes the one just used.
         MvcResult refreshResult = mockMvc.perform(post("/api/v1/auth/refresh")
-                        .contentType("application/json")
-                        .content("""
-                                {"refreshToken":"%s"}
-                                """.formatted(refreshToken)))
+                        .cookie(new Cookie(RefreshCookieService.COOKIE_NAME, refreshToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.accessToken").exists())
                 .andReturn();
-        String rotatedRefreshToken = objectMapper.readTree(refreshResult.getResponse().getContentAsString())
-                .get("data").get("refreshToken").asText();
+        String rotatedRefreshToken = refreshTokenCookie(refreshResult);
         assertThat(rotatedRefreshToken).isNotEqualTo(refreshToken);
 
         // 8. Reusing the now-rotated-away original refresh token fails
         mockMvc.perform(post("/api/v1/auth/refresh")
-                        .contentType("application/json")
-                        .content("""
-                                {"refreshToken":"%s"}
-                                """.formatted(refreshToken)))
+                        .cookie(new Cookie(RefreshCookieService.COOKIE_NAME, refreshToken)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("TOKEN_EXPIRED"));
 
-        // 9. Logout revokes the current refresh token
+        // 9. Logout revokes the current refresh token and clears the cookie
         mockMvc.perform(post("/api/v1/auth/logout")
-                        .contentType("application/json")
-                        .content("""
-                                {"refreshToken":"%s"}
-                                """.formatted(rotatedRefreshToken)))
-                .andExpect(status().isOk());
+                        .cookie(new Cookie(RefreshCookieService.COOKIE_NAME, rotatedRefreshToken)))
+                .andExpect(status().isOk())
+                .andExpect(cookie().maxAge(RefreshCookieService.COOKIE_NAME, 0));
 
         // 10. The logged-out refresh token can no longer be used
         mockMvc.perform(post("/api/v1/auth/refresh")
-                        .contentType("application/json")
-                        .content("""
-                                {"refreshToken":"%s"}
-                                """.formatted(rotatedRefreshToken)))
+                        .cookie(new Cookie(RefreshCookieService.COOKIE_NAME, rotatedRefreshToken)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("TOKEN_EXPIRED"));
     }
@@ -145,9 +145,15 @@ class AuthFlowIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/register").contentType("application/json").content(body))
                 .andExpect(status().isCreated());
 
+        // Same 201/no-tokens shape as a fresh signup — the response never reveals that this email
+        // was already registered (see AuthServiceImpl#register); the second call sends a
+        // "you already have an account" notice instead of creating a second user.
         mockMvc.perform(post("/api/v1/auth/register").contentType("application/json").content(body))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error").value("EMAIL_EXISTS"));
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.accessToken").doesNotExist());
+
+        long userCount = userRepository.findByEmail(email).stream().count();
+        assertThat(userCount).isEqualTo(1);
     }
 
     @Test
@@ -176,12 +182,15 @@ class AuthFlowIntegrationTest extends AbstractIntegrationTest {
         assertThat(user.getFailedLoginAttempts()).isZero(); // reset back to 0 once locked
         assertThat(user.getLockedUntil()).isNotNull().isAfter(java.time.Instant.now());
 
-        // even the correct password is rejected while locked
+        // even the correct password is rejected while locked — rejected before authentication is
+        // even attempted (AuthServiceImpl#login's explicit pre-check), with a structured code and
+        // lockedUntil timestamp the frontend can render as a countdown, not just a bare 403.
         mockMvc.perform(post("/api/v1/auth/login").contentType("application/json").content("""
                         {"email":"%s","password":"%s"}
                         """.formatted(email, password)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error").value("ACCOUNT_INACTIVE"));
+                .andExpect(status().isLocked())
+                .andExpect(jsonPath("$.error").value("ACCOUNT_LOCKED"))
+                .andExpect(jsonPath("$.details.lockedUntil").exists());
     }
 
     @Test
@@ -203,15 +212,12 @@ class AuthFlowIntegrationTest extends AbstractIntegrationTest {
                         """.formatted(email, password)))
                 .andExpect(status().isOk())
                 .andReturn();
-        String refreshToken = objectMapper.readTree(loginResult.getResponse().getContentAsString())
-                .get("data").get("refreshToken").asText();
+        String refreshToken = refreshTokenCookie(loginResult);
 
         // no delay — this used to collide when login() and refresh() landed in the same second
-        mockMvc.perform(post("/api/v1/auth/refresh").contentType("application/json").content("""
-                        {"refreshToken":"%s"}
-                        """.formatted(refreshToken)))
+        mockMvc.perform(post("/api/v1/auth/refresh").cookie(new Cookie(RefreshCookieService.COOKIE_NAME, refreshToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.accessToken").exists())
-                .andExpect(jsonPath("$.data.refreshToken").exists());
+                .andExpect(cookie().exists(RefreshCookieService.COOKIE_NAME));
     }
 }

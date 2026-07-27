@@ -20,5 +20,6 @@ export const vaultApi = {
     (await apiClient.post("/vault/export", stepUp, { responseType: "blob" })).data,
 };
 
-/** Either currentPassword (normal step-up) or stepUpToken (an already-trusted device, Phase 5). */
-export type StepUpCredential = { currentPassword: string } | { stepUpToken: string };
+/** currentPassword or pin (normal step-up, either one server-verified — see VaultServiceImpl), or
+ * stepUpToken (an already-trusted device, Phase 5). */
+export type StepUpCredential = { currentPassword: string } | { pin: string } | { stepUpToken: string };

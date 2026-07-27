@@ -533,62 +533,6 @@ public class WalletAccountServiceImpl implements WalletAccountService {
                 .toList();
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public byte[] generateStatementCsv(UUID accountId, UUID userId) {
-        findAndValidate(accountId, userId);
-
-        // Load all transactions
-        List<AccountTransactionItem> items = new ArrayList<>();
-
-        incomeRepository.findAllByAccountIdOrderByIncomeDateDesc(accountId).forEach(e -> {
-            String src = e.getSource().name();
-            boolean fromInvestment = "DIVIDEND".equals(src) || "INTEREST".equals(src);
-            items.add(AccountTransactionItem.builder()
-                .id(e.getId().toString()).type("INCOME").label(src)
-                .source(fromInvestment ? "INVESTMENT" : "MANUAL")
-                .amount(e.getAmount()).date(e.getIncomeDate()).description(e.getDescription())
-                .build());
-        });
-
-        List<Expense> expenses = expenseRepository.findAllByAccountIdOrderByExpenseDateDesc(accountId);
-        Set<UUID> catIds = expenses.stream().map(Expense::getCategoryId).collect(Collectors.toSet());
-        Map<UUID, String> catNames = categoryRepository.findAllById(catIds).stream()
-                .collect(Collectors.toMap(Category::getId, Category::getName));
-        expenses.forEach(e -> items.add(AccountTransactionItem.builder()
-                .id(e.getId().toString()).type("EXPENSE")
-                .label(catNames.getOrDefault(e.getCategoryId(), "Expense"))
-                .amount(e.getAmount()).date(e.getExpenseDate()).description(e.getDescription())
-                .build()));
-
-        transferRepository.findByAccountId(accountId).forEach(t -> {
-            boolean isIn = accountId.equals(t.getToAccountId());
-            items.add(AccountTransactionItem.builder()
-                .id(t.getId().toString()).type(isIn ? "TRANSFER_IN" : "TRANSFER_OUT")
-                .label(isIn ? "Transfer In" : "Transfer Out")
-                .amount(t.getAmount()).date(t.getTransferDate()).description(t.getDescription())
-                .build());
-        });
-
-        items.sort(Comparator.comparing(AccountTransactionItem::getDate).reversed());
-
-        StringBuilder sb = new StringBuilder("Date,Type,Description,Label,Amount (INR)\n");
-        for (AccountTransactionItem it : items) {
-            String sign = "EXPENSE".equals(it.getType()) || "TRANSFER_OUT".equals(it.getType()) || "DEBT_OUT".equals(it.getType()) ? "-" : "+";
-            sb.append(it.getDate()).append(',')
-              .append(it.getType()).append(',')
-              .append(escape(it.getDescription())).append(',')
-              .append(escape(it.getLabel())).append(',')
-              .append(sign).append(it.getAmount()).append('\n');
-        }
-        return sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
-    }
-
-    private String escape(String v) {
-        if (v == null) return "";
-        return v.contains(",") || v.contains("\"") ? "\"" + v.replace("\"", "\"\"") + "\"" : v;
-    }
-
     @Override @Transactional
     @CacheEvict(value = "dashboard", allEntries = true)
     public AccountResponse adjustBalance(UUID id, UUID userId, BigDecimal targetBalance) {

@@ -1,8 +1,7 @@
 "use client";
 
 import {useState} from "react";
-import {ArrowLeft, Loader2, TicketCheck} from "lucide-react";
-import Link from "next/link";
+import {Loader2, TicketCheck} from "lucide-react";
 import {useRouter} from "next/navigation";
 import {Header} from "@/components/layout/Header";
 import {PageWrapper} from "@/components/layout/PageWrapper";
@@ -50,14 +49,9 @@ export default function NewTicketPage() {
       <PageWrapper>
         <div className="max-w-lg md:max-w-3xl mx-auto space-y-6">
 
-          <Link href="/settings" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Settings
-          </Link>
-
           {/* Header */}
           <div className="flex flex-col items-center gap-3 py-2">
-            <PremiumIcon icon={TicketCheck} tone="indigo" size="xl" />
+            <PremiumIcon icon={TicketCheck} tone="green" size="xl" />
             <div className="text-center">
               <p className="text-base font-semibold text-foreground">Create a Support Ticket</p>
               <p className="text-xs text-muted-foreground mt-1">Describe your issue and we&apos;ll respond in the app.</p>
@@ -78,19 +72,19 @@ export default function NewTicketPage() {
                     className={cn(
                       "flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all",
                       category === c.value
-                        ? "bg-indigo-500/10 border-indigo-500/40"
+                        ? "bg-green-500/10 border-green-500/40"
                         : "bg-card border-border hover:bg-muted/50"
                     )}
                   >
                     <span className="text-xl shrink-0">{c.emoji}</span>
                     <div>
-                      <p className={cn("text-sm font-medium", category === c.value ? "text-indigo-600 dark:text-indigo-400" : "text-foreground")}>
+                      <p className={cn("text-sm font-medium", category === c.value ? "text-green-600 dark:text-green-400" : "text-foreground")}>
                         {c.label}
                       </p>
                       <p className="text-xs text-muted-foreground">{c.desc}</p>
                     </div>
                     {category === c.value && (
-                      <span className="ml-auto w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
+                      <span className="ml-auto w-2 h-2 rounded-full bg-green-500 shrink-0" />
                     )}
                   </button>
                 ))}
@@ -107,7 +101,7 @@ export default function NewTicketPage() {
                   placeholder="Brief summary of your issue"
                   maxLength={200}
                   data-testid="ticket-subject-input"
-                  className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-green-500/40"
                 />
                 {errors.subject && <p className="text-xs text-red-600 dark:text-red-400">{errors.subject}</p>}
               </div>
@@ -123,7 +117,7 @@ export default function NewTicketPage() {
                   rows={6}
                   maxLength={5000}
                   data-testid="ticket-description-input"
-                  className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/40 resize-none"
+                  className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-green-500/40 resize-none"
                 />
                 {errors.description && <p className="text-xs text-red-600 dark:text-red-400">{errors.description}</p>}
               </div>
@@ -133,7 +127,7 @@ export default function NewTicketPage() {
               type="submit"
               disabled={isPending}
               data-testid="ticket-submit"
-              className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-semibold py-3 rounded-xl transition-colors"
+              className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white text-sm font-semibold py-3 rounded-xl transition-colors"
             >
               {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
               Submit Ticket

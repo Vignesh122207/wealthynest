@@ -8,7 +8,7 @@ import {useNotificationStore} from "@/store/notification.store";
 import {formatCurrency} from "@/lib/utils";
 
 export type NotifSeverity = "error" | "warning" | "success" | "info";
-export type NotifType = "budget" | "income" | "goal" | "maturity" | "lowBalance" | "anomaly" | "debtDue" | "loanEmi";
+export type NotifType = "budget" | "income" | "goal" | "maturity" | "lowBalance" | "anomaly" | "debtDue" | "loanEmi" | "sipReminder";
 
 export interface AppNotification {
   id:       string;
@@ -31,28 +31,33 @@ export function useNotifications() {
   const { data: goals }           = useGoals();
   const { data: investments = [] } = useInvestments();
 
-  const { seenIds, prefs } = useNotificationStore();
+  const { seenIds, dismissedIds, prefs } = useNotificationStore();
 
   const notifications = useMemo<AppNotification[]>(() => {
     const items: AppNotification[] = [];
     const nowMs = Date.now();
 
-    // Budget alerts
+    // Budget alerts — a category can have both a MONTHLY and a YEARLY budget at once, so one
+    // expense can push two distinct BudgetSummary rows over threshold for the same category.
+    // Without budgetType in both the id and the title, those read as the same alert shown
+    // twice; the period suffix keeps them distinguishable (and matches the equivalent server-
+    // side title in useServerNotifications.ts, so cross-source dedup there keeps working).
     if (prefs.budgets) {
       for (const b of dashboard?.budgetSummaries ?? []) {
+        const period = b.budgetType === "YEARLY" ? "Yearly" : "Monthly";
         if (b.overBudget) {
           items.push({
-            id:       `budget-over-${b.categoryId}`,
+            id:       `budget-over-${b.categoryId}-${b.budgetType}`,
             type:     "budget",
-            title:    `Budget exceeded: ${b.categoryName}`,
-            message:  `Spent ${formatCurrency(b.spent)} of ${formatCurrency(b.budgeted)} budget`,
+            title:    `Budget exceeded: ${b.categoryName} (${period})`,
+            message:  `Spent ${formatCurrency(b.spent)} of ${formatCurrency(b.budgeted)} ${period.toLowerCase()} budget`,
             severity: "error",
           });
         } else if (b.percentUsed >= 80) {
           items.push({
-            id:       `budget-warn-${b.categoryId}`,
+            id:       `budget-warn-${b.categoryId}-${b.budgetType}`,
             type:     "budget",
-            title:    `Budget nearly full: ${b.categoryName}`,
+            title:    `Budget nearly full: ${b.categoryName} (${period})`,
             message:  `${b.percentUsed.toFixed(0)}% used — ${formatCurrency(b.budgeted - b.spent)} remaining`,
             severity: "warning",
           });
@@ -127,8 +132,10 @@ export function useNotifications() {
       }
     }
 
-    return items.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
-  }, [dashboard, incomeHistory, goals, investments, prefs]);
+    return items
+      .filter((n) => !dismissedIds.includes(n.id))
+      .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
+  }, [dashboard, incomeHistory, goals, investments, prefs, dismissedIds]);
 
   const unreadCount = useMemo(
     () => notifications.filter((n) => !seenIds.includes(n.id)).length,

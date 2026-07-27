@@ -18,6 +18,9 @@ public class Goal extends BaseEntity {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
+    @Column(name = "family_id")
+    private UUID familyId;
+
     @Column(nullable = false, length = 100)
     private String name;
 

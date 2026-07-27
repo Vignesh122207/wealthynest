@@ -126,7 +126,7 @@ public class StatementImportServiceImpl implements StatementImportService {
             List<ParsedRow> rows = new ArrayList<>();
             int idx = 0;
             for (CSVRecord r : records) {
-                rows.add(parseRow(r, idx++, effective, headers, expenseCategories));
+                rows.add(parseRow(r, idx++, effective, expenseCategories));
             }
             return StatementPreviewResponse.builder().needsMapping(false).rows(rows).build();
         } catch (IOException e) {
@@ -243,13 +243,12 @@ public class StatementImportServiceImpl implements StatementImportService {
         return s == null ? "" : s.toLowerCase().replaceAll("[^a-z0-9]", "");
     }
 
-    private ParsedRow parseRow(CSVRecord r, int rowIndex, ColumnMapping m, List<String> headers, List<Category> expenseCategories) {
-        String description = m.getDescriptionColumn() != null && m.getDescriptionColumn() < headers.size()
-                ? r.get(m.getDescriptionColumn()) : null;
+    private ParsedRow parseRow(CSVRecord r, int rowIndex, ColumnMapping m, List<Category> expenseCategories) {
+        String description = m.getDescriptionColumn() != null ? safeGet(r, m.getDescriptionColumn()) : null;
 
         LocalDate date = null;
         try {
-            date = parseDate(r.get(m.getDateColumn()));
+            date = parseDate(safeGet(r, m.getDateColumn()));
         } catch (Exception ignored) { /* falls through to the null-date validation error below */ }
 
         BigDecimal amount = null;

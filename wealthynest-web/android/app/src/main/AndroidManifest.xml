@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Session/refresh-token state lives in the WebView's own cookies/localStorage (this is a
+         server.url build, not bundled assets), so Android's Auto Backup and device-to-device
+         transfer would otherwise carry that off-device — a bigger blast radius than the
+         recents-thumbnail case MainActivity's FLAG_SECURE already treats as sensitive. Disabling
+         backup outright (rather than an exclusion-rules file) means there's nothing to keep in
+         sync as new local storage gets added later; the cost is just a normal re-login after a
+         reinstall/device transfer, same as any banking app. -->
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme.NoActionBar">
+        <activity
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
+            android:name=".MainActivity"
+            android:label="@string/title_activity_main"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:launchMode="singleTask"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- Default icon/color for a background FCM push when the payload doesn't specify its own
+             — reuses the same launcher icon and brand color already defined for the app, not new
+             assets. See @capacitor/push-notifications' own docs for why these two keys specifically
+             are read by the OS notification tray rather than anything set in JS at receive time. -->
+        <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@mipmap/ic_launcher" />
+        <meta-data android:name="com.google.firebase.messaging.default_notification_color" android:resource="@color/colorPrimary" />
+    </application>
+
+    <!-- Permissions -->
+
+    <uses-permission android:name="android.permission.INTERNET" />
+</manifest>

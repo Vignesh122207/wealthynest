@@ -28,10 +28,62 @@ import {BankLogo} from "@/components/icons/BankLogo";
 import {lighten} from "@/components/icons/PremiumIcon";
 import {getBankMonogram} from "@/lib/bankLogos";
 import {cn, formatDate} from "@/lib/utils";
+import {getYears} from "@/lib/printReport";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {downloadAccountStatement} from "../utils/downloadAccountStatement";
 import type {WalletAccount} from "../types/account.types";
 import type {DebtRecord} from "@/features/debts/types/debt.types";
+
+// Shared by both the credit-card and regular card faces below — a small year-scoped menu on the
+// download button instead of always dumping every transaction on record. Its own local component
+// (not inlined twice) since the portal/positioning logic is identical in both call sites.
+function DownloadStatementButton({ account, dark }: { account: WalletAccount; dark?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const years = getYears();
+
+  const toggle = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      const menuWidth = 140;
+      const left = Math.min(r.right - menuWidth, window.innerWidth - menuWidth - 8);
+      setMenuStyle({ position: "fixed", top: r.bottom + 4, left: Math.max(8, left), width: menuWidth, zIndex: 9999 });
+    }
+    setOpen(v => !v);
+  };
+
+  const pick = (year: number | "all") => {
+    setOpen(false);
+    void downloadAccountStatement(account, year);
+  };
+
+  return (
+    <div className="relative" onClick={e => e.stopPropagation()}>
+      <button ref={btnRef} title="Download statement" onClick={toggle}
+        className={cn("w-7 h-7 rounded-lg flex items-center justify-center transition-all",
+          dark ? "bg-white/14 hover:bg-white/22 text-white" : "text-indigo-500/70 hover:text-indigo-500 hover:bg-indigo-500/10")}>
+        <Download className="w-3.5 h-3.5" />
+      </button>
+      {open && typeof document !== "undefined" && createPortal(
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div style={menuStyle} className="bg-card border border-border rounded-xl shadow-xl overflow-hidden">
+            <button onClick={() => pick("all")} className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted/60 transition-colors">
+              All time
+            </button>
+            {years.map(y => (
+              <button key={y} onClick={() => pick(y)} className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted/60 transition-colors">
+                {y}
+              </button>
+            ))}
+          </div>
+        </>,
+        document.body
+      )}
+    </div>
+  );
+}
 
 export const AccountCard = memo(function AccountCard({ account, linkedDebts = [], onAddMoney, onAddExpense, onTransfer, onEdit, onSetPrimary, settingPrimary, onImportStatement }: {
   account:      WalletAccount;
@@ -172,9 +224,7 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
               <Link href={`/expenses?accountId=${account.id}&tab=all`} title="View transactions" className="w-7 h-7 rounded-lg text-white/60 hover:text-white hover:bg-white/15 flex items-center justify-center transition-all">
                 <List className="w-3.5 h-3.5" />
               </Link>
-              <button title="Download statement" onClick={() => downloadAccountStatement(account)} className="w-7 h-7 rounded-lg text-white/60 hover:text-white hover:bg-white/15 flex items-center justify-center transition-all">
-                <Download className="w-3.5 h-3.5" />
-              </button>
+              <DownloadStatementButton account={account} dark />
               {renderActions([
                 { key: "charge",  label: "Charge",   icon: Receipt,         color: "text-rose-500",   onClick: onAddExpense },
                 { key: "paybill", label: "Pay Bill", icon: ArrowLeftRight,  color: "text-indigo-500", onClick: onTransfer },
@@ -313,12 +363,7 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
             className="w-7 h-7 rounded-lg text-indigo-500/70 hover:text-indigo-500 hover:bg-indigo-500/10 flex items-center justify-center transition-all">
             <List className="w-3.5 h-3.5" />
           </Link>
-          <button
-            title="Download statement"
-            onClick={() => downloadAccountStatement(account)}
-            className="w-7 h-7 rounded-lg text-indigo-500/70 hover:text-indigo-500 hover:bg-indigo-500/10 flex items-center justify-center transition-all">
-            <Download className="w-3.5 h-3.5" />
-          </button>
+          <DownloadStatementButton account={account} />
           {onImportStatement && (
             <button
               title="Import statement"

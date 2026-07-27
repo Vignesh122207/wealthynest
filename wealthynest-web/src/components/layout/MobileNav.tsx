@@ -21,7 +21,7 @@ const MORE_GRADIENT: [string, string] = ["#6b7280", "#475569"];
 // Gradients come from NAV_GRADIENTS (Sidebar.tsx) so each icon is the exact
 // same color on mobile as it is on desktop, instead of its own named tone.
 const NAV_ITEMS = [
-  { href: "/dashboard",   label: "Home",         icon: Home },
+  { href: "/home",   label: "Home",         icon: Home },
   { href: "/accounts",    label: "Accounts",     icon: Wallet },
   { href: "/expenses",    label: "Transactions", icon: ArrowLeftRight },
   { href: "/investments", label: "Investments",  icon: TrendingUp },
@@ -69,10 +69,11 @@ export function MobileNav() {
           );
         })}
 
-        {/* Debts, Net Worth, Family, Analytics, Reports, Notifications, Settings, and Support
-            all live behind this — the header hamburger reaches the same full sidebar overlay,
-            but nothing in the bottom bar itself pointed there, so those eight destinations had
-            no affordance a mobile user would necessarily discover. */}
+        {/* Debts, Net Worth, Family, Analytics, Reports, Settings, and Support all live behind
+            this — the header hamburger reaches the same full sidebar overlay, but nothing in the
+            bottom bar itself pointed there, so those seven destinations had no affordance a
+            mobile user would necessarily discover. Notifications isn't among them — the header
+            bell (every page) opens that full-screen, same as it always has. */}
         <button
           type="button"
           onClick={openMobileMenu}

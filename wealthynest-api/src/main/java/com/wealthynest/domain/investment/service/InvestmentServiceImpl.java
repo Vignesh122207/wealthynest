@@ -30,6 +30,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -363,8 +364,7 @@ public class InvestmentServiceImpl implements InvestmentService {
 
     @Override @Transactional(readOnly = true)
     public List<InvestmentResponse> getInvestments(UUID userId) {
-        return investmentRepository.findByUserIdAndActiveTrue(userId).stream()
-            .map(this::enrich).toList();
+        return enrichAll(investmentRepository.findByUserIdAndActiveTrue(userId));
     }
 
     @Override
@@ -515,7 +515,33 @@ public class InvestmentServiceImpl implements InvestmentService {
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
+    /** Batched variant of {@link #enrich(Investment)} for a whole-portfolio list response — the
+     * per-row debit-account name lookup and per-row stock-transaction count that {@code enrich}
+     * does individually are each pre-fetched here as one grouped query, so a portfolio of N
+     * investments costs 2 extra queries total instead of up to 2N. */
+    private List<InvestmentResponse> enrichAll(List<Investment> investments) {
+        if (investments.isEmpty()) return List.of();
+
+        List<UUID> debitAccountIds = investments.stream()
+            .map(Investment::getDebitAccountId).filter(java.util.Objects::nonNull).distinct().toList();
+        Map<UUID, String> accountNames = debitAccountIds.isEmpty() ? Map.of()
+            : accountRepository.findAllById(debitAccountIds).stream()
+                .collect(java.util.stream.Collectors.toMap(a -> a.getId(), a -> a.getName()));
+
+        List<UUID> stockIds = investments.stream()
+            .filter(i -> i.getInvestmentType() == InvestmentType.STOCK).map(Investment::getId).toList();
+        Map<UUID, Long> stockTxnCounts = stockIds.isEmpty() ? Map.of()
+            : stockTransactionRepository.countByInvestmentIdIn(stockIds).stream()
+                .collect(java.util.stream.Collectors.toMap(row -> (UUID) row[0], row -> (Long) row[1]));
+
+        return investments.stream().map(inv -> enrich(inv, accountNames, stockTxnCounts)).toList();
+    }
+
     private InvestmentResponse enrich(Investment inv) {
+        return enrich(inv, null, null);
+    }
+
+    private InvestmentResponse enrich(Investment inv, Map<UUID, String> accountNameCache, Map<UUID, Long> stockTxnCountCache) {
         BigDecimal currentVal = inv.getCurrentValue();
         BigDecimal livePrice  = null;
         BigDecimal dayChange  = null, dayChangePct = null, w52h = null, w52l = null;
@@ -582,8 +608,9 @@ public class InvestmentServiceImpl implements InvestmentService {
 
         String debitAccountName = null;
         if (inv.getDebitAccountId() != null) {
-            debitAccountName = accountRepository.findById(inv.getDebitAccountId())
-                .map(a -> a.getName()).orElse(null);
+            debitAccountName = accountNameCache != null
+                ? accountNameCache.get(inv.getDebitAccountId())
+                : accountRepository.findById(inv.getDebitAccountId()).map(a -> a.getName()).orElse(null);
         }
 
         return InvestmentResponse.builder()
@@ -596,6 +623,7 @@ public class InvestmentServiceImpl implements InvestmentService {
             .investedAmount(inv.getInvestedAmount()).currentValue(currentVal)
             .gainLoss(gainLoss).gainLossPct(gainLossPct)
             .sipAmount(inv.getSipAmount()).sipDay(inv.getSipDay())
+            .nextSipDate(computeNextSipDate(inv))
             .purchaseDate(inv.getPurchaseDate())
             .faceValue(inv.getFaceValue())
             .couponRate(inv.getCouponRate()).couponFrequency(inv.getCouponFrequency())
@@ -616,7 +644,10 @@ public class InvestmentServiceImpl implements InvestmentService {
             .week52High(w52h).week52Low(w52l)
             .priceLastUpdated(priceLastUpdated)
             .transactionCount(inv.getInvestmentType() == InvestmentType.STOCK
-                    ? (int) stockTransactionRepository.countByInvestmentId(inv.getId()) : 0)
+                    ? (stockTxnCountCache != null
+                        ? stockTxnCountCache.getOrDefault(inv.getId(), 0L).intValue()
+                        : (int) stockTransactionRepository.countByInvestmentId(inv.getId()))
+                    : 0)
             .build();
     }
 
@@ -626,6 +657,25 @@ public class InvestmentServiceImpl implements InvestmentService {
         if (req.getQuantityGrams() != null && req.getCurrentPrice() != null)
             return req.getQuantityGrams().multiply(req.getCurrentPrice()).setScale(2, RoundingMode.HALF_UP);
         return req.getCurrentValue();
+    }
+
+    /** The next occurrence of this investment's SIP day on or after today — rolls into next month
+     *  once this month's (clamped) SIP date has already passed. Null when sipDay isn't set at all. */
+    private LocalDate computeNextSipDate(Investment inv) {
+        // Defensive beyond CreateInvestmentRequest's own @Min(1)@Max(31) — an unstubbed mock (or
+        // any future path that doesn't go through validation) can leave this at 0, which
+        // LocalDate.of would otherwise reject with a DateTimeException.
+        if (inv.getSipDay() == null || inv.getSipDay() < 1 || inv.getSipDay() > 31) return null;
+        LocalDate today = LocalDate.now();
+        LocalDate thisMonth = clampedSipDate(today.getYear(), today.getMonthValue(), inv.getSipDay());
+        if (!thisMonth.isBefore(today)) return thisMonth;
+        LocalDate next = today.plusMonths(1);
+        return clampedSipDate(next.getYear(), next.getMonthValue(), inv.getSipDay());
+    }
+
+    private LocalDate clampedSipDate(int year, int month, int day) {
+        int lastDay = YearMonth.of(year, month).lengthOfMonth();
+        return LocalDate.of(year, month, Math.min(day, lastDay));
     }
 
     private BigDecimal computeFDMaturity(Investment fd) {

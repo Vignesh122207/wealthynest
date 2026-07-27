@@ -324,6 +324,194 @@ class AutoIncomeSchedulerTest {
         }
     }
 
+    // ─── BackfillDividendsForStockTests ───────────────────────────────────────────
+
+    @Nested
+    @DisplayName("backfillDividendsForStock")
+    class BackfillDividendsForStockTests {
+
+        @Test
+        @DisplayName("null symbol → returns immediately, no external calls")
+        void nullSymbol_returnsImmediately() {
+            Investment inv = buildStockInvestment(null, LocalDate.now().minusMonths(1));
+
+            scheduler.backfillDividendsForStock(inv);
+
+            verifyNoInteractions(externalPriceService, stockPriceCacheRepository,
+                corporateActionRepository, incomeLogRepository);
+            verify(incomeRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("null purchaseDate → returns immediately, no external calls")
+        void nullPurchaseDate_returnsImmediately() {
+            Investment inv = buildStockInvestment("TCS", null);
+
+            scheduler.backfillDividendsForStock(inv);
+
+            verifyNoInteractions(externalPriceService, stockPriceCacheRepository,
+                corporateActionRepository, incomeLogRepository);
+            verify(incomeRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("succeeds on first attempt → single Yahoo call, no retry sleep")
+        void succeedsOnFirstAttempt_singleCallNoRetry() {
+            Investment inv = buildStockInvestment("TCS", LocalDate.now().minusMonths(1));
+            when(externalPriceService.fetchStockPrice(anyString()))
+                .thenThrow(new RuntimeException("live price unavailable"));
+            when(stockPriceCacheRepository.findById("TCS")).thenReturn(Optional.empty());
+            when(externalPriceService.fetchDividendHistory(anyString(), anyLong()))
+                .thenReturn(Collections.emptyMap());
+
+            scheduler.backfillDividendsForStock(inv);
+
+            verify(externalPriceService, times(1)).fetchDividendHistory(anyString(), anyLong());
+            verify(stockPriceCacheRepository, never()).save(any());
+        }
+    }
+
+    // ─── AttemptDividendBackfillTests ─────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("attemptDividendBackfill")
+    class AttemptDividendBackfillTests {
+
+        @Test
+        @DisplayName("Yahoo throws (retries exhausted) → returns false, nothing saved")
+        void yahooThrows_returnsFalse() {
+            Investment inv = buildStockInvestment("TCS", LocalDate.now().minusMonths(1));
+            when(externalPriceService.fetchDividendHistory(anyString(), anyLong()))
+                .thenThrow(new RuntimeException("Yahoo unavailable"));
+
+            boolean result = scheduler.attemptDividendBackfill(inv, 1);
+
+            assertThat(result).isFalse();
+            verifyNoInteractions(corporateActionRepository, incomeLogRepository);
+            verify(incomeRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Yahoo responds with dividends in period → returns true, income credited")
+        void yahooResponds_returnsTrueAndCredits() {
+            LocalDate exDate = LocalDate.now().withDayOfMonth(1);
+            Investment inv = buildStockInvestment("TCS", exDate.minusMonths(1));
+            when(externalPriceService.fetchDividendHistory(anyString(), anyLong()))
+                .thenReturn(Map.of(exDate.toString(), new BigDecimal("4.00")));
+            when(corporateActionRepository.existsBySymbolAndActionTypeAndExDate("TCS", "DIVIDEND", exDate))
+                .thenReturn(false);
+
+            boolean result = scheduler.attemptDividendBackfill(inv, 1);
+
+            assertThat(result).isTrue();
+            verify(corporateActionRepository).save(any(NseCorporateAction.class));
+            verify(incomeRepository).save(any(IncomeEntry.class));
+        }
+    }
+
+    // ─── BackfillBondCouponsTests ─────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("backfillBondCoupons")
+    class BackfillBondCouponsTests {
+
+        @Test
+        @DisplayName("null couponRate → returns immediately, no processing")
+        void nullCouponRate_returnsImmediately() {
+            Investment bond = buildBond(null, "ANNUALLY",
+                LocalDate.now().minusYears(1), LocalDate.now().plusYears(5),
+                new BigDecimal("1000"), BigDecimal.valueOf(100), BigDecimal.ZERO);
+
+            scheduler.backfillBondCoupons(bond);
+
+            verifyNoInteractions(incomeLogRepository);
+            verify(incomeRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("null purchaseDate → returns immediately, no processing")
+        void nullPurchaseDate_returnsImmediately() {
+            Investment bond = buildBond(new BigDecimal("10"), "ANNUALLY",
+                null, LocalDate.now().plusYears(5),
+                new BigDecimal("1000"), BigDecimal.valueOf(100), BigDecimal.ZERO);
+
+            scheduler.backfillBondCoupons(bond);
+
+            verifyNoInteractions(incomeLogRepository);
+            verify(incomeRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("valid bond due this month → delegates to processSingleBondCoupons and credits coupon")
+        void validBond_delegatesAndCredits() {
+            LocalDate purchaseDate   = LocalDate.now().minusYears(1).withDayOfMonth(1);
+            LocalDate expectedCoupon = purchaseDate.plusYears(1);
+            Investment bond = buildBond(new BigDecimal("12"), "ANNUALLY",
+                purchaseDate, LocalDate.now().plusYears(5),
+                new BigDecimal("1000"), BigDecimal.valueOf(100), BigDecimal.ZERO);
+            UUID bondId = (UUID) ReflectionTestUtils.getField(bond, "id");
+            when(incomeLogRepository.existsByInvestmentIdAndIncomeTypeAndEventDate(
+                bondId, "BOND_COUPON", expectedCoupon)).thenReturn(false);
+
+            scheduler.backfillBondCoupons(bond);
+
+            verify(incomeRepository).save(any(IncomeEntry.class));
+            verify(incomeLogRepository).save(any(InvestmentIncomeLog.class));
+        }
+    }
+
+    // ─── BackfillFDMaturityTests ──────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("backfillFDMaturity")
+    class BackfillFDMaturityTests {
+
+        @Test
+        @DisplayName("null couponRate → returns immediately, no processing")
+        void nullCouponRate_returnsImmediately() {
+            Investment fd = buildFD(null, LocalDate.now().minusYears(1),
+                LocalDate.now().minusDays(1), new BigDecimal("100000"), "SIMPLE");
+
+            scheduler.backfillFDMaturity(fd);
+
+            verifyNoInteractions(incomeLogRepository);
+            verify(incomeRepository, never()).save(any());
+            verify(investmentRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("null purchaseDate → returns immediately, no processing")
+        void nullPurchaseDate_returnsImmediately() {
+            Investment fd = buildFD(new BigDecimal("7"), null,
+                LocalDate.now().minusDays(1), new BigDecimal("100000"), "SIMPLE");
+
+            scheduler.backfillFDMaturity(fd);
+
+            verifyNoInteractions(incomeLogRepository);
+            verify(incomeRepository, never()).save(any());
+            verify(investmentRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("valid matured FD → delegates to processSingleFD and credits interest")
+        void validFD_delegatesAndCreditsInterest() {
+            LocalDate purchaseDate = LocalDate.now().minusDays(365);
+            LocalDate maturityDate = LocalDate.now().minusDays(1);
+            BigDecimal principal   = new BigDecimal("100000");
+            Investment fd = buildFD(new BigDecimal("7"), purchaseDate, maturityDate, principal, "SIMPLE");
+            UUID fdId = (UUID) ReflectionTestUtils.getField(fd, "id");
+            when(incomeLogRepository.existsByInvestmentIdAndIncomeTypeAndEventDate(
+                fdId, "FD_MATURITY", maturityDate)).thenReturn(false);
+
+            scheduler.backfillFDMaturity(fd);
+
+            verify(incomeRepository).save(any(IncomeEntry.class));
+            ArgumentCaptor<Investment> fdCaptor = ArgumentCaptor.forClass(Investment.class);
+            verify(investmentRepository).save(fdCaptor.capture());
+            assertThat(fdCaptor.getValue().isActive()).isFalse();
+        }
+    }
+
     // ─── ProcessSingleBondCouponsTests ────────────────────────────────────────────
 
     @Nested

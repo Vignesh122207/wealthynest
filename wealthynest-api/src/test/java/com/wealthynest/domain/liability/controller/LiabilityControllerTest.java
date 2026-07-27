@@ -125,4 +125,32 @@ class LiabilityControllerTest {
 
         verify(liabilityService).deleteLiability(id, userId);
     }
+
+    @Test
+    @DisplayName("GET /liabilities delegates the authenticated userId and family id")
+    void getAllDelegatesUserAndFamilyId() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, familyId);
+        when(liabilityService.getLiabilities(userId, familyId))
+                .thenReturn(java.util.List.of(LiabilityResponse.builder().id(UUID.randomUUID()).build()));
+
+        mockMvc.perform(get("/api/v1/liabilities"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data.length()").value(1));
+    }
+
+    @Test
+    @DisplayName("PUT /liabilities/{id} passes the path id, authenticated userId, and body through to the service")
+    void updateDelegatesToService() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null);
+        UUID id = UUID.randomUUID();
+        when(liabilityService.updateLiability(eq(id), eq(userId), any()))
+                .thenReturn(LiabilityResponse.builder().id(id).name("Home Loan").build());
+
+        mockMvc.perform(put("/api/v1/liabilities/{id}", id)
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(validRequest())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(id.toString()));
+    }
 }

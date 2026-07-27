@@ -8,12 +8,14 @@ import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.common.response.PagedResponse;
 import com.wealthynest.domain.auth.dto.request.ForgotPasswordRequest;
 import com.wealthynest.domain.auth.repository.RefreshTokenRepository;
+import com.wealthynest.domain.auth.repository.WebAuthnCredentialRepository;
 import com.wealthynest.domain.auth.service.AuthService;
 import com.wealthynest.domain.user.dto.response.UserResponse;
 import com.wealthynest.domain.user.entity.User;
 import com.wealthynest.domain.user.entity.UserRole;
 import com.wealthynest.domain.user.mapper.UserMapper;
 import com.wealthynest.domain.user.repository.UserRepository;
+import com.wealthynest.domain.vault.repository.VaultItemRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -35,12 +37,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AdminServiceImpl implements AdminService {
 
-    private final UserRepository         userRepository;
-    private final UserMapper             userMapper;
-    private final RefreshTokenRepository refreshTokenRepository;
-    private final AuthService            authService;
-    private final AuditLogRepository     auditLogRepository;
-    private final AuditService           auditService;
+    private final UserRepository                userRepository;
+    private final UserMapper                    userMapper;
+    private final RefreshTokenRepository        refreshTokenRepository;
+    private final AuthService                   authService;
+    private final AuditLogRepository            auditLogRepository;
+    private final AuditService                  auditService;
+    private final VaultItemRepository           vaultItemRepository;
+    private final WebAuthnCredentialRepository  webAuthnCredentialRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -149,6 +153,15 @@ public class AdminServiceImpl implements AdminService {
         user.setFullName("[Deleted User]");
         user.setEmail("deleted-" + targetId.toString().substring(0, 8) + "@removed.invalid");
         user.setActive(false);
+        // Wipe local-auth credentials and stored secrets outright rather than leaving them
+        // orphaned-but-intact on an anonymized identity — name/email are bookkeeping, these are
+        // actual credentials/secrets, and "anonymized" should mean nobody can use them again.
+        // Financial ledger data (accounts, transactions, investments, etc.) deliberately stays —
+        // that's audit/compliance-retained, not personally-identifying once name/email are gone.
+        user.setPinHash(null);
+        user.setPinEnabledAt(null);
+        vaultItemRepository.deleteByUserId(targetId);
+        webAuthnCredentialRepository.deleteByUserId(targetId);
         refreshTokenRepository.revokeAllByUserId(targetId);
         UserResponse saved = userMapper.toResponse(userRepository.save(user));
         auditService.log(

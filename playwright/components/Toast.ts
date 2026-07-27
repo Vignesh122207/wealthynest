@@ -4,8 +4,9 @@ import {toastLocator} from "../helpers/wait.helper";
 /** Wraps sonner's toast container (see ThemedToaster.tsx) — every toast it renders carries
  * `data-sonner-toast` on its own, so no custom data-testid was needed on the app side.
  *
- * Reliable for the *first* toast in a test (e.g. tests/auth/'s "Welcome back" / login-failure
- * toasts) — unreliable for a LATER toast in a multi-step flow. Confirmed by direct observation:
+ * Reliable for the *first* toast in a test (e.g. tests/auth/'s login-failure toasts — login
+ * success itself shows no toast, see useAuth.ts's useLogin comment) — unreliable for a LATER
+ * toast in a multi-step flow. Confirmed by direct observation:
  * sonner's auto-dismiss timer appears to never fire in this headless environment, so the first
  * toast of a session just sits in the DOM indefinitely and keeps occupying the only slot
  * `.first()` will find — a later toast (e.g. "Account created" several steps into

@@ -20,4 +20,7 @@ public class Budget extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "budget_type", nullable = false, length = 10)
     @Builder.Default private BudgetType budgetType = BudgetType.MONTHLY;
+    // One month only, never compounds — see BudgetServiceImpl.enrich() for the actual carry-forward
+    // calculation. Applies to MONTHLY budgets only; a YEARLY budget ignores this flag.
+    @Column(nullable = false) @Builder.Default private boolean rollover = false;
 }

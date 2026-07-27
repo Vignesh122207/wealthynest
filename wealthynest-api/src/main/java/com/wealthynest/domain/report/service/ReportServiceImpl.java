@@ -1,5 +1,7 @@
 package com.wealthynest.domain.report.service;
 
+import com.wealthynest.common.exception.BusinessException;
+import com.wealthynest.common.util.CsvSanitizer;
 import com.wealthynest.domain.category.entity.Category;
 import com.wealthynest.domain.category.repository.CategoryRepository;
 import com.wealthynest.domain.expense.entity.Expense;
@@ -8,6 +10,7 @@ import com.wealthynest.domain.income.entity.IncomeEntry;
 import com.wealthynest.domain.income.repository.IncomeRepository;
 import com.wealthynest.domain.report.dto.ReportCsv;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +32,9 @@ public class ReportServiceImpl implements ReportService {
     @Override
     @Transactional(readOnly = true)
     public ReportCsv generateMonthlyReport(UUID userId, int year, int month) {
+        if (month < 1 || month > 12) {
+            throw new BusinessException("Month must be between 1 and 12.", HttpStatus.BAD_REQUEST);
+        }
         List<Expense>     expenses = expenseRepository.findByUserAndMonth(userId, year, month);
         List<IncomeEntry> incomes  = incomeRepository.findByUserIdAndPeriodYearAndPeriodMonthAndDebtFalseOrderByIncomeDateDesc(userId, year, month);
 
@@ -143,14 +149,7 @@ public class ReportServiceImpl implements ReportService {
 
     private static String esc(String v) {
         if (v == null || v.isBlank()) return "";
-        String value = v;
-        // Prevent CSV formula injection: Excel/Sheets treat a cell starting with
-        // =, +, -, @ (or a tab/CR) as a formula to evaluate, even when quoted.
-        // Prefixing a literal apostrophe forces it to be read as plain text.
-        char first = value.charAt(0);
-        if (first == '=' || first == '+' || first == '-' || first == '@' || first == '\t' || first == '\r') {
-            value = "'" + value;
-        }
+        String value = CsvSanitizer.neutralizeFormula(v);
         return (value.contains(",") || value.contains("\"") || value.contains("\n"))
                 ? "\"" + value.replace("\"", "\"\"") + "\""
                 : value;

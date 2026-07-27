@@ -22,7 +22,7 @@ test.describe("Responsive (tablet-portrait viewport)", () => {
   // `lg`), the mobile overlay nav should render, not the desktop sidebar, proving the mobile layout
   // holds up at a materially taller/wider viewport than mobile-chrome's phone width, not just phones.
   test("dashboard shows the mobile menu toggle instead of the desktop sidebar @responsive", async ({ accountsPage }) => {
-    await accountsPage.goto(ROUTES.dashboard);
+    await accountsPage.goto(ROUTES.home);
     await expect(accountsPage.navLink(ROUTES.accounts)).toBeHidden();
 
     await accountsPage.openMobileMenu();
@@ -30,7 +30,7 @@ test.describe("Responsive (tablet-portrait viewport)", () => {
   });
 
   test("key pages have no horizontal overflow at tablet-portrait width @responsive", async ({ accountsPage }) => {
-    for (const route of [ROUTES.dashboard, ROUTES.accounts, ROUTES.transactions, ROUTES.investments]) {
+    for (const route of [ROUTES.home, ROUTES.accounts, ROUTES.transactions, ROUTES.investments]) {
       await accountsPage.goto(route);
       await accountsPage.expectNoHorizontalOverflow();
     }

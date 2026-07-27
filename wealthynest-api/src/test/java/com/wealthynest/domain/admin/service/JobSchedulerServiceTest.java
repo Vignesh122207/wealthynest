@@ -48,6 +48,7 @@ class JobSchedulerServiceTest {
     @Mock private SpendAnomalyScheduler               spendAnomalyScheduler;
     @Mock private DebtReminderScheduler               debtReminderScheduler;
     @Mock private EmiReminderScheduler                emiReminderScheduler;
+    @Mock private SipReminderScheduler                sipReminderScheduler;
     @Mock private RecurringTransferScheduler          recurringTransferScheduler;
     @Mock private RecurringGoalContributionScheduler  recurringGoalContributionScheduler;
     @Mock private MfMasterSyncScheduler                mfMasterSyncScheduler;
@@ -60,7 +61,7 @@ class JobSchedulerServiceTest {
         service = new JobSchedulerService(configRepo, autoIncomeScheduler, priceRefreshScheduler,
                 stockDataService, recurringExpenseScheduler, recurringIncomeScheduler,
                 netWorthSnapshotScheduler, stockDataScheduler, loanEmiScheduler, lowBalanceScheduler,
-                spendAnomalyScheduler, debtReminderScheduler, emiReminderScheduler,
+                spendAnomalyScheduler, debtReminderScheduler, emiReminderScheduler, sipReminderScheduler,
                 recurringTransferScheduler, recurringGoalContributionScheduler, mfMasterSyncScheduler,
                 dataSource);
     }
@@ -251,6 +252,8 @@ class JobSchedulerServiceTest {
             verify(debtReminderScheduler).checkUpcomingDueDates();
             run("LOAN_EMI_REMINDER");
             verify(emiReminderScheduler).checkUpcomingEmis();
+            run("SIP_REMINDER");
+            verify(sipReminderScheduler).checkUpcomingSips();
             run("RECURRING_TRANSFER");
             verify(recurringTransferScheduler).processRecurringTransfers();
             run("RECURRING_GOAL_CONTRIBUTION");

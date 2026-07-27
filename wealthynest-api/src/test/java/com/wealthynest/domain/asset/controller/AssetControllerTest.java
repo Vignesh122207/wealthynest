@@ -135,4 +135,31 @@ class AssetControllerTest {
 
         verify(assetService).deleteAsset(id, userId);
     }
+
+    @Test
+    @DisplayName("GET /assets delegates the authenticated userId and server-resolved familyId")
+    void getAllDelegatesToService() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, familyId);
+        when(assetService.getAssets(userId, familyId)).thenReturn(java.util.List.of(
+                AssetResponse.builder().id(UUID.randomUUID()).build()));
+
+        mockMvc.perform(get("/api/v1/assets"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1));
+    }
+
+    @Test
+    @DisplayName("PUT /assets/{id} passes the path id and authenticated userId through")
+    void updateDelegatesToService() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null);
+        UUID id = UUID.randomUUID();
+        when(assetService.updateAsset(eq(id), eq(userId), any()))
+                .thenReturn(AssetResponse.builder().id(id).build());
+
+        mockMvc.perform(put("/api/v1/assets/{id}", id)
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(validRequest())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(id.toString()));
+    }
 }

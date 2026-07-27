@@ -8,6 +8,7 @@ import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
 import {EmptyState} from "@/components/shared/EmptyState";
 import {QueryErrorState} from "@/components/shared/QueryErrorState";
 import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
+import {TabBar, type TabBarItem} from "@/components/ui/TabBar";
 import {
     useCreateInvestment,
     useDeleteInvestment,
@@ -60,13 +61,13 @@ type AnyInvestmentFormValues = StockSubmitValues | MFSubmitValues | GoldFormValu
 // flat indigo regardless of type, so switching to "Gold" didn't feel any different from "Bonds".
 // Overview gets its own neutral slate, not indigo — it's the whole-portfolio summary, not the
 // Stocks tab, and the two were rendering identically.
-const TAB_ACTIVE_BG: Record<TabId, string> = {
-  overview: "bg-slate-600",
-  stocks:   "bg-indigo-600",
-  mf:       "bg-emerald-600",
-  gold:     "bg-amber-600",
-  fd:       "bg-sky-600",
-  bonds:    "bg-violet-600",
+const TAB_COLOR: Record<TabId, string> = {
+  overview: "#475569",
+  stocks:   "#4f46e5",
+  mf:       "#059669",
+  gold:     "#d97706",
+  fd:       "#0284c7",
+  bonds:    "#7c3aed",
 };
 
 export default function InvestmentsPage() {
@@ -160,6 +161,8 @@ export default function InvestmentsPage() {
         purchaseDate: values.purchaseDate,
         linkedAccountId: values.linkedAccountId || undefined,
         debitAccountId: values.debitAccountId || undefined,
+        sipAmount: values.sipAmount ? Number(values.sipAmount) : undefined,
+        sipDay: values.sipDay ? Number(values.sipDay) : undefined,
       };
     }
     if (currentTab === "gold") {
@@ -240,7 +243,8 @@ export default function InvestmentsPage() {
         goldKarat: inv.goldKarat ?? 22,
         avgBuyPrice: inv.avgBuyPrice, purchaseDate: inv.purchaseDate };
     if (inv.investmentType === "MUTUAL_FUND")
-      return { ...base, units: Number(inv.units ?? 0).toFixed(2), avgBuyPrice: Number(inv.avgBuyPrice ?? 0).toFixed(2), purchaseDate: inv.purchaseDate };
+      return { ...base, units: Number(inv.units ?? 0).toFixed(2), avgBuyPrice: Number(inv.avgBuyPrice ?? 0).toFixed(2), purchaseDate: inv.purchaseDate,
+        sipAmount: inv.sipAmount, sipDay: inv.sipDay };
     // STOCK — allow correcting initial quantity and price (updates the seed transaction)
     return { ...base, units: fmtNum(inv.units ?? 0), avgBuyPrice: fmtNum(inv.avgBuyPrice ?? 0), purchaseDate: inv.purchaseDate };
   }, []);
@@ -332,28 +336,15 @@ const tabCounts = useMemo(() => investments.reduce((acc, i) => {
 
       <main className="flex-1 p-4 md:p-5 lg:p-6 pb-36 lg:pb-24 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-4">
-        {/* Tabs + Add button in one row */}
-        <div className="flex items-center gap-2">
-          <div className="flex gap-1 overflow-x-auto pb-0 flex-1 min-w-0" style={{ scrollbarWidth: "none" }}>
-            {TABS.map(({ id, label, icon: Icon }) => (
-              <button key={id}
-                onClick={() => { setTab(id); closeForm(); router.replace(`/investments?tab=${id}`); }}
-                className={cn(
-                  "flex items-center gap-2 h-9 px-4 rounded-xl text-xs font-medium whitespace-nowrap transition-all shrink-0",
-                  tab === id ? cn(TAB_ACTIVE_BG[id], "text-white") : "bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted"
-                )}>
-                <Icon className="w-3.5 h-3.5" />
-                {label}
-                {id !== "overview" && tabCounts[id] > 0 && (
-                  <span className={cn("text-xs px-1.5 py-0.5 rounded-full font-bold",
-                    tab === id ? "bg-white/20 text-white" : "bg-muted text-muted-foreground")}>
-                    {tabCounts[id]}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* Tabs — shared TabBar template. */}
+        <TabBar
+          items={TABS.map(({ id, label, icon }): TabBarItem<TabId> => ({
+            key: id, label, icon, color: TAB_COLOR[id],
+            count: id === "overview" ? undefined : tabCounts[id],
+          }))}
+          value={tab}
+          onChange={(id) => { setTab(id); closeForm(); router.replace(`/investments?tab=${id}`); }}
+        />
 
         {/* Content */}
         {isLoading ? (

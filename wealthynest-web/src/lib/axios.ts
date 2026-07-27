@@ -1,11 +1,17 @@
 import axios, {AxiosError, AxiosInstance, InternalAxiosRequestConfig} from "axios";
 import {useAuthStore} from "@/features/auth/store/auth.store";
+import {clearPersistedHiddenAt} from "@/features/auth/store/appLock.store";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/api/v1";
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,
   headers: { "Content-Type": "application/json" },
+  // Sends/accepts the httpOnly refresh-token cookie (RefreshCookieService on the backend) — the
+  // API and web app are on different subdomains of the same registrable domain, so this is a
+  // same-site, not cross-site, credentialed request; CORS already has allowCredentials(true) set
+  // to match.
+  withCredentials: true,
 });
 
 // ── Token Refresh Queue ────────────────────────────────────────────────────────
@@ -74,16 +80,14 @@ apiClient.interceptors.response.use(
     isRefreshing = true;
 
     try {
-      const raw = typeof window !== "undefined" ? localStorage.getItem("wealthynest-auth") : null;
-      const refreshToken = raw ? JSON.parse(raw)?.state?.refreshToken : null;
-      if (!refreshToken) throw new Error("No refresh token");
+      // No body needed — the refresh token rides along as an httpOnly cookie the browser attaches
+      // automatically (see RefreshCookieService). Use a plain axios instance (not apiClient) to
+      // avoid re-triggering this interceptor if the refresh call itself gets a 401, but still pass
+      // withCredentials explicitly since this bypasses apiClient's own instance-level default.
+      const { data } = await axios.post(`${BASE_URL}/auth/refresh`, {}, { withCredentials: true });
+      const { accessToken: newAccessToken } = data.data;
 
-      // Use a plain axios instance (not apiClient) to avoid re-triggering
-      // this interceptor if the refresh call itself gets a 401.
-      const { data } = await axios.post(`${BASE_URL}/auth/refresh`, { refreshToken });
-      const { accessToken: newAccessToken, refreshToken: newRefreshToken } = data.data;
-
-      useAuthStore.getState().setTokens(newAccessToken, newRefreshToken);
+      useAuthStore.getState().setTokens(newAccessToken);
 
       // Unblock all waiting requests with the new token.
       processQueue(null, newAccessToken);
@@ -91,9 +95,16 @@ apiClient.interceptors.response.use(
       original.headers.Authorization = `Bearer ${newAccessToken}`;
       return apiClient(original);
     } catch (refreshError) {
-      // Refresh failed — reject every waiting request and force logout.
+      // Refresh failed — reject every waiting request and force logout. This path bypasses
+      // useLogout()'s mutation (no server call makes sense — the token that would authorize it is
+      // exactly what just failed to refresh), so it has to clear the app-lock "went hidden at"
+      // marker itself too, same as that hook's onSettled does — otherwise a stale marker left over
+      // from *this* session lingers in localStorage and immediately re-locks (and can auto-fire a
+      // passkey prompt) the moment the user's *next* fresh login lands on the dashboard, even
+      // though they just proved who they are.
       processQueue(refreshError, null);
       useAuthStore.getState().logout();
+      clearPersistedHiddenAt();
       if (typeof window !== "undefined") window.location.href = "/login";
       return Promise.reject(refreshError);
     } finally {

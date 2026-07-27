@@ -104,15 +104,15 @@ export default function TicketPage({ params }: { params: Promise<{ id: string }>
                   className={cn(
                     "rounded-2xl px-4 py-3.5 space-y-1.5",
                     r.adminReply
-                      ? "bg-indigo-500/8 border border-indigo-500/20"
+                      ? "bg-blue-500/8 border border-blue-500/20"
                       : "bg-card border border-border"
                   )}>
                   <div className="flex items-center gap-2">
                     {r.adminReply
-                      ? <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                      ? <ShieldCheck className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
                       : <div className="w-3.5 h-3.5 rounded-full bg-muted shrink-0" />
                     }
-                    <p className={cn("text-xs font-semibold", r.adminReply ? "text-indigo-600 dark:text-indigo-400" : "text-foreground")}>
+                    <p className={cn("text-xs font-semibold", r.adminReply ? "text-blue-600 dark:text-blue-400" : "text-foreground")}>
                       {r.adminReply ? "WealthyNest Support" : "You"}
                     </p>
                     <span className="text-[11px] text-muted-foreground ml-auto">
@@ -129,7 +129,7 @@ export default function TicketPage({ params }: { params: Promise<{ id: string }>
           {isClosed ? (
             <div className="text-center text-sm text-muted-foreground bg-muted/50 rounded-2xl py-5 border border-border">
               This ticket is {ticket.status.toLowerCase()}.{" "}
-              <Link href="/settings/support/tickets/new" className="text-indigo-600 dark:text-indigo-400 hover:underline">
+              <Link href="/settings/support/tickets/new" className="text-blue-600 dark:text-blue-400 hover:underline">
                 Open a new ticket
               </Link>{" "}
               if you need further help.
@@ -142,10 +142,10 @@ export default function TicketPage({ params }: { params: Promise<{ id: string }>
                 onChange={e => setMessage(e.target.value)}
                 rows={4}
                 placeholder="Type your reply..."
-                className="w-full bg-card border border-border rounded-2xl px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/40 resize-none"
+                className="w-full bg-card border border-border rounded-2xl px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/40 resize-none"
               />
               <button type="submit" disabled={isPending || !message.trim()}
-                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors">
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors">
                 {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 Send reply
               </button>

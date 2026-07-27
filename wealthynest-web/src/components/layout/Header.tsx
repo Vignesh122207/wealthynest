@@ -1,112 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import {AlertCircle, Bell, CheckCircle2, Download, Eye, EyeOff, Info, Menu, Moon, Sun, X} from "lucide-react";
+import {Bell, Download, Eye, EyeOff, Menu, SunMoon} from "lucide-react";
 import {useTheme} from "next-themes";
-import {usePathname} from "next/navigation";
-import {useEffect, useRef, useState} from "react";
+import {useEffect, useState} from "react";
 import {cn, getInitials} from "@/lib/utils";
 import {useUIStore} from "@/store/ui.store";
 import {useAuthStore} from "@/features/auth/store/auth.store";
-import {type AppNotification, type NotifSeverity} from "@/hooks/useNotifications";
-import {useNotificationStore} from "@/store/notification.store";
 import {useMergedNotifications} from "@/features/notifications/hooks/useServerNotifications";
 import {usePrivacyStore} from "@/store/privacy.store";
+import {GlossyBadge} from "@/components/icons/PremiumIcon";
 
-// ─── Severity helpers ────────────────────────────────────────────────────────
-
-const SEVERITY_ICON: Record<NotifSeverity, React.ElementType> = {
-  error:   AlertCircle,
-  warning: AlertCircle,
-  success: CheckCircle2,
-  info:    Info,
-};
-
-const SEVERITY_COLOR: Record<NotifSeverity, string> = {
-  error:   "text-red-500",
-  warning: "text-amber-500",
-  success: "text-emerald-500",
-  info:    "text-indigo-500",
-};
-
-const SEVERITY_BG: Record<NotifSeverity, string> = {
-  error:   "bg-red-500/10",
-  warning: "bg-amber-500/10",
-  success: "bg-emerald-500/10",
-  info:    "bg-indigo-500/10",
-};
-
-// ─── Notification Panel ──────────────────────────────────────────────────────
-
-function NotificationPanel({
-  notifications,
-  newCount,
-  onClose,
-}: {
-  notifications: AppNotification[];
-  newCount: number;
-  onClose: () => void;
-}) {
-  return (
-    <div className="absolute right-0 top-full mt-2 w-[min(320px,calc(100vw-1rem))] bg-card border border-border rounded-2xl shadow-xl shadow-black/10 overflow-hidden z-50">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
-        <p className="text-sm font-semibold text-foreground">Notifications</p>
-        {newCount > 0 && (
-          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
-            {newCount} new
-          </span>
-        )}
-        <button
-          onClick={onClose}
-          className="ml-auto text-muted-foreground hover:text-foreground p-0.5 rounded-lg transition-colors"
-        >
-          <X className="w-3.5 h-3.5" />
-        </button>
-      </div>
-
-      {notifications.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
-          <Bell className="w-8 h-8 text-muted-foreground/40 mb-3" />
-          <p className="text-sm font-medium text-foreground">All clear</p>
-          <p className="text-xs text-muted-foreground mt-0.5">No alerts right now. Check back later.</p>
-        </div>
-      ) : (
-        <ul className="divide-y divide-border max-h-80 overflow-y-auto">
-          {notifications.slice(0, 5).map((n) => {
-            const SeverityIcon = SEVERITY_ICON[n.severity];
-            return (
-              <li key={n.id} className="flex gap-3 px-4 py-3 hover:bg-muted/50 transition-colors">
-                <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5", SEVERITY_BG[n.severity])}>
-                  <SeverityIcon className={cn("w-3.5 h-3.5", SEVERITY_COLOR[n.severity])} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-foreground leading-snug">{n.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{n.message}</p>
-                  {n.date && (
-                    <p className="text-[11px] text-muted-foreground/60 mt-1">
-                      {new Date(n.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                    </p>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      {/* View all link */}
-      <div className="border-t border-border px-4 py-2.5">
-        <Link
-          href="/notifications"
-          onClick={onClose}
-          className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
-        >
-          View all notifications →
-        </Link>
-      </div>
-    </div>
-  );
-}
+// Material-style icon button: transparent at rest, a neutral tonal circle appears only on
+// hover/press (Gmail/Calendar's own top-bar pattern) — the color lives in the glyph itself, not
+// in a permanent filled shape behind it. Shared by all four header actions so they read as one
+// consistent toolbar instead of drifting per-icon.
+const ICON_BUTTON = "w-9 h-9 rounded-full flex items-center justify-center hover:bg-muted active:bg-muted/70 transition-colors";
 
 // ─── Header ──────────────────────────────────────────────────────────────────
 
@@ -121,40 +30,12 @@ export function Header({ title, subtitle, onExport }: HeaderProps) {
   const [mounted, setMounted] = useState(false);
   const { toggleMobileMenu }  = useUIStore();
   const { user }              = useAuthStore();
-  const pathname               = usePathname();
-  const isHome                 = pathname === "/dashboard";
 
-  const [showNotifs, setShowNotifs] = useState(false);
-
-  const notifsRef = useRef<HTMLDivElement>(null);
-
-  const { notifications, unreadCount } = useMergedNotifications();
-  const { markSeen }                   = useNotificationStore();
+  const { unreadCount } = useMergedNotifications();
 
   const { hideAmounts, toggleHideAmounts } = usePrivacyStore();
 
   useEffect(() => setMounted(true), []);
-
-  useEffect(() => {
-    function handleOutsideClick(e: MouseEvent) {
-      if (notifsRef.current && !notifsRef.current.contains(e.target as Node)) setShowNotifs(false);
-    }
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setShowNotifs(false);
-    }
-    document.addEventListener("mousedown", handleOutsideClick);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handleOutsideClick);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, []);
-
-  function toggleNotifs() {
-    const opening = !showNotifs;
-    setShowNotifs(opening);
-    if (opening) markSeen(notifications.map((n) => n.id));
-  }
 
   return (
     <header className={cn(
@@ -180,76 +61,54 @@ export function Header({ title, subtitle, onExport }: HeaderProps) {
       <div className="flex items-center gap-1 shrink-0">
 
         {/* Hide/show amounts — masks currency figures on every page, not just Home, since
-            usePrivacyStore/useAmountFormatter is read app-wide (Accounts, Investments, Budgets…). */}
-        <button
-          onClick={toggleHideAmounts}
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-          aria-label={hideAmounts ? "Show amounts" : "Hide amounts"}
-          aria-pressed={hideAmounts}
-        >
-          {hideAmounts ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            usePrivacyStore/useAmountFormatter is read app-wide (Accounts, Investments, Budgets…).
+            Colored when amounts are visible, muted gray when hidden — the color itself signals
+            state, not just the glyph swap. */}
+        <button onClick={toggleHideAmounts} aria-label={hideAmounts ? "Show amounts" : "Hide amounts"} aria-pressed={hideAmounts} className={ICON_BUTTON}>
+          {hideAmounts
+            ? <EyeOff className="w-[18px] h-[18px] text-muted-foreground" strokeWidth={2} />
+            : <Eye className="w-[18px] h-[18px] text-blue-500" strokeWidth={2} />}
         </button>
 
-        {/* Bell */}
-        <div ref={notifsRef} className="relative">
-          <button
-            onClick={toggleNotifs}
-            className={cn(
-              "w-8 h-8 rounded-lg flex items-center justify-center relative transition-all",
-              showNotifs
-                ? "text-indigo-600 dark:text-indigo-400 bg-indigo-600/10"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
-            )}
-            aria-label="Notifications"
-            aria-haspopup="true"
-            aria-expanded={showNotifs}
-          >
-            <Bell className="w-4 h-4" />
-            {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 w-2 h-2 bg-indigo-500 rounded-full" />
-            )}
-          </button>
-          {showNotifs && (
-            <NotificationPanel
-              notifications={notifications}
-              newCount={unreadCount}
-              onClose={() => setShowNotifs(false)}
-            />
+        {/* Bell — filled, not outline, so it reads as a solid gold bell rather than a thin blue-ish
+            line icon, the way most apps render their notification glyph. Goes straight to the
+            full /notifications page (no dropdown preview) — it's the only way into that page now
+            that the sidebar's own "Notifications" entry is gone, so it needs to be a real
+            destination, not a teaser. */}
+        <Link href="/notifications" aria-label="Notifications" className={cn(ICON_BUTTON, "relative")}>
+          <Bell className="w-[18px] h-[18px] text-amber-500" fill="currentColor" strokeWidth={1.5} />
+          {unreadCount > 0 && (
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-[hsl(var(--sidebar-bg))]" />
           )}
-        </div>
+        </Link>
 
-        {/* Theme toggle */}
+        {/* Theme toggle — SunMoon is one glyph representing both states, so it never has to swap
+            to an actual Sun icon that would compete with the bell's gold for attention. */}
         {mounted && (
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-            aria-label="Toggle theme"
+            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            className={ICON_BUTTON}
           >
-            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            <SunMoon className="w-[18px] h-[18px] text-indigo-500" strokeWidth={2} />
           </button>
         )}
 
         {/* Export — only on pages that hand us something to export */}
         {onExport && (
-          <button
-            onClick={onExport}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-            aria-label="Export"
-          >
-            <Download className="w-4 h-4" />
+          <button onClick={onExport} aria-label="Export" className={ICON_BUTTON}>
+            <Download className="w-[18px] h-[18px] text-emerald-500" strokeWidth={2} />
           </button>
         )}
 
-        {/* User avatar — Home only; every other page links back here via Settings in the sidebar */}
-        {isHome && (
-          <Link
-            href="/settings/profile"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold bg-indigo-600/10 text-indigo-600 dark:text-indigo-300 hover:ring-2 hover:ring-indigo-500/30 transition-all ml-1"
-            aria-label="Edit profile"
-          >
-            {user ? getInitials(user.fullName) : "?"}
-          </Link>
-        )}
+        {/* User avatar — persistent across every page; other pages no longer forced you back to
+            Home to reach it. Square, matching BrandMark's own tile shape (both read as "identity"),
+            while the round action buttons around it read as a distinct "utility" family. */}
+        <Link href="/settings/profile" className="ml-1" aria-label="Edit profile">
+          <GlossyBadge gradient={["#c2703d", "#27272a"]} size="sm" interactive>
+            <span className="relative text-xs font-bold text-white">{user ? getInitials(user.fullName) : "?"}</span>
+          </GlossyBadge>
+        </Link>
 
       </div>
     </header>

@@ -1,6 +1,6 @@
-# WealthNest Web
+# WealthyNest Web
 
-Next.js 15 frontend for the WealthNest personal finance platform.
+Next.js 15 frontend for the WealthyNest personal finance platform.
 
 ## Tech Stack
 - Next.js 15 (App Router), TypeScript strict
@@ -29,15 +29,14 @@ src/
 │   ├── (auth)/           Login, signup
 │   ├── (dashboard)/      Authenticated pages + sidebar
 │   └── page.tsx          Landing page
-├── features/             Feature modules
+├── features/             Feature modules (each: API, hooks, schemas, types)
 │   ├── auth/             store, API, hooks, components, schemas
-│   ├── dashboard/        API, hooks, types
-│   ├── expenses/         API, hooks, schemas, types
-│   ├── assets/           API, hooks, types
-│   ├── investments/      API, hooks, types
-│   ├── budgets/          API, hooks, types
-│   ├── family/           API, hooks, types
-│   └── analytics/        API, hooks, types
+│   ├── dashboard/, analytics/, reports/
+│   ├── accounts/, expenses/, expensesplits/, budgets/
+│   ├── assets/, liability/, debts/, networth/, investments/
+│   ├── goals/, recurringIncome/, recurringTransfer/, recurringGoalContribution/
+│   ├── statementimport/, casimport/
+│   └── family/, vault/, notifications/, support/, admin/
 ├── components/
 │   ├── layout/           Sidebar, Header, MobileNav, PageWrapper
 │   ├── charts/           AreaChart, BarChart, DonutChart
@@ -53,4 +52,11 @@ src/
 npm run dev          # Development
 npm run build        # Production build
 npm run type-check   # TypeScript check
+npm run lint         # ESLint
+npm test             # Vitest unit suite
 ```
+
+## Android
+
+`android/` is a generated Capacitor project (server-mode WebView against the deployed site) —
+see `../ANDROID_APP_ROADMAP.md` for status and the release checklist.

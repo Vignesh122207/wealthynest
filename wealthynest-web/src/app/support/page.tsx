@@ -1,7 +1,7 @@
 "use client";
 
 import {useState} from "react";
-import {ChevronDown, Mail, MessageCircle} from "lucide-react";
+import {ChevronDown, HelpCircle, Mail} from "lucide-react";
 import {cn} from "@/lib/utils";
 import {PublicFooter, PublicNav} from "@/components/layout/PublicNav";
 import {PremiumIcon} from "@/components/icons/PremiumIcon";
@@ -83,7 +83,7 @@ export default function SupportPage() {
         {/* Header */}
         <div className="text-center">
           <div className="flex justify-center mb-5">
-            <PremiumIcon icon={MessageCircle} tone="indigo" size="md" />
+            <PremiumIcon icon={HelpCircle} tone="cyan" size="md" />
           </div>
           <h1 className="text-3xl font-bold text-foreground mb-3">How can we help?</h1>
           <p className="text-muted-foreground">
@@ -112,7 +112,7 @@ export default function SupportPage() {
           </div>
           <a
             href="mailto:support@wealthynest.in"
-            className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
+            className="text-sm text-[#a85f30] dark:text-[#d98a52] hover:underline font-medium"
           >
             support@wealthynest.in
           </a>

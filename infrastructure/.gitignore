@@ -1,0 +1,10 @@
+target/
+cdk.out/
+cdk.context.json
+*.class
+.idea/
+*.iml
+
+smoke-tests/node_modules/
+smoke-tests/smoke-report/
+smoke-tests/test-results/

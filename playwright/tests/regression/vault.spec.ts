@@ -89,6 +89,9 @@ test.describe("Vault", () => {
     expect(passphraseValue).not.toBe(randomValue);
     expect(passphraseValue).toMatch(/-/); // word-word-word-word style
 
+    await vaultPage.useGeneratedSecret();
+    await expect(vaultPage.rawPage.getByTestId("vault-secret-input")).toHaveValue(passphraseValue);
+
     await Promise.all([
       waitForApiResponse(vaultPage.rawPage, "/vault/items", "POST"),
       vaultPage.rawPage.getByTestId("vault-form-submit").click(),

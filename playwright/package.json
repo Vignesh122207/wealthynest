@@ -22,7 +22,8 @@
     "test:ui": "playwright test --ui",
     "test:debug": "playwright test --debug",
     "report": "playwright show-report",
-    "install:browsers": "playwright install --with-deps"
+    "install:browsers": "playwright install --with-deps",
+    "cleanup:e2e": "tsx scripts/cleanup-e2e-data.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
@@ -33,6 +34,7 @@
     "axios": "^1.7.7",
     "dotenv": "^16.4.5",
     "pg": "^8.13.0",
+    "tsx": "^4.23.1",
     "typescript": "^5"
   }
 }

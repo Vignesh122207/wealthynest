@@ -64,8 +64,17 @@ jobs:
 
       # playwright/config/env.ts loads ../../.env (the repo-root file generated above) via
       # dotenv, so DB_PASSWORD and friends are already picked up — nothing to pass explicitly.
+      # API_URL is the one exception: the repo-root .env sets it to the Docker-internal hostname
+      # (http://wealthynest-api:8080/...), correct for wealthynest-web's own server-side calls
+      # from inside the compose network, but Playwright runs directly on this runner, outside
+      # that network — "wealthynest-api" doesn't resolve there at all. Override it to the
+      # published localhost port (matching playwright/.env.example's own documented value for
+      # running against a local docker-compose stack) so global-setup's health check can actually
+      # reach it, instead of failing every retry and throwing "never reported healthy".
       - name: Run E2E suite
         working-directory: playwright
+        env:
+          API_URL: http://localhost:8080/api/v1
         run: npm test
 
       - name: Upload Playwright report

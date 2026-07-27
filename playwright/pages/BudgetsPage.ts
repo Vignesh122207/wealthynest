@@ -35,6 +35,14 @@ export class BudgetsPage extends BasePage {
     await this.createBudget("YEARLY", input);
   }
 
+  /** The Monthly/Yearly lists are tabbed (BudgetTypeTabs) — only the active tab's budgets are in
+   * the DOM at all. Creating a budget auto-switches to its tab (see budgets/page.tsx's onSubmit),
+   * so most flows never need this directly; it's here for anything that has to check the other
+   * tab's list without creating something new in it. */
+  async selectBudgetTypeTab(type: "MONTHLY" | "YEARLY"): Promise<void> {
+    await this.page.getByTestId(`budget-list-tab-${type}`).click();
+  }
+
   /** BudgetRow (budgets/page.tsx) gives every row an accessible
    * `aria-label="Edit <category> budget, <pct>% used"` — no dedicated testid needed to open it. */
   async openEditByCategory(categoryName: string): Promise<void> {
@@ -98,10 +106,10 @@ export class BudgetsPage extends BasePage {
   }
 
   // Not "category name absent from the page" — deleting a budget doesn't delete the underlying
-  // category (it can still be in use elsewhere, e.g. on expenses), and it legitimately keeps
-  // showing up in the page's own "Custom Categories" management list. What actually indicates the
-  // budget itself is gone is its row's accessible label (BudgetRow's `aria-label="Edit <category>
-  // budget, ..."`) no longer existing.
+  // category (it can still be in use elsewhere, e.g. on expenses), and it can still legitimately
+  // appear elsewhere on this page too (e.g. selectable in the "New Budget" category picker). What
+  // actually indicates the budget itself is gone is its row's accessible label (BudgetRow's
+  // `aria-label="Edit <category> budget, ..."`) no longer existing.
   async expectBudgetNotVisible(categoryName: string): Promise<void> {
     await expect(this.page.getByRole("button", { name: new RegExp(`^Edit ${escapeRegExp(categoryName)} budget`) })).toHaveCount(0);
   }

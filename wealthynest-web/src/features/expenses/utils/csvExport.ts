@@ -15,6 +15,10 @@ function triggerCsvDownload(filename: string, header: string[], rows: string[][]
   document.body.removeChild(a); URL.revokeObjectURL(url);
 }
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  CASH: "Cash", CREDIT_CARD: "Credit Card", BANK_ACCOUNT: "Bank Account",
+};
+
 export function exportCsv(
   expenses: Expense[],
   label: string,
@@ -23,7 +27,7 @@ export function exportCsv(
 ) {
   const header = ["Date", "Description", "Category", `Amount (${getCurrencySymbol()})`, "Account", "Payment Method"];
   const rows = expenses.map(e => {
-    let paymentMethod = e.paymentMethod ?? "";
+    let paymentMethod = e.paymentMethod ? (PAYMENT_METHOD_LABELS[e.paymentMethod] ?? e.paymentMethod) : "";
     if (!paymentMethod && e.accountId) {
       const type = accountTypeMap[e.accountId];
       if      (type === "CASH_WALLET")   paymentMethod = "Cash";

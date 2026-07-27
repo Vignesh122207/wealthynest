@@ -20,8 +20,9 @@ Phases 15-23 (one pass) closed out nearly every item the "Known gaps" section us
 column-mapping + PDF password + per-row editing (3 tests). Phase 17 — CAS Import depth, PDF
 password + manual-fix-a-row + add-missed-scheme (2 tests). Phase 18 — Stock/Mutual Fund investment
 creation via a mocked LiveSearch result (2 tests). Phase 19 — Dividend suggest/dismiss (2 tests, new
-file, direct-DB seeded). Phase 20 — a real WebAuthn passkey register+login round trip via a
-Chromium CDP virtual authenticator (1 test, new file). Phase 21 — firefox/webkit cross-browser
+file, direct-DB seeded). Phase 20 — a real WebAuthn passkey registration + app-lock-unlock round
+trip via a Chromium CDP virtual authenticator (1 test, new file; passkey's full-login entry point
+was later removed — see webauthn.spec.ts's own comment). Phase 21 — firefox/webkit cross-browser
 support: per-project user provisioning so `tests/regression/` can actually run against another
 browser without the singleton-account collision Phase 9 first documented. Phase 22 — Accessibility
 tightened from critical/serious-only to every axe severity tier (two real moderate findings fixed).
@@ -45,12 +46,29 @@ double — see Phase 24's own section for what broke, what got fixed, a real orc
 a real performance budget) needs a product or infra decision this suite genuinely can't make on its
 own — see "Known gaps" below.
 
-That's **110 `test:regression`-family tests** (auth 10 + smoke 1 + regression 99 across 24 files —
-Phase 24 added 3 validation-depth tests to `goals.spec.ts`/`debts.spec.ts`) **plus 45 more** across
+Phase 25 closed the one gap that predated this session's own app-lock feature: PIN quick-login had
+a `pinInput` locator sitting unused in `LoginPage.ts` since whenever it was first scaffolded, but
+no spec ever actually drove it end to end. New `app-lock.spec.ts` (5 tests) covers that plus the
+new visibility/idle re-lock feature itself — backgrounding past the 30s grace period locks the app
+on whatever page you were on (not a redirect to /home), a wrong PIN leaves it locked, the correct
+PIN clears it with the page's data still intact (no reload), returning from background *within*
+the grace period doesn't lock, and PIN quick-login on `/login` itself while already
+authenticated (confirmed via reading `(auth)/layout.tsx` that there's no redirect-away-from-login
+guard, so this is a faithful stand-in for a real app relaunch without needing to actually close
+the browser). `webauthn.spec.ts` gets one more test for the app-lock screen's passkey-unlock path,
+its own dedicated user/context for the same rate-limit reasons as the file's existing test — real
+5-minute idle-lock timing is deliberately left to `useAppLockTrigger.test.ts`'s fake-timer unit
+tests rather than a genuine 5+ minute E2E wait per run; what only a real browser can prove
+(the actual visibilitychange cycle, the real backend PIN/passkey round trip, no reload on unlock)
+is exactly what these specs check.
+
+That's **116 `test:regression`-family tests** (auth 10 + smoke 1 + regression 105 across 25 files —
+Phase 24 added 3 validation-depth tests to `goals.spec.ts`/`debts.spec.ts`, Phase 25 added
+`app-lock.spec.ts`'s 5 plus one more to `webauthn.spec.ts`) **plus 45 more** across
 the standalone suites — Responsive (13: mobile-chrome, tablet, tablet-portrait, narrow-desktop),
 Accessibility (15: all 14 dashboard pages + login), Performance (8: loadEventEnd + real Core Web
 Vitals per page), Visual (7: 4 static + 3 dynamic-empty-state), and the new standalone `tests/oauth/`
-suite (2) — **155 tests total**, all reusing the same scaffold. Every regression file is now
+suite (2) — **161 tests total**, all reusing the same scaffold. Every regression file is now
 individually confirmed passing under firefox and webkit, not just chromium (see Phase 24's
 cross-browser section).
 

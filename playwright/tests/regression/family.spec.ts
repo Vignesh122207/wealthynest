@@ -50,7 +50,7 @@ test.describe("Family", () => {
 
     await memberLogin.goto();
     await memberLogin.loginWithPassword(member.email, member.password);
-    await memberLogin.expectRedirectedToDashboard();
+    await memberLogin.expectRedirectedToHome();
     await memberFamily.gotoFamily();
     await memberFamily.joinFamily(inviteCode);
     await expect(memberPage.getByText(`${familyName} Renamed`)).toBeVisible();

@@ -5,17 +5,18 @@ import {BarChart2, CalendarDays, Database, FileText} from "lucide-react";
 import {Header} from "@/components/layout/Header";
 import {PageWrapper} from "@/components/layout/PageWrapper";
 import {PremiumIcon} from "@/components/icons/PremiumIcon";
-import {cn} from "@/lib/utils";
+import {TabBar, type TabBarItem} from "@/components/ui/TabBar";
 import {MonthlyTab} from "./_components/MonthlyTab";
 import {AnnualTab} from "./_components/AnnualTab";
 import {ExportTab} from "./_components/ExportTab";
 
-const TABS = [
-  { id: "monthly", label: "Monthly",     icon: CalendarDays },
-  { id: "annual",  label: "Annual",      icon: BarChart2    },
-  { id: "export",  label: "Export Data", icon: Database     },
-] as const;
-type Tab = typeof TABS[number]["id"];
+type Tab = "monthly" | "annual" | "export";
+
+const TABS: TabBarItem<Tab>[] = [
+  { key: "monthly", label: "Monthly",     icon: CalendarDays, color: "#2563eb" },
+  { key: "annual",  label: "Annual",      icon: BarChart2,    color: "#7c3aed" },
+  { key: "export",  label: "Export Data", icon: Database,     color: "#059669" },
+];
 
 export default function ReportsPage() {
   const [tab, setTab] = useState<Tab>("monthly");
@@ -37,25 +38,8 @@ export default function ReportsPage() {
             </div>
           </div>
 
-          {/* Tabs */}
-          <div className="flex items-center gap-1 bg-muted rounded-2xl p-1">
-            {TABS.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                data-testid={`reports-tab-${id}`}
-                onClick={() => setTab(id)}
-                className={cn(
-                  "flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-all",
-                  tab === id
-                    ? "bg-card text-foreground shadow-sm border border-border"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                {label}
-              </button>
-            ))}
-          </div>
+          {/* Tabs — shared TabBar template. */}
+          <TabBar items={TABS} value={tab} onChange={setTab} testIdPrefix="reports-tab" />
 
           {/* Tab content — kept mounted so selections are preserved on tab switch */}
           <div style={{ display: tab === "monthly" ? "block" : "none" }}><MonthlyTab /></div>

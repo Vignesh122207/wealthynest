@@ -2,6 +2,7 @@ package com.wealthynest.testsupport;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wealthynest.common.security.RefreshCookieService;
 import com.wealthynest.domain.user.entity.User;
 import com.wealthynest.domain.user.repository.UserRepository;
 import org.springframework.test.web.servlet.MockMvc;
@@ -46,6 +47,9 @@ public final class IntegrationAuthHelper {
                 .andReturn();
 
         JsonNode data = objectMapper.readTree(loginResult.getResponse().getContentAsString()).get("data");
-        return new AuthResult(user.getId(), data.get("accessToken").asText(), data.get("refreshToken").asText());
+        // The refresh token travels as an httpOnly cookie, not in the JSON body — see
+        // AuthResponse#refreshToken's own @JsonIgnore and RefreshCookieService.
+        String refreshToken = loginResult.getResponse().getCookie(RefreshCookieService.COOKIE_NAME).getValue();
+        return new AuthResult(user.getId(), data.get("accessToken").asText(), refreshToken);
     }
 }

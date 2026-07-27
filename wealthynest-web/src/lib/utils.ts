@@ -16,6 +16,35 @@ export function apiErrorMessage(e: unknown, fallback: string): string {
   return fallback;
 }
 
+// The backend's stable machine-readable error code (e.g. "ACCOUNT_LOCKED", "PIN_LOCKED",
+// "RATE_LIMIT_EXCEEDED") — see GlobalExceptionHandler#handleBusiness — for callers that need to
+// branch on failure type rather than just display apiErrorMessage's human copy.
+export function apiErrorCode(e: unknown): string | undefined {
+  if (e && typeof e === "object" && "response" in e) {
+    return (e as { response?: { data?: { error?: string } } }).response?.data?.error;
+  }
+  return undefined;
+}
+
+// Structured extras a BusinessException attached (e.g. a lockout's {lockedUntil} ISO timestamp)
+// — see BusinessException#details.
+export function apiErrorDetails(e: unknown): Record<string, string> | undefined {
+  if (e && typeof e === "object" && "response" in e) {
+    return (e as { response?: { data?: { details?: Record<string, string> } } }).response?.data?.details;
+  }
+  return undefined;
+}
+
+// RateLimitFilter's 429 body isn't a BusinessException (it's a raw servlet filter, not routed
+// through GlobalExceptionHandler), so its retryAfterSeconds sits at the top level instead of
+// inside `details` — kept as its own accessor rather than folded into apiErrorDetails.
+export function apiRetryAfterSeconds(e: unknown): number | undefined {
+  if (e && typeof e === "object" && "response" in e) {
+    return (e as { response?: { data?: { retryAfterSeconds?: number } } }).response?.data?.retryAfterSeconds;
+  }
+  return undefined;
+}
+
 // Escapes a single CSV cell: quotes it when it contains a comma/quote/newline,
 // and — separately — guards against CSV formula injection. Excel/Sheets treat
 // a cell starting with =, +, -, @ (or a tab/CR) as a formula to evaluate even

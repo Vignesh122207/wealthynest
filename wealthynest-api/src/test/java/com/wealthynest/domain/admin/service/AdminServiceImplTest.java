@@ -5,12 +5,14 @@ import com.wealthynest.common.audit.AuditService;
 import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.domain.auth.repository.RefreshTokenRepository;
+import com.wealthynest.domain.auth.repository.WebAuthnCredentialRepository;
 import com.wealthynest.domain.auth.service.AuthService;
 import com.wealthynest.domain.user.dto.response.UserResponse;
 import com.wealthynest.domain.user.entity.User;
 import com.wealthynest.domain.user.entity.UserRole;
 import com.wealthynest.domain.user.mapper.UserMapper;
 import com.wealthynest.domain.user.repository.UserRepository;
+import com.wealthynest.domain.vault.repository.VaultItemRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -33,12 +35,14 @@ import static org.mockito.Mockito.argThat;
 @ExtendWith(MockitoExtension.class)
 class AdminServiceImplTest {
 
-    @Mock private UserRepository         userRepository;
-    @Mock private UserMapper             userMapper;
-    @Mock private RefreshTokenRepository refreshTokenRepository;
-    @Mock private AuthService            authService;
-    @Mock private AuditLogRepository     auditLogRepository;
-    @Mock private AuditService           auditService;
+    @Mock private UserRepository               userRepository;
+    @Mock private UserMapper                   userMapper;
+    @Mock private RefreshTokenRepository       refreshTokenRepository;
+    @Mock private AuthService                  authService;
+    @Mock private AuditLogRepository           auditLogRepository;
+    @Mock private AuditService                 auditService;
+    @Mock private VaultItemRepository          vaultItemRepository;
+    @Mock private WebAuthnCredentialRepository webAuthnCredentialRepository;
 
     @InjectMocks
     private AdminServiceImpl service;
@@ -164,6 +168,23 @@ class AdminServiceImplTest {
             assertThat(user.isActive()).isFalse();
             verify(refreshTokenRepository).revokeAllByUserId(targetId);
         }
+
+        @Test
+        @DisplayName("wipes the PIN hash and hard-deletes vault items and passkeys — not just name/email")
+        void purgesCredentialsAndSecrets() {
+            User user = withId(User.builder()
+                    .fullName("Alice Real Name").email("alice@real.com").active(true)
+                    .pinHash("some-hash").pinEnabledAt(java.time.Instant.now()).build());
+            when(userRepository.findById(targetId)).thenReturn(Optional.of(user));
+            when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            service.anonymizeUser(targetId, actorId, "ip", "ua");
+
+            assertThat(user.getPinHash()).isNull();
+            assertThat(user.getPinEnabledAt()).isNull();
+            verify(vaultItemRepository).deleteByUserId(targetId);
+            verify(webAuthnCredentialRepository).deleteByUserId(targetId);
+        }
     }
 
     // ─── getStats ────────────────────────────────────────────────────────────────
@@ -181,5 +202,135 @@ class AdminServiceImplTest {
 
         assertThat(stats.get("totalUsers")).isEqualTo(100L);
         assertThat(stats.get("inactiveUsers")).isEqualTo(20L);
+    }
+
+    // ─── getUserGrowth ───────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("getUserGrowth maps each [month, count] row into a month/count map")
+    void getUserGrowthMapsRows() {
+        Object[] row1 = new Object[] { "2026-06", 5L };
+        Object[] row2 = new Object[] { "2026-07", 9L };
+        when(userRepository.countNewUsersByMonth(any())).thenReturn(java.util.List.of(row1, row2));
+
+        var growth = service.getUserGrowth();
+
+        assertThat(growth).hasSize(2);
+        assertThat(growth.get(0).get("month")).isEqualTo("2026-06");
+        assertThat(growth.get(0).get("count")).isEqualTo(5L);
+        assertThat(growth.get(1).get("count")).isEqualTo(9L);
+    }
+
+    // ─── listUsers ───────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("listUsers")
+    class ListUsersTests {
+
+        @Test
+        @DisplayName("blank search term → uses findAll, not the search query")
+        void blankSearch_usesFindAll() {
+            var pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+            User u = withId(User.builder().email("a@b.com").fullName("A").build());
+            when(userRepository.findAll(pageable))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of(u)));
+
+            var result = service.listUsers(pageable, "  ");
+
+            assertThat(result.getData()).hasSize(1);
+            verify(userRepository, never()).search(anyString(), any());
+        }
+
+        @Test
+        @DisplayName("non-blank search term → uses the search query, trimmed")
+        void nonBlankSearch_usesSearchQuery() {
+            var pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+            User u = withId(User.builder().email("alice@b.com").fullName("Alice").build());
+            when(userRepository.search("alice", pageable))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of(u)));
+
+            var result = service.listUsers(pageable, "  alice  ");
+
+            assertThat(result.getData()).hasSize(1);
+            verify(userRepository, never()).findAll(any(org.springframework.data.domain.Pageable.class));
+        }
+    }
+
+    // ─── getAuditLogs ────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("getAuditLogs")
+    class GetAuditLogsTests {
+
+        private final org.springframework.data.domain.Pageable pageable =
+            org.springframework.data.domain.PageRequest.of(0, 10);
+
+        @Test
+        @DisplayName("no filters → uses findAllByOrderByCreatedAtDesc")
+        void noFilters_usesUnfilteredQuery() {
+            when(auditLogRepository.findAllByOrderByCreatedAtDesc(pageable))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of()));
+
+            var result = service.getAuditLogs(pageable, null, null);
+
+            assertThat(result.getData()).isEmpty();
+            verify(auditLogRepository, never()).findWithFilters(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("userId or action filter present → uses findWithFilters")
+        void withFilter_usesFilteredQuery() {
+            when(auditLogRepository.findWithFilters(eq(targetId), eq("USER_DEACTIVATED"), eq(pageable)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of()));
+
+            service.getAuditLogs(pageable, targetId, "USER_DEACTIVATED");
+
+            verify(auditLogRepository).findWithFilters(targetId, "USER_DEACTIVATED", pageable);
+            verify(auditLogRepository, never()).findAllByOrderByCreatedAtDesc(any());
+        }
+
+        @Test
+        @DisplayName("log with null userId → response userEmail is \"system\"")
+        void nullUserId_mapsToSystem() {
+            var log = com.wealthynest.common.audit.AuditLog.builder()
+                .action("SCHEDULED_JOB").build();
+            when(auditLogRepository.findAllByOrderByCreatedAtDesc(pageable))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of(log)));
+
+            var result = service.getAuditLogs(pageable, null, null);
+
+            assertThat(result.getData().get(0).getUserEmail()).isEqualTo("system");
+            verifyNoInteractions(userRepository);
+        }
+
+        @Test
+        @DisplayName("log with known userId → response userEmail resolved from userRepository")
+        void knownUserId_resolvesEmail() {
+            var log = com.wealthynest.common.audit.AuditLog.builder()
+                .userId(targetId).action("USER_ROLE_CHANGED").build();
+            User u = withId(User.builder().email("alice@b.com").build());
+            when(auditLogRepository.findAllByOrderByCreatedAtDesc(pageable))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of(log)));
+            when(userRepository.findAllById(java.util.List.of(targetId))).thenReturn(java.util.List.of(u));
+
+            var result = service.getAuditLogs(pageable, null, null);
+
+            assertThat(result.getData().get(0).getUserEmail()).isEqualTo("alice@b.com");
+        }
+
+        @Test
+        @DisplayName("log with unknown userId (user deleted since) → response userEmail is \"unknown\"")
+        void unknownUserId_mapsToUnknown() {
+            UUID deletedUserId = UUID.randomUUID();
+            var log = com.wealthynest.common.audit.AuditLog.builder()
+                .userId(deletedUserId).action("USER_ROLE_CHANGED").build();
+            when(auditLogRepository.findAllByOrderByCreatedAtDesc(pageable))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of(log)));
+            when(userRepository.findAllById(java.util.List.of(deletedUserId))).thenReturn(java.util.List.of());
+
+            var result = service.getAuditLogs(pageable, null, null);
+
+            assertThat(result.getData().get(0).getUserEmail()).isEqualTo("unknown");
+        }
     }
 }

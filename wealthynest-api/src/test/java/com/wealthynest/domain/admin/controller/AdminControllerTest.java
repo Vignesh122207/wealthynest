@@ -222,4 +222,53 @@ class AdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(targetId.toString()));
     }
+
+    @Test
+    @DisplayName("listUsers builds a createdAt-descending pageable and returns the service's paged result")
+    void listUsersReturnsPagedResult() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null, UserRole.ADMIN);
+        var userResponse = com.wealthynest.domain.user.dto.response.UserResponse.builder()
+                .id(UUID.randomUUID()).fullName("Alice").build();
+        var page = new org.springframework.data.domain.PageImpl<>(List.of(userResponse));
+        when(adminService.listUsers(any(), eq("alice"))).thenReturn(
+                com.wealthynest.common.response.PagedResponse.of(page));
+
+        mockMvc.perform(get("/api/v1/admin/users").param("search", "alice"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].fullName").value("Alice"));
+    }
+
+    @Test
+    @DisplayName("updateRole passes the target id, role query param, and authenticated actor id through")
+    void updateRoleDelegatesToService() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null, UserRole.ADMIN);
+        UUID targetId = UUID.randomUUID();
+        when(adminService.updateRole(eq(targetId), eq(UserRole.ADMIN), eq(userId), any(), any()))
+                .thenReturn(com.wealthynest.domain.user.dto.response.UserResponse.builder()
+                        .id(targetId).role(UserRole.ADMIN.name()).build());
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .patch("/api/v1/admin/users/{id}/role", targetId)
+                        .param("role", "ADMIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.role").value("ADMIN"));
+    }
+
+    @Test
+    @DisplayName("getAuditLogs passes page/size/userId/action query params through and returns the service's paged result")
+    void getAuditLogsReturnsPagedResult() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null, UserRole.ADMIN);
+        UUID filterUserId = UUID.randomUUID();
+        var logResponse = com.wealthynest.common.audit.AuditLogResponse.builder()
+                .action("USER_ROLE_CHANGED").userEmail("alice@x.com").build();
+        var page = new org.springframework.data.domain.PageImpl<>(List.of(logResponse));
+        when(adminService.getAuditLogs(any(), eq(filterUserId), eq("USER_ROLE_CHANGED")))
+                .thenReturn(com.wealthynest.common.response.PagedResponse.of(page));
+
+        mockMvc.perform(get("/api/v1/admin/audit-logs")
+                        .param("userId", filterUserId.toString())
+                        .param("action", "USER_ROLE_CHANGED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].userEmail").value("alice@x.com"));
+    }
 }

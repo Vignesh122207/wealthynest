@@ -172,7 +172,7 @@ function RuleFormModal({
               <button
                 onClick={() => valid && onSave({ goalId, amount: Number(amount), dayOfMonth: Number(day) })}
                 type="button" disabled={saving || !valid} data-testid="recurring-goal-form-submit"
-                className="flex-1 h-11 rounded-xl text-sm font-semibold bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white shadow-lg shadow-indigo-500/25 transition-all disabled:opacity-60 disabled:shadow-none flex items-center justify-center gap-1.5">
+                className="flex-1 h-11 rounded-xl text-sm font-semibold bg-gradient-to-r from-[#c2703d] to-[#27272a] hover:from-[#d98a52] hover:to-[#3f3f46] text-white shadow-lg shadow-[#c2703d]/25 transition-all disabled:opacity-60 disabled:shadow-none flex items-center justify-center gap-1.5">
                 <Check className="w-3.5 h-3.5" />
                 {saving ? "Saving…" : isEdit ? "Save Changes" : "Create Rule"}
               </button>

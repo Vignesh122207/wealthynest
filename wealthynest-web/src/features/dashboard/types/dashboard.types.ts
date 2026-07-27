@@ -1,3 +1,5 @@
+import type {BudgetType} from "@/features/budgets/types/budget.types";
+
 export interface DashboardData {
   totalNetWorth:        number;
   monthlyExpenses:      number;
@@ -34,6 +36,10 @@ export interface BudgetSummary {
   categoryName:  string;
   categoryColor?: string;
   categoryIcon?:  string;
+  // A category can have both a MONTHLY and a YEARLY budget at once — consumers that key/dedupe
+  // off this response must include budgetType, not just categoryId, or two distinct breached
+  // budgets for the same category collide into one indistinguishable notification.
+  budgetType:    BudgetType;
   budgeted:      number;
   spent:         number;
   percentUsed:   number;

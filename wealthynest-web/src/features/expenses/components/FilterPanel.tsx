@@ -55,7 +55,14 @@ export function FilterPanel({
   return (
     <>
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[380px] bg-background sm:border-l border-border shadow-2xl flex flex-col">
+      {/* `fixed inset-y-0` — unlike ordinary flowed content — needs its own safe-area padding
+          instead of inheriting any from an ancestor; without it, the "Filters" header row rendered
+          directly under the status bar on native, overlapping the clock/battery/wifi icons. Same
+          fix as Sidebar's mobile drawer and AppLockScreen. */}
+      <div
+        className="fixed inset-y-0 right-0 z-50 w-full sm:w-[380px] bg-background sm:border-l border-border shadow-2xl flex flex-col"
+        style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+      >
         <div className="h-1 bg-gradient-to-r from-indigo-500 via-violet-500 to-blue-500 shrink-0" />
         <div className="flex items-center gap-3 px-5 h-16 border-b border-border shrink-0">
           <PremiumIcon icon={SlidersHorizontal} tone="indigo" size="sm" />

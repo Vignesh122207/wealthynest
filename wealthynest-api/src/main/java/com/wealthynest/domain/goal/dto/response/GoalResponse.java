@@ -21,4 +21,5 @@ public class GoalResponse {
     private UUID       accountId;
     private String     accountName;
     private boolean    paused;
+    private boolean    shared;
 }

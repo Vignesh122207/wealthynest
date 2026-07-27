@@ -1,7 +1,7 @@
 "use client";
 
 import {useMemo} from "react";
-import {Clock, Trophy, Wallet, Zap} from "lucide-react";
+import {Clock, Trophy, Users, Wallet, Zap} from "lucide-react";
 import {PremiumIcon} from "@/components/icons/PremiumIcon";
 import {resolveGoalIcon} from "@/lib/categoryMeta";
 import type {Goal} from "@/features/goals/types/goal.types";
@@ -58,6 +58,11 @@ export function GoalCard({ goal, goalColor, onEdit, onAddSavings }: {
             <div className="flex items-center gap-1.5 flex-wrap">
               <p className="text-sm font-semibold text-foreground truncate">{goal.name}</p>
               {complete && <Trophy className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />}
+              {goal.shared && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/15 text-indigo-400 border border-indigo-500/20 shrink-0">
+                  <Users className="w-2.5 h-2.5" /> Shared
+                </span>
+              )}
               {goal.paused && !complete && (
                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground shrink-0">PAUSED</span>
               )}

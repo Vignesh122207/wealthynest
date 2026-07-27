@@ -1,16 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="192" y2="192" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#6366f1"/>
-      <stop offset="100%" stop-color="#7c3aed"/>
-    </linearGradient>
+    <radialGradient id="bg" cx="30%" cy="20%" r="85%">
+      <stop offset="0%" stop-color="#45454b"/>
+      <stop offset="70%" stop-color="#1c1c1f"/>
+    </radialGradient>
+    <linearGradient id="wa" x1="-61.03" y1="0" x2="61.03" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#e8935f"/><stop offset="100%" stop-color="#c2703d"/></linearGradient>
+    <linearGradient id="wb" x1="-39.06" y1="0" x2="39.06" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#c2703d"/><stop offset="100%" stop-color="#e8935f"/></linearGradient>
+    <linearGradient id="wc" x1="-39.06" y1="0" x2="39.06" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#935a35"/><stop offset="100%" stop-color="#52341f"/></linearGradient>
+    <linearGradient id="wd" x1="-61.03" y1="0" x2="61.03" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#52341f"/><stop offset="100%" stop-color="#6b4526"/></linearGradient>
+    <filter id="soft" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="6"/></filter>
   </defs>
   <rect width="192" height="192" fill="url(#bg)"/>
-  <g transform="translate(96 96) scale(1.632) translate(-50 -55)">
-    
-  <path d="M50 50 C36 50 20 40 16 22 C34 24 48 32 50 50 Z" fill="#ffffff"/>
-  <path d="M50 50 C64 50 80 40 84 22 C66 24 52 32 50 50 Z" fill="#ffffff"/>
-  <path d="M10 54 Q50 42 90 54 C90 72 72 88 50 88 C28 88 10 72 10 54 Z" fill="#ffffff"/>
-
+  <g transform="translate(96 96) scale(1.06) translate(-100 -114)">
+    <ellipse cx="82" cy="172" rx="16" ry="10" fill="#000000" opacity="0.35" filter="url(#soft)"/>
+    <ellipse cx="100" cy="96" rx="16" ry="10" fill="#000000" opacity="0.35" filter="url(#soft)"/>
+    <ellipse cx="118" cy="172" rx="16" ry="10" fill="#000000" opacity="0.35" filter="url(#soft)"/>
+    <g transform="translate(63 114) rotate(71.9)"><rect x="-61.03" y="-13" width="122.07" height="26" rx="9" fill="url(#wa)"/></g>
+    <g transform="translate(91 134) rotate(-76.7)"><rect x="-39.06" y="-13" width="78.1" height="26" rx="9" fill="url(#wb)"/></g>
+    <g transform="translate(109 134) rotate(76.7)"><rect x="-39.06" y="-13" width="78.1" height="26" rx="9" fill="url(#wc)"/></g>
+    <g transform="translate(137 114) rotate(-71.9)"><rect x="-61.03" y="-13" width="122.07" height="26" rx="9" fill="url(#wd)"/></g>
   </g>
 </svg>

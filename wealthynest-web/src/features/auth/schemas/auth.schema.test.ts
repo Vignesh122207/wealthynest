@@ -18,11 +18,6 @@ describe("loginSchema", () => {
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error.flatten().fieldErrors.password).toContain("Password is required");
   });
-
-  it("treats rememberMe as optional", () => {
-    const result = loginSchema.safeParse({ email: "user@example.com", password: "x" });
-    expect(result.success).toBe(true);
-  });
 });
 
 describe("registerSchema", () => {
@@ -78,6 +73,14 @@ describe("registerSchema", () => {
       expect(result.error.flatten().fieldErrors.confirmPassword).toContain("Passwords do not match");
     }
   });
+
+  it("rejects an empty confirmPassword with its own message, not a silent pass via an equally-empty password", () => {
+    const result = registerSchema.safeParse({ fullName: "", email: "", password: "", confirmPassword: "" });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.confirmPassword).toContain("Please confirm your password");
+    }
+  });
 });
 
 describe("forgotPasswordSchema", () => {
@@ -101,6 +104,14 @@ describe("resetPasswordSchema", () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.flatten().fieldErrors.confirmPassword).toContain("Passwords do not match");
+    }
+  });
+
+  it("rejects an empty confirmPassword with its own message, not a silent pass via an equally-empty newPassword", () => {
+    const result = resetPasswordSchema.safeParse({ newPassword: "", confirmPassword: "" });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.confirmPassword).toContain("Please confirm your password");
     }
   });
 });

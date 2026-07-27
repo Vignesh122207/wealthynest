@@ -29,6 +29,8 @@ public class InvestmentResponse {
     private double     gainLossPct;
     private BigDecimal sipAmount;
     private Integer    sipDay;
+    /** Next occurrence of sipDay on/after today, clamped to month length — null when sipDay isn't set. */
+    private LocalDate  nextSipDate;
     private LocalDate  purchaseDate;
     private BigDecimal faceValue;
     private BigDecimal couponRate;

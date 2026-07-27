@@ -1,5 +1,6 @@
 package com.wealthynest.domain.analytics.dto.response;
 
+import com.wealthynest.domain.budget.entity.BudgetType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -13,6 +14,10 @@ public class BudgetSummaryResponse {
     private String     categoryName;
     private String     categoryColor;
     private String     categoryIcon;
+    // A category can have both a MONTHLY and a YEARLY budget at once — callers that key/dedupe
+    // notifications off this response must include budgetType, not just categoryId, or two
+    // distinct breached budgets for the same category collide into one indistinguishable alert.
+    private BudgetType budgetType;
     private BigDecimal budgeted;
     private BigDecimal spent;
     private double     percentUsed;

@@ -15,6 +15,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -40,8 +41,9 @@ class GoalServiceImplTest {
     @InjectMocks
     private GoalServiceImpl service;
 
-    private final UUID userId = UUID.randomUUID();
-    private final UUID goalId = UUID.randomUUID();
+    private final UUID userId   = UUID.randomUUID();
+    private final UUID goalId   = UUID.randomUUID();
+    private final UUID familyId = UUID.randomUUID();
 
     private Goal.GoalBuilder baseGoal() {
         return Goal.builder().userId(userId).name("Emergency Fund")
@@ -94,7 +96,7 @@ class GoalServiceImplTest {
         void throwsWhenSavedExceedsTarget() {
             CreateGoalRequest req = createRequest(new BigDecimal("1000"), new BigDecimal("1500"), null);
 
-            assertThatThrownBy(() -> service.create(userId, req)).isInstanceOf(BusinessException.class);
+            assertThatThrownBy(() -> service.create(userId, null, req)).isInstanceOf(BusinessException.class);
             verify(goalRepository, never()).save(any());
         }
 
@@ -105,7 +107,7 @@ class GoalServiceImplTest {
             CreateGoalRequest req = createRequest(new BigDecimal("1000"), null, null);
             when(goalRepository.save(any(Goal.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
 
-            GoalResponse response = service.create(userId, req);
+            GoalResponse response = service.create(userId, null, req);
 
             assertThat(response.getSavedAmount()).isEqualByComparingTo("0");
         }
@@ -117,7 +119,7 @@ class GoalServiceImplTest {
             CreateGoalRequest req = createRequest(new BigDecimal("1000"), new BigDecimal("1000"), null);
             when(goalRepository.save(any(Goal.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
 
-            GoalResponse response = service.create(userId, req);
+            GoalResponse response = service.create(userId, null, req);
 
             assertThat(response.getPercentSaved()).isEqualTo(100.0);
         }
@@ -130,7 +132,7 @@ class GoalServiceImplTest {
             CreateGoalRequest req = createRequest(new BigDecimal("1000"), BigDecimal.ZERO, accountId);
             when(goalRepository.save(any(Goal.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
 
-            service.create(userId, req);
+            service.create(userId, null, req);
 
             verify(accountOwnershipGuard).validateAccountOwnership(accountId, userId);
         }
@@ -146,7 +148,7 @@ class GoalServiceImplTest {
         @DisplayName("throws ResourceNotFoundException when the goal does not exist")
         void throwsWhenNotFound() {
             when(goalRepository.findById(goalId)).thenReturn(Optional.empty());
-            assertThatThrownBy(() -> service.update(goalId, userId, updateRequest()))
+            assertThatThrownBy(() -> service.update(goalId, userId, null, updateRequest()))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
 
@@ -155,7 +157,7 @@ class GoalServiceImplTest {
         void throwsWhenNotOwned() {
             Goal goal = withId(baseGoal().userId(UUID.randomUUID()).build());
             when(goalRepository.findById(goalId)).thenReturn(Optional.of(goal));
-            assertThatThrownBy(() -> service.update(goalId, userId, updateRequest()))
+            assertThatThrownBy(() -> service.update(goalId, userId, null, updateRequest()))
                     .isInstanceOf(AccessDeniedException.class);
         }
 
@@ -169,7 +171,7 @@ class GoalServiceImplTest {
             UpdateGoalRequest req = updateRequest();
             when(req.getName()).thenReturn("Renamed Goal");
 
-            service.update(goalId, userId, req);
+            service.update(goalId, userId, null, req);
 
             assertThat(goal.getName()).isEqualTo("Renamed Goal");
             assertThat(goal.getIcon()).isEqualTo("piggy-bank"); // unchanged
@@ -183,7 +185,7 @@ class GoalServiceImplTest {
             UpdateGoalRequest req = updateRequest();
             when(req.getSavedAmount()).thenReturn(new BigDecimal("1500"));
 
-            assertThatThrownBy(() -> service.update(goalId, userId, req)).isInstanceOf(BusinessException.class);
+            assertThatThrownBy(() -> service.update(goalId, userId, null, req)).isInstanceOf(BusinessException.class);
             verify(goalRepository, never()).save(any());
         }
 
@@ -198,7 +200,7 @@ class GoalServiceImplTest {
             stubNoAccounts();
             when(goalRepository.save(any(Goal.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            service.update(goalId, userId, req);
+            service.update(goalId, userId, null, req);
 
             assertThat(goal.getSavedAmount()).isEqualByComparingTo("3000");
         }
@@ -217,7 +219,7 @@ class GoalServiceImplTest {
             // is even consulted, which is exactly the branch precedence this test verifies.
             lenient().when(req.getAccountId()).thenReturn(UUID.randomUUID());
 
-            service.update(goalId, userId, req);
+            service.update(goalId, userId, null, req);
 
             assertThat(goal.getAccountId()).isNull();
             verify(accountOwnershipGuard, never()).validateAccountOwnership(any(), any());
@@ -234,7 +236,7 @@ class GoalServiceImplTest {
             UpdateGoalRequest req = updateRequest();
             when(req.getAccountId()).thenReturn(newAccountId);
 
-            service.update(goalId, userId, req);
+            service.update(goalId, userId, null, req);
 
             verify(accountOwnershipGuard).validateAccountOwnership(newAccountId, userId);
             assertThat(goal.getAccountId()).isEqualTo(newAccountId);
@@ -250,7 +252,7 @@ class GoalServiceImplTest {
             UpdateGoalRequest req = updateRequest();
             when(req.getPaused()).thenReturn(true);
 
-            service.update(goalId, userId, req);
+            service.update(goalId, userId, null, req);
 
             assertThat(goal.isPaused()).isTrue();
         }
@@ -266,7 +268,7 @@ class GoalServiceImplTest {
         @DisplayName("throws when the goal does not exist")
         void throwsWhenNotFound() {
             when(goalRepository.findById(goalId)).thenReturn(Optional.empty());
-            assertThatThrownBy(() -> service.delete(goalId, userId)).isInstanceOf(ResourceNotFoundException.class);
+            assertThatThrownBy(() -> service.delete(goalId, userId, null)).isInstanceOf(ResourceNotFoundException.class);
         }
 
         @Test
@@ -274,7 +276,7 @@ class GoalServiceImplTest {
         void throwsWhenNotOwned() {
             Goal goal = withId(baseGoal().userId(UUID.randomUUID()).build());
             when(goalRepository.findById(goalId)).thenReturn(Optional.of(goal));
-            assertThatThrownBy(() -> service.delete(goalId, userId)).isInstanceOf(AccessDeniedException.class);
+            assertThatThrownBy(() -> service.delete(goalId, userId, null)).isInstanceOf(AccessDeniedException.class);
         }
 
         @Test
@@ -283,7 +285,7 @@ class GoalServiceImplTest {
             Goal goal = withId(baseGoal().build());
             when(goalRepository.findById(goalId)).thenReturn(Optional.of(goal));
 
-            service.delete(goalId, userId);
+            service.delete(goalId, userId, null);
 
             verify(goalRepository).delete(goal);
         }
@@ -302,7 +304,7 @@ class GoalServiceImplTest {
             stubNoAccounts();
             when(goalRepository.findByUserIdOrderByCreatedAtAsc(userId)).thenReturn(List.of(goal));
 
-            GoalResponse response = service.getAll(userId).get(0);
+            GoalResponse response = service.getAll(userId, null).get(0);
 
             assertThat(response.getSavedAmount()).isEqualByComparingTo("250");
             assertThat(response.getPercentSaved()).isEqualTo(25.0);
@@ -319,7 +321,7 @@ class GoalServiceImplTest {
             when(walletAccountService.getAccounts(userId)).thenReturn(List.of(account));
             when(goalRepository.findByUserIdOrderByCreatedAtAsc(userId)).thenReturn(List.of(goal));
 
-            GoalResponse response = service.getAll(userId).get(0);
+            GoalResponse response = service.getAll(userId, null).get(0);
 
             // 600 (live balance), not 250 (stored savedAmount)
             assertThat(response.getSavedAmount()).isEqualByComparingTo("600");
@@ -337,7 +339,7 @@ class GoalServiceImplTest {
             when(walletAccountService.getAccounts(userId)).thenReturn(List.of(account));
             when(goalRepository.findByUserIdOrderByCreatedAtAsc(userId)).thenReturn(List.of(goal));
 
-            GoalResponse response = service.getAll(userId).get(0);
+            GoalResponse response = service.getAll(userId, null).get(0);
 
             assertThat(response.getSavedAmount()).isEqualByComparingTo("0");
             assertThat(response.getPercentSaved()).isEqualTo(0.0);
@@ -352,7 +354,7 @@ class GoalServiceImplTest {
             stubNoAccounts(); // account map has nothing for missingAccountId
             when(goalRepository.findByUserIdOrderByCreatedAtAsc(userId)).thenReturn(List.of(goal));
 
-            GoalResponse response = service.getAll(userId).get(0);
+            GoalResponse response = service.getAll(userId, null).get(0);
 
             assertThat(response.getSavedAmount()).isEqualByComparingTo("400");
             assertThat(response.getAccountName()).isNull();
@@ -365,7 +367,7 @@ class GoalServiceImplTest {
             stubNoAccounts();
             when(goalRepository.findByUserIdOrderByCreatedAtAsc(userId)).thenReturn(List.of(goal));
 
-            GoalResponse response = service.getAll(userId).get(0);
+            GoalResponse response = service.getAll(userId, null).get(0);
 
             assertThat(response.getPercentSaved()).isEqualTo(100.0);
         }
@@ -380,9 +382,102 @@ class GoalServiceImplTest {
             stubNoAccounts();
             when(goalRepository.findByUserIdOrderByCreatedAtAsc(userId)).thenReturn(List.of(goal1, goal2));
 
-            service.getAll(userId);
+            service.getAll(userId, null);
 
             verify(walletAccountService, times(1)).getAccounts(userId);
+        }
+    }
+
+    // ─── family sharing ─────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("family sharing")
+    class FamilySharingTests {
+
+        @Test
+        @DisplayName("create sets familyId when the caller is in a family, and the response reports shared=true")
+        void createSetsFamilyIdWhenInFamily() {
+            stubNoAccounts();
+            CreateGoalRequest req = createRequest(new BigDecimal("1000"), BigDecimal.ZERO, null);
+            when(goalRepository.save(any(Goal.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
+
+            GoalResponse response = service.create(userId, familyId, req);
+
+            ArgumentCaptor<Goal> captor = ArgumentCaptor.forClass(Goal.class);
+            verify(goalRepository).save(captor.capture());
+            assertThat(captor.getValue().getFamilyId()).isEqualTo(familyId);
+            assertThat(captor.getValue().getUserId()).isEqualTo(userId); // creator still recorded
+            assertThat(response.isShared()).isTrue();
+        }
+
+        @Test
+        @DisplayName("create leaves familyId null and reports shared=false for a personal-scope caller")
+        void createLeavesFamilyIdNullWhenPersonal() {
+            stubNoAccounts();
+            CreateGoalRequest req = createRequest(new BigDecimal("1000"), BigDecimal.ZERO, null);
+            when(goalRepository.save(any(Goal.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
+
+            GoalResponse response = service.create(userId, null, req);
+
+            assertThat(response.isShared()).isFalse();
+        }
+
+        @Test
+        @DisplayName("getAll uses the family-scoped query instead of the personal one when in a family")
+        void getAllUsesFamilyScopeWhenInFamily() {
+            Goal goal = withId(baseGoal().familyId(familyId).build());
+            stubNoAccounts();
+            when(goalRepository.findByFamilyIdOrderByCreatedAtAsc(familyId)).thenReturn(List.of(goal));
+
+            List<GoalResponse> result = service.getAll(userId, familyId);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).isShared()).isTrue();
+            verify(goalRepository, never()).findByUserIdOrderByCreatedAtAsc(any());
+        }
+
+        @Test
+        @DisplayName("a family member who didn't create the goal can still update it")
+        void familyMemberCanUpdateSharedGoal() {
+            UUID creator = UUID.randomUUID();
+            Goal goal = withId(Goal.builder().userId(creator).familyId(familyId).name("Family Trip")
+                    .targetAmount(new BigDecimal("2000")).savedAmount(BigDecimal.ZERO).build());
+            when(goalRepository.findById(goalId)).thenReturn(Optional.of(goal));
+            stubNoAccounts();
+            when(goalRepository.save(any(Goal.class))).thenAnswer(inv -> inv.getArgument(0));
+            UpdateGoalRequest req = updateRequest();
+            when(req.getSavedAmount()).thenReturn(new BigDecimal("500"));
+
+            service.update(goalId, userId, familyId, req);
+
+            assertThat(goal.getSavedAmount()).isEqualByComparingTo("500");
+        }
+
+        @Test
+        @DisplayName("a caller outside the family and not the creator cannot update a shared goal")
+        void outsiderCannotUpdateSharedGoal() {
+            UUID creator = UUID.randomUUID();
+            UUID otherFamily = UUID.randomUUID();
+            Goal goal = withId(Goal.builder().userId(creator).familyId(familyId).name("Family Trip")
+                    .targetAmount(new BigDecimal("2000")).savedAmount(BigDecimal.ZERO).build());
+            when(goalRepository.findById(goalId)).thenReturn(Optional.of(goal));
+
+            assertThatThrownBy(() -> service.update(goalId, userId, otherFamily, updateRequest()))
+                    .isInstanceOf(AccessDeniedException.class);
+            verify(goalRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("a family member who didn't create the goal can still delete it")
+        void familyMemberCanDeleteSharedGoal() {
+            UUID creator = UUID.randomUUID();
+            Goal goal = withId(Goal.builder().userId(creator).familyId(familyId).name("Family Trip")
+                    .targetAmount(new BigDecimal("2000")).savedAmount(BigDecimal.ZERO).build());
+            when(goalRepository.findById(goalId)).thenReturn(Optional.of(goal));
+
+            service.delete(goalId, UUID.randomUUID(), familyId);
+
+            verify(goalRepository).delete(goal);
         }
     }
 }

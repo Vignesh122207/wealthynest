@@ -4,44 +4,42 @@ import Link from "next/link";
 import {
     Bell,
     ChevronRight,
-    FileText,
     HelpCircle,
     Lock,
-    LogOut,
     type LucideIcon,
     Mail,
     Plus,
     RefreshCw,
+    ScrollText,
     Shield,
     Sun,
     Tag,
     Ticket,
-    Trash2,
 } from "lucide-react";
 import {Header} from "@/components/layout/Header";
 import {PageWrapper} from "@/components/layout/PageWrapper";
 import {GlossyBadge, type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
 import {useAuthStore} from "@/features/auth/store/auth.store";
-import {useCloseAccount, useLogout} from "@/features/auth/hooks/useAuth";
 import {getInitials} from "@/lib/utils";
-import {useState} from "react";
-import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
 
 // ─── Menu item ────────────────────────────────────────────────────────────────
 
 function MenuItem({
-  href, icon: Icon, tone, label, description, external,
+  href, icon: Icon, tone, hex, label, description, external,
 }: {
   href: string;
   icon: LucideIcon;
-  tone: IconTone;
+  /** Named tone from the Apple system-color palette. Ignored when `hex` is set — same contract as PremiumIcon itself. */
+  tone?: IconTone;
+  /** Raw hex for a row that needs to match a destination page's exact brand color instead of a named tone. */
+  hex?: string;
   label: string;
   description: string;
   external?: boolean;
 }) {
   const inner = (
     <div className="flex items-center gap-3.5 px-4 py-3.5 hover:bg-muted/60 transition-colors group">
-      <PremiumIcon icon={Icon} tone={tone} size="sm" />
+      <PremiumIcon icon={Icon} tone={tone} hex={hex} size="sm" />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground">{label}</p>
         <p className="text-xs text-muted-foreground mt-0.5 truncate">{description}</p>
@@ -69,11 +67,7 @@ function MenuGroup({ label, children }: { label: string; children: React.ReactNo
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
-  const { user }          = useAuthStore();
-  const { mutate: logout } = useLogout();
-  const { mutate: closeAccount } = useCloseAccount();
-  const [showLogout, setShowLogout]   = useState(false);
-  const [showClose,  setShowClose]    = useState(false);
+  const { user } = useAuthStore();
 
   function roleBadge(role?: string) {
     const map: Record<string, string> = {
@@ -95,7 +89,7 @@ export default function SettingsPage() {
             href="/settings/profile"
             className="flex items-center gap-4 bg-card border border-border rounded-2xl p-4 hover:bg-muted/40 transition-colors group"
           >
-            <GlossyBadge gradient={["#6366f1", "#7c3aed"]} size="lg">
+            <GlossyBadge gradient={["#c2703d", "#27272a"]} size="lg">
               <span className="text-xl font-bold text-white select-none">{user ? getInitials(user.fullName) : "?"}</span>
             </GlossyBadge>
             <div className="flex-1 min-w-0">
@@ -133,7 +127,7 @@ export default function SettingsPage() {
                   icon={Bell} tone="pink"
                   label="Notifications" description="Budget alerts, goals, and maturity reminders" />
                 <MenuItem href="/settings/categories"
-                  icon={Tag} tone="violet"
+                  icon={Tag} tone="purple"
                   label="Categories" description="Manage expense and income categories" />
                 <MenuItem href="/settings/recurring"
                   icon={RefreshCw} tone="indigo"
@@ -148,13 +142,13 @@ export default function SettingsPage() {
               {/* ── Get Help ────────────────────────────────────── */}
               <MenuGroup label="Get Help">
                 <MenuItem href="/settings/support/contact"
-                  icon={Mail} tone="indigo"
+                  icon={Mail} tone="teal"
                   label="Contact Us" description="Email support · reply within 48 hours" />
                 <MenuItem href="/settings/support/tickets"
-                  icon={Ticket} tone="violet"
+                  icon={Ticket} tone="blue"
                   label="My Tickets" description="View and track your support requests" />
                 <MenuItem href="/settings/support/tickets/new"
-                  icon={Plus} tone="emerald"
+                  icon={Plus} tone="green"
                   label="Create a Ticket" description="Report a bug or ask a question" />
               </MenuGroup>
 
@@ -163,41 +157,14 @@ export default function SettingsPage() {
                 <MenuItem href="/settings/support/faq"
                   icon={HelpCircle} tone="cyan"
                   label="FAQ" description="Answers to common questions" />
-                <MenuItem href="/privacy"
-                  icon={Shield} tone="gray"
+                <MenuItem href="/privacy?from=settings"
+                  icon={Shield} hex="#935a35"
                   label="Privacy Policy" description="How we handle your data" />
-                <MenuItem href="/terms"
-                  icon={FileText} tone="gray"
+                <MenuItem href="/terms?from=settings"
+                  icon={ScrollText} tone="yellow"
                   label="Terms of Service" description="Terms & conditions of use" />
               </MenuGroup>
 
-            </div>
-          </div>
-
-          {/* ── Danger zone (full-width) ──────────────────────────── */}
-          <div>
-            <p className="text-[11px] font-semibold text-red-600 dark:text-red-400 uppercase tracking-widest px-1 mb-1.5">Danger Zone</p>
-            <div className="bg-card border border-red-500/20 rounded-2xl overflow-hidden divide-y divide-border/60">
-              <button
-                onClick={() => setShowLogout(true)}
-                className="w-full flex items-center gap-3.5 px-4 py-3.5 hover:bg-red-500/5 transition-colors text-left"
-              >
-                <PremiumIcon icon={LogOut} tone="red" size="sm" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-red-600 dark:text-red-400">Sign out</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Sign out of your account on this device</p>
-                </div>
-              </button>
-              <button
-                onClick={() => setShowClose(true)}
-                className="w-full flex items-center gap-3.5 px-4 py-3.5 hover:bg-red-500/5 transition-colors text-left"
-              >
-                <PremiumIcon icon={Trash2} tone="red" size="sm" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-red-600 dark:text-red-400">Close account</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Deactivate your account — data retained, admin must reactivate</p>
-                </div>
-              </button>
             </div>
           </div>
 
@@ -207,23 +174,6 @@ export default function SettingsPage() {
 
         </div>
       </PageWrapper>
-
-      {showLogout && (
-        <ConfirmDialog open title="Sign out?"
-          description="You'll be signed out from this device. You can sign back in at any time."
-          confirmLabel="Sign out" danger
-          onConfirm={() => logout()}
-          onCancel={() => setShowLogout(false)} />
-      )}
-
-      {showClose && (
-        <ConfirmDialog open title="Close your account?"
-          description="Your account will be deactivated immediately and you will be signed out. Your data is retained. Only an admin can reactivate your account."
-          confirmLabel="Yes, close account" danger
-          typeToConfirm="CLOSE"
-          onConfirm={() => closeAccount()}
-          onCancel={() => setShowClose(false)} />
-      )}
     </div>
   );
 }

@@ -14,7 +14,7 @@
     --card:        0 0% 100%;
     --card-foreground: 222 47% 9%;
     --panel:       0 0% 100%;
-    --primary:     239 84% 62%;
+    --primary:     23 52% 50%;
     --primary-foreground: 0 0% 100%;
     --secondary:   220 20% 92%;
     --secondary-foreground: 222 47% 20%;
@@ -34,12 +34,30 @@
     --border:      220 20% 88%;
     --border-subtle: 220 20% 93%;
     --input:       0 0% 100%;
-    --ring:        239 84% 62%;
+    --ring:        23 52% 50%;
     --radius:      1rem;
     --sidebar-bg:  0 0% 100%;
     --sidebar-border: 220 20% 90%;
     --chart-grid:  220 20% 92%;
     --progress-bg: 220 20% 90%;
+
+    /* ── Brand copper scale (auth screens, app-lock) ─────────────────────────
+       RGB triplets (not HSL) so every stop reproduces its original hex exactly
+       — these are curated brand-mark stops, not a generated ramp, so precision
+       matters more than staying in the same color-space as the semantic tokens
+       above. Fixed across both themes on purpose: consumers pick a step with
+       Tailwind's own dark: variant (e.g. text-brand-600 dark:text-brand-300),
+       the same way every call site already did by hand with raw hex before
+       this existed — the token replaces the literal, not the theme-branching. */
+    --brand-100: 236 201 163; /* #ecc9a3 */
+    --brand-200: 226 168 119; /* #e2a877 */
+    --brand-300: 217 138 82;  /* #d98a52 */
+    --brand-400: 168 121 79;  /* #a8794f */
+    --brand-500: 194 112 61;  /* #c2703d — matches --primary exactly */
+    --brand-600: 168 95 48;   /* #a85f30 */
+    --brand-700: 138 74 38;   /* #8a4a26 */
+    --brand-750: 107 69 38;   /* #6b4526 */
+    --brand-900: 82 52 31;    /* #52341f */
   }
 
   /* ── Dark theme — premium deep navy ──────────────────────── */
@@ -50,7 +68,7 @@
     --card:        213 52% 11%;
     --card-foreground: 213 25% 92%;
     --panel:       213 52% 13%;
-    --primary:     234 89% 74%;
+    --primary:     23 75% 64%;
     --primary-foreground: 0 0% 100%;
     --secondary:   217 38% 16%;
     --secondary-foreground: 213 25% 92%;
@@ -65,7 +83,7 @@
     --border:      217 38% 16%;
     --border-subtle: 217 38% 13%;
     --input:       217 38% 14%;
-    --ring:        234 89% 74%;
+    --ring:        23 75% 64%;
     --sidebar-bg:  213 80% 5%;
     --sidebar-border: 217 38% 12%;
     --chart-grid:  217 38% 12%;
@@ -73,6 +91,14 @@
   }
 
   * { @apply border-border; }
+  /* Deliberately NOT `padding-top: env(safe-area-inset-top)` here — that was tried and reverted:
+     it makes body taller than one viewport, and since DashboardLayout's Header relies on sitting
+     in a non-scrolling flex column (actual scrolling happens in PageWrapper's own `<main>`, not
+     body), the extra body-level scroll it introduced carried Header off-screen with it — the "top
+     view disappears when scrolling" bug. Safe-area top padding is applied per-shell instead: see
+     (auth)/layout.tsx and (dashboard)/layout.tsx, both of which have a `min-h-screen` root where
+     Tailwind's border-box preflight keeps padding-top inside that one viewport instead of adding
+     to it. */
   body { @apply bg-background text-foreground; }
 
   ::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -117,12 +143,47 @@
   0%   { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-8px); }
+  40%      { transform: translateX(7px); }
+  60%      { transform: translateX(-5px); }
+  80%      { transform: translateX(3px); }
+}
 
 @layer utilities {
   .tabular-nums { font-variant-numeric: tabular-nums; }
+  /* Hides the scrollbar entirely on an otherwise-scrollable element — Firefox honors
+     scrollbar-width directly; Chrome/Safari/Edge only listen to ::-webkit-scrollbar, which can't
+     be reached via an inline style at all, so the base ::-webkit-scrollbar rule above (a visible
+     thin gray thumb, the app-wide default) was still painting on every horizontally-scrollable
+     tab rail even where scrollbarWidth:"none" was set inline for Firefox. */
+  .no-scrollbar { scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  /* Subtle depth texture for the auth pages' colored brand panels — sits under the existing blur
+     circles, low enough opacity to read as texture rather than a pattern. */
+  .bg-dot-grid {
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.14) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+  /* Fine engraved-metal hairlines for the auth brand panel, layered over bg-dot-grid — same
+     "texture, not pattern" intent as bg-dot-grid above, just a second material. */
+  .bg-hairline-diagonal {
+    background-image: repeating-linear-gradient(115deg,
+      rgba(255, 255, 255, 0.10) 0px, rgba(255, 255, 255, 0.10) 1px,
+      transparent 1px, transparent 34px);
+  }
   .animate-fade-in-up { animation: fadeInUp 0.4s cubic-bezier(.22,1,.36,1) both; }
   .animate-fade-in    { animation: fadeIn 0.25s ease both; }
   .animate-scale-in   { animation: scaleIn 0.25s cubic-bezier(.22,1,.36,1) both; }
+  .animate-float      { animation: float 5s ease-in-out infinite; }
+  /* Quick shake on the app-lock screen's PIN cells for a wrong attempt. Reduced-motion is already
+     handled globally below (animation-duration override). */
+  .animate-shake      { animation: shake 0.42s ease; }
 
   /* Stagger delays for card grids */
   .delay-0   { animation-delay:   0ms; }

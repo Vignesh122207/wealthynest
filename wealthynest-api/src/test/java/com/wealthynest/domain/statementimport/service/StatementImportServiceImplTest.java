@@ -73,6 +73,26 @@ class StatementImportServiceImplTest {
     class AutoDetectionTests {
 
         @Test
+        @DisplayName("a ragged row missing its trailing description column is flagged invalid, not thrown")
+        void raggedRowMissingTrailingColumnDoesNotCrashTheWholeImport() {
+            // Narration is the LAST header column here, and the data row's trailing empty
+            // Narration field (with its comma) is dropped entirely, as some spreadsheet-edited
+            // or bank-exported CSVs do for a blank trailing cell.
+            String csv = "Date,Debit,Credit,Narration\n2026-01-15,150.00,0.00\n";
+            when(categoryRepository.findByUserIdOrSystem(userId)).thenReturn(List.of());
+
+            StatementPreviewResponse response = service.preview(csvFile(csv), null, null, userId, null);
+
+            assertThat(response.getRows()).hasSize(1);
+            ParsedRow row = response.getRows().get(0);
+            assertThat(row.getDate()).isEqualTo(LocalDate.of(2026, 1, 15));
+            assertThat(row.getDescription()).isNull();
+            assertThat(row.getAmount()).isEqualByComparingTo("150.00");
+            assertThat(row.getType()).isEqualTo("DEBIT");
+            assertThat(row.isValid()).isTrue();
+        }
+
+        @Test
         @DisplayName("requests manual mapping when headers can't be confidently auto-detected")
         void requestsMappingWhenUnrecognizedHeaders() {
             // The mapping-failure early-return happens BEFORE categories are ever fetched, so no

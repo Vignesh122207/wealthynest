@@ -10,7 +10,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Production {@link GoogleIdTokenValidator} — verifies against Google's real, live-fetched certs,
@@ -21,11 +22,22 @@ import java.util.Collections;
 @Configuration
 public class GoogleAuthConfig {
 
+    // Accepts BOTH client IDs so one validator covers both sign-in paths: the web GIS button
+    // (ID token minted directly against the "Web application" client) and the native Android flow
+    // (ID token minted by Google's token endpoint against the "Desktop app" client, after
+    // AuthServiceImpl.googleLoginNative exchanges an authorization code for it server-side). A
+    // GoogleIdToken's `aud` claim must match one of these or verify() rejects it outright.
     @Bean
     @Profile("!e2e-oauth-test")
-    public GoogleIdTokenValidator googleIdTokenValidator(@Value("${wealthynest.google.client-id:}") String googleClientId) {
+    public GoogleIdTokenValidator googleIdTokenValidator(
+            @Value("${wealthynest.google.client-id:}") String googleClientId,
+            @Value("${wealthynest.google.native.client-id:}") String googleNativeClientId) {
+        List<String> audiences = new ArrayList<>();
+        if (!googleClientId.isBlank()) audiences.add(googleClientId);
+        if (!googleNativeClientId.isBlank()) audiences.add(googleNativeClientId);
+
         GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), GsonFactory.getDefaultInstance())
-                .setAudience(Collections.singletonList(googleClientId))
+                .setAudience(audiences)
                 .build();
         return idTokenString -> {
             GoogleIdToken idToken = verifier.verify(idTokenString);

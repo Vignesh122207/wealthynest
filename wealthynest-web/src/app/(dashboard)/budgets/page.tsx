@@ -12,11 +12,11 @@ import {
     ChevronRight,
     PieChart,
     Plus,
+    Repeat,
     Tag,
     Target,
     Users,
     Wallet,
-    X,
 } from "lucide-react";
 import {useForm} from "react-hook-form";
 import {zodResolver} from "@hookform/resolvers/zod";
@@ -30,6 +30,8 @@ import {FormSelect} from "@/components/forms/FormSelect";
 import {Button} from "@/components/ui/Button";
 import {Card} from "@/components/ui/Card";
 import {FormModalShell} from "@/components/ui/FormModalShell";
+import {Toggle} from "@/components/ui/Toggle";
+import {Tooltip} from "@/components/ui/Tooltip";
 import {PremiumIcon} from "@/components/icons/PremiumIcon";
 import {CategoryPicker} from "@/components/transactions/CategoryPicker";
 import {FormModalHeader} from "@/components/transactions/FormModalHeader";
@@ -38,9 +40,10 @@ import {BigAmountInput} from "@/components/transactions/BigAmountInput";
 import {getCategoryColor, getCategoryIcon} from "@/lib/categoryMeta";
 import {CATEGORY_COLOR_PALETTE, CATEGORY_ICON_LIST, suggestUnusedCombo} from "@/lib/categoryIcons";
 import {useBudgets, useCreateBudget, useDeleteBudget,} from "@/features/budgets/hooks/useBudgets";
-import {useCategories, useCreateCategory, useDeleteCategory} from "@/features/categories/hooks/useCategories";
+import {useCategories, useCreateCategory} from "@/features/categories/hooks/useCategories";
 import {type BudgetFormValues, budgetSchema} from "@/features/budgets/schemas/budget.schema";
 import {BudgetDetailModal} from "@/features/budgets/components/BudgetDetailModal";
+import {BudgetTypeTabs} from "./_components/BudgetTypeTabs";
 import type {Budget, BudgetType} from "@/features/budgets/types/budget.types";
 import {cn} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
@@ -84,6 +87,12 @@ function BudgetRow({ budget, onEdit }: { budget: Budget; onEdit: () => void }) {
                 <Users className="w-2.5 h-2.5" /> Shared
               </span>
             )}
+            {budget.rolloverAmount > 0 && (
+              <span title={`${fmt(budget.rolloverAmount)} carried over from last month`}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-500 border border-emerald-500/20 shrink-0">
+                <Repeat className="w-2.5 h-2.5" /> +{fmt(budget.rolloverAmount)}
+              </span>
+            )}
           </div>
           <span className={cn("text-xs font-bold tabular-nums shrink-0", pctColor)}>{budget.percentUsed.toFixed(0)}%</span>
         </div>
@@ -92,7 +101,9 @@ function BudgetRow({ budget, onEdit }: { budget: Budget; onEdit: () => void }) {
             pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-500" : "bg-emerald-500")} style={{ width: `${pct}%` }} />
         </div>
         <div className="flex items-center justify-between mt-1">
-          <span className="text-xs text-muted-foreground/70 tabular-nums">{fmt(budget.spent)} / {fmt(budget.amount)}</span>
+          <span className="text-xs text-muted-foreground/70 tabular-nums">
+            {fmt(budget.spent)} / {fmt(budget.amount)}{budget.rolloverAmount > 0 && ` + ${fmt(budget.rolloverAmount)}`}
+          </span>
           <span className={cn("text-xs", budget.overBudget ? "text-red-600 dark:text-red-400 font-medium" : "text-muted-foreground/60")}>
             {budget.overBudget ? `Over by ${fmt(Math.abs(budget.remaining))}` : `${fmt(budget.remaining)} left`}
           </span>
@@ -116,8 +127,8 @@ export default function BudgetsPage() {
   const [showForm,    setShowForm]    = useState(false);
   const [editBudget,  setEditBudget]  = useState<Budget | null>(null);
   const [confirmId,   setConfirmId]   = useState<string | null>(null);
-  const [confirmCatId, setConfirmCatId] = useState<string | null>(null);
   const [budgetType,  setBudgetType]  = useState<BudgetType>("MONTHLY");
+  const [activeType,  setActiveType]  = useState<BudgetType>("MONTHLY");
   const [showAddCat,  setShowAddCat]  = useState(false);
   const [newCatName,  setNewCatName]  = useState("");
   const [newCatColor, setNewCatColor] = useState(CATEGORY_COLOR_PALETTE[0]);
@@ -129,13 +140,13 @@ export default function BudgetsPage() {
   const { mutate: deleteBudget }                         = useDeleteBudget();
   const { data: categories = [] }                        = useCategories("EXPENSE");
   const { mutate: createCategory, isPending: creatingCat } = useCreateCategory();
-  const { mutate: deleteCategory }                       = useDeleteCategory();
 
   const form = useForm<BudgetFormValues>({
     resolver: zodResolver(budgetSchema),
-    defaultValues: { budgetType: "MONTHLY", alertThreshold: 80 },
+    defaultValues: { budgetType: "MONTHLY", alertThreshold: 80, rollover: false },
   });
   const watchedCategoryId = form.watch("categoryId");
+  const watchedRollover   = form.watch("rollover");
 
   const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
 
@@ -179,8 +190,16 @@ export default function BudgetsPage() {
       return;
     }
     createBudget(
-      { categoryId: v.categoryId, budgetType, amount: Number(v.amount), alertThreshold: v.alertThreshold ? Number(v.alertThreshold) : undefined },
-      { onSuccess: () => { form.reset({ budgetType: "MONTHLY", alertThreshold: 80 }); setShowForm(false); } }
+      { categoryId: v.categoryId, budgetType, amount: Number(v.amount), alertThreshold: v.alertThreshold ? Number(v.alertThreshold) : undefined, rollover: budgetType === "MONTHLY" ? v.rollover : false },
+      {
+        onSuccess: () => {
+          form.reset({ budgetType: "MONTHLY", alertThreshold: 80, rollover: false });
+          setShowForm(false);
+          // Jump to whichever tab the new budget actually lives in — it's the one thing worth
+          // seeing right after creating it, and the tabs only ever show one type's list at a time.
+          setActiveType(budgetType);
+        },
+      }
     );
   };
 
@@ -219,14 +238,6 @@ export default function BudgetsPage() {
           onConfirm={() => { deleteBudget(confirmId); setConfirmId(null); }}
           onCancel={() => setConfirmId(null)} />
       )}
-      {confirmCatId && (
-        <ConfirmDialog open title="Delete Category"
-          description="Any budgets on this category will also be removed. Existing expenses are kept and will still show this category — recreating it with the same name brings it back."
-          confirmLabel="Delete" danger
-          onConfirm={() => { deleteCategory(confirmCatId); setConfirmCatId(null); }}
-          onCancel={() => setConfirmCatId(null)} />
-      )}
-
       {showForm && (
         <TransactionModalOverlay onDismiss={() => setShowForm(false)}>
           <FormModalShell accent="from-amber-500 to-orange-600">
@@ -299,6 +310,15 @@ export default function BudgetsPage() {
                 <BigAmountInput colorClass="text-amber-500 dark:text-amber-400" testId="budget-amount-input"
                   error={form.formState.errors.amount?.message} inputProps={form.register("amount")} />
                 <FormSelect label="Alert At (%)" options={ALERT_OPTIONS} {...form.register("alertThreshold")} />
+                {budgetType === "MONTHLY" && (
+                  <div className="flex items-center justify-between gap-3 bg-muted/40 rounded-xl p-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground">Roll over unused amount</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Unspent budget carries into next month only — it never compounds further.</p>
+                    </div>
+                    <Toggle checked={!!watchedRollover} onChange={v => form.setValue("rollover", v)} testId="budget-rollover-toggle" />
+                  </div>
+                )}
                 <div className="flex gap-2 pt-1">
                   <Button type="submit" data-testid="budget-form-submit" variant="gradient" loading={isPending}
                     className="flex-1 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 shadow-amber-500/25 disabled:shadow-none">
@@ -337,14 +357,19 @@ export default function BudgetsPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setSortByUsage(v => !v)}
-              className={cn("flex items-center gap-1.5 h-9 px-3 rounded-xl text-xs font-medium transition-all border",
-                sortByUsage
-                  ? "bg-gradient-to-r from-amber-500 to-orange-600 border-transparent text-white shadow-lg shadow-amber-500/25"
-                  : "bg-muted/60 border-border text-muted-foreground hover:text-foreground")}>
-              <ArrowUpDown className="w-3.5 h-3.5" />
-              {sortByUsage ? "Sorted by usage" : "Sort by usage"}
-            </button>
+            <Tooltip content={sortByUsage ? "Sorted by usage" : "Sort by usage"}>
+              <button onClick={() => setSortByUsage(v => !v)}
+                aria-pressed={sortByUsage}
+                aria-label={sortByUsage ? "Sorted by usage" : "Sort by usage"}
+                className={cn(
+                  "w-9 h-9 rounded-full flex items-center justify-center transition-all",
+                  sortByUsage
+                    ? "bg-gradient-to-r from-amber-500 to-orange-600 shadow-lg shadow-amber-500/30"
+                    : "hover:bg-muted"
+                )}>
+                <ArrowUpDown className={cn("w-4 h-4", sortByUsage ? "text-white" : "text-muted-foreground")} />
+              </button>
+            </Tooltip>
           </div>
         </div>
 
@@ -395,67 +420,53 @@ export default function BudgetsPage() {
         )}
 
         {/* Budget lists */}
-        {[
-          { label: "Monthly Budgets", icon: Calendar,     tone: "blue" as const,   list: monthlyBudgets, type: "MONTHLY" as BudgetType, budgeted: monthlyBudgeted, spent: monthlySpent },
-          { label: "Yearly Budgets",  icon: CalendarDays, tone: "violet" as const, list: yearlyBudgets,  type: "YEARLY"  as BudgetType, budgeted: yearlyBudgeted,  spent: yearlySpent  },
-        ].map(({ label, icon, tone, list, type, budgeted: typeBudgeted, spent: typeSpent }) => (
-          <Card key={type} className="overflow-hidden">
-            <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
-              <PremiumIcon icon={icon} tone={tone} size="xs" />
-              <span className="font-semibold text-foreground text-sm">{label}</span>
-              {type === "YEARLY" && <span className="text-xs text-muted-foreground">({year})</span>}
-              <span className="text-xs text-muted-foreground">{list.length}</span>
-              {list.length > 0 && (
-                <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
-                  <span>Budgeted <span className="text-foreground font-medium">{fmt(typeBudgeted)}</span></span>
-                  <span>Spent <span className="text-red-600 dark:text-red-400 font-medium">{fmt(typeSpent)}</span></span>
-                  <span>Left <span className={cn("font-medium", typeSpent > typeBudgeted ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400")}>{fmt(Math.max(0, typeBudgeted - typeSpent))}</span></span>
+        <BudgetTypeTabs value={activeType} onChange={setActiveType}
+          monthlyCount={monthlyBudgets.length} yearlyCount={yearlyBudgets.length} />
+
+        {(() => {
+          const isMonthly = activeType === "MONTHLY";
+          const list = isMonthly ? monthlyBudgets : yearlyBudgets;
+          const typeBudgeted = isMonthly ? monthlyBudgeted : yearlyBudgeted;
+          const typeSpent = isMonthly ? monthlySpent : yearlySpent;
+          const label = isMonthly ? "Monthly Budgets" : "Yearly Budgets";
+          const icon = isMonthly ? Calendar : CalendarDays;
+          const tone = isMonthly ? "blue" : "violet";
+
+          return (
+            <Card className="overflow-hidden">
+              <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
+                <PremiumIcon icon={icon} tone={tone} size="xs" />
+                <span className="font-semibold text-foreground text-sm">{label}</span>
+                {!isMonthly && <span className="text-xs text-muted-foreground">({year})</span>}
+                {list.length > 0 && (
+                  <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>Budgeted <span className="text-foreground font-medium">{fmt(typeBudgeted)}</span></span>
+                    <span>Spent <span className="text-red-600 dark:text-red-400 font-medium">{fmt(typeSpent)}</span></span>
+                    <span>Left <span className={cn("font-medium", typeSpent > typeBudgeted ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400")}>{fmt(Math.max(0, typeBudgeted - typeSpent))}</span></span>
+                  </div>
+                )}
+              </div>
+              {isLoading ? <TableRowSkeleton rows={3} /> : isError ? (
+                <QueryErrorState onRetry={() => refetch()} description="Couldn't load your budgets. Check your connection and try again." />
+              ) : list.length === 0 ? (
+                <EmptyState icon={Target} title={`No ${isMonthly ? "monthly" : "yearly"} budgets`}
+                  description={`Create a ${isMonthly ? "monthly" : "yearly"} budget to track spending limits.`}
+                  action={
+                    <button onClick={() => { setShowForm(true); setBudgetType(activeType); }}
+                      className="flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
+                      <Plus className="w-4 h-4" /> Create {isMonthly ? "Monthly" : "Yearly"} Budget
+                    </button>
+                  } />
+              ) : (
+                <div className="divide-y divide-border/40">
+                  {list.map(b => (
+                    <BudgetRow key={b.id} budget={b} onEdit={() => setEditBudget(b)} />
+                  ))}
                 </div>
               )}
-            </div>
-            {isLoading ? <TableRowSkeleton rows={3} /> : isError ? (
-              <QueryErrorState onRetry={() => refetch()} description="Couldn't load your budgets. Check your connection and try again." />
-            ) : list.length === 0 ? (
-              <EmptyState icon={Target} title={`No ${type === "MONTHLY" ? "monthly" : "yearly"} budgets`}
-                description={`Create a ${type === "MONTHLY" ? "monthly" : "yearly"} budget to track spending limits.`}
-                action={
-                  <button onClick={() => { setShowForm(true); setBudgetType(type); }}
-                    className="flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
-                    <Plus className="w-4 h-4" /> Create {type === "MONTHLY" ? "Monthly" : "Yearly"} Budget
-                  </button>
-                } />
-            ) : (
-              <div className="divide-y divide-border/40">
-                {list.map(b => (
-                  <BudgetRow key={b.id} budget={b} onEdit={() => setEditBudget(b)} />
-                ))}
-              </div>
-            )}
-          </Card>
-        ))}
-
-        {/* Custom Categories */}
-        {categories.filter(c => !c.isSystem).length > 0 && (
-          <Card className="overflow-hidden">
-            <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-              <PremiumIcon icon={Tag} tone="gray" size="xs" />
-              <span className="font-semibold text-foreground text-sm">Custom Categories</span>
-              <span className="text-xs text-muted-foreground ml-auto">{categories.filter(c => !c.isSystem).length}</span>
-            </div>
-            <div className="px-5 py-4 flex flex-wrap gap-2">
-              {categories.filter(c => !c.isSystem).map(c => (
-                <div key={c.id} className="flex items-center gap-2 bg-muted/60 border border-border/60 rounded-lg pl-1.5 pr-2.5 py-1.5 group">
-                  <PremiumIcon icon={getCategoryIcon(c)} hex={getCategoryColor(c.name, c.color)} size="xs" />
-                  <span className="text-xs text-foreground">{c.name}</span>
-                  <button onClick={() => setConfirmCatId(c.id)} aria-label={`Delete ${c.name} category`}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground/80 hover:text-red-400 ml-1">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
+            </Card>
+          );
+        })()}
         </div>
       </main>
 

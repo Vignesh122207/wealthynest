@@ -3,7 +3,7 @@ import type {BrowserContext, Page} from "@playwright/test";
 import {provisionE2EUser} from "../../helpers/auth.helper";
 import {api} from "../../helpers/api.helper";
 import {LoginPage} from "../../pages/auth/LoginPage";
-import {DashboardPage} from "../../pages/DashboardPage";
+import {HomePage} from "../../pages/HomePage";
 import {AccountsPage} from "../../pages/AccountsPage";
 import {TransactionsPage} from "../../pages/TransactionsPage";
 
@@ -39,7 +39,7 @@ test.describe("Visual regression (dynamic pages, fresh empty-state user)", () =>
     page = await context.newPage();
     const login = new LoginPage(page);
     await login.loginWithPassword(user.email, user.password);
-    await login.expectRedirectedToDashboard();
+    await login.expectRedirectedToHome();
   });
 
   test.afterAll(async () => {
@@ -48,10 +48,10 @@ test.describe("Visual regression (dynamic pages, fresh empty-state user)", () =>
   });
 
   test("dashboard (empty state) @visual", async () => {
-    const dashboard = new DashboardPage(page);
-    await dashboard.gotoDashboard();
-    await dashboard.expectLoaded();
-    await dashboard.rawPage.waitForTimeout(900);
+    const home = new HomePage(page);
+    await home.gotoHome();
+    await home.expectLoaded();
+    await home.rawPage.waitForTimeout(900);
     await expect(page).toHaveScreenshot("dashboard-empty.png", {
       mask: [page.getByTestId("greeting-banner")],
       maxDiffPixelRatio: 0.02,

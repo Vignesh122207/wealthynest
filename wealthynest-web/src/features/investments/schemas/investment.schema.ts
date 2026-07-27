@@ -16,6 +16,10 @@ export const mfSchema = z.object({
   purchaseDate:    z.string().min(1, "Date required"),
   linkedAccountId: z.string().optional(),
   debitAccountId:  z.string().optional(),
+  sipAmount:       z.coerce.number().positive("SIP amount must be positive").optional(),
+  // Same "" -> 0 -> fails .min(1) silent-block-submit gotcha as BondForm's couponCreditDay
+  // (see that field's own comment) — preprocess "" to undefined before coercion.
+  sipDay:          z.preprocess(v => (v === "" ? undefined : v), z.coerce.number().min(1).max(31).optional()),
 });
 export type MFFormValues = z.infer<typeof mfSchema>;
 
