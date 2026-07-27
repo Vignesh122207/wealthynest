@@ -1,0 +1,12 @@
+{
+  "name": "wealthynest-post-deploy-smoke",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Read-only, DB-free browser smoke checks run against the live production URLs right after a backend deploy. Deliberately separate from ../../playwright (the app's own E2E suite) - that suite's global-setup needs direct Postgres access to verify a test user's email, and production RDS sits in a private-isolated subnet with no internet route at all, so no security-group rule could make it reachable from a GitHub-hosted runner even temporarily.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0"
+  }
+}

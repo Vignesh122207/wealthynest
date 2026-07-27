@@ -1,0 +1,43 @@
+[Unit]
+Description=WealthyNest Backend API (Spring Boot)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=wealthynest
+Group=wealthynest
+WorkingDirectory=/opt/wealthynest
+
+# Written by scripts/deploy-backend.sh before each deploy; leading '-' makes it optional so
+# `systemctl enable` doesn't fail before the very first deploy has ever run.
+EnvironmentFile=-/opt/wealthynest/current.env
+
+# /opt/wealthynest/current -> symlink to the currently-deployed release directory, flipped
+# atomically by deploy-backend.sh so a rollback is just re-pointing the symlink and restarting.
+ExecStart=/usr/bin/java \
+  -XX:+UseContainerSupport \
+  -XX:MaxRAMPercentage=70.0 \
+  -jar /opt/wealthynest/current/app.jar \
+  --spring.profiles.active=prod
+
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=90
+TimeoutStopSec=30
+
+# Hardening - the service only needs its own app/log directories, nothing else on the host.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/wealthynest /var/log/wealthynest
+
+StandardOutput=append:/var/log/wealthynest/app.log
+StandardError=append:/var/log/wealthynest/app.log
+
+[Install]
+WantedBy=multi-user.target

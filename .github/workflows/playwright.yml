@@ -1,0 +1,66 @@
+name: Post-Deploy Smoke (Playwright)
+
+# Deliberately NOT the app's own playwright/tests/smoke suite. That suite's global-setup writes
+# directly to Postgres to verify a test user's email — production RDS sits in a private-isolated
+# subnet with no internet route at all, so no security-group rule could make it reachable from a
+# GitHub-hosted runner even temporarily. infrastructure/smoke-tests/ is a small, separate,
+# DB-free Playwright project that only exercises the public HTTPS surface (landing page, login
+# page, a real rejected-login round trip, /actuator/health) — see its package.json for the full
+# rationale. Callable directly (backend.yml calls this after every deploy and fails the deploy if
+# it fails) or run standalone via workflow_dispatch.
+on:
+  workflow_call:
+    inputs:
+      base-url:
+        required: true
+        type: string
+      api-url:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      base-url:
+        description: "Frontend URL to check"
+        required: true
+        default: "https://wealthynest.in"
+      api-url:
+        description: "Backend API base URL to check"
+        required: true
+        default: "https://api.wealthynest.in/api/v1"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: infrastructure/smoke-tests
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run post-deploy smoke checks
+        env:
+          BASE_URL: ${{ inputs.base-url }}
+          API_URL: ${{ inputs.api-url }}
+        run: npm test
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: post-deploy-smoke-report
+          path: infrastructure/smoke-tests/smoke-report/
+          retention-days: 14
