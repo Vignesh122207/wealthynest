@@ -19,20 +19,31 @@ import software.constructs.Construct;
 
 /**
  * GitHub Actions authenticates to AWS via OIDC federation - no long-lived IAM access keys ever
- * sit in a GitHub secret. Two purpose-scoped roles, both trusted only for this exact repo:
+ * sit in a GitHub secret. Two purpose-scoped roles, both trusted only for this exact repo.
+ *
+ * <p><b>The OIDC {@code sub} claim's shape depends on whether the calling job specifies
+ * {@code environment:}, not just its trigger event</b> - a subtlety easy to get wrong (this stack
+ * did, until every push/PR touching {@code infrastructure/**} or {@code wealthynest-api/**} once
+ * failed at the assume-role step with a generic "not authorized", regardless of a correct-looking
+ * ref/pull_request condition). A plain push/pull_request job gets
+ * {@code repo:<repo>:ref:refs/heads/<branch>} or {@code repo:<repo>:pull_request}; a job with
+ * {@code environment: <name>} gets {@code repo:<repo>:environment:<name>} <i>instead</i>, not in
+ * addition. Both {@code backend.yml} and {@code infra.yml} run their actual `deploy` step under
+ * {@code environment: production} specifically so GitHub's environment protection rules
+ * (required reviewers, wait timers) apply - so trust has to be granted for that claim shape too.
  *
  * <ul>
- *   <li>{@code BackendDeployRole} (backend.yml) - trusted only for pushes to {@code main} (that
- *       workflow has no {@code pull_request} trigger). Upload a JAR to S3, trigger
- *       {@code deploy-backend.sh} on the app server over SSM Send Command. No EC2/SSH access,
- *       no Secrets Manager access (the instance reads its own secrets via its own role).</li>
- *   <li>{@code InfraDeployRole} (infra.yml) - trusted for both pushes to {@code main} and
- *       {@code pull_request} runs (infra.yml's {@code synth} job runs read-only {@code cdk
- *       synth}/{@code diff} on PRs targeting main, which needs its own OIDC trust pattern - see
- *       {@code githubInfraPrincipal} below). Only permission is {@code sts:AssumeRole} on this
- *       account's CDK bootstrap roles (the standard AWS-documented pattern for CDK CI/CD). It
- *       carries no direct resource permissions of its own - the bootstrap roles, created once by
- *       {@code cdk bootstrap}, are what actually provision resources.</li>
+ *   <li>{@code BackendDeployRole} (backend.yml) - both jobs that assume this role
+ *       ({@code deploy}, {@code rollback}) run under {@code environment: production}; the
+ *       {@code build} job needs no AWS credentials at all. So this role only ever needs to trust
+ *       the {@code environment:production} claim shape, never the ref-based one.</li>
+ *   <li>{@code InfraDeployRole} (infra.yml) - trusted for three distinct claim shapes: `synth`
+ *       runs on both push (`ref:refs/heads/main`) and `pull_request` (`pull_request`) with no
+ *       `environment:`, while `deploy` runs under `environment: production` like backend.yml's
+ *       jobs do. Only permission is {@code sts:AssumeRole} on this account's CDK bootstrap roles
+ *       (the standard AWS-documented pattern for CDK CI/CD) - it carries no direct resource
+ *       permissions of its own, the bootstrap roles (created once by {@code cdk bootstrap}) are
+ *       what actually provision resources.</li>
  * </ul>
  *
  * <p>Created last (depends on Compute's instance and Storage's bucket) so it can reference their
@@ -55,24 +66,25 @@ public class CicdStack extends Stack {
             .clientIds(List.of("sts.amazonaws.com"))
             .build();
 
+        // backend.yml's `deploy`/`rollback` jobs (the only ones that assume this role) both run
+        // under `environment: production` - see this class's own doc comment for why that changes
+        // the OIDC sub claim shape entirely rather than adding to the ref-based one.
         OpenIdConnectPrincipal githubPrincipal = new OpenIdConnectPrincipal(githubOidcProvider, Map.of(
             "StringEquals", Map.of("token.actions.githubusercontent.com:aud", "sts.amazonaws.com"),
             "StringLike", Map.of(
-                "token.actions.githubusercontent.com:sub", "repo:" + config.githubRepo() + ":ref:refs/heads/main")
+                "token.actions.githubusercontent.com:sub", "repo:" + config.githubRepo() + ":environment:production")
         ));
 
-        // infra.yml's `synth` job also runs on `pull_request` (read-only cdk synth/diff, already
-        // scoped to PRs targeting main by the workflow's own trigger) - GitHub's OIDC `sub` claim
-        // for a pull_request event is "repo:<repo>:pull_request", not the push event's
-        // "ref:refs/heads/main" form, so InfraDeployRole alone needs both patterns trusted.
-        // BackendDeployRole stays on the narrower push-only principal - backend.yml has no
-        // pull_request trigger.
+        // InfraDeployRole is assumed by three different claim shapes across infra.yml's two jobs -
+        // see this class's own doc comment for why each exists and why they can't be merged into
+        // fewer patterns.
         OpenIdConnectPrincipal githubInfraPrincipal = new OpenIdConnectPrincipal(githubOidcProvider, Map.of(
             "StringEquals", Map.of("token.actions.githubusercontent.com:aud", "sts.amazonaws.com"),
             "StringLike", Map.of(
                 "token.actions.githubusercontent.com:sub", List.of(
                     "repo:" + config.githubRepo() + ":ref:refs/heads/main",
-                    "repo:" + config.githubRepo() + ":pull_request"
+                    "repo:" + config.githubRepo() + ":pull_request",
+                    "repo:" + config.githubRepo() + ":environment:production"
                 ))
         ));
 
