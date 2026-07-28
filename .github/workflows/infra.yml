@@ -15,6 +15,7 @@ on:
     paths:
       - "infrastructure/**"
       - ".github/workflows/infra.yml"
+  workflow_dispatch: {}
 
 concurrency:
   group: infra-deploy
@@ -82,7 +83,7 @@ jobs:
   # there apply here, the same as backend.yml's deploy job.
   deploy:
     needs: synth
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
     defaults:
