@@ -72,6 +72,6 @@ git push origin main             # infra.yml deploys the corrected stacks
 For a single misbehaving resource where you know the exact prior CloudFormation state, `cdk diff`
 against the previous commit locally first to see exactly what would change, then deploy that
 commit's `infrastructure/` tree. Avoid `cdk destroy` on stateful stacks
-(`wealthynest-production-database`, `wealthynest-production-storage`) — both have `deletionProtection`/
+(`wealthynest-prod-database`, `wealthynest-prod-storage`) — both have `deletionProtection`/
 `RemovalPolicy.RETAIN` specifically to make that a deliberate, hard-to-do-by-accident action; see
 `disaster-recovery-guide.md` if you actually need to.

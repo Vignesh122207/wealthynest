@@ -21,9 +21,17 @@ public record AppConfig(
     MonitoringConfig monitoring
 ) {
 
-    /** {@code "wealthynest-production-<suffix>"} — consistent naming across every stack. */
+    /** {@code "wealthynest-<env>-<suffix>"} — consistent naming across every stack. */
     public String resourceName(String suffix) {
         return "wealthynest-%s-%s".formatted(envName, suffix);
+    }
+
+    /**
+     * {@code "/wealthynest/<env>/<path>"} — the one place SSM parameter and CloudWatch Log Group
+     * paths are built, so no stack hand-concatenates this literal (and drifts from the others).
+     */
+    public String namespace(String path) {
+        return "/wealthynest/%s/%s".formatted(envName, path);
     }
 
     public record NetworkConfig(

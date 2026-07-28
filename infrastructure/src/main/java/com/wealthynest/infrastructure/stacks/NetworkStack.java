@@ -76,7 +76,7 @@ public class NetworkStack extends Stack {
         // what let you reconstruct "what actually talked to what" during an incident, not just
         // "what got blocked". CDK auto-creates the IAM role this needs to write to the log group.
         LogGroup flowLogGroup = LogGroup.Builder.create(this, "VpcFlowLogGroup")
-            .logGroupName("/wealthynest/" + config.envName() + "/vpc-flow-logs")
+            .logGroupName(config.namespace("vpc-flow-logs"))
             .retention(LogRetentionMapper.fromDays(config.monitoring().logRetentionDays()))
             .build();
         vpc.addFlowLog("FlowLog", FlowLogOptions.builder()
@@ -96,6 +96,7 @@ public class NetworkStack extends Stack {
         // Lambda), the same explicit-ingress convention used everywhere else in this app.
         this.secretsManagerEndpointSecurityGroup = SecurityGroup.Builder.create(this, "SecretsManagerEndpointSecurityGroup")
             .vpc(vpc)
+            .securityGroupName(config.resourceName("sg-secretsmgr"))
             .description("WealthyNest Secrets Manager VPC interface endpoint - ingress opened per-consumer")
             .allowAllOutbound(false)
             .build();

@@ -19,7 +19,7 @@ sudo journalctl -u wealthynest-backend -n 200 --no-pager
 **Instance itself is unhealthy (won't respond to SSM, failed status checks):**
 ```bash
 cd infrastructure
-cdk deploy wealthynest-production-compute
+cdk deploy wealthynest-prod-compute
 ```
 CDK's `Ec2AppServerConstruct` doesn't have a "replace this instance" button by itself, but
 terminating the instance via the EC2 console and re-running `cdk deploy` on the compute stack
@@ -37,20 +37,20 @@ for AWS to recover the instance or restoring from backup (below).
 **Point-in-time restore** (accidental bad migration, bad data, etc.):
 ```bash
 aws rds restore-db-instance-to-point-in-time \
-  --source-db-instance-identifier wealthynest-production-postgres \
-  --target-db-instance-identifier wealthynest-production-postgres-restored \
+  --source-db-instance-identifier wealthynest-prod-db \
+  --target-db-instance-identifier wealthynest-prod-db-restored \
   --restore-time 2026-07-27T10:00:00Z
 ```
 This creates a **new** instance — it does not overwrite the running one. Verify the restored data,
-then either point the app at it (update the `/wealthynest/production/db-url` SSM parameter and the
+then either point the app at it (update the `/wealthynest/prod/db-url` SSM parameter and the
 DB credentials secret's target, or swap identifiers) or export/import just the needed rows.
 `rdsBackupRetentionDays` (default 7) bounds how far back you can go.
 
 **Restore from a specific automated or manual snapshot:**
 ```bash
-aws rds describe-db-snapshots --db-instance-identifier wealthynest-production-postgres
+aws rds describe-db-snapshots --db-instance-identifier wealthynest-prod-db
 aws rds restore-db-instance-from-db-snapshot \
-  --db-instance-identifier wealthynest-production-postgres-restored \
+  --db-instance-identifier wealthynest-prod-db-restored \
   --db-snapshot-identifier <snapshot-id>
 ```
 
@@ -60,7 +60,7 @@ Redis here holds only cache entries and rate-limit counters — nothing that isn
 Recovery is just replacing the resource, not restoring data:
 ```bash
 cd infrastructure
-cdk deploy wealthynest-production-database
+cdk deploy wealthynest-prod-database
 ```
 If the replication group itself needs replacing (not just a node), delete it via the console/CLI
 first — CDK will recreate it on the next deploy since it's declared in code. The app reconnects

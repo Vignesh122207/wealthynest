@@ -65,14 +65,28 @@ if ! command -v nginx >/dev/null 2>&1; then
 fi
 
 mkdir -p "${NGINX_SSL_DIR}"
-if [[ ! -f "${NGINX_SSL_DIR}/cloudflare-origin.pem" || ! -f "${NGINX_SSL_DIR}/cloudflare-origin.key" ]]; then
-  log "WARNING: Cloudflare Origin CA certificate not found at ${NGINX_SSL_DIR}."
+# Fetched fresh on every boot (not cached to disk beyond writing the PEM/key themselves) so the
+# cert survives an instance replacement without a manual SSM step - see SecurityStack's own
+# comment on CloudflareOriginCertSecret for why this exists as a real secret instead of a one-off
+# manual install.
+CF_CERT_SECRET_NAME="wealthynest-${ENV_NAME}-cloudflare-origin-cert"
+CF_CERT_JSON="$(aws secretsmanager get-secret-value --region "${AWS_REGION}" --secret-id "${CF_CERT_SECRET_NAME}" --query SecretString --output text 2>/dev/null || true)"
+if [[ -n "${CF_CERT_JSON}" && "${CF_CERT_JSON}" != "REPLACE_ME_POST_DEPLOY" ]]; then
+  log "Installing Cloudflare Origin CA certificate from Secrets Manager (${CF_CERT_SECRET_NAME})"
+  echo "${CF_CERT_JSON}" | jq -r '.CERT' > "${NGINX_SSL_DIR}/cloudflare-origin.pem"
+  echo "${CF_CERT_JSON}" | jq -r '.KEY' > "${NGINX_SSL_DIR}/cloudflare-origin.key"
+  chmod 644 "${NGINX_SSL_DIR}/cloudflare-origin.pem"
+  chmod 600 "${NGINX_SSL_DIR}/cloudflare-origin.key"
+elif [[ ! -f "${NGINX_SSL_DIR}/cloudflare-origin.pem" || ! -f "${NGINX_SSL_DIR}/cloudflare-origin.key" ]]; then
+  log "WARNING: Cloudflare Origin CA certificate not found in Secrets Manager (still REPLACE_ME_POST_DEPLOY) or locally at ${NGINX_SSL_DIR}."
   log "Generating a temporary self-signed cert so Nginx can still start - replace it for real"
-  log "traffic. See docs/deployment-guide.md 'TLS: Cloudflare Origin CA' for the real steps."
+  log "traffic. See docs/secrets-management-guide.md for how to populate the real one."
   openssl req -x509 -nodes -days 30 -newkey rsa:2048 \
     -keyout "${NGINX_SSL_DIR}/cloudflare-origin.key" \
     -out "${NGINX_SSL_DIR}/cloudflare-origin.pem" \
     -subj "/CN=temporary-self-signed"
+else
+  log "Cloudflare Origin CA certificate secret still placeholder - keeping existing local cert at ${NGINX_SSL_DIR}"
 fi
 
 install -m 0644 /tmp/wealthynest-nginx.conf /etc/nginx/sites-available/wealthynest.conf 2>/dev/null || true

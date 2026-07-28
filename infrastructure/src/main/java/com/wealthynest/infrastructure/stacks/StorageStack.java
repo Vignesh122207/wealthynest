@@ -22,7 +22,7 @@ public class StorageStack extends Stack {
         super(scope, id, props);
 
         // S3 bucket names are globally unique across all AWS accounts - suffix with the account
-        // ID so this doesn't collide with someone else's "wealthynest-production-backups".
+        // ID so this doesn't collide with someone else's "wealthynest-prod-backups".
         String bucketName = config.resourceName("backups") + "-" + this.getAccount();
 
         this.backupBucket = new VersionedEncryptedBucketConstruct(this, "BackupBucket",

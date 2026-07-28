@@ -130,7 +130,8 @@ public class DatabaseStack extends Stack {
             databaseCredentialsSecret,
             dataKey,
             "wealthynest",
-            config.resourceName("postgres")
+            config.resourceName("db"),
+            config.resourceName("sg-db")
         ));
 
         SecretTargetAttachment dbSecretAttachment = new SecretTargetAttachment(this, "DatabaseCredentialsAttachment",
@@ -143,6 +144,7 @@ public class DatabaseStack extends Stack {
         // ingress rules below stay the explicit, per-consumer grants this app uses everywhere else.
         SecurityGroup rotationLambdaSecurityGroup = SecurityGroup.Builder.create(this, "DbRotationLambdaSecurityGroup")
             .vpc(vpc)
+            .securityGroupName(config.resourceName("sg-db-rotation"))
             .description("WealthyNest DB credentials rotation Lambda - reaches RDS and the Secrets Manager VPC endpoint only")
             .allowAllOutbound(true)
             .build();
@@ -154,6 +156,11 @@ public class DatabaseStack extends Stack {
             // Matches the character set db-credentials was generated with in SecurityStack - a
             // rotated password must satisfy the same constraints the original did.
             .excludeCharacters("\"@/\\ '")
+            // CDK's default CloudFormation-generated name (derived from the full construct ID
+            // path: "DatabaseCredentialsAttachmentDbCredentialsRotationSchedule<hash>-
+            // PostgreSQLSingleUser-Lambda") exceeds Lambda's 64-character functionName limit and
+            // fails at deploy time - explicit short name avoids that.
+            .functionName(config.resourceName("db-rotation"))
             .build());
         dbSecretAttachment.addRotationSchedule("DbCredentialsRotationSchedule", RotationScheduleOptions.builder()
             .hostedRotation(hostedRotation)
@@ -182,7 +189,9 @@ public class DatabaseStack extends Stack {
             config.redis().nodeType(),
             config.redis().numNodes(),
             dataKey,
-            config.resourceName("redis")
+            config.resourceName("redis"),
+            config.resourceName("redis"),
+            config.resourceName("sg-redis")
         ));
 
         // Non-secret runtime config the app needs at boot, read by deploy-backend.sh alongside
@@ -191,17 +200,17 @@ public class DatabaseStack extends Stack {
         String jdbcUrl = "jdbc:postgresql://" + database.getDatabaseInstance().getDbInstanceEndpointAddress()
             + ":" + database.getDatabaseInstance().getDbInstanceEndpointPort() + "/wealthynest";
         this.dbUrlParameter = StringParameter.Builder.create(this, "DbUrlParameter")
-            .parameterName("/wealthynest/" + config.envName() + "/db-url")
+            .parameterName(config.namespace("db-url"))
             .description("JDBC URL for wealthynest-api's DB_URL")
             .stringValue(jdbcUrl)
             .build();
         this.redisHostParameter = StringParameter.Builder.create(this, "RedisHostParameter")
-            .parameterName("/wealthynest/" + config.envName() + "/redis-host")
+            .parameterName(config.namespace("redis-host"))
             .description("ElastiCache primary endpoint for wealthynest-api's REDIS_HOST")
             .stringValue(cache.getPrimaryEndpointAddress())
             .build();
         this.redisPortParameter = StringParameter.Builder.create(this, "RedisPortParameter")
-            .parameterName("/wealthynest/" + config.envName() + "/redis-port")
+            .parameterName(config.namespace("redis-port"))
             .description("ElastiCache port for wealthynest-api's REDIS_PORT")
             .stringValue(cache.getPrimaryEndpointPort())
             .build();

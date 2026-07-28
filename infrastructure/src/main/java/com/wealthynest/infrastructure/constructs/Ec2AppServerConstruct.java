@@ -45,6 +45,7 @@ public final class Ec2AppServerConstruct extends Construct {
 
         this.securityGroup = SecurityGroup.Builder.create(this, "SecurityGroup")
             .vpc(props.vpc())
+            .securityGroupName(props.securityGroupName())
             .description("WealthyNest backend app server - HTTP/HTTPS from Cloudflare edge only, no SSH")
             .allowAllOutbound(true)
             .build();
@@ -87,7 +88,7 @@ public final class Ec2AppServerConstruct extends Construct {
             ))
             .userData(props.userData())
             .build();
-        Tags.of(instance).add("Name", props.resourceNamePrefix() + "-app-server");
+        Tags.of(instance).add("Name", props.nameTag());
 
         this.elasticIp = CfnEIP.Builder.create(this, "ElasticIp")
             .domain("vpc")
@@ -123,7 +124,7 @@ public final class Ec2AppServerConstruct extends Construct {
             default -> throw new IllegalArgumentException(
                 "Unsupported ec2Architecture '%s' - expected 'arm64' or 'x86_64'".formatted(architecture));
         };
-        return "/aws/service/canonical/ubuntu/server/22.04/stable/current/%s/hvm/ebs-gp3/ami-id"
+        return "/aws/service/canonical/ubuntu/server/26.04/stable/current/%s/hvm/ebs-gp3/ami-id"
             .formatted(archSegment);
     }
 
@@ -154,7 +155,8 @@ public final class Ec2AppServerConstruct extends Construct {
         String adminCidrForSsm,
         UserData userData,
         IKey ebsKmsKey,
-        String resourceNamePrefix
+        String nameTag,
+        String securityGroupName
     ) {
         public boolean hasAdminCidr() {
             return adminCidrForSsm != null && !adminCidrForSsm.isBlank();

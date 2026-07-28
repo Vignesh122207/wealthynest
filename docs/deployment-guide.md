@@ -28,8 +28,8 @@ cd infrastructure
 cdk deploy --all
 ```
 
-Note the outputs — `wealthynest-production-cicd`'s `BackendDeployRoleArn`/`InfraDeployRoleArn`,
-`wealthynest-production-outputs`'s `AppServerPublicIp`/`BackupBucketName`. You'll need them next.
+Note the outputs — `wealthynest-prod-cicd`'s `BackendDeployRoleArn`/`InfraDeployRoleArn`,
+`wealthynest-prod-outputs`'s `AppServerPublicIp`/`BackupBucketName`. You'll need them next.
 
 ### 3. GitHub repository configuration
 

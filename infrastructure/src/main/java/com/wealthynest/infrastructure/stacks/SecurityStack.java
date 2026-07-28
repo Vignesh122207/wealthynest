@@ -47,6 +47,7 @@ public class SecurityStack extends Stack {
     private final ISecret vaultEncryptionKeySecret;
     private final ISecret vaultHashPepperSecret;
     private final ISecret fcmServiceAccountSecret;
+    private final ISecret cloudflareOriginCertSecret;
 
     public SecurityStack(Construct scope, String id, StackProps props, AppConfig config) {
         super(scope, id, props);
@@ -120,6 +121,16 @@ public class SecurityStack extends Stack {
                 + "Optional: push notifications silently no-op if left as the placeholder. "
                 + "Populate manually after deploy (see ANDROID_APP_ROADMAP.md)."
         );
+
+        this.cloudflareOriginCertSecret = Secret.Builder.create(this, "CloudflareOriginCertSecret")
+            .secretName(config.resourceName("cloudflare-origin-cert"))
+            .description("Cloudflare Origin CA cert/key for nginx TLS termination - JSON {\"CERT\":..,"
+                + "\"KEY\":..}. bootstrap-ec2.sh fetches this on every boot, so it survives instance "
+                + "replacement without a manual SSM step. Populate manually after generating the "
+                + "cert in the Cloudflare dashboard (SSL/TLS > Origin Server).")
+            .secretStringValue(SecretValue.unsafePlainText("REPLACE_ME_POST_DEPLOY"))
+            .removalPolicy(RemovalPolicy.RETAIN)
+            .build();
     }
 
     private ISecret placeholderSecret(String constructId, String secretName, String description) {
@@ -161,5 +172,9 @@ public class SecurityStack extends Stack {
 
     public ISecret getFcmServiceAccountSecret() {
         return fcmServiceAccountSecret;
+    }
+
+    public ISecret getCloudflareOriginCertSecret() {
+        return cloudflareOriginCertSecret;
     }
 }

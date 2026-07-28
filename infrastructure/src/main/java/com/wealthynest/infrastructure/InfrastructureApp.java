@@ -83,7 +83,8 @@ public final class InfrastructureApp {
             security.getSmtpCredentialsSecret(),
             security.getVaultEncryptionKeySecret(),
             security.getVaultHashPepperSecret(),
-            security.getFcmServiceAccountSecret()
+            security.getFcmServiceAccountSecret(),
+            security.getCloudflareOriginCertSecret()
         );
 
         DatabaseStack database = new DatabaseStack(
@@ -96,7 +97,8 @@ public final class InfrastructureApp {
         ComputeStack compute = new ComputeStack(
             app, stackPrefix + "-compute",
             stackProps(environment, "WealthyNest backend EC2 app server"),
-            config, network.getVpc(), security.getDataKey(), storage.getBackupBucket(), secrets, database
+            config, network.getVpc(), security.getDataKey(), storage.getBackupBucket(), secrets, database,
+            network.getSecretsManagerEndpointSecurityGroup()
         );
 
         new MonitoringStack(

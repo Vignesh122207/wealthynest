@@ -18,12 +18,12 @@ class SecurityStackTest {
     }
 
     @Test
-    void createsExactlySevenSecrets() {
+    void createsExactlyEightSecrets() {
         App app = new App();
         SecurityStack stack = new SecurityStack(app, "TestSecurity", TestFixtures.stackProps(), TestFixtures.appConfig());
         Template template = Template.fromStack(stack);
 
-        template.resourceCountIs("AWS::SecretsManager::Secret", 7);
+        template.resourceCountIs("AWS::SecretsManager::Secret", 8);
     }
 
     @Test

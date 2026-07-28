@@ -9,6 +9,7 @@ import software.amazon.awscdk.Stack;
 import software.amazon.awscdk.StackProps;
 import software.amazon.awscdk.services.ec2.CfnSecurityGroupIngress;
 import software.amazon.awscdk.services.ec2.ExecuteFileOptions;
+import software.amazon.awscdk.services.ec2.ISecurityGroup;
 import software.amazon.awscdk.services.ec2.IVpc;
 import software.amazon.awscdk.services.ec2.S3DownloadOptions;
 import software.amazon.awscdk.services.ec2.UserData;
@@ -46,7 +47,8 @@ public class ComputeStack extends Stack {
         IKey dataKey,
         Bucket backupBucket,
         AppSecrets secrets,
-        DatabaseStack database
+        DatabaseStack database,
+        ISecurityGroup secretsManagerEndpointSecurityGroup
     ) {
         super(scope, id, props);
 
@@ -61,6 +63,10 @@ public class ComputeStack extends Stack {
             .build();
 
         UserData userData = UserData.forLinux();
+        // Ubuntu Server AMIs (unlike Amazon Linux) don't ship the AWS CLI - addS3DownloadCommand()
+        // below generates `aws s3 cp` calls that would otherwise fail with "command not found"
+        // before bootstrap-ec2.sh is even downloaded.
+        userData.addCommands("apt-get update -y", "apt-get install -y awscli");
         // bootstrap-ec2.sh's nginx and systemd steps look for these at these exact paths.
         userData.addS3DownloadCommand(S3DownloadOptions.builder()
             .bucket(nginxConfigAsset.getBucket())
@@ -91,7 +97,8 @@ public class ComputeStack extends Stack {
             config.compute().adminCidrForSsm(),
             userData,
             dataKey,
-            config.resourceName("backend")
+            config.resourceName("app-server"),
+            config.resourceName("sg-app")
         ));
 
         // Single-sources RATE_LIMIT_TRUSTED_PROXIES (deploy-backend.sh) from the same
@@ -99,7 +106,7 @@ public class ComputeStack extends Stack {
         // set_real_ip_from with - one list, three enforcement points, instead of a third
         // hand-copied duplicate that could silently drift from the other two.
         StringParameter trustedProxiesParameter = StringParameter.Builder.create(this, "RateLimitTrustedProxiesParameter")
-            .parameterName("/wealthynest/" + config.envName() + "/rate-limit-trusted-proxies")
+            .parameterName(config.namespace("rate-limit-trusted-proxies"))
             .description("Comma-joined Cloudflare IPv4 ranges for wealthynest-api's RATE_LIMIT_TRUSTED_PROXIES")
             .stringValue(String.join(",", config.compute().cloudflareIpv4Ranges()))
             .build();
@@ -115,19 +122,19 @@ public class ComputeStack extends Stack {
         // where IAM's eventual consistency still causes a first-attempt miss).
         RetentionDays logRetention = LogRetentionMapper.fromDays(config.monitoring().logRetentionDays());
         LogGroup appLogGroup = LogGroup.Builder.create(this, "AppLogGroup")
-            .logGroupName("/wealthynest/" + config.envName() + "/app")
+            .logGroupName(config.namespace("app"))
             .retention(logRetention)
             .build();
         LogGroup nginxLogGroup = LogGroup.Builder.create(this, "NginxLogGroup")
-            .logGroupName("/wealthynest/" + config.envName() + "/nginx")
+            .logGroupName(config.namespace("nginx"))
             .retention(logRetention)
             .build();
         LogGroup systemLogGroup = LogGroup.Builder.create(this, "SystemLogGroup")
-            .logGroupName("/wealthynest/" + config.envName() + "/system")
+            .logGroupName(config.namespace("system"))
             .retention(logRetention)
             .build();
         StringParameter cloudWatchAgentConfigParameter = StringParameter.Builder.create(this, "CloudWatchAgentConfig")
-            .parameterName("/wealthynest/" + config.envName() + "/cloudwatch-agent-config")
+            .parameterName(config.namespace("cloudwatch-agent-config"))
             .description("CloudWatch Agent config (metrics + log tailing) for the backend app server")
             .stringValue(cloudWatchAgentConfigJson(
                 appLogGroup.getLogGroupName(), nginxLogGroup.getLogGroupName(), systemLogGroup.getLogGroupName()))
@@ -173,6 +180,21 @@ public class ComputeStack extends Stack {
             .fromPort(6379)
             .toPort(6379)
             .description("Backend app server to Redis")
+            .build();
+
+        // Without this, DNS for secretsmanager.<region>.amazonaws.com resolves (VPC-wide, thanks
+        // to the endpoint's PrivateDnsEnabled) to the interface endpoint's private IP even for
+        // this public-subnet instance - but that endpoint's own security group (NetworkStack) only
+        // ever had ingress opened for the DB rotation Lambda's SG, so the app server's traffic gets
+        // silently dropped (long hang, no error) instead of an explicit reject. Same per-consumer
+        // explicit-ingress pattern as DatabaseIngressFromRotationLambda in DatabaseStack.
+        CfnSecurityGroupIngress.Builder.create(this, "SecretsManagerEndpointIngressFromAppServer")
+            .groupId(secretsManagerEndpointSecurityGroup.getSecurityGroupId())
+            .sourceSecurityGroupId(appServer.getSecurityGroup().getSecurityGroupId())
+            .ipProtocol("tcp")
+            .fromPort(443)
+            .toPort(443)
+            .description("Backend app server to the Secrets Manager VPC endpoint")
             .build();
     }
 

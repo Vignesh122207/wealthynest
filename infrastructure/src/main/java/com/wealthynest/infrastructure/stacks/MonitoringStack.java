@@ -83,13 +83,13 @@ public class MonitoringStack extends Stack {
             .period(Duration.minutes(5))
             .build();
 
-        alarms.threshold("wealthynest-ec2-cpu-high", cpuMetric,
+        alarms.threshold(config.resourceName("ec2-cpu-high"), cpuMetric,
             80, 3, ComparisonOperator.GREATER_THAN_THRESHOLD,
             "EC2 CPU above 80% for 3 consecutive 5-minute periods");
-        alarms.threshold("wealthynest-ec2-memory-high", memoryMetric,
+        alarms.threshold(config.resourceName("ec2-memory-high"), memoryMetric,
             85, 3, ComparisonOperator.GREATER_THAN_THRESHOLD,
             "EC2 memory above 85% for 3 consecutive 5-minute periods");
-        alarms.threshold("wealthynest-ec2-disk-high", diskMetric,
+        alarms.threshold(config.resourceName("ec2-disk-high"), diskMetric,
             85, 3, ComparisonOperator.GREATER_THAN_THRESHOLD,
             "EC2 root volume above 85% used for 3 consecutive 5-minute periods");
 
@@ -108,8 +108,8 @@ public class MonitoringStack extends Stack {
             .statistic("Maximum")
             .period(Duration.minutes(1))
             .build();
-        Alarm recoveryAlarm = Alarm.Builder.create(this, "wealthynest-ec2-system-status-check-failed")
-            .alarmName("wealthynest-ec2-system-status-check-failed")
+        Alarm recoveryAlarm = Alarm.Builder.create(this, "SystemStatusCheckFailedAlarm")
+            .alarmName(config.resourceName("ec2-system-status-check-failed"))
             .metric(systemStatusCheckMetric)
             .threshold(0)
             .evaluationPeriods(2)
@@ -121,13 +121,13 @@ public class MonitoringStack extends Stack {
         recoveryAlarm.addAlarmAction(new Ec2Action(Ec2InstanceAction.RECOVER));
         recoveryAlarm.addAlarmAction(new SnsAction(alarmTopic));
 
-        alarms.threshold("wealthynest-rds-cpu-high", database.metricCPUUtilization(),
+        alarms.threshold(config.resourceName("rds-cpu-high"), database.metricCPUUtilization(),
             80, 3, ComparisonOperator.GREATER_THAN_THRESHOLD, "RDS CPU above 80%");
-        alarms.threshold("wealthynest-rds-free-storage-low", database.metricFreeStorageSpace(),
+        alarms.threshold(config.resourceName("rds-free-storage-low"), database.metricFreeStorageSpace(),
             2_000_000_000, 1, ComparisonOperator.LESS_THAN_THRESHOLD, "RDS free storage below 2GB");
-        alarms.threshold("wealthynest-rds-freeable-memory-low", database.metricFreeableMemory(),
+        alarms.threshold(config.resourceName("rds-freeable-memory-low"), database.metricFreeableMemory(),
             256_000_000, 3, ComparisonOperator.LESS_THAN_THRESHOLD, "RDS freeable memory below 256MB");
-        alarms.threshold("wealthynest-rds-connections-high", database.metricDatabaseConnections(),
+        alarms.threshold(config.resourceName("rds-connections-high"), database.metricDatabaseConnections(),
             80, 3, ComparisonOperator.GREATER_THAN_THRESHOLD, "RDS connection count above 80");
 
         // ElastiCache publishes per-node metrics under CacheClusterId, not ReplicationGroupId.
@@ -150,9 +150,9 @@ public class MonitoringStack extends Stack {
             .period(Duration.minutes(5))
             .build();
 
-        alarms.threshold("wealthynest-redis-cpu-high", redisCpuMetric,
+        alarms.threshold(config.resourceName("redis-cpu-high"), redisCpuMetric,
             80, 3, ComparisonOperator.GREATER_THAN_THRESHOLD, "Redis engine CPU above 80%");
-        alarms.threshold("wealthynest-redis-evictions-high", redisEvictionsMetric,
+        alarms.threshold(config.resourceName("redis-evictions-high"), redisEvictionsMetric,
             100, 3, ComparisonOperator.GREATER_THAN_THRESHOLD,
             "Redis evicting keys - working set no longer fits the node's memory");
 
