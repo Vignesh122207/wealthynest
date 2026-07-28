@@ -19,14 +19,17 @@ import software.constructs.Construct;
 
 /**
  * GitHub Actions authenticates to AWS via OIDC federation - no long-lived IAM access keys ever
- * sit in a GitHub secret. Two purpose-scoped roles, each trusted only for this exact repo on
- * {@code main}:
+ * sit in a GitHub secret. Two purpose-scoped roles, both trusted only for this exact repo:
  *
  * <ul>
- *   <li>{@code BackendDeployRole} (backend.yml) - upload a JAR to S3, trigger
+ *   <li>{@code BackendDeployRole} (backend.yml) - trusted only for pushes to {@code main} (that
+ *       workflow has no {@code pull_request} trigger). Upload a JAR to S3, trigger
  *       {@code deploy-backend.sh} on the app server over SSM Send Command. No EC2/SSH access,
  *       no Secrets Manager access (the instance reads its own secrets via its own role).</li>
- *   <li>{@code InfraDeployRole} (infra.yml) - only permission is {@code sts:AssumeRole} on this
+ *   <li>{@code InfraDeployRole} (infra.yml) - trusted for both pushes to {@code main} and
+ *       {@code pull_request} runs (infra.yml's {@code synth} job runs read-only {@code cdk
+ *       synth}/{@code diff} on PRs targeting main, which needs its own OIDC trust pattern - see
+ *       {@code githubInfraPrincipal} below). Only permission is {@code sts:AssumeRole} on this
  *       account's CDK bootstrap roles (the standard AWS-documented pattern for CDK CI/CD). It
  *       carries no direct resource permissions of its own - the bootstrap roles, created once by
  *       {@code cdk bootstrap}, are what actually provision resources.</li>
@@ -58,6 +61,21 @@ public class CicdStack extends Stack {
                 "token.actions.githubusercontent.com:sub", "repo:" + config.githubRepo() + ":ref:refs/heads/main")
         ));
 
+        // infra.yml's `synth` job also runs on `pull_request` (read-only cdk synth/diff, already
+        // scoped to PRs targeting main by the workflow's own trigger) - GitHub's OIDC `sub` claim
+        // for a pull_request event is "repo:<repo>:pull_request", not the push event's
+        // "ref:refs/heads/main" form, so InfraDeployRole alone needs both patterns trusted.
+        // BackendDeployRole stays on the narrower push-only principal - backend.yml has no
+        // pull_request trigger.
+        OpenIdConnectPrincipal githubInfraPrincipal = new OpenIdConnectPrincipal(githubOidcProvider, Map.of(
+            "StringEquals", Map.of("token.actions.githubusercontent.com:aud", "sts.amazonaws.com"),
+            "StringLike", Map.of(
+                "token.actions.githubusercontent.com:sub", List.of(
+                    "repo:" + config.githubRepo() + ":ref:refs/heads/main",
+                    "repo:" + config.githubRepo() + ":pull_request"
+                ))
+        ));
+
         Role backendDeployRole = Role.Builder.create(this, "BackendDeployRole")
             .roleName(config.resourceName("gha-backend-deploy"))
             .description("Assumed by backend.yml via GitHub OIDC to ship a new backend release - "
@@ -87,7 +105,7 @@ public class CicdStack extends Stack {
             .roleName(config.resourceName("gha-infra-deploy"))
             .description("Assumed by infra.yml via GitHub OIDC - only permission is assuming this "
                 + "account's CDK bootstrap roles")
-            .assumedBy(githubPrincipal)
+            .assumedBy(githubInfraPrincipal)
             .maxSessionDuration(Duration.hours(1))
             .build();
         infraDeployRole.addToPolicy(PolicyStatement.Builder.create()
