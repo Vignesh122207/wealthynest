@@ -20,12 +20,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # No `working-directory: wealthynest-web` default here on purpose - the linked Vercel project's
+  # own "Root Directory" setting is already wealthynest-web, so `vercel build`/`deploy` need to run
+  # from the repo root and let Vercel CLI apply that setting itself. Running from inside
+  # wealthynest-web/ doubles the path (wealthynest-web/wealthynest-web) and fails with ENOENT -
+  # reproduced, not theoretical (see PR history).
   deploy:
     runs-on: ubuntu-latest
     environment: production
-    defaults:
-      run:
-        working-directory: wealthynest-web
 
     steps:
       - name: Checkout

@@ -38,9 +38,18 @@ log() { echo "[deploy] $(date -u +%FT%TZ) $*"; }
 # shellcheck disable=SC1091
 source "$APP_DIR/env.conf"
 
-secret_field() { # $1 = secret name suffix, $2 = jq filter ("." for a plain-string secret)
+secret_field() { # $1 = secret name suffix, $2 = jq filter - for a JSON-shaped secret only
+  # (db-credentials, smtp-credentials). jq parses its input as JSON first; a plain-string
+  # secret's raw value (e.g. a bare 64-char alphanumeric JWT secret) is not valid JSON on its
+  # own - `jq -r "."` on one fails with a parse error and silently yields an empty string. Use
+  # secret_value() below for those instead.
   aws secretsmanager get-secret-value --region "$AWS_REGION" \
     --secret-id "wealthynest-${ENV_NAME}-$1" --query SecretString --output text | jq -r "$2"
+}
+
+secret_value() { # $1 = secret name suffix - for a plain-string secret; no JSON parsing involved
+  aws secretsmanager get-secret-value --region "$AWS_REGION" \
+    --secret-id "wealthynest-${ENV_NAME}-$1" --query SecretString --output text
 }
 
 ssm_value() {
@@ -58,15 +67,15 @@ write_env_file() {
     echo "DB_PASSWORD=$(secret_field db-credentials .password)"
     echo "REDIS_HOST=$(ssm_value redis-host)"
     echo "REDIS_PORT=$(ssm_value redis-port)"
-    echo "JWT_SECRET=$(secret_field jwt-secret .)"
-    echo "VAULT_ENCRYPTION_KEY=$(secret_field vault-encryption-key .)"
-    echo "VAULT_HASH_PEPPER=$(secret_field vault-hash-pepper .)"
-    echo "GOOGLE_NATIVE_CLIENT_SECRET=$(secret_field google-oauth-client-secret .)"
+    echo "JWT_SECRET=$(secret_value jwt-secret)"
+    echo "VAULT_ENCRYPTION_KEY=$(secret_value vault-encryption-key)"
+    echo "VAULT_HASH_PEPPER=$(secret_value vault-hash-pepper)"
+    echo "GOOGLE_NATIVE_CLIENT_SECRET=$(secret_value google-oauth-client-secret)"
     echo "MAIL_HOST=smtp-relay.brevo.com"
     echo "MAIL_PORT=587"
     echo "MAIL_USERNAME=$(secret_field smtp-credentials .MAIL_USERNAME)"
     echo "MAIL_PASSWORD=$(secret_field smtp-credentials .MAIL_PASSWORD)"
-    echo "FCM_SERVICE_ACCOUNT_JSON=$(secret_field fcm-service-account .)"
+    echo "FCM_SERVICE_ACCOUNT_JSON=$(secret_value fcm-service-account)"
     echo "CORS_ORIGINS=https://wealthynest.in"
     echo "FRONTEND_URL=https://wealthynest.in"
     echo "RATE_LIMIT_TRUSTED_PROXIES=$(ssm_value rate-limit-trusted-proxies)"
