@@ -11,6 +11,11 @@ on:
     paths:
       - "wealthynest-web/**"
       - ".github/workflows/frontend-ci.yml"
+  # Lets `frontend-test` (a required status check on main) be satisfied manually for a PR whose
+  # path filter never matches (e.g. infra-only or workflow-only changes) - dispatch this against
+  # the PR's branch and the resulting check run attaches to that commit SHA, which branch
+  # protection recognizes the same as an automatic run would.
+  workflow_dispatch: {}
 
 concurrency:
   group: frontend-ci-${{ github.ref }}
