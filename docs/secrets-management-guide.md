@@ -75,10 +75,23 @@ render — a safe default, unlike a blank JWT secret would be.
 
 ## Rotation
 
-- `db-credentials`, `jwt-secret`: safe to rotate any time — generate a new `SecretStringGenerator`
-  value (or use Secrets Manager's built-in rotation if you wire up a rotation Lambda later) and
-  redeploy; the app reads it fresh on every deploy/restart.
+- `db-credentials`: **automatic.** `DatabaseStack` attaches an AWS-managed PostgreSQL single-user
+  `HostedRotation` to this secret, running on a schedule (`rdsCredentialRotationDays` in
+  `cdk.json`, default 30 days) — no rotation Lambda for us to write or maintain. One operational
+  step this doesn't do for you: the running app only reads `DB_PASSWORD` into
+  `/opt/wealthynest/current.env` at process start, not per-connection, so a rotation only takes
+  effect for the app once that file is rewritten. Already-open connections keep working (Postgres
+  doesn't drop live sessions on a password change); *new* connections after a rotation will fail
+  auth until then. Run `deploy-backend.sh --refresh-env` over SSM after a rotation (or point a
+  scheduled trigger at it — not wired up automatically; see `DatabaseStack`'s own comment for why)
+  to pick it up without waiting for the next real deploy.
+- `jwt-secret`: **still manual.** There's no AWS-provided rotation blueprint for a bare signing
+  secret (no database to test a new value against), and rotating it invalidates every
+  currently-issued JWT — safe automatic rotation needs `wealthynest-api` to verify against both the
+  current and previous secret during a grace window, which is a backend change, not an infra one.
+  Rotate the same way as before: generate a new `SecretStringGenerator` value and redeploy.
 - `vault-encryption-key`, `vault-hash-pepper`: **do not rotate casually** — see the secret's own
-  description. Only rotate as part of a deliberate, planned Vault data migration.
+  description. Only rotate as part of a deliberate, planned Vault data migration. Never put these
+  on an automatic schedule.
 - `google-oauth-client-secret`, `smtp-credentials`, `fcm-service-account`: rotate whenever the
   upstream provider (Google/Brevo/Firebase) issues a new one — `put-secret-value` + redeploy.

@@ -146,6 +146,14 @@ export function formatChartTickINR(value: number): string {
   return `${sign}₹${abs >= 100000 ? `${(abs / 100000).toFixed(1)}L` : `${(abs / 1000).toFixed(0)}K`}`;
 }
 
+/** Recharts' Tooltip `formatter` value is typed as `ValueType` (number | string | array of
+ * either) since a series can in principle hold either — every chart in this app is numeric, so
+ * normalize to a plain number once here instead of repeating the same narrowing at each call site. */
+export function chartValueToNumber(value: number | string | readonly (number | string)[] | undefined): number {
+  const v = Array.isArray(value) ? value[0] : value;
+  return typeof v === "number" ? v : Number(v ?? 0) || 0;
+}
+
 export function formatDate(date: string | Date): string {
   return new Intl.DateTimeFormat("en-IN", {
     day: "2-digit", month: "short", year: "numeric",

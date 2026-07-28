@@ -3,13 +3,25 @@ package com.wealthynest.infrastructure.stacks;
 import com.wealthynest.infrastructure.config.AppConfig;
 import com.wealthynest.infrastructure.constructs.PostgresDatabaseConstruct;
 import com.wealthynest.infrastructure.constructs.RedisReplicationGroupConstruct;
+import java.util.List;
+import software.amazon.awscdk.Duration;
 import software.amazon.awscdk.RemovalPolicy;
 import software.amazon.awscdk.Stack;
 import software.amazon.awscdk.StackProps;
+import software.amazon.awscdk.services.ec2.CfnSecurityGroupIngress;
+import software.amazon.awscdk.services.ec2.ISecurityGroup;
 import software.amazon.awscdk.services.ec2.IVpc;
+import software.amazon.awscdk.services.ec2.SecurityGroup;
+import software.amazon.awscdk.services.ec2.SubnetSelection;
+import software.amazon.awscdk.services.ec2.SubnetType;
 import software.amazon.awscdk.services.kms.IKey;
 import software.amazon.awscdk.services.kms.Key;
+import software.amazon.awscdk.services.secretsmanager.HostedRotation;
 import software.amazon.awscdk.services.secretsmanager.ISecret;
+import software.amazon.awscdk.services.secretsmanager.RotationScheduleOptions;
+import software.amazon.awscdk.services.secretsmanager.SecretTargetAttachment;
+import software.amazon.awscdk.services.secretsmanager.SecretTargetAttachmentProps;
+import software.amazon.awscdk.services.secretsmanager.SingleUserHostedRotationOptions;
 import software.amazon.awscdk.services.ssm.StringParameter;
 import software.constructs.Construct;
 
@@ -44,6 +56,40 @@ import software.constructs.Construct;
  * direction backwards doesn't fail at compile time; it fails at {@code cdk synth}, as a full
  * dependency-cycle report across every stack involved. See {@code InfrastructureApp} for the
  * resulting stack order these two fixes require (Database before Compute).
+ *
+ * <p><b>Automatic credential rotation.</b> {@code db-credentials} rotates every
+ * {@code rdsCredentialRotationDays} via Secrets Manager's AWS-managed PostgreSQL single-user
+ * {@link HostedRotation} - no rotation Lambda for us to write or patch. Getting there needs one
+ * more piece {@code PostgresDatabaseConstruct} deliberately doesn't have: a
+ * {@link SecretTargetAttachment}, built here (not via {@code databaseCredentialsSecret.attach()})
+ * for the exact same reason {@code fromUsername} was chosen over {@code fromSecret} above -
+ * calling {@code .attach()} on the secret creates the attachment as a child of the secret's own
+ * scope (SecurityStack), which would make SecurityStack depend on DatabaseStack. Constructing
+ * {@code SecretTargetAttachment} directly with {@code this} (DatabaseStack) as scope keeps the
+ * edge one-directional; DatabaseStack already depends on SecurityStack for the secret itself, so
+ * this adds no new edge. The attachment doesn't create a second secret - {@code getSecretArn()}
+ * on the result is the same ARN, it just knows how to also write the DB's host/port/dbname back
+ * into the secret's JSON, which is what lets the rotation Lambda actually connect.
+ *
+ * <p><b>Operational caveat that must not get lost:</b> PostgreSQL single-user rotation changes the
+ * password on the live DB user in place - there's no overlap window the way multi-user rotation
+ * has. {@code wealthynest-api} only reads {@code DB_PASSWORD} from
+ * {@code /opt/wealthynest/current.env} at process start (see {@code deploy-backend.sh}), not on
+ * every connection, so already-open pool connections keep working after a rotation (Postgres
+ * doesn't kill live sessions on {@code ALTER ROLE ... PASSWORD}) but any *new* connection attempt
+ * after that point will fail auth until the app re-reads the secret. {@code deploy-backend.sh
+ * --refresh-env} does exactly that on demand (over SSM, no new JAR needed) - run it by hand after
+ * a rotation, or wire it to something that fires on a schedule. Deliberately not automated here;
+ * see {@code docs/secrets-management-guide.md} for why and what wiring that would take.
+ *
+ * <p><b>JWT/vault secrets are not part of this rotation.</b> {@code jwt-secret} has no natural
+ * {@link HostedRotation} blueprint (there's no database to test a new value against) and rotating
+ * it invalidates every currently-issued JWT - safe automatic rotation would need
+ * {@code wealthynest-api} to verify against both the current and previous signing secret during a
+ * grace window, which is a backend change, not an infra one, matching the exact scope boundary
+ * already drawn for Redis transit encryption (see {@code RedisReplicationGroupConstruct}).
+ * {@code vault-encryption-key}/{@code vault-hash-pepper} must never auto-rotate at all - their own
+ * secret descriptions in {@code SecurityStack} explain why.
  */
 public class DatabaseStack extends Stack {
 
@@ -59,7 +105,8 @@ public class DatabaseStack extends Stack {
         StackProps props,
         AppConfig config,
         IVpc vpc,
-        ISecret databaseCredentialsSecret
+        ISecret databaseCredentialsSecret,
+        ISecurityGroup secretsManagerEndpointSecurityGroup
     ) {
         super(scope, id, props);
 
@@ -85,6 +132,50 @@ public class DatabaseStack extends Stack {
             "wealthynest",
             config.resourceName("postgres")
         ));
+
+        SecretTargetAttachment dbSecretAttachment = new SecretTargetAttachment(this, "DatabaseCredentialsAttachment",
+            SecretTargetAttachmentProps.builder()
+                .secret(databaseCredentialsSecret)
+                .target(database.getDatabaseInstance())
+                .build());
+
+        // Own security group (not the endpoint's "open" default, which we didn't set) so the two
+        // ingress rules below stay the explicit, per-consumer grants this app uses everywhere else.
+        SecurityGroup rotationLambdaSecurityGroup = SecurityGroup.Builder.create(this, "DbRotationLambdaSecurityGroup")
+            .vpc(vpc)
+            .description("WealthyNest DB credentials rotation Lambda - reaches RDS and the Secrets Manager VPC endpoint only")
+            .allowAllOutbound(true)
+            .build();
+
+        HostedRotation hostedRotation = HostedRotation.postgreSqlSingleUser(SingleUserHostedRotationOptions.builder()
+            .vpc(vpc)
+            .vpcSubnets(SubnetSelection.builder().subnetType(SubnetType.PRIVATE_ISOLATED).build())
+            .securityGroups(List.of(rotationLambdaSecurityGroup))
+            // Matches the character set db-credentials was generated with in SecurityStack - a
+            // rotated password must satisfy the same constraints the original did.
+            .excludeCharacters("\"@/\\ '")
+            .build());
+        dbSecretAttachment.addRotationSchedule("DbCredentialsRotationSchedule", RotationScheduleOptions.builder()
+            .hostedRotation(hostedRotation)
+            .automaticallyAfter(Duration.days(config.database().credentialRotationDays()))
+            .build());
+
+        CfnSecurityGroupIngress.Builder.create(this, "DatabaseIngressFromRotationLambda")
+            .groupId(database.getSecurityGroup().getSecurityGroupId())
+            .sourceSecurityGroupId(rotationLambdaSecurityGroup.getSecurityGroupId())
+            .ipProtocol("tcp")
+            .fromPort(5432)
+            .toPort(5432)
+            .description("DB credentials rotation Lambda to PostgreSQL")
+            .build();
+        CfnSecurityGroupIngress.Builder.create(this, "SecretsManagerEndpointIngressFromRotationLambda")
+            .groupId(secretsManagerEndpointSecurityGroup.getSecurityGroupId())
+            .sourceSecurityGroupId(rotationLambdaSecurityGroup.getSecurityGroupId())
+            .ipProtocol("tcp")
+            .fromPort(443)
+            .toPort(443)
+            .description("DB credentials rotation Lambda to the Secrets Manager VPC endpoint")
+            .build();
 
         this.cache = new RedisReplicationGroupConstruct(this, "Cache", new RedisReplicationGroupConstruct.Props(
             vpc,

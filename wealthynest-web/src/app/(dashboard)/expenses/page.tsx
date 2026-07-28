@@ -566,11 +566,9 @@ export default function TransactionsPage() {
   }, []);
 
   useEffect(() => { setListPage(0); },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [startDate, endDate, debouncedSearch, categoryId, payChannel, minAmount, maxAmount, sortKey, recurringOnly]);
 
   useEffect(() => { setAllPage(0); },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [txType, dateMode, year, month, customStart, customEnd, debouncedSearch, categoryId, payChannel, minAmount, maxAmount, recurringOnly]);
 
   const activeFilterCount = [

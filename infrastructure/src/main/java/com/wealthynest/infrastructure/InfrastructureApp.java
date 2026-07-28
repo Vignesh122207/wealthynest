@@ -89,7 +89,8 @@ public final class InfrastructureApp {
         DatabaseStack database = new DatabaseStack(
             app, stackPrefix + "-database",
             stackProps(environment, "WealthyNest RDS PostgreSQL and ElastiCache Redis"),
-            config, network.getVpc(), security.getDatabaseCredentialsSecret()
+            config, network.getVpc(), security.getDatabaseCredentialsSecret(),
+            network.getSecretsManagerEndpointSecurityGroup()
         );
 
         ComputeStack compute = new ComputeStack(

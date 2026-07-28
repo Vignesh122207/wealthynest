@@ -53,7 +53,8 @@ final class TestFixtures {
                 false,
                 true,
                 7,
-                7
+                7,
+                30
             ),
             new AppConfig.RedisConfig("cache.t4g.micro", 1),
             new AppConfig.StorageConfig(30, 365, 30),

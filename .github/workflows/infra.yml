@@ -28,7 +28,10 @@ env:
   AWS_REGION: ap-south-1
 
 jobs:
-  infra:
+  # No `environment:` here on purpose - this job only ever synths/diffs, and gating a read-only
+  # `cdk diff` behind a manual approval would make every PR wait on a human for zero benefit.
+  # Deploying to the account is exactly what `deploy` below exists to gate.
+  synth:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -73,6 +76,43 @@ jobs:
         if: github.event_name == 'pull_request'
         run: cdk diff --all
 
+  # Infra changes (IAM, security groups, KMS, deletion policies) carry a bigger blast radius than
+  # an app-server JAR swap, which is why this - unlike synth above - runs under the `production`
+  # GitHub environment: whatever protection rules (required reviewers, wait timer) are configured
+  # there apply here, the same as backend.yml's deploy job.
+  deploy:
+    needs: synth
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: infrastructure
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install AWS CDK CLI
+        run: npm install --global aws-cdk
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_INFRA_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
       - name: cdk deploy
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: cdk deploy --all --require-approval never --concurrency 4

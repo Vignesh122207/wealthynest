@@ -65,7 +65,8 @@ public final class ConfigLoader {
                 requireBoolean(env, "rdsMultiAz", envName),
                 requireBoolean(env, "rdsDeletionProtection", envName),
                 requireInt(env, "rdsBackupRetentionDays", envName),
-                requireInt(env, "rdsPerformanceInsightsRetentionDays", envName)
+                requireInt(env, "rdsPerformanceInsightsRetentionDays", envName),
+                requireInt(env, "rdsCredentialRotationDays", envName)
             ),
             new AppConfig.RedisConfig(
                 requireString(env, "redisNodeType", envName),

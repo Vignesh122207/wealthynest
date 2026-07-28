@@ -2,9 +2,9 @@
 
 import {useMemo} from "react";
 import Link from "next/link";
-import {Cell, Pie, PieChart, ResponsiveContainer, Tooltip} from "recharts";
+import {Cell, Pie, PieChart, ResponsiveContainer, Tooltip, type TooltipValueType} from "recharts";
 import {ArrowDownRight, ArrowUpRight, TrendingUp, Wallet} from "lucide-react";
-import {cn} from "@/lib/utils";
+import {chartValueToNumber, cn} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {CHART_COLORS} from "@/lib/chartColors";
 import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
@@ -131,7 +131,7 @@ export function InvestmentPanel({ investments, chart }: InvestmentPanelProps) {
                     {allocation.map((a) => <Cell key={a.bucket} fill={BUCKET_COLOR[a.bucket]} />)}
                   </Pie>
                   <Tooltip contentStyle={chart.tooltipStyle} labelStyle={chart.labelStyle} itemStyle={chart.itemStyle}
-                    formatter={(v: number, _n: string, props: { payload?: { bucket?: string } }) => [fmt(v), props.payload?.bucket ?? "Value"]} />
+                    formatter={(v: TooltipValueType | undefined, _n: number | string | undefined, props: { payload?: { bucket?: string } }) => [fmt(chartValueToNumber(v)), props.payload?.bucket ?? "Value"]} />
                 </PieChart>
               </ResponsiveContainer>
             </div>

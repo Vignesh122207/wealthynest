@@ -2,10 +2,10 @@
 
 import {useMemo, useState} from "react";
 import {Activity, BarChart3, Gem, Info, Percent, TrendingDown, TrendingUp, Wallet} from "lucide-react";
-import {Cell, Pie, PieChart, ResponsiveContainer, Tooltip} from "recharts";
+import {Cell, Pie, PieChart, ResponsiveContainer, Tooltip, type TooltipValueType} from "recharts";
 import {EmptyState} from "@/components/shared/EmptyState";
 import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
-import {cn, formatDate} from "@/lib/utils";
+import {chartValueToNumber, cn, formatDate} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {useChartTheme} from "@/hooks/useChartTheme";
 import {IncomeTypeBadge} from "./IncomeTypeBadge";
@@ -117,7 +117,7 @@ export function OverviewTab({ investments, year, onYearChange, incomeHistory, po
                     labelStyle={chart.labelStyle}
                     itemStyle={chart.itemStyle}
                     wrapperStyle={{ zIndex: 20 }}
-                    formatter={(v: number, _: string, props: { payload?: { name?: string } }) => [fmt(v), INV_TYPE_LABELS[props.payload?.name ?? ""] ?? props.payload?.name]} />
+                    formatter={(v: TooltipValueType | undefined, _: number | string | undefined, props: { payload?: { name?: string } }) => [fmt(chartValueToNumber(v)), INV_TYPE_LABELS[props.payload?.name ?? ""] ?? props.payload?.name]} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-0">

@@ -7,11 +7,16 @@ import java.util.Map;
 import software.amazon.awscdk.Duration;
 import software.amazon.awscdk.Stack;
 import software.amazon.awscdk.StackProps;
+import software.amazon.awscdk.services.cloudwatch.Alarm;
 import software.amazon.awscdk.services.cloudwatch.ComparisonOperator;
 import software.amazon.awscdk.services.cloudwatch.Dashboard;
 import software.amazon.awscdk.services.cloudwatch.GraphWidget;
 import software.amazon.awscdk.services.cloudwatch.IMetric;
 import software.amazon.awscdk.services.cloudwatch.Metric;
+import software.amazon.awscdk.services.cloudwatch.TreatMissingData;
+import software.amazon.awscdk.services.cloudwatch.actions.Ec2Action;
+import software.amazon.awscdk.services.cloudwatch.actions.Ec2InstanceAction;
+import software.amazon.awscdk.services.cloudwatch.actions.SnsAction;
 import software.amazon.awscdk.services.ec2.Instance;
 import software.amazon.awscdk.services.elasticache.CfnReplicationGroup;
 import software.amazon.awscdk.services.rds.DatabaseInstance;
@@ -87,6 +92,34 @@ public class MonitoringStack extends Stack {
         alarms.threshold("wealthynest-ec2-disk-high", diskMetric,
             85, 3, ComparisonOperator.GREATER_THAN_THRESHOLD,
             "EC2 root volume above 85% used for 3 consecutive 5-minute periods");
+
+        // This app is a single EC2 instance with no ASG, so a host-level hardware fault (not just
+        // an app crash - systemd's Restart=on-failure already covers that case) would otherwise
+        // mean downtime until someone manually intervenes. AWS's own auto-recovery migrates the
+        // instance to new hardware, preserving instance ID/EIP association/EBS volumes, when the
+        // *system* status check fails twice in a row (2 x 1-minute periods is the AWS-documented
+        // threshold for this specific check - not the same cadence as the other alarms above).
+        // Goes through AlarmFactory's SNS notify as well, not just this construct's dedicated
+        // Ec2Action, so an actual recovery event still shows up as an ops notification.
+        IMetric systemStatusCheckMetric = Metric.Builder.create()
+            .namespace("AWS/EC2")
+            .metricName("StatusCheckFailed_System")
+            .dimensionsMap(Map.of("InstanceId", instanceId))
+            .statistic("Maximum")
+            .period(Duration.minutes(1))
+            .build();
+        Alarm recoveryAlarm = Alarm.Builder.create(this, "wealthynest-ec2-system-status-check-failed")
+            .alarmName("wealthynest-ec2-system-status-check-failed")
+            .metric(systemStatusCheckMetric)
+            .threshold(0)
+            .evaluationPeriods(2)
+            .comparisonOperator(ComparisonOperator.GREATER_THAN_THRESHOLD)
+            .treatMissingData(TreatMissingData.NOT_BREACHING)
+            .alarmDescription("EC2 system status check failed twice in a row - AWS auto-recovers "
+                + "the instance to new underlying hardware")
+            .build();
+        recoveryAlarm.addAlarmAction(new Ec2Action(Ec2InstanceAction.RECOVER));
+        recoveryAlarm.addAlarmAction(new SnsAction(alarmTopic));
 
         alarms.threshold("wealthynest-rds-cpu-high", database.metricCPUUtilization(),
             80, 3, ComparisonOperator.GREATER_THAN_THRESHOLD, "RDS CPU above 80%");
