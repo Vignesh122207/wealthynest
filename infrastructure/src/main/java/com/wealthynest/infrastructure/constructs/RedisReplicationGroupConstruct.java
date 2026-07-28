@@ -46,6 +46,7 @@ public final class RedisReplicationGroupConstruct extends Construct {
 
         this.securityGroup = SecurityGroup.Builder.create(this, "SecurityGroup")
             .vpc(props.vpc())
+            .securityGroupName(props.securityGroupName())
             .description("WealthyNest ElastiCache Redis - private isolated subnet, no public access")
             .allowAllOutbound(false)
             .build();
@@ -62,6 +63,7 @@ public final class RedisReplicationGroupConstruct extends Construct {
         boolean highAvailability = props.numNodes() > 1;
 
         this.replicationGroup = CfnReplicationGroup.Builder.create(this, "ReplicationGroup")
+            .replicationGroupId(props.replicationGroupId())
             .replicationGroupDescription(props.resourceNamePrefix() + " Redis - cache + rate limiting")
             .engine("redis")
             .engineVersion("7.1")
@@ -98,7 +100,9 @@ public final class RedisReplicationGroupConstruct extends Construct {
         String nodeType,
         int numNodes,
         IKey kmsKey,
-        String resourceNamePrefix
+        String resourceNamePrefix,
+        String replicationGroupId,
+        String securityGroupName
     ) {
     }
 }

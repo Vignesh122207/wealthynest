@@ -53,6 +53,7 @@ public final class PostgresDatabaseConstruct extends Construct {
 
         this.securityGroup = SecurityGroup.Builder.create(this, "SecurityGroup")
             .vpc(props.vpc())
+            .securityGroupName(props.securityGroupName())
             .description("WealthyNest RDS PostgreSQL - private isolated subnet, no public access")
             .allowAllOutbound(false)
             .build();
@@ -62,12 +63,12 @@ public final class PostgresDatabaseConstruct extends Construct {
             : PerformanceInsightRetention.MONTHS_1;
 
         this.databaseInstance = DatabaseInstance.Builder.create(this, "Instance")
-            .instanceIdentifier(props.resourceNamePrefix() + "-postgres")
+            .instanceIdentifier(props.instanceIdentifier())
             .vpc(props.vpc())
             .vpcSubnets(SubnetSelection.builder().subnetType(SubnetType.PRIVATE_ISOLATED).build())
             .securityGroups(List.of(securityGroup))
             .engine(DatabaseInstanceEngine.postgres(PostgresInstanceEngineProps.builder()
-                .version(PostgresEngineVersion.VER_16_3)
+                .version(PostgresEngineVersion.VER_17_5)
                 .build()))
             .instanceType(new InstanceType(props.instanceClass()))
             .credentials(Credentials.fromUsername(MASTER_USERNAME, CredentialsFromUsernameOptions.builder()
@@ -114,7 +115,8 @@ public final class PostgresDatabaseConstruct extends Construct {
         ISecret credentialsSecret,
         IKey kmsKey,
         String databaseName,
-        String resourceNamePrefix
+        String instanceIdentifier,
+        String securityGroupName
     ) {
     }
 }

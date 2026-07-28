@@ -5,7 +5,7 @@ import software.amazon.awscdk.services.secretsmanager.ISecret;
 
 /**
  * Every credential {@link com.wealthynest.infrastructure.stacks.SecurityStack} owns, bundled so
- * downstream stacks (Compute, Monitoring, Outputs) take one reference instead of seven positional
+ * downstream stacks (Compute, Monitoring, Outputs) take one reference instead of eight positional
  * parameters.
  */
 public record AppSecrets(
@@ -15,12 +15,13 @@ public record AppSecrets(
     ISecret smtpCredentials,
     ISecret vaultEncryptionKey,
     ISecret vaultHashPepper,
-    ISecret fcmServiceAccount
+    ISecret fcmServiceAccount,
+    ISecret cloudflareOriginCert
 ) {
     public List<ISecret> all() {
         return List.of(
             databaseCredentials, jwt, googleOAuthClientSecret, smtpCredentials,
-            vaultEncryptionKey, vaultHashPepper, fcmServiceAccount
+            vaultEncryptionKey, vaultHashPepper, fcmServiceAccount, cloudflareOriginCert
         );
     }
 }

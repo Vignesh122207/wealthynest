@@ -16,7 +16,7 @@ public final class ConfigLoader {
 
     private static final String ENVIRONMENTS_CONTEXT_KEY = "wealthynest:environments";
     private static final String ENV_CONTEXT_KEY = "env";
-    private static final String DEFAULT_ENV_NAME = "production";
+    private static final String DEFAULT_ENV_NAME = "prod";
 
     private ConfigLoader() {
     }

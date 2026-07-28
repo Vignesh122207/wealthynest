@@ -121,7 +121,8 @@ class InfrastructureAppWiringTest {
             security.getSmtpCredentialsSecret(),
             security.getVaultEncryptionKeySecret(),
             security.getVaultHashPepperSecret(),
-            security.getFcmServiceAccountSecret()
+            security.getFcmServiceAccountSecret(),
+            security.getCloudflareOriginCertSecret()
         );
 
         DatabaseStack database = new DatabaseStack(app, "TestDatabase", props, config,
@@ -129,7 +130,8 @@ class InfrastructureAppWiringTest {
             network.getSecretsManagerEndpointSecurityGroup());
 
         ComputeStack compute = new ComputeStack(app, "TestCompute", props, config,
-            network.getVpc(), security.getDataKey(), storage.getBackupBucket(), secrets, database);
+            network.getVpc(), security.getDataKey(), storage.getBackupBucket(), secrets, database,
+            network.getSecretsManagerEndpointSecurityGroup());
 
         MonitoringStack monitoring = new MonitoringStack(app, "TestMonitoring", props, config,
             compute.getAppServer().getInstance(), database.getDatabase().getDatabaseInstance(),

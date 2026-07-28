@@ -15,7 +15,7 @@
     "@aws-cdk/core:checkSecretUsage": true,
 
     "wealthynest:environments": {
-      "production": {
+      "prod": {
         "account": "",
         "region": "ap-south-1",
 
@@ -38,7 +38,7 @@
         "rdsMaxAllocatedStorageGb": 100,
         "rdsMultiAz": false,
         "rdsDeletionProtection": true,
-        "rdsBackupRetentionDays": 7,
+        "rdsBackupRetentionDays": 1,
         "rdsPerformanceInsightsRetentionDays": 7,
         "rdsCredentialRotationDays": 30,
 

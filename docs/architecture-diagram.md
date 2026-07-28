@@ -65,7 +65,7 @@ flowchart TB
 |---|---|---|
 | **Vercel** | Hosts `wealthynest-web` | Already in place before this infra work; zero-config Next.js hosting, its own CDN/edge. |
 | **Cloudflare** | DNS + edge proxy for `api.wealthynest.in` | Already the DNS provider. Proxied (orange-cloud) mode terminates the public TLS handshake, hides the EC2 IP, and gives free WAF/DDoS protection in front of the origin. |
-| **EC2 (t4g.small, Ubuntu 22.04 LTS)** | Runs `wealthynest-api` as a systemd service behind Nginx | Public subnet with an Elastic IP; security group accepts 80/443 from Cloudflare's published ranges only — never `0.0.0.0/0`, never SSH (access is via SSM Session Manager). |
+| **EC2 (t4g.small, Ubuntu 26.04 LTS)** | Runs `wealthynest-api` as a systemd service behind Nginx | Public subnet with an Elastic IP; security group accepts 80/443 from Cloudflare's published ranges only — never `0.0.0.0/0`, never SSH (access is via SSM Session Manager). |
 | **Nginx** | TLS termination (Cloudflare Origin CA cert) + reverse proxy to `127.0.0.1:8080` | Full (strict) mode with Cloudflare — the edge-to-origin hop is real TLS, not just Cloudflare-to-Flexible-HTTP. |
 | **RDS PostgreSQL (t4g.micro)** | System of record | Private-isolated subnet, no route to the internet at all — not just security-group-restricted, actually unreachable from outside the VPC. Encrypted (own CMK), automated backups, Performance Insights. |
 | **ElastiCache Redis (t4g.micro)** | Cache + rate-limit counters | Same private-isolated subnet. Encrypted at rest; **not** encrypted in transit — see `deployment-guide.md`'s TLS note for why, and the follow-up it points to. |

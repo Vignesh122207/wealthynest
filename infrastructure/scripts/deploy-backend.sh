@@ -71,12 +71,10 @@ write_env_file() {
     echo "FRONTEND_URL=https://wealthynest.in"
     echo "RATE_LIMIT_TRUSTED_PROXIES=$(ssm_value rate-limit-trusted-proxies)"
     # GOOGLE_CLIENT_ID / GOOGLE_NATIVE_CLIENT_ID are public (non-secret) OAuth client IDs, not
-    # provisioned by CDK — set them here manually, once, after creating the OAuth clients in
-    # Google Cloud Console (see docs/secrets-management-guide.md). Left blank, the Google
-    # sign-in button just doesn't render on either platform — a genuinely safe default, unlike
-    # an unset JWT secret would be.
-    echo "GOOGLE_CLIENT_ID="
-    echo "GOOGLE_NATIVE_CLIENT_ID="
+    # provisioned by CDK — from the OAuth clients already created in Google Cloud Console (see
+    # docs/secrets-management-guide.md).
+    echo "GOOGLE_CLIENT_ID=510219615328-nsin4tqf2pe39vd0qg7pd23guq9da7a6.apps.googleusercontent.com"
+    echo "GOOGLE_NATIVE_CLIENT_ID=510219615328-2pspp599ckp92b6kfrrkk8ovkdlj61uj.apps.googleusercontent.com"
   } > "$ENV_FILE"
   chown wealthynest:wealthynest "$ENV_FILE"
   chmod 600 "$ENV_FILE"
