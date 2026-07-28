@@ -7,7 +7,7 @@ this fresh from Secrets Manager/SSM Parameter Store on every deploy and writes i
 `/opt/wealthynest/current.env` (mode `600`, owned by the `wealthynest` user, never committed
 anywhere, never logged).
 
-## The 9 secrets
+## The 8 secrets
 
 | Secret name | Maps to env var(s) | Source |
 |---|---|---|
