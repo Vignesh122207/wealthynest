@@ -1,6 +1,7 @@
 package com.wealthynest.infrastructure.stacks;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.wealthynest.infrastructure.config.AppConfig;
 import com.wealthynest.infrastructure.config.AppSecrets;
@@ -70,6 +71,35 @@ class InfrastructureAppWiringTest {
         }
     }
 
+    @Test
+    void ec2HasAutoRecoveryAlarmOnSystemStatusCheckFailure() {
+        App app = new App();
+        MonitoringStack monitoring = wireUpTo(app).monitoring();
+        Template template = Template.fromStack(monitoring);
+
+        // The ec2:recover action ARN is a Fn::Join of stack pseudo-parameters rather than a
+        // plain string, so pin down alarm identity/thresholds here and leave the exact action
+        // ARN shape unasserted - just confirm 2 actions are wired (recover + SNS notify).
+        template.hasResourceProperties("AWS::CloudWatch::Alarm", Map.of(
+            "MetricName", "StatusCheckFailed_System",
+            "Namespace", "AWS/EC2",
+            "EvaluationPeriods", 2,
+            "Threshold", 0,
+            "ComparisonOperator", "GreaterThanThreshold"
+        ));
+
+        Map<String, Map<String, Object>> alarms =
+            template.findResources("AWS::CloudWatch::Alarm", Map.of(
+                "Properties", Map.of("MetricName", "StatusCheckFailed_System")
+            ));
+        assertEquals(1, alarms.size());
+        @SuppressWarnings("unchecked")
+        var properties = (Map<String, Object>) alarms.values().iterator().next().get("Properties");
+        @SuppressWarnings("unchecked")
+        var alarmActions = (java.util.List<Object>) properties.get("AlarmActions");
+        assertEquals(2, alarmActions.size(), "expected both the ec2:recover action and the SNS notify action");
+    }
+
     private static void buildAndSynth() {
         App app = new App();
         wireUpTo(app);
@@ -95,12 +125,13 @@ class InfrastructureAppWiringTest {
         );
 
         DatabaseStack database = new DatabaseStack(app, "TestDatabase", props, config,
-            network.getVpc(), security.getDatabaseCredentialsSecret());
+            network.getVpc(), security.getDatabaseCredentialsSecret(),
+            network.getSecretsManagerEndpointSecurityGroup());
 
         ComputeStack compute = new ComputeStack(app, "TestCompute", props, config,
             network.getVpc(), security.getDataKey(), storage.getBackupBucket(), secrets, database);
 
-        new MonitoringStack(app, "TestMonitoring", props, config,
+        MonitoringStack monitoring = new MonitoringStack(app, "TestMonitoring", props, config,
             compute.getAppServer().getInstance(), database.getDatabase().getDatabaseInstance(),
             database.getCache().getReplicationGroup());
 
@@ -116,9 +147,9 @@ class InfrastructureAppWiringTest {
         new CicdStack(app, "TestCicd", props, config,
             compute.getAppServer().getInstance(), storage.getBackupBucket());
 
-        return new Wired(database, compute);
+        return new Wired(database, compute, monitoring);
     }
 
-    private record Wired(DatabaseStack database, ComputeStack compute) {
+    private record Wired(DatabaseStack database, ComputeStack compute, MonitoringStack monitoring) {
     }
 }

@@ -53,7 +53,8 @@ public record AppConfig(
         boolean multiAz,
         boolean deletionProtection,
         int backupRetentionDays,
-        int performanceInsightsRetentionDays
+        int performanceInsightsRetentionDays,
+        int credentialRotationDays
     ) {
     }
 

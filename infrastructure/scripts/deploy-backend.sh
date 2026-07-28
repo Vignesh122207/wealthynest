@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
 #
 # Invoked over SSM Run Command by .github/workflows/backend.yml (as root, AWS-RunShellScript's
-# default). Two call forms:
+# default). Three call forms:
 #
 #   deploy-backend.sh <s3-bucket> <s3-key> <version>   # normal deploy
 #   deploy-backend.sh --rollback                        # revert to the last known-good release
+#   deploy-backend.sh --refresh-env                      # re-read secrets/params, restart, no new JAR
+#
+# --refresh-env exists for DatabaseStack's Secrets Manager rotation schedule (db-credentials
+# rotates automatically every N days - see DatabaseStack's own comment on the operational caveat):
+# a rotated password only takes effect for *new* DB connections once current.env is rewritten with
+# it, which only otherwise happens on the next actual deploy. Run this by hand over SSM after a
+# rotation (or point a scheduled trigger at it) rather than waiting for the next deploy to happen
+# to fix it.
 #
 # Release layout, borrowed from the standard "releases + current symlink" pattern so a rollback
 # is just re-pointing a symlink and restarting, never a redeploy:
@@ -160,12 +168,38 @@ deploy() {
   exit 1
 }
 
-if [ "${1:-}" = "--rollback" ]; then
-  rollback
-else
-  if [ $# -lt 3 ]; then
-    echo "usage: deploy-backend.sh <s3-bucket> <s3-key> <version>  |  deploy-backend.sh --rollback" >&2
-    exit 2
+refresh_env() {
+  log "Refreshing ${ENV_FILE} from Secrets Manager/SSM (no JAR change) and restarting ${SERVICE}"
+  if [ ! -L "$CURRENT_LINK" ]; then
+    log "No current release deployed yet - nothing to refresh"
+    exit 1
   fi
-  deploy "$1" "$2" "$3"
-fi
+  write_env_file
+  systemctl restart "$SERVICE"
+  if wait_for_health; then
+    log "Refreshed and healthy"
+    exit 0
+  fi
+  # Unlike deploy(), there's no previous JAR/env pairing to fall back to here - the JAR didn't
+  # change, so a failure means the freshly-read secret itself is bad (e.g. rotation produced a
+  # credential the DB user doesn't actually have yet), not a bad release. Nothing to self-roll-back
+  # to; surface it loudly instead.
+  log "Service did not become healthy after refreshing env - manual investigation required"
+  exit 1
+}
+
+case "${1:-}" in
+  --rollback)
+    rollback
+    ;;
+  --refresh-env)
+    refresh_env
+    ;;
+  *)
+    if [ $# -lt 3 ]; then
+      echo "usage: deploy-backend.sh <s3-bucket> <s3-key> <version>  |  deploy-backend.sh --rollback  |  deploy-backend.sh --refresh-env" >&2
+      exit 2
+    fi
+    deploy "$1" "$2" "$3"
+    ;;
+esac

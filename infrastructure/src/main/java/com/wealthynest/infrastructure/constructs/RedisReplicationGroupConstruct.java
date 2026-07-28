@@ -27,6 +27,14 @@ import software.constructs.Construct;
  * backend code, that one-line Spring config addition
  * ({@code spring.data.redis.ssl.enabled=true}) is called out as a follow-up in the security
  * review instead of being made here — see {@code docs/deployment-guide.md}.
+ *
+ * <p>Consequence worth stating explicitly, not just implying: without transit encryption, an
+ * {@code AuthToken} can't be set either (ElastiCache requires the former before it'll accept the
+ * latter) — so this Redis has no protocol-level authentication at all today, not merely
+ * unencrypted authentication. The only thing standing between "in the VPC" and "can read the
+ * cache/rate-limit counters" is the security group scoping ingress to the app server's own SG.
+ * That's an adequate compensating control for a private-isolated-subnet resource, but it means a
+ * misconfigured security group here has no second line of defense the way a password would give.
  */
 public final class RedisReplicationGroupConstruct extends Construct {
 

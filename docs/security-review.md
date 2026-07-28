@@ -67,10 +67,19 @@ because they're still open:
 
 ### Follow-ups worth planning, not blocking
 
-1. **No automated secret rotation.** `db-credentials`/`jwt-secret` could be rotated on a schedule
-   via Secrets Manager's native rotation (a Lambda CDK could provision) — not done here since it
-   adds real complexity (a rotation Lambda, VPC networking for it to reach RDS) for a first
-   production cut. Manual rotation works today (`secrets-management-guide.md`).
+1. **`db-credentials` now rotates automatically** (AWS-managed PostgreSQL `HostedRotation`, every
+   `rdsCredentialRotationDays`, via a new Secrets Manager VPC interface endpoint since there's no
+   NAT Gateway for the rotation Lambda to reach the internet through) — this closes the item that
+   used to be here. What's still open: the app doesn't dynamically reload `DB_PASSWORD`, so a
+   rotation only takes effect for new connections once someone (or something) runs
+   `deploy-backend.sh --refresh-env`. That trigger is manual today, not wired to fire
+   automatically on a schedule or on the rotation event itself — a real follow-up, not a
+   theoretical one, since it's the difference between "credentials rotate" and "credentials rotate
+   *and the app can actually still connect afterward.*" `jwt-secret` is deliberately **not**
+   included — no AWS rotation blueprint applies to a bare signing secret, and doing it safely needs
+   a backend-side dual-secret verification window during rotation, which is out of scope for an
+   infra-only change (see `DatabaseStack`'s own comment, same reasoning as the Redis TLS item
+   below).
 2. **No WAF rules beyond Cloudflare's own.** Cloudflare proxied mode gives baseline DDoS/bot
    protection for free; AWS WAF on top (rate-based rules, managed rule groups) is a reasonable
    next step once real traffic patterns exist to tune it against — premature to guess at rules now.

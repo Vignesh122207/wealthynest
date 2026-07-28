@@ -40,6 +40,7 @@
         "rdsDeletionProtection": true,
         "rdsBackupRetentionDays": 7,
         "rdsPerformanceInsightsRetentionDays": 7,
+        "rdsCredentialRotationDays": 30,
 
         "redisNodeType": "cache.t4g.micro",
         "redisNumNodes": 1,
