@@ -1,9 +1,9 @@
 "use client";
 
 import {BarChart2, ChevronLeft, ChevronRight, X} from "lucide-react";
-import {Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis,} from "recharts";
+import {Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, type TooltipValueType, XAxis, YAxis,} from "recharts";
 import {GlossyBadge, PremiumIcon} from "@/components/icons/PremiumIcon";
-import {cn, formatCurrencyCompact, getInitials} from "@/lib/utils";
+import {chartValueToNumber, cn, formatCurrencyCompact, getInitials} from "@/lib/utils";
 import type {useChartTheme} from "@/hooks/useChartTheme";
 
 type MemberSpendingEntry = { id: string; name: string; amount: number; color: string; fullName: string };
@@ -66,7 +66,7 @@ export function MemberSpendingChart({
                 axisLine={false} tickLine={false} width={72} />
               <Tooltip contentStyle={chart.tooltipStyle} labelStyle={chart.labelStyle} itemStyle={chart.itemStyle}
                 cursor={chart.cursorStyle}
-                formatter={(v: number, _: string, props: { payload?: { fullName?: string } }) => [fmt(v), props.payload?.fullName ?? "Spending"]} />
+                formatter={(v: TooltipValueType | undefined, _: number | string | undefined, props: { payload?: { fullName?: string } }) => [fmt(chartValueToNumber(v)), props.payload?.fullName ?? "Spending"]} />
               <Bar dataKey="amount" radius={[0, 6, 6, 0]} style={{ cursor: "pointer" }}
                 onClick={(data: { id?: string }) => setDrillMemberId(prev => prev === data.id ? null : (data.id ?? null))}>
                 {memberSpending.map((m, i) => (

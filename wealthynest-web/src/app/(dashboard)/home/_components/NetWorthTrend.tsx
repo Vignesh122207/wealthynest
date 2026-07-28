@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import {Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,} from "recharts";
+import {Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, type TooltipValueType, XAxis, YAxis,} from "recharts";
 import {TrendingUp} from "lucide-react";
-import {cn, formatChartTickINR, formatTrendDelta} from "@/lib/utils";
+import {chartValueToNumber, cn, formatChartTickINR, formatTrendDelta} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {CHART_COLORS} from "@/lib/chartColors";
 import type {NetWorthHistoryPoint} from "@/features/networth/types/networth.types";
@@ -73,7 +73,7 @@ export function NetWorthTrend({ history, netWorth, changePct, chart, isLoading }
               <Tooltip
                 contentStyle={chart.tooltipStyle} labelStyle={chart.labelStyle} itemStyle={chart.itemStyle}
                 cursor={chart.cursorStyle}
-                formatter={(v: number) => [fmt(v), "Net Worth"]}
+                formatter={(v: TooltipValueType | undefined) => [fmt(chartValueToNumber(v)), "Net Worth"]}
               />
               <ReferenceLine y={0} stroke={chart.gridColor} strokeWidth={1.5} />
               <Area type="monotone" dataKey="netWorth" stroke={CHART_COLORS.primary} strokeWidth={2.5}

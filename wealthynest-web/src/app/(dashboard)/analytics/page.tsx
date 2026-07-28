@@ -32,6 +32,7 @@ import {
     ReferenceLine,
     ResponsiveContainer,
     Tooltip,
+    type TooltipValueType,
     XAxis,
     YAxis,
 } from "recharts";
@@ -43,7 +44,7 @@ import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
 import {useAnnualTrend} from "@/features/analytics/hooks/useAnalytics";
 import {useDashboard} from "@/features/dashboard/hooks/useDashboard";
 import {useChartTheme} from "@/hooks/useChartTheme";
-import {cn, formatChartTickINR, formatCurrencyCompact} from "@/lib/utils";
+import {chartValueToNumber, cn, formatChartTickINR, formatCurrencyCompact} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {getCategoryColor} from "@/lib/categoryMeta";
 import {CHART_COLORS} from "@/lib/chartColors";
@@ -259,7 +260,7 @@ export default function AnalyticsPage() {
                 <YAxis tick={{ fill: chart.axisColor, fontSize: 10 }} axisLine={false} tickLine={false}
                   tickFormatter={(v) => formatCurrencyCompact(v)} />
                 <Tooltip contentStyle={chart.tooltipStyle} labelStyle={chart.labelStyle} itemStyle={chart.itemStyle}
-                  cursor={chart.cursorStyle} formatter={(v: number) => fmt(v)} />
+                  cursor={chart.cursorStyle} formatter={(v: TooltipValueType | undefined) => fmt(chartValueToNumber(v))} />
                 <Legend wrapperStyle={{ fontSize: "11px", paddingTop: "12px", color: chart.axisColor }} />
                 <ReferenceLine y={0} stroke={chart.gridColor} strokeWidth={1.5} />
                 <Bar dataKey="Income"   fill={CHART_COLORS.income}  radius={[4,4,0,0]} />
@@ -293,7 +294,7 @@ export default function AnalyticsPage() {
                   <YAxis tick={{ fill: chart.axisColor, fontSize: 10 }} axisLine={false} tickLine={false}
                     tickFormatter={(v) => `${v}%`} domain={[rateYMin, rateYMax]} />
                   <Tooltip contentStyle={chart.tooltipStyle} labelStyle={chart.labelStyle} itemStyle={chart.itemStyle}
-                    cursor={chart.cursorStyle} formatter={(v: number) => [`${v.toFixed(1)}%`, "Savings Rate"]} />
+                    cursor={chart.cursorStyle} formatter={(v: TooltipValueType | undefined) => [`${chartValueToNumber(v).toFixed(1)}%`, "Savings Rate"]} />
                   <ReferenceLine y={0} stroke={chart.gridColor} strokeWidth={1.5} />
                   <ReferenceLine y={avgRate} stroke="#8b5cf6" strokeDasharray="4 4" strokeOpacity={0.5} />
                   <Line type="monotone" dataKey="Rate" stroke="#8b5cf6" strokeWidth={2.5}
@@ -320,7 +321,7 @@ export default function AnalyticsPage() {
                       ))}
                     </Pie>
                     <Tooltip contentStyle={chart.tooltipStyle} labelStyle={chart.labelStyle} itemStyle={chart.itemStyle}
-                      formatter={(v: number) => fmt(v)} />
+                      formatter={(v: TooltipValueType | undefined) => fmt(chartValueToNumber(v))} />
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="flex-1 space-y-1.5 pt-1 overflow-y-auto max-h-44 pr-1">
@@ -390,7 +391,7 @@ export default function AnalyticsPage() {
                 <YAxis type="category" dataKey="name" tick={{ fill: chart.axisColor, fontSize: 11 }}
                   axisLine={false} tickLine={false} width={90} />
                 <Tooltip contentStyle={chart.tooltipStyle} labelStyle={chart.labelStyle} itemStyle={chart.itemStyle}
-                  cursor={chart.cursorStyle} formatter={(v: number) => fmt(v)} />
+                  cursor={chart.cursorStyle} formatter={(v: TooltipValueType | undefined) => fmt(chartValueToNumber(v))} />
                 <Legend wrapperStyle={{ fontSize: "11px", paddingTop: "8px", color: chart.axisColor }} />
                 <Bar dataKey="Budgeted" fill={chart.isDark ? "#334155" : "#e2e8f0"} radius={[0,4,4,0]} />
                 <Bar dataKey="Spent" radius={[0,4,4,0]}>
@@ -425,7 +426,7 @@ export default function AnalyticsPage() {
                 tickFormatter={(v) => formatCurrencyCompact(v)} />
               <Tooltip contentStyle={chart.tooltipStyle} labelStyle={chart.labelStyle} itemStyle={chart.itemStyle}
                 cursor={chart.cursorStyle}
-                formatter={(v: number) => v == null ? ["No data yet", ""] : [fmt(v), ""]} />
+                formatter={(v: TooltipValueType | undefined) => v == null ? ["No data yet", ""] : [fmt(chartValueToNumber(v)), ""]} />
               <Legend wrapperStyle={{ fontSize: "11px", paddingTop: "10px", color: chart.axisColor }} />
               <Bar dataKey={String(year)}     fill="#6366f1" radius={[4,4,0,0]} />
               <Bar dataKey={String(year - 1)} fill={chart.isDark ? "#334155" : "#cbd5e1"} radius={[4,4,0,0]} />
@@ -484,7 +485,7 @@ export default function AnalyticsPage() {
                   <Tooltip
                     contentStyle={chart.tooltipStyle} labelStyle={chart.labelStyle} itemStyle={chart.itemStyle}
                     cursor={{ fill: "rgba(99,102,241,0.06)" }}
-                    formatter={(v: number) => [fmt(v), ""]}
+                    formatter={(v: TooltipValueType | undefined) => [fmt(chartValueToNumber(v)), ""]}
                   />
                   <Bar dataKey="value" radius={[6, 6, 0, 0]}>
                     {[current!.totalInvested, current!.totalInvestmentValue].map((_, i) => (

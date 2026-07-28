@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import {Cell, Pie, PieChart, ResponsiveContainer, Tooltip} from "recharts";
+import {Cell, Pie, PieChart, ResponsiveContainer, Tooltip, type TooltipValueType} from "recharts";
 import {Receipt} from "lucide-react";
-import {monthLabel} from "@/lib/utils";
+import {chartValueToNumber, monthLabel} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {getCategoryColor, getCategoryIcon} from "@/lib/categoryMeta";
 import {PremiumIcon} from "@/components/icons/PremiumIcon";
@@ -58,8 +58,8 @@ export function SpendingDonut({ categoryBreakdown, year, month, chart, onAddExpe
                 contentStyle={chart.tooltipStyle}
                 labelStyle={chart.labelStyle}
                 itemStyle={chart.itemStyle}
-                formatter={(v: number, _: string, props: { payload?: { categoryName?: string } }) => [
-                  fmt(v), props.payload?.categoryName ?? "Amount"
+                formatter={(v: TooltipValueType | undefined, _: number | string | undefined, props: { payload?: { categoryName?: string } }) => [
+                  fmt(chartValueToNumber(v)), props.payload?.categoryName ?? "Amount"
                 ]}
               />
             </PieChart>

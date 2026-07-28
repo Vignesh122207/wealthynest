@@ -1,8 +1,9 @@
 "use client";
 
-import {Cell, Pie, PieChart as RechartsPie, ResponsiveContainer, Sector, Tooltip} from "recharts";
+import {Cell, Pie, PieChart as RechartsPie, ResponsiveContainer, Sector, Tooltip, type TooltipValueType} from "recharts";
 import {PieChart} from "lucide-react";
 import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {chartValueToNumber} from "@/lib/utils";
 import type {useChartTheme} from "@/hooks/useChartTheme";
 import type {NetWorthSummary} from "@/features/networth/types/networth.types";
 
@@ -55,8 +56,8 @@ export function AssetAllocationChart({ summary, pieData, chart, fmt }: {
                   labelStyle={chart.labelStyle}
                   itemStyle={chart.itemStyle}
                   wrapperStyle={{ zIndex: 20 }}
-                  formatter={(v: number, _: string, props: { payload?: { name?: string } }) => [
-                    fmt(v),
+                  formatter={(v: TooltipValueType | undefined, _: number | string | undefined, props: { payload?: { name?: string } }) => [
+                    fmt(chartValueToNumber(v)),
                     props.payload?.name ?? "Amount",
                   ]} />
               </RechartsPie>

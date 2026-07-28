@@ -1,7 +1,7 @@
 "use client";
 
-import {Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis,} from "recharts";
-import {formatCurrencyCompact} from "@/lib/utils";
+import {Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, type TooltipValueType, XAxis, YAxis,} from "recharts";
+import {chartValueToNumber, formatCurrencyCompact} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {CHART_COLORS} from "@/lib/chartColors";
 import type {MonthlyTrend} from "@/features/dashboard/types/dashboard.types";
@@ -65,7 +65,7 @@ export function SixMonthTrend({ trend, chart, isLoading }: SixMonthTrendProps) {
                 labelStyle={chart.labelStyle}
                 itemStyle={chart.itemStyle}
                 cursor={chart.cursorStyle}
-                formatter={(v: number, name: string) => [fmt(v), name]}
+                formatter={(v: TooltipValueType | undefined, name: number | string | undefined) => [fmt(chartValueToNumber(v)), name ?? ""]}
               />
               <Legend iconType="circle" iconSize={6}
                 wrapperStyle={{ fontSize: "11px", paddingTop: "8px", color: chart.axisColor }} />

@@ -10,10 +10,11 @@ import {
     ReferenceLine,
     ResponsiveContainer,
     Tooltip,
+    type TooltipValueType,
     XAxis,
     YAxis,
 } from "recharts";
-import {cn, formatChartTickINR} from "@/lib/utils";
+import {chartValueToNumber, cn, formatChartTickINR} from "@/lib/utils";
 import type {useChartTheme} from "@/hooks/useChartTheme";
 import type {NetWorthHistoryPoint} from "@/features/networth/types/networth.types";
 
@@ -63,7 +64,7 @@ export function NetWorthHistoryChart({
                   <Tooltip
                     contentStyle={chart.tooltipStyle} labelStyle={chart.labelStyle} itemStyle={chart.itemStyle}
                     cursor={chart.cursorStyle}
-                    formatter={(v: number) => [fmt(v), "Net Worth"]}
+                    formatter={(v: TooltipValueType | undefined) => [fmt(chartValueToNumber(v)), "Net Worth"]}
                   />
                   <ReferenceLine y={0} stroke={chart.gridColor} strokeWidth={1.5} />
                   <Line
@@ -86,7 +87,7 @@ export function NetWorthHistoryChart({
                   <Tooltip
                     contentStyle={chart.tooltipStyle} labelStyle={chart.labelStyle} itemStyle={chart.itemStyle}
                     cursor={{ fill: "rgba(99,102,241,0.06)" }}
-                    formatter={(v: number) => [fmt(v), "Net Worth"]}
+                    formatter={(v: TooltipValueType | undefined) => [fmt(chartValueToNumber(v)), "Net Worth"]}
                   />
                   <ReferenceLine y={0} stroke={chart.gridColor} strokeWidth={1.5} />
                   <Bar dataKey="netWorth" fill="#6366f1" radius={[6, 6, 0, 0]} />
