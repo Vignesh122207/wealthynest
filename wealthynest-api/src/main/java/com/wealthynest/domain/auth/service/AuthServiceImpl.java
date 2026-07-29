@@ -398,16 +398,37 @@ public class AuthServiceImpl implements AuthService {
         log.info("PIN unlock enabled for user {}", userId);
     }
 
+    // Unlike enablePin, this DOES require proving the current PIN first — turning protection OFF
+    // is the more sensitive direction: anyone holding an already-unlocked device for a few seconds
+    // could otherwise disable it outright (not just plant a backdoor PIN the way a missing check
+    // on enablePin would allow). Shares pinLogin's own attempt counter/lockout fields rather than
+    // adding separate ones — it's the same secret being brute-forced either way.
     @Override
-    @Transactional
-    public void disablePin(UUID userId) {
+    @Transactional(noRollbackFor = BusinessException.class)
+    public void disablePin(UUID userId, DisablePinRequest request, String ipAddress, String userAgent) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException("User not found", HttpStatus.NOT_FOUND));
+
+        if (user.getPinHash() == null) {
+            throw new BusinessException("PIN unlock isn't enabled for this account.", HttpStatus.BAD_REQUEST);
+        }
+        if (user.getPinLockedUntil() != null && user.getPinLockedUntil().isAfter(Instant.now())) {
+            throw new BusinessException(
+                    "Too many incorrect PIN attempts. Please try again later.",
+                    HttpStatus.LOCKED, "PIN_LOCKED",
+                    Map.of("lockedUntil", DateTimeFormatter.ISO_INSTANT.format(user.getPinLockedUntil())));
+        }
+        if (!passwordEncoder.matches(request.getPin(), user.getPinHash())) {
+            registerFailedPin(user, ipAddress, userAgent, "PIN_DISABLE_FAILED");
+            throw new BusinessException("Incorrect PIN", HttpStatus.UNAUTHORIZED, "INVALID_PIN");
+        }
+
         user.setPinHash(null);
         user.setPinEnabledAt(null);
         user.setPinFailedAttempts(0);
         user.setPinLockedUntil(null);
         userRepository.save(user);
+        auditService.log(userId, "PIN_DISABLED", "USER", userId, null, null, ipAddress, userAgent);
         log.info("PIN unlock disabled for user {}", userId);
     }
 
@@ -444,7 +465,7 @@ public class AuthServiceImpl implements AuthService {
                     Map.of("lockedUntil", DateTimeFormatter.ISO_INSTANT.format(user.getPinLockedUntil())));
         }
         if (!passwordEncoder.matches(request.getPin(), user.getPinHash())) {
-            registerFailedPin(user, ipAddress, userAgent);
+            registerFailedPin(user, ipAddress, userAgent, "PIN_LOGIN_FAILED");
             throw new BusinessException("Incorrect PIN", HttpStatus.UNAUTHORIZED, "INVALID_PIN");
         }
 
@@ -462,7 +483,10 @@ public class AuthServiceImpl implements AuthService {
         return buildAuthResponse(user, stored.isRememberMe(), ipAddress, userAgent);
     }
 
-    private void registerFailedPin(User user, String ipAddress, String userAgent) {
+    // failedAction distinguishes which flow the failure came from (login vs disable-verification)
+    // in the audit trail — both draw from and feed the same pinFailedAttempts/pinLockedUntil state
+    // on User, since it's the same PIN being brute-forced either way.
+    private void registerFailedPin(User user, String ipAddress, String userAgent, String failedAction) {
         int attempts = user.getPinFailedAttempts() + 1;
         if (attempts >= MAX_PIN_ATTEMPTS) {
             user.setPinFailedAttempts(0);
@@ -473,7 +497,7 @@ public class AuthServiceImpl implements AuthService {
             user.setPinFailedAttempts(attempts);
         }
         userRepository.save(user);
-        auditService.log(user.getId(), "PIN_LOGIN_FAILED", "USER", user.getId(), null, null, ipAddress, userAgent);
+        auditService.log(user.getId(), failedAction, "USER", user.getId(), null, null, ipAddress, userAgent);
     }
 
     @Override

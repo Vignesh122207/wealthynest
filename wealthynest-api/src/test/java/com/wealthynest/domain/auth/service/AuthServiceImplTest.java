@@ -595,16 +595,63 @@ class AuthServiceImplTest {
             assertThat(user.getPinLockedUntil()).isNull();
         }
 
+        private DisablePinRequest disableReq(String pin) {
+            DisablePinRequest r = mock(DisablePinRequest.class);
+            lenient().when(r.getPin()).thenReturn(pin);
+            return r;
+        }
+
         @Test
-        @DisplayName("disablePin clears the PIN and all lockout state")
-        void disablePinClearsState() {
-            User user = withId(baseUser().pinHash("existing").pinFailedAttempts(2).build());
+        @DisplayName("disablePin throws when PIN unlock isn't enabled for the account")
+        void disablePinThrowsWhenNotEnabled() {
+            User user = withId(baseUser().pinHash(null).build());
             when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
-            service.disablePin(userId);
+            assertThatThrownBy(() -> service.disablePin(userId, disableReq("1234"), ip, ua))
+                    .isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("disablePin throws LOCKED with a structured PIN_LOCKED code while the lockout window is active, without checking the PIN")
+        void disablePinThrowsWhenLocked() {
+            User user = withId(baseUser().pinHash("hash").pinLockedUntil(Instant.now().plusSeconds(120)).build());
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+            assertThatThrownBy(() -> service.disablePin(userId, disableReq("1234"), ip, ua))
+                    .isInstanceOfSatisfying(BusinessException.class, e -> {
+                        assertThat(e.getCode()).isEqualTo("PIN_LOCKED");
+                        assertThat(e.getDetails()).containsKey("lockedUntil");
+                    });
+            verify(passwordEncoder, never()).matches(any(), any());
+        }
+
+        @Test
+        @DisplayName("disablePin rejects a wrong PIN, leaves the PIN enabled, and increments the shared failure counter")
+        void disablePinRejectsWrongPin() {
+            User user = withId(baseUser().pinHash("hash").pinFailedAttempts(1).build());
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(passwordEncoder.matches("0000", "hash")).thenReturn(false);
+
+            assertThatThrownBy(() -> service.disablePin(userId, disableReq("0000"), ip, ua))
+                    .isInstanceOfSatisfying(BusinessException.class, e -> assertThat(e.getCode()).isEqualTo("INVALID_PIN"));
+
+            assertThat(user.getPinHash()).isEqualTo("hash");
+            assertThat(user.getPinFailedAttempts()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("disablePin clears the PIN and all lockout state once the current PIN is confirmed")
+        void disablePinClearsStateOnCorrectPin() {
+            User user = withId(baseUser().pinHash("existing").pinFailedAttempts(2).build());
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(passwordEncoder.matches("1234", "existing")).thenReturn(true);
+
+            service.disablePin(userId, disableReq("1234"), ip, ua);
 
             assertThat(user.getPinHash()).isNull();
+            assertThat(user.getPinEnabledAt()).isNull();
             assertThat(user.getPinFailedAttempts()).isEqualTo(0);
+            assertThat(user.getPinLockedUntil()).isNull();
         }
     }
 

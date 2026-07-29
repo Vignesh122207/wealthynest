@@ -312,16 +312,39 @@ describe("useEnablePin / useDisablePin", () => {
     expect(mockedApi.enablePin).toHaveBeenCalledWith("1234");
   });
 
-  it("useDisablePin sets pinEnabled=false on the user", async () => {
+  it("useDisablePin sets pinEnabled=false on the user, passing the confirmed PIN through", async () => {
     useAuthStore.setState({ user: { ...baseUser, pinEnabled: true } });
     mockedApi.disablePin.mockResolvedValue(undefined as never);
     const { Wrapper } = createQueryClientWrapper();
 
     const { result } = renderHook(() => useDisablePin(), { wrapper: Wrapper });
-    result.current.mutate();
+    result.current.mutate("1234");
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(useAuthStore.getState().user?.pinEnabled).toBe(false);
+    expect(mockedApi.disablePin).toHaveBeenCalledWith("1234");
+  });
+
+  it("useDisablePin stays silent (no toast) on an INVALID_PIN failure — the call site shakes the cells inline instead", async () => {
+    mockedApi.disablePin.mockRejectedValue({ response: { data: { error: "INVALID_PIN", message: "Incorrect PIN" } } });
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useDisablePin(), { wrapper: Wrapper });
+    result.current.mutate("0000");
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("useDisablePin still toasts a fallback message for an unexpected failure", async () => {
+    mockedApi.disablePin.mockRejectedValue({});
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useDisablePin(), { wrapper: Wrapper });
+    result.current.mutate("1234");
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(toast.error).toHaveBeenCalledWith("Failed to disable PIN");
   });
 });
 

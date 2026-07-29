@@ -5,6 +5,7 @@ import com.wealthynest.common.response.ApiResponse;
 import com.wealthynest.common.security.RefreshCookieService;
 import com.wealthynest.common.security.SecurityUtils;
 import com.wealthynest.domain.auth.dto.request.ChangeEmailRequest;
+import com.wealthynest.domain.auth.dto.request.DisablePinRequest;
 import com.wealthynest.domain.auth.dto.request.EnablePinRequest;
 import com.wealthynest.domain.auth.dto.response.SessionResponse;
 import com.wealthynest.domain.auth.service.AuthService;
@@ -83,8 +84,10 @@ public class UserController {
 
     @PostMapping("/me/pin/disable")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<Void>> disablePin() {
-        authService.disablePin(SecurityUtils.requireCurrentUserId());
+    public ResponseEntity<ApiResponse<Void>> disablePin(
+            @Valid @RequestBody DisablePinRequest request, HttpServletRequest httpRequest) {
+        authService.disablePin(SecurityUtils.requireCurrentUserId(), request,
+                httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"));
         return ResponseEntity.ok(ApiResponse.noContent());
     }
 

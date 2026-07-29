@@ -36,8 +36,10 @@ export const authApi = {
   enablePin: async (pin: string): Promise<void> => {
     await apiClient.post("/users/me/pin/enable", { pin });
   },
-  disablePin: async (): Promise<void> => {
-    await apiClient.post("/users/me/pin/disable");
+  // Requires the current PIN — see AuthServiceImpl#disablePin's own comment for why turning PIN
+  // unlock OFF gets a step-up check that turning it on deliberately doesn't.
+  disablePin: async (pin: string): Promise<void> => {
+    await apiClient.post("/users/me/pin/disable", { pin });
   },
   // No refreshToken param — the anchoring session is read off the httpOnly cookie server-side.
   pinLogin: async (pin: string): Promise<AuthResponse> =>

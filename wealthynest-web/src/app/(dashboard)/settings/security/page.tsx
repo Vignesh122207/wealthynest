@@ -1,6 +1,7 @@
 "use client";
 
 import {useState} from "react";
+import {useRouter} from "next/navigation";
 import type {UseFormRegisterReturn} from "react-hook-form";
 import {useForm} from "react-hook-form";
 import {zodResolver} from "@hookform/resolvers/zod";
@@ -18,7 +19,6 @@ import {
     Trash2,
     X
 } from "lucide-react";
-import Link from "next/link";
 import {Header} from "@/components/layout/Header";
 import {PageWrapper} from "@/components/layout/PageWrapper";
 import {PremiumIcon} from "@/components/icons/PremiumIcon";
@@ -29,7 +29,6 @@ import {
     useChangeEmail,
     useChangePassword,
     useDeletePasskey,
-    useDisablePin,
     usePasskeys,
     useRegisterPasskey,
     useRevokeOtherSessions,
@@ -42,6 +41,8 @@ import {
     useIsNativePlatform,
     useNativeBiometricStatus,
 } from "@/features/auth/hooks/useNativeBiometric";
+import {PinSetupModal} from "@/features/auth/components/PinSetupModal";
+import {PinVerifyModal} from "@/features/auth/components/PinVerifyModal";
 import {useAuthStore} from "@/features/auth/store/auth.store";
 import {useWebAuthnSupport} from "@/features/auth/hooks/useWebAuthnSupport";
 import {cn, formatDate} from "@/lib/utils";
@@ -120,34 +121,45 @@ function StatusPill({ on, children }: { on: boolean; children: React.ReactNode }
 
 function PinRow() {
   const { user } = useAuthStore();
-  const { mutate: disablePin } = useDisablePin();
+  const router = useRouter();
+  const isNative = useIsNativePlatform();
   const enabled = !!user?.pinEnabled;
+  const [showSetup, setShowSetup] = useState(false);
+  const [showVerify, setShowVerify] = useState(false);
 
-  const icon = <PremiumIcon icon={KeyRound} hex="#c2703d" size="sm" />;
-  const meta = (
-    <div className="flex-1 min-w-0">
-      <p className="text-sm font-semibold text-foreground flex items-center gap-2 flex-wrap">
-        PIN unlock
-        <StatusPill on={enabled}>{enabled ? "ENABLED" : "NOT SET UP"}</StatusPill>
-      </p>
-      <p className="text-xs text-muted-foreground mt-0.5">Quick 4-digit unlock for this device</p>
-    </div>
-  );
-
-  if (!enabled) {
-    return (
-      <Link href="/settings/security/pin" data-testid="security-pin-setup-link"
-        className="flex items-center gap-3.5 px-4 py-4 min-h-[64px] hover:bg-muted/40 transition-colors">
-        {icon}{meta}
-        <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" />
-      </Link>
-    );
-  }
+  // Mirrors NativeBiometricRow/PasskeyRow's own toggle below — PIN used to be a tap-through link
+  // when off and an always-on switch when on, the one unlock method here that didn't behave like
+  // its neighbors. Flipping it on can't just flip a boolean (a PIN has to actually be chosen), so
+  // "on" opens the setup flow instead of enabling directly. Flipping it off no longer disables
+  // immediately either — it opens PinVerifyModal first (see AuthServiceImpl#disablePin's own
+  // comment on why turning protection OFF needs proving the current PIN, unlike turning it on).
+  const handleChange = (next: boolean) => {
+    if (!next) { setShowVerify(true); return; }
+    if (isNative) router.push("/settings/security/pin");
+    else setShowSetup(true);
+  };
 
   return (
     <div className="flex items-center gap-3.5 px-4 py-4 min-h-[64px]">
-      {icon}{meta}
-      <Toggle checked onChange={() => disablePin()} testId="security-pin-disable-toggle" />
+      <PremiumIcon icon={KeyRound} tone="indigo" size="sm" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-foreground flex items-center gap-2 flex-wrap">
+          PIN unlock
+          <StatusPill on={enabled}>{enabled ? "ENABLED" : "NOT SET UP"}</StatusPill>
+        </p>
+        <p className="text-xs text-muted-foreground mt-0.5">Quick 4-digit unlock for this device</p>
+      </div>
+      <Toggle
+        checked={enabled}
+        onChange={handleChange}
+        testId={enabled ? "security-pin-disable-toggle" : "security-pin-enable-toggle"}
+      />
+      {showSetup && (
+        <PinSetupModal onClose={() => setShowSetup(false)} onSuccess={() => setShowSetup(false)} />
+      )}
+      {showVerify && (
+        <PinVerifyModal onClose={() => setShowVerify(false)} onVerified={() => setShowVerify(false)} />
+      )}
     </div>
   );
 }
@@ -165,7 +177,7 @@ function NativeBiometricRow() {
 
   return (
     <div className="flex items-center gap-3.5 px-4 py-4 min-h-[64px]">
-      <PremiumIcon icon={Fingerprint} hex={data.enabled ? "#34C759" : "#8E8E93"} size="sm" />
+      <PremiumIcon icon={Fingerprint} tone={data.enabled ? "green" : "gray"} size="sm" />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-foreground flex items-center gap-2 flex-wrap">
           Fingerprint &amp; face unlock
@@ -203,10 +215,10 @@ function PasskeyRow() {
   return (
     <div className="px-4 py-4 space-y-3">
       <div className="flex items-center gap-3.5">
-        <PremiumIcon icon={Fingerprint} hex={enabled ? "#34C759" : "#8E8E93"} size="sm" />
+        <PremiumIcon icon={Fingerprint} tone={enabled ? "green" : "gray"} size="sm" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-foreground flex items-center gap-2 flex-wrap">
-            Fingerprint &amp; face unlock
+            Passkey unlock
             <StatusPill on={enabled}>{enabled ? `${passkeys.length} DEVICE${passkeys.length === 1 ? "" : "S"}` : "NOT SET UP"}</StatusPill>
             {passkeys.length > 0 && (
               <InfoTooltip content={
@@ -218,7 +230,7 @@ function PasskeyRow() {
               } />
             )}
           </p>
-          <p className="text-xs text-muted-foreground mt-0.5">Unlock instantly with your fingerprint, face, or screen lock</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Unlock instantly with your fingerprint, face, or screen lock — no separate biometric setup, it&apos;s all part of the passkey</p>
         </div>
       </div>
 
@@ -266,7 +278,7 @@ function PasskeyRow() {
         ) : (
           <button onClick={() => setShowAdd(true)} data-testid="security-passkey-add-toggle"
             className="h-10 px-3.5 rounded-xl text-xs font-medium bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 dark:text-brand-300 border border-brand-500/20 transition-colors">
-            {enabled ? "Add another device" : "Enable fingerprint unlock"}
+            {enabled ? "Add another device" : "Enable passkey unlock"}
           </button>
         )}
       </div>
@@ -327,7 +339,7 @@ function PasswordRow() {
         aria-expanded={open}
         className="w-full flex items-center gap-3.5 px-4 py-4 min-h-[64px] text-left hover:bg-muted/40 transition-colors"
       >
-        <PremiumIcon icon={KeyRound} hex="#c2703d" size="sm" />
+        <PremiumIcon icon={KeyRound} tone="blue" size="sm" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-foreground">Password</p>
           <p className="text-xs text-muted-foreground mt-0.5">Use a strong password with letters, numbers, and symbols</p>
@@ -409,7 +421,7 @@ function EmailRow() {
   return (
     <div className="px-4 py-4 space-y-3">
       <div className="flex items-center gap-3.5">
-        <PremiumIcon icon={Mail} hex="#c2703d" size="sm" />
+        <PremiumIcon icon={Mail} tone="teal" size="sm" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-foreground flex items-center gap-2">
             Email address <StatusPill on>VERIFIED</StatusPill>

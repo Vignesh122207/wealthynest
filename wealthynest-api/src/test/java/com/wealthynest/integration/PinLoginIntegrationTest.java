@@ -82,9 +82,26 @@ class PinLoginIntegrationTest extends AbstractIntegrationTest {
                         .cookie(refreshCookie(auth.refreshToken())))
                 .andExpect(status().isUnauthorized());
 
-        // Disabling the PIN clears the profile flag and blocks further PIN logins on this token.
+        // A wrong PIN can't disable it — the profile flag stays true.
         mockMvc.perform(post("/api/v1/users/me/pin/disable")
-                        .header("Authorization", auth(auth.accessToken())))
+                        .header("Authorization", auth(auth.accessToken()))
+                        .contentType("application/json")
+                        .content("""
+                                {"pin":"0000"}
+                                """))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/v1/users/me").header("Authorization", auth(auth.accessToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.pinEnabled").value(true));
+
+        // Disabling the PIN requires the current PIN and clears the profile flag, blocking
+        // further PIN logins on this token.
+        mockMvc.perform(post("/api/v1/users/me/pin/disable")
+                        .header("Authorization", auth(auth.accessToken()))
+                        .contentType("application/json")
+                        .content("""
+                                {"pin":"1234"}
+                                """))
                 .andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/users/me").header("Authorization", auth(auth.accessToken())))
                 .andExpect(status().isOk())

@@ -10,6 +10,7 @@ import {deriveLockoutState} from "../utils/lockout";
 import type {LoginFormValues, RegisterFormValues} from "../schemas/auth.schema";
 import {notificationsApi} from "@/features/notifications/api/notifications.api";
 import {getLastRegisteredPushToken} from "@/features/notifications/utils/nativePush";
+import {apiErrorCode} from "@/lib/utils";
 
 type ApiError = { response?: { data?: { message?: string; error?: string } } };
 
@@ -166,12 +167,18 @@ export function useEnablePin() {
 export function useDisablePin() {
   const { user, setUser } = useAuthStore();
   return useMutation({
-    mutationFn: () => authApi.disablePin(),
+    mutationFn: (pin: string) => authApi.disablePin(pin),
     onSuccess: () => {
       if (user) setUser({ ...user, pinEnabled: false });
       toast.success("PIN unlock disabled");
     },
-    onError: () => toast.error("Failed to disable PIN"),
+    // PIN_LOCKED renders as a LockoutBanner and a wrong PIN as a cell shake, both inline at the
+    // call site (PinVerifyModal) — same reasoning as useUnlockWithPin's own comment on skipping
+    // the toast for those. Only something genuinely unexpected still toasts here.
+    onError: (e: ApiError) => {
+      if (deriveLockoutState(e) || apiErrorCode(e) === "INVALID_PIN") return;
+      toast.error(e.response?.data?.message ?? "Failed to disable PIN");
+    },
   });
 }
 
