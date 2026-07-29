@@ -43,6 +43,14 @@ jobs:
           MAIL_PORT=1025
           MAIL_USERNAME=test
           MAIL_PASSWORD=test
+          # Fake, not a real Google OAuth client - tests/auth/login.spec.ts's "Google sign-in
+          # button renders when a client ID is configured" only asserts the button element exists
+          # (GoogleSignInButton.tsx's WebGoogleSignInButton returns null when this is unset/empty),
+          # it never drives a real sign-in here. That's covered separately, against a real backend
+          # test double, by tests/oauth/google-oauth.spec.ts (needs its own opt-in API restart -
+          # see that file's own comment) - unset entirely, this button-render test failed outright
+          # since docker-compose.yml has no fallback for its own NEXT_PUBLIC_GOOGLE_CLIENT_ID build arg.
+          GOOGLE_CLIENT_ID=e2e-fake-client-id.apps.googleusercontent.com
           # MUST be browser-reachable, not the Docker-internal hostname - docker-compose.yml feeds
           # this straight into wealthynest-web's NEXT_PUBLIC_API_URL build arg, which Next.js bakes
           # directly into the CLIENT bundle (and this app's CSP connect-src). Every API call this
