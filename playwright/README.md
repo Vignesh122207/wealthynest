@@ -498,11 +498,16 @@ manage.
   with no per-run-dynamic content. A dashboard/accounts screenshot would diff on every run purely
   from `regressionUser`'s ever-growing transaction history, which is noise, not a real visual
   regression. **Read before trusting a failure here**: Playwright screenshot baselines are pinned
-  to the OS/GPU that generated them (these were generated on macOS); running this suite on a
-  different platform — a Linux CI runner, for instance — will fail on font-rendering/
-  anti-aliasing differences alone and needs its own baseline, not a real bug. Treat a mismatch as
-  "look at the diff, then regenerate with `--update-snapshots` on that platform" before assuming a
-  regression.
+  to the OS/GPU that generated them (these were generated on macOS, `-darwin` suffix); running this
+  suite on a different platform — the `e2e-nightly.yml` Linux CI runner, for instance — needs its
+  own `-linux` baseline or every run fails on font-rendering/anti-aliasing differences alone, not a
+  real bug (this was true and unaddressed for a while — the Linux baselines were simply never
+  generated, so every CI run of this file failed with "snapshot doesn't exist" until they were).
+  To (re)generate the Linux ones specifically — not from a local macOS/Windows machine, which would
+  just recreate the same mismatch — manually dispatch `e2e-nightly.yml` with `update_snapshots:
+  true` (see that workflow's own comment) and commit the PNGs its `visual-snapshots` artifact
+  uploads. Do this only after a real, intentional UI change; a mismatch you didn't expect is worth
+  looking at the diff for first, not blindly regenerating over.
 
 Also added in support of all four: `BasePage.rawPage` (an escape hatch to the underlying
 Playwright `Page` for tools like `AxeBuilder` that need it directly rather than a `Locator`/testid)

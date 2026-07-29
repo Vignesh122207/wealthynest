@@ -6,7 +6,12 @@ name: E2E (Playwright)
 on:
   schedule:
     - cron: "0 2 * * *" # 02:00 UTC daily
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      update_snapshots:
+        description: "Regenerate visual-regression baseline screenshots (tests/visual/*-snapshots/*-linux.png) instead of running the full suite"
+        type: boolean
+        default: false
 
 concurrency:
   group: e2e-nightly
@@ -84,8 +89,28 @@ jobs:
       # dotenv, so API_URL/DB_PASSWORD/everything else here is already the right, browser-and-
       # runner-reachable value — nothing to override per-step.
       - name: Run E2E suite
+        if: ${{ github.event.inputs.update_snapshots != 'true' }}
         working-directory: playwright
         run: npm test
+
+      # Screenshots are platform-sensitive (font rendering differs), so a baseline generated
+      # locally on a dev machine's OS never matches this runner's Linux rendering — every
+      # tests/visual/* run otherwise fails with "A snapshot doesn't exist at ...-linux.png".
+      # Manually dispatch this workflow with update_snapshots: true after a real, intentional UI
+      # change to regenerate them correctly (on the actual CI platform), then commit the PNGs this
+      # uploads as an artifact — don't hand-generate/copy these from any other OS.
+      - name: Regenerate visual snapshots
+        if: ${{ github.event.inputs.update_snapshots == 'true' }}
+        working-directory: playwright
+        run: npx playwright test tests/visual --project=chromium --update-snapshots
+
+      - name: Upload regenerated snapshots
+        if: ${{ github.event.inputs.update_snapshots == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-snapshots
+          path: playwright/tests/visual/*-snapshots/*-linux.png
+          retention-days: 14
 
       - name: Upload Playwright report
         if: always()
