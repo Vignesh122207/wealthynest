@@ -182,9 +182,17 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
   if (isCreditCard) {
     // ── Credit card: premium card design ──────────────────────────────────────
     return (
-      <div onClick={onEdit} role="button" tabIndex={0}
-        onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEdit(); } }}
+      <div onClick={onEdit}
         className="relative rounded-2xl shadow-sm hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 animate-fade-in-up cursor-pointer">
+        {/* Real, separately-focusable control for the same action the card's plain onClick above
+            already does — a role="button" here would nest the View-transactions/Download/Actions
+            controls below inside another interactive widget (axe's nested-interactive rule), so
+            the card itself stays a non-widget div and this sr-only-until-focused button is the
+            keyboard/screen-reader path to Edit instead. */}
+        <button type="button" onClick={onEdit}
+          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-20 focus:px-3 focus:py-1.5 focus:rounded-lg focus:bg-primary focus:text-primary-foreground focus:text-xs focus:font-medium">
+          Edit {account.name}
+        </button>
         {/* Background layer — clipped to the rounded corners on its own, so content (like the
             action menu below) isn't also clipped when it needs to overflow the card bounds. */}
         <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
@@ -305,9 +313,17 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
   const meta = ACCOUNT_TYPE_META[account.accountType];
 
   return (
-    <div onClick={onEdit} role="button" tabIndex={0}
-      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEdit(); } }}
+    <div onClick={onEdit}
       className="relative bg-card border border-border/50 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 animate-fade-in-up flex flex-col cursor-pointer overflow-hidden">
+      {/* Real, separately-focusable control for the same action the card's plain onClick above
+          already does — a role="button" here would nest the View-transactions/Download/Actions
+          controls below inside another interactive widget (axe's nested-interactive rule), so
+          the card itself stays a non-widget div and this sr-only-until-focused button is the
+          keyboard/screen-reader path to Edit instead. */}
+      <button type="button" onClick={onEdit}
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-20 focus:px-3 focus:py-1.5 focus:rounded-lg focus:bg-primary focus:text-primary-foreground focus:text-xs focus:font-medium">
+        Edit {account.name}
+      </button>
       {/* Same premium gradient-edge treatment as the form modal headers, tinted to this account
           type's own Apple system color — a lighter touch than the credit card's full "physical
           card" face, but still gives every type its own visible identity rather than just a
