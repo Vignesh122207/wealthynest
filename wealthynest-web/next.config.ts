@@ -18,14 +18,20 @@ const apiOrigin = (() => {
 // reverts to the verified-working static policy rather than ship a broken lockdown.
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://accounts.google.com",
+  // static.cloudflareinsights.com: Cloudflare injects its Web Analytics beacon at the proxy level
+  // (whenever the zone has it enabled) independent of anything this app does — not something a
+  // page-level opt-out can suppress, so it has to be allowed here instead or the browser blocks it
+  // outright with a console CSP violation on every single page.
+  "script-src 'self' 'unsafe-inline' https://accounts.google.com https://static.cloudflareinsights.com",
   // Missing accounts.google.com here (script-src/connect-src/frame-src already allow it) blocks
   // GIS's own https://accounts.google.com/gsi/style stylesheet — the button still renders, but the
   // degraded iframe falls back to a plain window.open() with no popup dimensions, which most
   // browsers then show as a full new tab instead of GIS's normal compact popup.
   "style-src 'self' 'unsafe-inline' https://accounts.google.com",
   "img-src 'self' data: https:",
-  `connect-src 'self' ${apiOrigin} https://accounts.google.com`,
+  // https://cloudflareinsights.com (no static. prefix — a different host from the script-src one
+  // above) is where the beacon script actually reports its RUM data via sendBeacon/fetch.
+  `connect-src 'self' ${apiOrigin} https://accounts.google.com https://cloudflareinsights.com`,
   "frame-src https://accounts.google.com",
   "font-src 'self' data:",
   "object-src 'none'",
