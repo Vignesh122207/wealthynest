@@ -429,7 +429,7 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
         <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl px-3 py-2">
           <div className="flex items-center gap-1 mb-0.5">
             <TrendingUp className="w-3 h-3 text-emerald-500" />
-            <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">In</p>
+            <p className="text-[10px] text-muted-foreground/80 uppercase tracking-wide">In</p>
           </div>
           <p className="text-sm font-bold text-emerald-500 dark:text-emerald-400 tabular-nums">
             {fmt(account.totalMoneyIn)}
@@ -438,7 +438,7 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
         <div className="bg-red-500/5 border border-red-500/10 rounded-xl px-3 py-2">
           <div className="flex items-center gap-1 mb-0.5">
             <TrendingDown className="w-3 h-3 text-red-500" />
-            <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">Out</p>
+            <p className="text-[10px] text-muted-foreground/80 uppercase tracking-wide">Out</p>
           </div>
           <p className="text-sm font-bold text-red-500 dark:text-red-400 tabular-nums">
             {fmt(account.totalMoneyOut)}
