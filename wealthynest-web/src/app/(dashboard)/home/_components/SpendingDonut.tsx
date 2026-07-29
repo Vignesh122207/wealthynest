@@ -44,9 +44,11 @@ export function SpendingDonut({ categoryBreakdown, year, month, chart, onAddExpe
         <div className="flex-1 min-h-[180px] rounded-2xl shimmer mt-4" />
       ) : categoryBreakdown.length > 0 ? (
         <div className="flex-1 flex flex-col justify-center">
+          {/* accessibilityLayer={false} — see SixMonthTrend.tsx's identical wrapper for why: without
+              it, Recharts' own focusable <svg> inside this aria-hidden div is a real WCAG violation. */}
           <div aria-hidden="true">
           <ResponsiveContainer width="100%" height={160}>
-            <PieChart>
+            <PieChart accessibilityLayer={false}>
               <Pie data={categoryBreakdown} cx="50%" cy="50%"
                 innerRadius={42} outerRadius={64} paddingAngle={3}
                 dataKey="amount" strokeWidth={0}>

@@ -123,9 +123,12 @@ export function InvestmentPanel({ investments, chart }: InvestmentPanelProps) {
         <div className="grid sm:grid-cols-2 gap-5 mb-5">
           {/* Allocation donut */}
           <div className="flex items-center gap-4">
+            {/* accessibilityLayer={false} — see home/_components/SixMonthTrend.tsx's identical
+                wrapper for why: without it, Recharts' own focusable <svg> inside this aria-hidden
+                div is a real WCAG violation. */}
             <div className="w-[120px] h-[120px] sm:w-[100px] sm:h-[100px] shrink-0" aria-hidden="true">
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
+                <PieChart accessibilityLayer={false}>
                   <Pie data={allocation} cx="50%" cy="50%" innerRadius={32} outerRadius={48}
                     paddingAngle={3} dataKey="value" strokeWidth={0}>
                     {allocation.map((a) => <Cell key={a.bucket} fill={BUCKET_COLOR[a.bucket]} />)}

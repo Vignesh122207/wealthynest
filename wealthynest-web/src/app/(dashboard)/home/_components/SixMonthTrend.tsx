@@ -38,9 +38,14 @@ export function SixMonthTrend({ trend, chart, isLoading }: SixMonthTrendProps) {
         {isLoading ? (
           <div className="w-full h-full rounded-2xl shimmer" />
         ) : trend.length > 0 ? (
+          /* aria-hidden on the wrapper alone isn't enough — Recharts adds its own keyboard-nav
+             layer (role="application" tabindex="0" on the inner <svg>) by default, which axe
+             flags as a real WCAG violation ("aria-hidden-focus": a focusable element can't sit
+             inside an aria-hidden subtree). accessibilityLayer={false} turns that default off to
+             match this chart's own already-decorative intent. */
           <div className="w-full h-full" aria-hidden="true">
           <ResponsiveContainer width="100%" height="100%" minHeight={200}>
-            <AreaChart data={trend} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
+            <AreaChart data={trend} margin={{ left: 0, right: 0, top: 4, bottom: 0 }} accessibilityLayer={false}>
               <defs>
                 <linearGradient id={GRAD_INCOME} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor={CHART_COLORS.income} stopOpacity={0.25} />
