@@ -39,6 +39,12 @@ jobs:
           MAIL_USERNAME=test
           MAIL_PASSWORD=test
           API_URL=http://wealthynest-api:8080/api/v1
+          # The prod default (10 auth req/min) is per-IP; every Playwright worker here shares one
+          # runner IP, and 4 workers x 128 tests hitting /api/v1/auth/* blows through that almost
+          # immediately, 429-ing logins and cascading into unrelated test failures. Raised only for
+          # this ephemeral CI stack.
+          RATE_LIMIT_AUTH_PER_MINUTE=1000
+          RATE_LIMIT_API_PER_MINUTE=5000
           EOF
 
       - name: Start the stack

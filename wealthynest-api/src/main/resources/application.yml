@@ -93,8 +93,8 @@ wealthynest:
     cors:
       allowed-origins: ${CORS_ORIGINS:http://localhost:3000}
     rate-limit:
-      auth-requests-per-minute: 10
-      api-requests-per-minute: 200
+      auth-requests-per-minute: ${RATE_LIMIT_AUTH_PER_MINUTE:10}
+      api-requests-per-minute: ${RATE_LIMIT_API_PER_MINUTE:200}
       trusted-proxies: ${RATE_LIMIT_TRUSTED_PROXIES:}
   cookie:
     # Must be true for the httpOnly refresh-token cookie in any environment served over HTTPS —
