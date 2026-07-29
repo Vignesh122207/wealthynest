@@ -29,6 +29,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
@@ -588,6 +590,31 @@ public class AuthServiceImpl implements AuthService {
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
+    /**
+     * auditService.log() is {@code @Async} + {@code REQUIRES_NEW} — it runs on its own connection
+     * that doesn't wait for the CALLER's transaction to commit. That's harmless when the referenced
+     * user already existed before this request (already committed by some earlier transaction), but
+     * signInWithGooglePayload's new-account branch audits a user row created in this very
+     * transaction — the audit insert's FK can then lose the race against this transaction's own
+     * commit, intermittently failing with "not present in table users" (reproduced in prod on
+     * brand-new Google signups). Deferring to {@code afterCommit()} closes that race; it's harmless
+     * to use unconditionally for the already-existing-user case too, so callers don't need to know
+     * which case they're in. {@code isSynchronizationActive()} is false outside a real transaction
+     * (e.g. a plain Mockito unit test with no Spring context), where logging immediately is correct.
+     */
+    private void logAfterCommit(UUID actorId, String action, UUID entityId, String ipAddress, String userAgent) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    auditService.log(actorId, action, "USER", entityId, null, null, ipAddress, userAgent);
+                }
+            });
+        } else {
+            auditService.log(actorId, action, "USER", entityId, null, null, ipAddress, userAgent);
+        }
+    }
+
     private GoogleIdToken.Payload verifyGoogleIdToken(String idTokenString) {
         try {
             GoogleIdToken.Payload payload = googleIdTokenValidator.verify(idTokenString);
@@ -657,13 +684,16 @@ public class AuthServiceImpl implements AuthService {
                     .authProvider("GOOGLE")
                     .build());
             log.info("New user registered via Google Sign-In: {}", created.getId());
-            auditService.log(created.getId(), "GOOGLE_SIGNUP", "USER", created.getId(), null, null, ipAddress, userAgent);
+            logAfterCommit(created.getId(), "GOOGLE_SIGNUP", created.getId(), ipAddress, userAgent);
             return created;
         });
 
         user.setLastLoginAt(Instant.now());
         userRepository.save(user);
-        auditService.log(user.getId(), "GOOGLE_LOGIN_SUCCESS", "USER", user.getId(), null, null, ipAddress, userAgent);
+        // Also goes through logAfterCommit — for the just-created branch above, `user` is that same
+        // uncommitted row (identical race), and deferring costs nothing extra for the ordinary
+        // already-committed-user case, so there's no need to special-case which branch ran.
+        logAfterCommit(user.getId(), "GOOGLE_LOGIN_SUCCESS", user.getId(), ipAddress, userAgent);
         emailService.sendNewSignInEmail(user.getEmail(), user.getFullName(), ipAddress, userAgent, Instant.now());
         return buildAuthResponse(user, rememberMe, ipAddress, userAgent);
     }

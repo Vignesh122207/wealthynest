@@ -793,6 +793,40 @@ class AuthServiceImplTest {
             assertThat(saved.isEmailVerified()).isTrue();
             verify(auditService).log(eq(userId), eq("GOOGLE_SIGNUP"), any(), any(), any(), any(), any(), any());
         }
+
+        @Test
+        @DisplayName("defers the GOOGLE_SIGNUP audit log to after commit when a real transaction is active")
+        void newUserAuditLogIsDeferredToAfterCommit() throws Exception {
+            // auditService.log() is @Async + REQUIRES_NEW, so it runs on a connection that can't
+            // see this transaction's own not-yet-committed INSERT of the new user row — logging
+            // immediately risks the audit row's FK losing that race (reproduced in prod: brand-new
+            // Google signups intermittently failed with "not present in table users"). Simulating a
+            // real active transaction here (Mockito's own service instance has none by default,
+            // which is exactly why the test above sees the call happen immediately instead) proves
+            // the fix actually defers to afterCommit() rather than logging eagerly.
+            when(googleIdTokenValidator.verify("raw-id-token")).thenReturn(payload);
+            when(payload.getEmailVerified()).thenReturn(true);
+            when(payload.getEmail()).thenReturn("deferred@example.com");
+            when(payload.get("name")).thenReturn("Deferred Person");
+            when(userRepository.findByEmail("deferred@example.com")).thenReturn(Optional.empty());
+            when(passwordEncoder.encode(anyString())).thenReturn("random-hash");
+            when(userRepository.save(any(User.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
+            stubAuthResponseBuilding();
+
+            org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+            try {
+                service.googleLogin(req(), ip, ua);
+
+                verifyNoInteractions(auditService);
+                org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations()
+                        .forEach(org.springframework.transaction.support.TransactionSynchronization::afterCommit);
+            } finally {
+                org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization();
+            }
+
+            verify(auditService).log(eq(userId), eq("GOOGLE_SIGNUP"), any(), any(), any(), any(), any(), any());
+            verify(auditService).log(eq(userId), eq("GOOGLE_LOGIN_SUCCESS"), any(), any(), any(), any(), any(), any());
+        }
     }
 
     // ─── googleLoginNative ───────────────────────────────────────────────────────
