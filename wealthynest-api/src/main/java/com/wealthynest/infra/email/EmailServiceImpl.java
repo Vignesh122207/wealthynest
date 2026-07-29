@@ -25,6 +25,13 @@ public class EmailServiceImpl implements EmailService {
     private static final String LOGO_CID = "logo-mark";
     private static final ClassPathResource LOGO_RESOURCE = new ClassPathResource("email/logo-mark.png");
 
+    // Matches the web app's `new Date().getFullYear()` footer/copyright convention (see
+    // AuthBrandPanel consumers, PublicNav, the landing page) instead of a literal year that goes
+    // stale every January — pinned to IST since that's the app's stated audience/timezone.
+    private static int currentYear() {
+        return java.time.Year.now(java.time.ZoneId.of("Asia/Kolkata")).getValue();
+    }
+
     private final JavaMailSender mailSender;
 
     @Value("${wealthynest.mail.from}")
@@ -134,7 +141,7 @@ public class EmailServiceImpl implements EmailService {
                     </tr>
                     <tr>
                       <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:24px 40px;text-align:center;">
-                        <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;">© 2026 WealthyNest · Built with ♥ for Indian families</p>
+                        <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;">© %d WealthyNest · Built with ♥ for Indian families</p>
                         <p style="margin:0;font-size:12px;color:#cbd5e1;">noreply@wealthynest.in · Do not reply to this email</p>
                       </td>
                     </tr>
@@ -143,7 +150,7 @@ public class EmailServiceImpl implements EmailService {
               </table>
             </body>
             </html>
-            """.formatted(firstName, link, link);
+            """.formatted(firstName, link, link, currentYear());
     }
 
     private String buildVerificationHtml(String name, String link) {
@@ -201,7 +208,7 @@ public class EmailServiceImpl implements EmailService {
                     </tr>
                     <tr>
                       <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:24px 40px;text-align:center;">
-                        <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;">© 2026 WealthyNest · Built with ♥ for Indian families</p>
+                        <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;">© %d WealthyNest · Built with ♥ for Indian families</p>
                         <p style="margin:0;font-size:12px;color:#cbd5e1;">noreply@wealthynest.in · Do not reply to this email</p>
                       </td>
                     </tr>
@@ -210,7 +217,7 @@ public class EmailServiceImpl implements EmailService {
               </table>
             </body>
             </html>
-            """.formatted(firstName, link, link);
+            """.formatted(firstName, link, link, currentYear());
     }
 
     private String buildAccountExistsHtml(String name, String loginLink, String resetLink) {
@@ -272,7 +279,7 @@ public class EmailServiceImpl implements EmailService {
                     </tr>
                     <tr>
                       <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:24px 40px;text-align:center;">
-                        <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;">© 2026 WealthyNest · Built with ♥ for Indian families</p>
+                        <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;">© %d WealthyNest · Built with ♥ for Indian families</p>
                         <p style="margin:0;font-size:12px;color:#cbd5e1;">noreply@wealthynest.in · Do not reply to this email</p>
                       </td>
                     </tr>
@@ -281,7 +288,7 @@ public class EmailServiceImpl implements EmailService {
               </table>
             </body>
             </html>
-            """.formatted(firstName, loginLink, resetLink);
+            """.formatted(firstName, loginLink, resetLink, currentYear());
     }
 
     private String buildNewSignInHtml(String name, String when, String ipAddress, String userAgent, String securityLink) {
@@ -346,7 +353,7 @@ public class EmailServiceImpl implements EmailService {
                     </tr>
                     <tr>
                       <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:24px 40px;text-align:center;">
-                        <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;">© 2026 WealthyNest · Built with ♥ for Indian families</p>
+                        <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;">© %d WealthyNest · Built with ♥ for Indian families</p>
                         <p style="margin:0;font-size:12px;color:#cbd5e1;">noreply@wealthynest.in · Do not reply to this email</p>
                       </td>
                     </tr>
@@ -355,6 +362,6 @@ public class EmailServiceImpl implements EmailService {
               </table>
             </body>
             </html>
-            """.formatted(firstName, when, ip, device, securityLink);
+            """.formatted(firstName, when, ip, device, securityLink, currentYear());
     }
 }

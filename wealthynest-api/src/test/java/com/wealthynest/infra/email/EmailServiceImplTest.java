@@ -68,21 +68,18 @@ class EmailServiceImplTest {
         verify(mailSender).send(captor.capture());
         MimeMessage sent = captor.getValue();
 
-        Object content = sent.getContent();
-        org.assertj.core.api.Assertions.assertThat(content).isInstanceOf(jakarta.mail.internet.MimeMultipart.class);
-        jakarta.mail.internet.MimeMultipart related = (jakarta.mail.internet.MimeMultipart) content;
-        boolean hasLogoPart = false;
-        for (int i = 0; i < related.getCount(); i++) {
-            jakarta.mail.BodyPart part = related.getBodyPart(i);
-            if ("image/png".equalsIgnoreCase(part.getContentType().split(";")[0].trim())) {
-                hasLogoPart = true;
-                org.assertj.core.api.Assertions.assertThat(part.getHeader("Content-ID")[0]).contains("logo-mark");
-            }
-        }
-        org.assertj.core.api.Assertions.assertThat(hasLogoPart).as("brand logo inline image part").isTrue();
+        // MimeMessageHelper wraps the message as multipart/mixed > [0] multipart/related >
+        // [0] html text, [1] the addInline()'d logo — see EmailServiceImpl#sendEmail.
+        jakarta.mail.internet.MimeMultipart mixed = (jakarta.mail.internet.MimeMultipart) sent.getContent();
+        jakarta.mail.internet.MimeMultipart related =
+                (jakarta.mail.internet.MimeMultipart) mixed.getBodyPart(0).getContent();
 
-        Object textContent = related.getBodyPart(0).getContent();
-        org.assertj.core.api.Assertions.assertThat((String) textContent).contains("cid:logo-mark");
+        org.assertj.core.api.Assertions.assertThat((String) related.getBodyPart(0).getContent())
+                .contains("cid:logo-mark");
+
+        jakarta.mail.internet.MimeBodyPart logoPart = (jakarta.mail.internet.MimeBodyPart) related.getBodyPart(1);
+        org.assertj.core.api.Assertions.assertThat(logoPart.getHeader("Content-ID")[0]).contains("logo-mark");
+        org.assertj.core.api.Assertions.assertThat(logoPart.getHeader("Content-Disposition")[0]).contains("inline");
     }
 
     @Test
