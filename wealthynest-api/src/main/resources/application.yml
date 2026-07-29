@@ -113,6 +113,10 @@ wealthynest:
     rp-name: WealthyNest
   google:
     client-id: ${GOOGLE_CLIENT_ID:}
+    # Only needed for the web popup-code fallback (AuthServiceImpl.googleLoginPopup) — the primary
+    # web sign-in (ID token, googleLogin) never needs a secret. Same "Web application" OAuth
+    # client as client-id above; fetch its secret from Google Cloud Console > Credentials.
+    client-secret: ${GOOGLE_CLIENT_SECRET:}
     native:
       client-id: ${GOOGLE_NATIVE_CLIENT_ID:}
       client-secret: ${GOOGLE_NATIVE_CLIENT_SECRET:}

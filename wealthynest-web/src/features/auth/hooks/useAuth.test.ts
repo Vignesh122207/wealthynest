@@ -5,7 +5,7 @@ import {
   useLogin, useRegister, useLogout, useVerifyEmail, useResendVerification, useUpdateProfile,
   useChangePassword, useChangeEmail, useForgotPassword, useResetPassword, useEnablePin,
   useDisablePin, usePinLogin, usePasskeys, useRegisterPasskey, useDeletePasskey,
-  useGoogleLogin, useCloseAccount, useUnlockWithPin, useUnlockWithPasskey,
+  useGoogleLogin, useGoogleLoginPopup, useCloseAccount, useUnlockWithPin, useUnlockWithPasskey,
   useSessions, useRevokeSession, useRevokeOtherSessions,
 } from "./useAuth";
 import { authApi } from "../api/auth.api";
@@ -25,7 +25,7 @@ vi.mock("../api/auth.api", () => ({
     enablePin: vi.fn(), disablePin: vi.fn(), pinLogin: vi.fn(),
     listPasskeys: vi.fn(), getPasskeyRegistrationOptions: vi.fn(), verifyPasskeyRegistration: vi.fn(),
     deletePasskey: vi.fn(), getPasskeyLoginOptions: vi.fn(), passkeyLogin: vi.fn(),
-    googleLogin: vi.fn(), closeAccount: vi.fn(),
+    googleLogin: vi.fn(), googleLoginNative: vi.fn(), googleLoginPopup: vi.fn(), closeAccount: vi.fn(),
     listSessions: vi.fn(), revokeSession: vi.fn(), revokeOtherSessions: vi.fn(),
   },
 }));
@@ -581,6 +581,31 @@ describe("useGoogleLogin", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(readPersistedHiddenAt()).toBeNull();
     expect(useAppLockStore.getState().isLocked).toBe(false);
+  });
+});
+
+describe("useGoogleLoginPopup", () => {
+  it("clears cache, sets auth, and navigates on success", async () => {
+    mockedApi.googleLoginPopup.mockResolvedValue(authResponse);
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useGoogleLoginPopup(), { wrapper: Wrapper });
+    result.current.mutate({ code: "auth-code", redirectUri: "postmessage", rememberMe: true });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("shows the backend's error message on failure", async () => {
+    mockedApi.googleLoginPopup.mockRejectedValue({ response: { data: { message: "Google sign-in failed" } } });
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useGoogleLoginPopup(), { wrapper: Wrapper });
+    result.current.mutate({ code: "auth-code", redirectUri: "postmessage", rememberMe: true });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(toast.error).toHaveBeenCalledWith("Google sign-in failed");
   });
 });
 

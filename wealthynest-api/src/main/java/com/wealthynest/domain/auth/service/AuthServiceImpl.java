@@ -78,6 +78,11 @@ public class AuthServiceImpl implements AuthService {
     @Value("${wealthynest.google.client-id:}")
     private String googleClientId;
 
+    // Only needed for the web popup-code fallback's server-side exchange (see googleLoginPopup) —
+    // the primary web flow (googleLogin) verifies an ID token directly and never touches this.
+    @Value("${wealthynest.google.client-secret:}")
+    private String googleClientSecret;
+
     @Value("${wealthynest.google.native.client-id:}")
     private String googleNativeClientId;
 
@@ -552,12 +557,31 @@ public class AuthServiceImpl implements AuthService {
      */
     @Override
     @Transactional
-    public AuthResponse googleLoginNative(GoogleNativeLoginRequest request, String ipAddress, String userAgent) {
+    public AuthResponse googleLoginNative(GoogleCodeLoginRequest request, String ipAddress, String userAgent) {
         if (googleNativeClientId == null || googleNativeClientId.isBlank()
                 || googleNativeClientSecret == null || googleNativeClientSecret.isBlank()) {
             throw new BusinessException("Google Sign-In isn't configured yet.", HttpStatus.SERVICE_UNAVAILABLE);
         }
-        String idTokenString = exchangeGoogleAuthorizationCode(request);
+        String idTokenString = exchangeGoogleAuthorizationCode(request, googleNativeClientId, googleNativeClientSecret);
+        GoogleIdToken.Payload payload = verifyGoogleIdToken(idTokenString);
+        return signInWithGooglePayload(payload, request.isRememberMe(), ipAddress, userAgent);
+    }
+
+    /**
+     * Web counterpart to googleLoginNative — see AuthService's own comment for why this exists:
+     * One Tap's silent prompt() is unreliable on a lot of mobile browsers (blocked third-party
+     * cookies, no FedCM support, or a post-dismissal cooldown), so WebGoogleSignInButton falls
+     * back to GIS's interactive popup code-flow when that happens. Same server-side exchange as
+     * the native path, just against the "Web application" OAuth client's own id/secret.
+     */
+    @Override
+    @Transactional
+    public AuthResponse googleLoginPopup(GoogleCodeLoginRequest request, String ipAddress, String userAgent) {
+        if (googleClientId == null || googleClientId.isBlank()
+                || googleClientSecret == null || googleClientSecret.isBlank()) {
+            throw new BusinessException("Google Sign-In isn't configured yet.", HttpStatus.SERVICE_UNAVAILABLE);
+        }
+        String idTokenString = exchangeGoogleAuthorizationCode(request, googleClientId, googleClientSecret);
         GoogleIdToken.Payload payload = verifyGoogleIdToken(idTokenString);
         return signInWithGooglePayload(payload, request.isRememberMe(), ipAddress, userAgent);
     }
@@ -579,15 +603,20 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
-    /** POSTs the authorization code + PKCE verifier to Google's token endpoint, alongside the
-     * client secret Google requires for this client type, and returns the resulting ID token. */
+    /** POSTs the authorization code (plus PKCE verifier, when the caller has one) to Google's
+     * token endpoint, alongside the client id/secret for whichever OAuth client this request
+     * belongs to, and returns the resulting ID token. */
     @SuppressWarnings("unchecked")
-    private String exchangeGoogleAuthorizationCode(GoogleNativeLoginRequest request) {
+    private String exchangeGoogleAuthorizationCode(GoogleCodeLoginRequest request, String clientId, String clientSecret) {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-        form.add("client_id", googleNativeClientId);
-        form.add("client_secret", googleNativeClientSecret);
+        form.add("client_id", clientId);
+        form.add("client_secret", clientSecret);
         form.add("code", request.getCode());
-        form.add("code_verifier", request.getCodeVerifier());
+        // The web popup fallback has no PKCE verifier to send — GIS's initCodeClient popup mode
+        // never establishes a code_challenge, so there's nothing for Google to check it against.
+        if (request.getCodeVerifier() != null && !request.getCodeVerifier().isBlank()) {
+            form.add("code_verifier", request.getCodeVerifier());
+        }
         form.add("redirect_uri", request.getRedirectUri());
         form.add("grant_type", "authorization_code");
 
@@ -600,7 +629,7 @@ public class AuthServiceImpl implements AuthService {
                     .retrieve()
                     .body(Map.class);
         } catch (RestClientException e) {
-            log.warn("Google native token exchange failed: {}", e.getMessage());
+            log.warn("Google authorization code exchange failed: {}", e.getMessage());
             throw new BusinessException("Google sign-in failed. Please try again.", HttpStatus.UNAUTHORIZED);
         }
         Object idToken = tokenResponse == null ? null : tokenResponse.get("id_token");

@@ -55,6 +55,15 @@ export const authApi = {
   ): Promise<AuthResponse> =>
     (await apiClient.post<ApiResponse<AuthResponse>>("/auth/google-login-native", params)).data.data,
 
+  // Web fallback used only when One Tap's silent prompt() is blocked/skipped (see
+  // GoogleSignInButton.tsx's runPopupFallback) — same authorization-code shape as
+  // googleLoginNative, minus codeVerifier, since GIS's initCodeClient popup mode never
+  // establishes a PKCE challenge.
+  googleLoginPopup: async (
+    params: { code: string; redirectUri: string; rememberMe: boolean }
+  ): Promise<AuthResponse> =>
+    (await apiClient.post<ApiResponse<AuthResponse>>("/auth/google-login-popup", params)).data.data,
+
   getPasskeyRegistrationOptions: async (): Promise<PublicKeyCredentialCreationOptionsJSON> =>
     (await apiClient.post<ApiResponse<PublicKeyCredentialCreationOptionsJSON>>("/users/me/webauthn/register/options")).data.data,
   verifyPasskeyRegistration: async (credential: PublicKeyCredentialJSON, nickname: string): Promise<void> => {

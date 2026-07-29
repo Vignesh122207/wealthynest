@@ -809,8 +809,8 @@ class AuthServiceImplTest {
         @org.mockito.Mock private RestClient.RequestBodyUriSpec requestSpec;
         @org.mockito.Mock private RestClient.ResponseSpec       responseSpec;
 
-        private GoogleNativeLoginRequest req() {
-            GoogleNativeLoginRequest r = mock(GoogleNativeLoginRequest.class);
+        private GoogleCodeLoginRequest req() {
+            GoogleCodeLoginRequest r = mock(GoogleCodeLoginRequest.class);
             lenient().when(r.getCode()).thenReturn("auth-code");
             lenient().when(r.getCodeVerifier()).thenReturn("pkce-verifier");
             lenient().when(r.getRedirectUri()).thenReturn("com.googleusercontent.apps.test:/oauth2redirect");
@@ -841,7 +841,7 @@ class AuthServiceImplTest {
         @DisplayName("throws SERVICE_UNAVAILABLE when the native client id/secret aren't configured")
         void throwsWhenNotConfigured() {
             ReflectionTestUtils.setField(service, "googleNativeClientId", "");
-            GoogleNativeLoginRequest req = mock(GoogleNativeLoginRequest.class);
+            GoogleCodeLoginRequest req = mock(GoogleCodeLoginRequest.class);
 
             assertThatThrownBy(() -> service.googleLoginNative(req, ip, ua)).isInstanceOf(BusinessException.class);
             // Not googleOAuthClient too — wireGoogleNative()'s own stub setup above already calls
@@ -915,6 +915,79 @@ class AuthServiceImplTest {
             assertThat(saved.getAuthProvider()).isEqualTo("GOOGLE");
             assertThat(saved.getFullName()).isEqualTo("New Person");
             verify(auditService).log(eq(userId), eq("GOOGLE_SIGNUP"), any(), any(), any(), any(), any(), any());
+        }
+    }
+
+    // ─── googleLoginPopup ────────────────────────────────────────────────────────
+    // Web counterpart to googleLoginNative above — same exchange-then-verify-then-sign-in shape,
+    // just reading googleClientId/googleClientSecret (the "Web application" client) instead of the
+    // native fields, and never sending a code_verifier. Doesn't re-cover every branch
+    // GoogleLoginNativeTests already exercises against the shared exchange/verify helpers — only
+    // what's actually distinct about this method: its own config guard, and that it reaches
+    // sign-in successfully end to end.
+
+    @Nested
+    @DisplayName("googleLoginPopup")
+    class GoogleLoginPopupTests {
+
+        @org.mockito.Mock private com.google.api.client.googleapis.auth.oauth2.GoogleIdToken.Payload payload;
+        @org.mockito.Mock private RestClient.RequestBodyUriSpec requestSpec;
+        @org.mockito.Mock private RestClient.ResponseSpec       responseSpec;
+
+        private GoogleCodeLoginRequest req() {
+            GoogleCodeLoginRequest r = mock(GoogleCodeLoginRequest.class);
+            lenient().when(r.getCode()).thenReturn("auth-code");
+            lenient().when(r.getCodeVerifier()).thenReturn(null); // GIS's popup code-flow never has one
+            lenient().when(r.getRedirectUri()).thenReturn("postmessage");
+            lenient().when(r.isRememberMe()).thenReturn(false);
+            return r;
+        }
+
+        @BeforeEach
+        void wireGooglePopup() {
+            ReflectionTestUtils.setField(service, "googleClientId", "test-web-client-id");
+            ReflectionTestUtils.setField(service, "googleClientSecret", "test-web-secret");
+            lenient().when(googleOAuthClient.post()).thenReturn(requestSpec);
+            lenient().when(requestSpec.uri(anyString())).thenReturn(requestSpec);
+            lenient().when(requestSpec.contentType(any())).thenReturn(requestSpec);
+            lenient().when(requestSpec.body(any(Object.class))).thenReturn(requestSpec);
+            lenient().when(requestSpec.retrieve()).thenReturn(responseSpec);
+        }
+
+        @Test
+        @DisplayName("throws SERVICE_UNAVAILABLE when the web client id/secret aren't configured")
+        void throwsWhenNotConfigured() {
+            ReflectionTestUtils.setField(service, "googleClientSecret", "");
+
+            assertThatThrownBy(() -> service.googleLoginPopup(req(), ip, ua)).isInstanceOf(BusinessException.class);
+            verifyNoInteractions(userRepository);
+        }
+
+        @Test
+        @DisplayName("throws UNAUTHORIZED when Google's token endpoint rejects the exchange")
+        void throwsWhenExchangeFails() {
+            when(responseSpec.body(Map.class)).thenThrow(new RestClientException("invalid_grant"));
+
+            assertThatThrownBy(() -> service.googleLoginPopup(req(), ip, ua)).isInstanceOf(BusinessException.class);
+            verifyNoInteractions(userRepository);
+        }
+
+        @Test
+        @DisplayName("an existing user signs in via the web popup fallback without creating a duplicate account")
+        void existingUserSignsIn() throws Exception {
+            when(responseSpec.body(Map.class)).thenReturn(Map.of("id_token", "raw-id-token"));
+            when(googleIdTokenValidator.verify("raw-id-token")).thenReturn(payload);
+            when(payload.getEmailVerified()).thenReturn(true);
+            when(payload.getEmail()).thenReturn("alice@example.com");
+            User existing = withId(baseUser().build());
+            when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(existing));
+            stubAuthResponseBuilding();
+
+            AuthResponse response = service.googleLoginPopup(req(), ip, ua);
+
+            assertThat(response.getAccessToken()).isEqualTo("access-token");
+            verify(userRepository, never()).save(argThat(u -> "GOOGLE".equals(u.getAuthProvider())));
+            verify(auditService).log(eq(userId), eq("GOOGLE_LOGIN_SUCCESS"), any(), any(), any(), any(), any(), any());
         }
     }
 
