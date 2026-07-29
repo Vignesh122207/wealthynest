@@ -38,7 +38,19 @@ jobs:
           MAIL_PORT=1025
           MAIL_USERNAME=test
           MAIL_PASSWORD=test
-          API_URL=http://wealthynest-api:8080/api/v1
+          # MUST be browser-reachable, not the Docker-internal hostname - docker-compose.yml feeds
+          # this straight into wealthynest-web's NEXT_PUBLIC_API_URL build arg, which Next.js bakes
+          # directly into the CLIENT bundle (and this app's CSP connect-src). Every API call this
+          # app makes - including login - runs client-side in the real browser (no server-side
+          # fetches, no middleware/rewrites proxy this repo's own code was checked for one), so
+          # "http://wealthynest-api:8080" here is never reachable at all from that browser: it's a
+          # Docker-network-only DNS name. Confirmed the hard way - every request failed
+          # net::ERR_NAME_NOT_RESOLVED, cascading into the same mass test failure the rate-limit
+          # fix below was mistaken for fixing on an earlier attempt. Runner-published localhost
+          # port instead, reachable both from the browser and from the Playwright/Node process
+          # itself (see the removed per-step override this used to need, now redundant since this
+          # is already the right value from here on).
+          API_URL=http://localhost:8080/api/v1
           # The prod default (10 auth req/min) is per-IP; every Playwright worker here shares one
           # runner IP, and 4 workers x 128 tests hitting /api/v1/auth/* blows through that almost
           # immediately, 429-ing logins and cascading into unrelated test failures. Raised only for
@@ -69,18 +81,10 @@ jobs:
           npx playwright install --with-deps chromium
 
       # playwright/config/env.ts loads ../../.env (the repo-root file generated above) via
-      # dotenv, so DB_PASSWORD and friends are already picked up — nothing to pass explicitly.
-      # API_URL is the one exception: the repo-root .env sets it to the Docker-internal hostname
-      # (http://wealthynest-api:8080/...), correct for wealthynest-web's own server-side calls
-      # from inside the compose network, but Playwright runs directly on this runner, outside
-      # that network — "wealthynest-api" doesn't resolve there at all. Override it to the
-      # published localhost port (matching playwright/.env.example's own documented value for
-      # running against a local docker-compose stack) so global-setup's health check can actually
-      # reach it, instead of failing every retry and throwing "never reported healthy".
+      # dotenv, so API_URL/DB_PASSWORD/everything else here is already the right, browser-and-
+      # runner-reachable value — nothing to override per-step.
       - name: Run E2E suite
         working-directory: playwright
-        env:
-          API_URL: http://localhost:8080/api/v1
         run: npm test
 
       - name: Upload Playwright report
