@@ -43,6 +43,7 @@ public class SecurityStack extends Stack {
     private final ISecret databaseCredentialsSecret;
     private final ISecret jwtSecret;
     private final ISecret googleOAuthClientSecret;
+    private final ISecret googleOAuthWebClientSecret;
     private final ISecret smtpCredentialsSecret;
     private final ISecret vaultEncryptionKeySecret;
     private final ISecret vaultHashPepperSecret;
@@ -86,6 +87,15 @@ public class SecurityStack extends Stack {
             config.resourceName("google-oauth-client-secret"),
             "Google OAuth 'Desktop app' client secret (Cloud Console > Credentials) - maps to "
                 + "GOOGLE_NATIVE_CLIENT_SECRET. Populate manually after deploy."
+        );
+
+        this.googleOAuthWebClientSecret = placeholderSecret(
+            "GoogleOAuthWebClientSecret",
+            config.resourceName("google-oauth-web-client-secret"),
+            "Google OAuth 'Web application' client secret (Cloud Console > Credentials, same client "
+                + "as GOOGLE_CLIENT_ID) - maps to GOOGLE_CLIENT_SECRET. Only used by the web "
+                + "popup-code fallback (AuthServiceImpl.googleLoginPopup) for when One Tap's silent "
+                + "prompt() is blocked/skipped on mobile. Populate manually after deploy."
         );
 
         this.smtpCredentialsSecret = Secret.Builder.create(this, "SmtpCredentialsSecret")
@@ -156,6 +166,10 @@ public class SecurityStack extends Stack {
 
     public ISecret getGoogleOAuthClientSecret() {
         return googleOAuthClientSecret;
+    }
+
+    public ISecret getGoogleOAuthWebClientSecret() {
+        return googleOAuthWebClientSecret;
     }
 
     public ISecret getSmtpCredentialsSecret() {

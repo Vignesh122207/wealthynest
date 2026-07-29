@@ -44,6 +44,8 @@ public class OutputsStack extends Stack {
             "Secrets Manager ARN - JWT_SECRET");
         output("GoogleOAuthClientSecretArn", secrets.googleOAuthClientSecret().getSecretArn(),
             "Secrets Manager ARN - GOOGLE_NATIVE_CLIENT_SECRET (populate manually post-deploy)");
+        output("GoogleOAuthWebClientSecretArn", secrets.googleOAuthWebClientSecret().getSecretArn(),
+            "Secrets Manager ARN - GOOGLE_CLIENT_SECRET (populate manually post-deploy)");
         output("SmtpCredentialsSecretArn", secrets.smtpCredentials().getSecretArn(),
             "Secrets Manager ARN - MAIL_USERNAME / MAIL_PASSWORD (populate manually post-deploy)");
         output("VaultEncryptionKeySecretArn", secrets.vaultEncryptionKey().getSecretArn(),

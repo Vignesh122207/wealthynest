@@ -77,6 +77,11 @@ write_env_file() {
     echo "VAULT_ENCRYPTION_KEY=$(secret_value vault-encryption-key)"
     echo "VAULT_HASH_PEPPER=$(secret_value vault-hash-pepper)"
     echo "GOOGLE_NATIVE_CLIENT_SECRET=$(secret_value google-oauth-client-secret)"
+    # Web counterpart — only used by AuthServiceImpl.googleLoginPopup (the popup-code fallback for
+    # when One Tap's silent prompt() is blocked/skipped on mobile). Separate secret from the native
+    # one above because it belongs to a different Google OAuth client ("Web application", not
+    # "Desktop app") with its own id/secret pair.
+    echo "GOOGLE_CLIENT_SECRET=$(secret_value google-oauth-web-client-secret)"
     echo "MAIL_HOST=smtp-relay.brevo.com"
     echo "MAIL_PORT=587"
     echo "MAIL_USERNAME=$(secret_field smtp-credentials .MAIL_USERNAME)"

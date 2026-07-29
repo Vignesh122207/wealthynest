@@ -12,6 +12,7 @@ public record AppSecrets(
     ISecret databaseCredentials,
     ISecret jwt,
     ISecret googleOAuthClientSecret,
+    ISecret googleOAuthWebClientSecret,
     ISecret smtpCredentials,
     ISecret vaultEncryptionKey,
     ISecret vaultHashPepper,
@@ -20,7 +21,7 @@ public record AppSecrets(
 ) {
     public List<ISecret> all() {
         return List.of(
-            databaseCredentials, jwt, googleOAuthClientSecret, smtpCredentials,
+            databaseCredentials, jwt, googleOAuthClientSecret, googleOAuthWebClientSecret, smtpCredentials,
             vaultEncryptionKey, vaultHashPepper, fcmServiceAccount, cloudflareOriginCert
         );
     }
