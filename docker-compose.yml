@@ -73,6 +73,13 @@ services:
       VAULT_HASH_PEPPER:    ${VAULT_HASH_PEPPER}
       CORS_ORIGINS:        ${CORS_ORIGINS}
       RATE_LIMIT_TRUSTED_PROXIES: ${RATE_LIMIT_TRUSTED_PROXIES:-}
+      # Numeric defaults here match application.yml's own fallback (10/200) exactly, so an unset
+      # .env behaves identically to before - only an explicit override (e.g. the E2E workflow's
+      # generous ephemeral-stack values) actually changes anything. Needed as an explicit forward
+      # here at all because Compose does NOT auto-inject every .env key into a container's own
+      # environment - only vars listed under this block reach it, regardless of what's in .env.
+      RATE_LIMIT_AUTH_PER_MINUTE: ${RATE_LIMIT_AUTH_PER_MINUTE:-10}
+      RATE_LIMIT_API_PER_MINUTE:  ${RATE_LIMIT_API_PER_MINUTE:-200}
       PORT:         8080
       MAIL_HOST:     ${MAIL_HOST}
       MAIL_PORT:     ${MAIL_PORT}
@@ -80,6 +87,10 @@ services:
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       FRONTEND_URL:  ${FRONTEND_URL}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      # Web popup-code fallback (AuthServiceImpl.googleLoginPopup) - see that method's own comment
+      # for why. Only needed if testing that specific fallback locally; the primary ID-token web
+      # flow (googleLogin) never reads this.
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       # Native Android sign-in (Desktop app OAuth client) — see AuthServiceImpl.googleLoginNative
       # for why the backend, not the app, needs these to exchange an authorization code for an
       # ID token: Google requires this client secret for that exchange even with PKCE.
