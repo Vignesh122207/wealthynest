@@ -85,6 +85,13 @@ export default function DashboardPage() {
   const { data, isLoading, isError, refetch } = useDashboard(year, month);
   const { data: prevData }            = useDashboard(prevYearNum, prevMonthNum);
   const { data: walletAccounts = [], isLoading: accountsLoading } = useAccounts();
+  // Widgets below all took `isLoading` alone, but the accounts-gated section (and the
+  // onboarding banner) also wait on `accountsLoading` - when that query settled after the
+  // dashboard one, everything else had already swapped from skeleton to real content, then the
+  // accounts section popped into the middle of the page a beat later, on its own. One combined
+  // flag makes every section reveal in the same instant instead of staggered "loading again"
+  // hops.
+  const dataLoading = isLoading || accountsLoading;
   const { data: goals = [] }          = useGoals();
   const { data: categories = [] }       = useCategories("EXPENSE");
   const { data: incomeCategories = [] } = useCategories("INCOME");
@@ -269,7 +276,7 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto p-4 md:p-5 lg:p-6 space-y-4 lg:space-y-5">
 
           {/* ── Onboarding: new user ── */}
-          {!isLoading && !accountsLoading && walletAccounts.length === 0 && (
+          {!dataLoading && walletAccounts.length === 0 && (
             <div className="rounded-2xl border border-primary/25 bg-primary/5 p-6 space-y-4 animate-fade-in-up">
               <div className="flex items-center gap-3">
                 <PremiumIcon icon={Sparkles} tone="purple" size="md" className="w-10 h-10" />
@@ -335,7 +342,7 @@ export default function DashboardPage() {
             expenseTrend={expenseTrend}
             budgetSummaries={budgetSummaries}
             alertBannerVisible={!overBudgetDismissed && overBudgetCount > 0}
-            isLoading={isLoading}
+            isLoading={dataLoading}
           />
 
           {/* ── Alerts: over-budget + smart insights + upcoming bills ── */}
@@ -363,7 +370,7 @@ export default function DashboardPage() {
                 month={month}
                 chart={chart}
                 onAddExpense={() => setQuickModal("expense")}
-                isLoading={isLoading}
+                isLoading={dataLoading}
               />
             </TwoColRow>
           )}
@@ -374,9 +381,9 @@ export default function DashboardPage() {
               budgetSummaries={data?.budgetSummaries ?? []}
               year={year}
               month={month}
-              isLoading={isLoading}
+              isLoading={dataLoading}
             />
-            <TransactionList transactions={recentTransactions} isLoading={isLoading} />
+            <TransactionList transactions={recentTransactions} isLoading={dataLoading} />
           </TwoColRow>
 
           {/* ── Phase 3: Net Worth Trend (left) + 6-Month Income/Expense/Savings Trend (right) ── */}
@@ -386,19 +393,19 @@ export default function DashboardPage() {
               netWorth={data?.totalNetWorth}
               changePct={netWorthTrend}
               chart={chart}
-              isLoading={isLoading}
+              isLoading={dataLoading}
             />
-            <SixMonthTrend trend={trend} chart={chart} isLoading={isLoading} />
+            <SixMonthTrend trend={trend} chart={chart} isLoading={dataLoading} />
           </TwoColRow>
 
           {/* ── Investment Overview (left) + Goals (right) ── */}
           {hasInvestments ? (
             <TwoColRow>
               <InvestmentPanel investments={investments} chart={chart} />
-              <GoalsSummary goals={goals} isLoading={isLoading} />
+              <GoalsSummary goals={goals} isLoading={dataLoading} />
             </TwoColRow>
           ) : (
-            <GoalsSummary goals={goals} isLoading={isLoading} />
+            <GoalsSummary goals={goals} isLoading={dataLoading} />
           )}
 
         </div>

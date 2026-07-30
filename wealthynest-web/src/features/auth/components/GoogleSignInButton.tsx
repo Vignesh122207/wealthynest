@@ -3,7 +3,6 @@
 import {useEffect, useState} from "react";
 import Script from "next/script";
 import {Capacitor} from "@capacitor/core";
-import {GenericOAuth2} from "@capacitor-community/generic-oauth2";
 import {Loader2} from "lucide-react";
 import {toast} from "sonner";
 import {useGoogleLogin, useGoogleLoginNative, useGoogleLoginPopup} from "../hooks/useAuth";
@@ -119,6 +118,20 @@ function NativeGoogleSignInButton() {
   const handleSignIn = async () => {
     setAuthenticating(true);
     try {
+      // Imported lazily, not at module scope: this module-loads registerPlugin('GenericOAuth2', ...),
+      // which reads window.Capacitor.PluginHeaders exactly once, synchronously, and bakes whatever
+      // it finds into the plugin's proxy forever. In this app's server-mode setup (the WebView loads
+      // the live site over the network rather than bundled local assets - see capacitor.config.ts),
+      // native Android injects PluginHeaders asynchronously via evaluateJavascript, racing the
+      // remote page's own scripts - Capacitor's deterministic HTML-injection path only covers its
+      // own local virtual server, not a real external domain. A static top-level import here ran
+      // registerPlugin() as soon as the login page's bundle loaded, before that injection reliably
+      // won the race, permanently wedging this plugin's proxy into throwing "not implemented on
+      // android" (confirmed via a direct Capacitor.Plugins.GenericOAuth2.authenticate() call
+      // reproducing that exact error, with zero native-side log lines ever appearing - it never
+      // left JS). Deferring the import to the moment of a real tap - which needs a human to
+      // perceive, decide, and move a finger - gives the bridge far more real time to finish first.
+      const {GenericOAuth2} = await import("@capacitor-community/generic-oauth2");
       const result = await GenericOAuth2.authenticate({
         appId: clientId,
         authorizationBaseUrl: "https://accounts.google.com/o/oauth2/v2/auth",
