@@ -51,10 +51,10 @@ export const metadata: Metadata = {
     // fall through to the PNGs.
     icon:  [
       { url: "/icons/favicon.svg?v=ribbon-w-2",      type: "image/svg+xml" },
-      { url: "/icons/icon-192.png?v=ribbonw-copper2", sizes: "192x192", type: "image/png" },
-      { url: "/icons/icon-512.png?v=ribbonw-copper2", sizes: "512x512", type: "image/png" },
+      { url: "/icons/icon-192.png?v=ribbonw-copper3", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png?v=ribbonw-copper3", sizes: "512x512", type: "image/png" },
     ],
-    apple: [{ url: "/icons/icon-192.png?v=ribbonw-copper2", sizes: "192x192" }],
+    apple: [{ url: "/icons/icon-192.png?v=ribbonw-copper3", sizes: "192x192" }],
   },
   // Image itself comes from opengraph-image.tsx/twitter-image.tsx (Next's file-convention
   // auto-detects and injects those) — these fields cover the surrounding text/type metadata that
