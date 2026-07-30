@@ -13,11 +13,20 @@ const apiUrl = process.env.API_URL ?? "https://api.wealthynest.in/api/v1";
 // smoke check. Derive just the origin for this one endpoint instead.
 const apiOrigin = new URL(apiUrl).origin;
 
+// Polls instead of a single request: deploy-backend.sh's own local health check already passed
+// before this suite ever starts, but the symlink-flip + systemd restart it just did can leave the
+// service flapping for up to ~90s afterward (a real, reproduced restart race, not theoretical) -
+// backend.yml's own external health check step already tolerates exactly this with the same
+// polling/timeout shape. A single fast request here (Playwright's default retry fires almost
+// immediately, not with real delay) was catching that same window and rolling back releases that
+// were actually fine moments later.
 test("API health endpoint reports UP", async ({ request }) => {
-  const response = await request.get(`${apiOrigin}/actuator/health`);
-  expect(response.ok()).toBeTruthy();
-  const body = await response.json();
-  expect(body.status).toBe("UP");
+  await expect.poll(async () => {
+    const response = await request.get(`${apiOrigin}/actuator/health`);
+    if (!response.ok()) return null;
+    const body = await response.json();
+    return body.status;
+  }, { timeout: 90_000, intervals: [2_000] }).toBe("UP");
 });
 
 test("landing page loads", async ({ page }) => {
