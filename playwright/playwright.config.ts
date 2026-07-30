@@ -12,6 +12,19 @@ export default defineConfig({
   workers: env.isCI ? 4 : undefined,
   reportSlowTests: { max: 10, threshold: 30000 },
 
+  // Playwright's own default (unset = 5000ms) governs every `expect(locator).toBeVisible()`-style
+  // assertion — a separate knob from actionTimeout/navigationTimeout below, and the one actually
+  // behind several of the CI-only flakes this file's own comment describes (e.g. family.spec.ts's
+  // "element(s) not found... Timeout: 5000ms" on getByTestId("family-create-card")).
+  expect: { timeout: env.isCI ? 10000 : 5000 },
+
+  // Playwright's own per-test default (unset = 30000ms) caps the whole test regardless of any
+  // individual step's own timeout — bumping actionTimeout/navigationTimeout to 30-35s in CI below
+  // without also raising this just moves the failure mode to "Target page, context or browser has
+  // been closed" mid-wait once the overall budget runs out first. Give CI enough headroom above
+  // the longest individual step timeout (35s) for one slow step to actually resolve.
+  timeout: env.isCI ? 60000 : 30000,
+
   globalSetup: require.resolve("./global-setup"),
   globalTeardown: require.resolve("./global-teardown"),
 
@@ -26,8 +39,15 @@ export default defineConfig({
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
-    actionTimeout: 15000,
-    navigationTimeout: 20000,
+    // Flat 15s/20s locally is plenty (one worker, no contention). In CI, 4 workers share a
+    // 2-vCPU runner — confirmed by reproducing the exact CI flake set locally (app-lock's PIN
+    // submit not re-enabling, investments' live-search result not resolving, a transfer-delete
+    // response, webauthn's redirect) purely by adding worker contention with an otherwise-correct
+    // (rate-limit-matched) local env; every one of them was a timeout landing right at the old
+    // ceiling, not a real assertion failure. Not a rate-limit or app bug — see README's "Real rate
+    // limits" section, already solved for CI via RATE_LIMIT_*_PER_MINUTE in e2e-nightly.yml.
+    actionTimeout: env.isCI ? 30000 : 15000,
+    navigationTimeout: env.isCI ? 35000 : 20000,
   },
 
   projects: [
