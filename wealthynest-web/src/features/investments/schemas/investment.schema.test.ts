@@ -32,6 +32,22 @@ describe("mfSchema", () => {
   it("rejects non-positive units", () => {
     expect(mfSchema.safeParse({ ...base, units: 0 }).success).toBe(false);
   });
+
+  it("treats an empty-string sipAmount as absent, not 0 (which would fail .positive())", () => {
+    const result = mfSchema.safeParse({ ...base, sipAmount: "" });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.sipAmount).toBeUndefined();
+  });
+
+  it("rejects a non-positive sipAmount when provided", () => {
+    expect(mfSchema.safeParse({ ...base, sipAmount: 0 }).success).toBe(false);
+  });
+
+  it("treats an empty-string sipDay as absent, not 0 (which would fail .min(1))", () => {
+    const result = mfSchema.safeParse({ ...base, sipDay: "" });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.sipDay).toBeUndefined();
+  });
 });
 
 describe("goldSchema", () => {
