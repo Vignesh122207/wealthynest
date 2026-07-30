@@ -10,6 +10,7 @@ import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
 import {type IncomeFormValues, type IncomeSourceValue} from "@/components/transactions/IncomeForm";
 import {type TransferFormValues} from "@/components/transactions/TransferFormModal";
 import {
+    useAllTimeExpenses,
     useCreateExpense,
     useDeleteExpense,
     useExpenses,
@@ -192,8 +193,8 @@ export default function TransactionsPage() {
   // balance column (needs full history per account, anchored at opening balance) and,
   // outside "month" mode, the stat-card totals (the month-mode dashboard aggregate below
   // is server-summed with no size cap; this is the fallback for year/custom/all ranges).
-  const { data: allTimeExpensesData } = useExpenses({ size: 2000, sortDir: "asc", includeDebt: true });
-  const allTimeExpenses = useMemo(() => allTimeExpensesData?.data ?? [], [allTimeExpensesData]);
+  const { data: allTimeExpensesData } = useAllTimeExpenses();
+  const allTimeExpenses = useMemo(() => allTimeExpensesData ?? [], [allTimeExpensesData]);
   const { data: allTimeIncome = [] } = useIncome(undefined, undefined, true);
   const { data: dashboardSummary }     = useDashboard(year, month);
   const { data: prevDashboardSummary } = useDashboard(prevYearNum, prevMonthNum);

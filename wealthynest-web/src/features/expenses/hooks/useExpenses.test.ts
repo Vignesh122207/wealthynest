@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QUERY_KEYS } from "@/lib/constants";
 import { createQueryClientWrapper } from "@/test-utils/queryClientWrapper";
-import { useExpenses, useCreateExpense, useUpdateExpense, useDeleteExpense } from "./useExpenses";
+import { useExpenses, useAllTimeExpenses, useCreateExpense, useUpdateExpense, useDeleteExpense } from "./useExpenses";
 import { expensesApi } from "../api/expenses.api";
 import { toast } from "sonner";
 
@@ -31,6 +31,29 @@ describe("useExpenses", () => {
     const { result } = renderHook(() => useExpenses({}, false), { wrapper: Wrapper });
     expect(result.current.fetchStatus).toBe("idle");
     expect(mockedApi.getExpenses).not.toHaveBeenCalled();
+  });
+});
+
+describe("useAllTimeExpenses", () => {
+  it("pages through every page at size 500 instead of one oversized request", async () => {
+    // Regression test: this used to call getExpenses({ size: 2000, ... }) directly, which the
+    // backend's @Max(500) on `size` now rejects with a 422 (added alongside the export flow's own
+    // paginated fetch, without auditing this pre-existing caller) — see git history on
+    // ExpenseController's size param. Must never go back to a single oversized request.
+    mockedApi.getExpenses
+      .mockResolvedValueOnce({ data: [{ id: "e1" }], meta: { last: false } } as never)
+      .mockResolvedValueOnce({ data: [{ id: "e2" }], meta: { last: true } } as never);
+
+    const { Wrapper } = createQueryClientWrapper();
+    const { result } = renderHook(() => useAllTimeExpenses(), { wrapper: Wrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual([{ id: "e1" }, { id: "e2" }]);
+    expect(mockedApi.getExpenses).toHaveBeenCalledTimes(2);
+    for (const call of mockedApi.getExpenses.mock.calls) {
+      expect(call[0]).toMatchObject({ sortDir: "asc", includeDebt: true, size: 500 });
+      expect((call[0] as { size: number }).size).toBeLessThanOrEqual(500);
+    }
   });
 });
 

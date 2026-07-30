@@ -33,7 +33,7 @@ import {
     createAccountSchema,
     LOAN_TYPE_LABELS,
 } from "@/features/accounts/schemas/account.schema";
-import {useCreateExpense, useExpenses} from "@/features/expenses/hooks/useExpenses";
+import {useAllTimeExpenses, useCreateExpense, useExpenses} from "@/features/expenses/hooks/useExpenses";
 import {useCreateIncome, useIncome} from "@/features/income/hooks/useIncome";
 import {useDebts} from "@/features/debts/hooks/useDebts";
 import type {DebtRecord} from "@/features/debts/types/debt.types";
@@ -110,8 +110,8 @@ export default function AccountsPage() {
   // Same "last used, else most used" default as the Transactions page's Add Expense/Income —
   // reused via pickSmartDefault so opening these forms from an account card doesn't drop back to
   // an empty category picker just because it's a different entry point into the same forms.
-  const { data: allTimeExpensesData }      = useExpenses({ size: 2000, sortDir: "asc", includeDebt: true });
-  const allTimeExpenses = useMemo(() => allTimeExpensesData?.data ?? [], [allTimeExpensesData]);
+  const { data: allTimeExpensesData }      = useAllTimeExpenses();
+  const allTimeExpenses = useMemo(() => allTimeExpensesData ?? [], [allTimeExpensesData]);
   const { data: allTimeIncome = [] }       = useIncome(undefined, undefined, true);
   const defaultExpenseCategoryId = useMemo(() =>
     pickSmartDefault(allTimeExpenses, e => e.expenseDate, e => e.createdAt, e => e.categoryId),

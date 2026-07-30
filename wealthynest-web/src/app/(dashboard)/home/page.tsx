@@ -16,7 +16,7 @@ import {useDashboard} from "@/features/dashboard/hooks/useDashboard";
 import {useAccounts, useTransfer} from "@/features/accounts/hooks/useAccounts";
 import {useGoals} from "@/features/goals/hooks/useGoals";
 import {useCategories} from "@/features/categories/hooks/useCategories";
-import {useCreateExpense, useExpenses} from "@/features/expenses/hooks/useExpenses";
+import {useAllTimeExpenses, useCreateExpense, useExpenses} from "@/features/expenses/hooks/useExpenses";
 import {useCreateIncome, useIncome} from "@/features/income/hooks/useIncome";
 import {useInvestments} from "@/features/investments/hooks/useInvestments";
 import {useNetWorthHistory} from "@/features/networth/hooks/useNetWorth";
@@ -94,8 +94,8 @@ export default function DashboardPage() {
   // frequent" category and income-source defaults below, and to sort each picker most-used
   // first — without this, Home's quick-add forms always start with nothing selected and list
   // categories in whatever order the API returns them instead of Groceries/Salary-first.
-  const { data: allTimeExpensesData }   = useExpenses({ size: 2000, sortDir: "asc", includeDebt: true });
-  const allTimeExpenses = useMemo(() => allTimeExpensesData?.data ?? [], [allTimeExpensesData]);
+  const { data: allTimeExpensesData }   = useAllTimeExpenses();
+  const allTimeExpenses = useMemo(() => allTimeExpensesData ?? [], [allTimeExpensesData]);
   const { data: allTimeIncome = [] }    = useIncome(undefined, undefined, true);
 
   const expenseCategoryUsage = useMemo(() => buildUsageCounts(allTimeExpenses, e => e.categoryId), [allTimeExpenses]);
