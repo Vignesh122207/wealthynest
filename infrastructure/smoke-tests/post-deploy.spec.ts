@@ -41,16 +41,7 @@ test("API health endpoint reports UP", async ({ request }) => {
   test.setTimeout(170_000);
   await expect.poll(async () => {
     const response = await request.get(`${apiOrigin}/actuator/health`);
-    // TEMPORARY diagnostic logging - real status/body/headers on every attempt, since three real
-    // runs have now failed with the actual response swallowed down to a bare `null`. Remove once
-    // the real cause (suspected Cloudflare-side block of this specific request, independent of
-    // app health or deploy timing - confirmed by a standalone run with no deploy in progress
-    // failing identically) is confirmed and fixed.
-    console.log(`[diag] status=${response.status()} headers=${JSON.stringify(response.headers())}`);
-    if (!response.ok()) {
-      console.log(`[diag] body=${(await response.text()).slice(0, 500)}`);
-      return null;
-    }
+    if (!response.ok()) return null;
     const body = await response.json();
     return body.status;
   }, { timeout: 150_000, intervals: [3_000] }).toBe("UP");
