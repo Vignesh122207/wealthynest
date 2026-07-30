@@ -48,21 +48,21 @@ export function LiabilityRow({ liability, onEdit }: {
                 style={{ backgroundColor: meta.hex + "18", color: meta.hex }}>
                 {typeLabel(LIABILITY_TYPES, liability.liabilityType)}
               </span>
-              {liability.lenderName && <span className="text-xs text-muted-foreground/60">· {liability.lenderName}</span>}
-              {liability.interestRate != null && <span className="text-xs text-muted-foreground/60">· {liability.interestRate}% p.a.</span>}
-              {liability.endDate && <span className="text-xs text-muted-foreground/60">· Payoff {formatDate(liability.endDate)}</span>}
+              {liability.lenderName && <span className="text-xs text-muted-foreground/80">· {liability.lenderName}</span>}
+              {liability.interestRate != null && <span className="text-xs text-muted-foreground/80">· {liability.interestRate}% p.a.</span>}
+              {liability.endDate && <span className="text-xs text-muted-foreground/80">· Payoff {formatDate(liability.endDate)}</span>}
             </div>
           </div>
           <div className="text-right shrink-0">
             <p className="text-sm font-bold text-red-600 dark:text-red-400 tabular-nums">{fmt(liability.outstandingAmount)}</p>
-            <p className="text-xs text-muted-foreground/60">outstanding</p>
+            <p className="text-xs text-muted-foreground/80">outstanding</p>
           </div>
         </div>
         {/* Repayment progress */}
         {liability.principalAmount > 0 && (
           <div className="mt-2.5">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-muted-foreground/60">Repaid</span>
+              <span className="text-xs text-muted-foreground/80">Repaid</span>
               <span className="text-xs text-muted-foreground/80 tabular-nums">
                 {fmt(liability.principalAmount - liability.outstandingAmount)} / {fmt(liability.principalAmount)}
               </span>
@@ -71,7 +71,7 @@ export function LiabilityRow({ liability, onEdit }: {
               <div className="h-full bg-emerald-500/70 rounded-full transition-all" style={{ width: `${pct}%` }} />
             </div>
             <div className="flex items-center justify-between mt-1">
-              <span className="text-xs text-muted-foreground/60">{pct.toFixed(0)}% paid off</span>
+              <span className="text-xs text-muted-foreground/80">{pct.toFixed(0)}% paid off</span>
               {liability.emiAmount && (
                 <span className="text-xs text-muted-foreground/80">EMI {fmt(liability.emiAmount)}/mo</span>
               )}

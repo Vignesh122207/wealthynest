@@ -70,7 +70,7 @@ function StatTile({ icon, tone, label, value, deltaText, deltaGood, sparkColor, 
     )}>
       <div className="flex items-center gap-2 mb-3">
         <PremiumIcon icon={icon} tone={tone} size="sm" />
-        <p className="text-xs font-semibold text-muted-foreground/70 truncate">{label}</p>
+        <p className="text-xs font-semibold text-muted-foreground/80 truncate">{label}</p>
       </div>
       <p className="text-xl font-bold text-foreground tabular-nums tracking-tight leading-none mb-2">{value}</p>
       <div className="flex items-center justify-between gap-2">

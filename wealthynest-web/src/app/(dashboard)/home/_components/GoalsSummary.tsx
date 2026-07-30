@@ -120,7 +120,7 @@ export function GoalsSummary({ goals, isLoading }: GoalsSummaryProps) {
                     </p>
                   </div>
 
-                  <div className="text-[11px] text-muted-foreground/70 text-right shrink-0 ml-2 whitespace-nowrap">
+                  <div className="text-[11px] text-muted-foreground/80 text-right shrink-0 ml-2 whitespace-nowrap">
                     {g.targetDate
                       ? new Date(g.targetDate).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
                       : "No date"}
