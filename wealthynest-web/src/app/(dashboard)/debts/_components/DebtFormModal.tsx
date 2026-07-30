@@ -65,7 +65,7 @@ export function DebtFormModal({ initial, defaultType, accounts, onSave, onDelete
             <div className="flex gap-2 mb-4">
               <button type="button" data-testid="debt-type-lent" onClick={() => setType("LENT")}
                 className={cn("flex-1 flex items-center justify-center gap-2 h-9 rounded-xl text-sm font-medium transition-all border",
-                  type === "LENT" ? "bg-emerald-600 border-emerald-500 text-white" : "bg-muted/60 border-border text-muted-foreground hover:text-foreground")}>
+                  type === "LENT" ? "bg-emerald-700 border-emerald-500 text-white" : "bg-muted/60 border-border text-muted-foreground hover:text-foreground")}>
                 <ArrowUpRight className="w-3.5 h-3.5" /> I Lent
               </button>
               <button type="button" data-testid="debt-type-borrowed" onClick={() => setType("BORROWED")}

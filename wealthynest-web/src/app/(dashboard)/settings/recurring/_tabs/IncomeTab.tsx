@@ -317,7 +317,7 @@ export function IncomeTab() {
             Add a rule to auto-credit your salary or any monthly income directly to your account.
           </p>
           <button onClick={() => setModal("create")}
-            className="mt-4 flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-all">
+            className="mt-4 flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-emerald-700 hover:bg-emerald-600 text-white transition-all">
             <Plus className="w-4 h-4" /> Add First Rule
           </button>
         </div>

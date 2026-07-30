@@ -46,7 +46,7 @@ export function AddSavingsModal({ goal, goalColor, onClose }: { goal: Goal; goal
         <div className="flex gap-1.5 p-1 bg-muted/60 rounded-xl mb-4">
           <button type="button" data-testid="goal-savings-mode-add" onClick={() => { setMode("add"); setError(""); form.reset(); }}
             className={cn("flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg text-xs font-medium transition-all",
-              mode === "add" ? "bg-emerald-600 text-white shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+              mode === "add" ? "bg-emerald-700 text-white shadow-sm" : "text-muted-foreground hover:text-foreground")}>
             <Plus className="w-3.5 h-3.5" /> Add
           </button>
           <button type="button" data-testid="goal-savings-mode-withdraw" onClick={() => { setMode("withdraw"); setError(""); form.reset(); }}
@@ -80,7 +80,7 @@ export function AddSavingsModal({ goal, goalColor, onClose }: { goal: Goal; goal
             )}
             <button type="submit" data-testid="goal-savings-submit" disabled={isPending}
               className={cn("flex-1 h-9 rounded-xl text-sm font-medium text-white transition-all disabled:opacity-60",
-                mode === "add" ? "bg-emerald-600 hover:bg-emerald-500" : "bg-red-600 hover:bg-red-500")}>
+                mode === "add" ? "bg-emerald-700 hover:bg-emerald-600" : "bg-red-600 hover:bg-red-500")}>
               {isPending ? "Saving…" : mode === "add" ? "Add to Savings" : "Withdraw"}
             </button>
           </div>

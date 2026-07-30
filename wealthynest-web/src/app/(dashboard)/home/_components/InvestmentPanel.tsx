@@ -189,7 +189,7 @@ export function InvestmentPanel({ investments, chart }: InvestmentPanelProps) {
               <p className="text-xs text-muted-foreground font-medium flex-1">{s.label}</p>
               <div className="text-right shrink-0">
                 <p className={cn("text-sm font-bold tabular-nums", s.valueColor)}>{s.value}</p>
-                {s.sub && <p className="text-[11px] text-muted-foreground/60 mt-0.5">{s.sub}</p>}
+                {s.sub && <p className="text-[11px] text-muted-foreground/80 mt-0.5">{s.sub}</p>}
               </div>
             </div>
           ))}
@@ -201,10 +201,10 @@ export function InvestmentPanel({ investments, chart }: InvestmentPanelProps) {
             <div key={s.key} className={cn("rounded-2xl p-4 border border-border/30", s.cardBg)}>
               <div className="flex items-center gap-2 mb-2">
                 <PremiumIcon icon={s.icon} tone={s.tone} size="xs" />
-                <p className="text-xs text-muted-foreground/70 font-medium">{s.label}</p>
+                <p className="text-xs text-muted-foreground/80 font-medium">{s.label}</p>
               </div>
               <div className={cn("text-base font-bold tabular-nums", s.valueColor)}>{s.value}</div>
-              {s.sub && <p className="text-[11px] text-muted-foreground/60 mt-1">{s.sub}</p>}
+              {s.sub && <p className="text-[11px] text-muted-foreground/80 mt-1">{s.sub}</p>}
             </div>
           ))}
         </div>
