@@ -65,10 +65,15 @@ export default function PrivacyPage() {
           <Section title="4. Data sharing">
             <p>
               We do not sell, rent, or share your personal or financial data with any third party for marketing
-              or advertising purposes — ever.
+              or advertising purposes — ever. We use a small number of service providers strictly to operate
+              the app, each limited to the data they need to do their job:
             </p>
-            <p>The only third-party service we use is a transactional email provider to send verification
-              and notification emails. They process your email address only to deliver these messages.</p>
+            <ul className="list-disc list-inside space-y-1 pl-2">
+              <li><span className="text-foreground font-medium">Transactional email provider</span> — your email address only, to deliver verification, password-reset, and notification emails</li>
+              <li><span className="text-foreground font-medium">Google Sign-In</span> (if you choose to sign in with Google) — Google provides us your name and email address to create/authenticate your account; we do not receive your Google password or access your other Google data</li>
+              <li><span className="text-foreground font-medium">Firebase Cloud Messaging</span> (Google) — used only to deliver push notifications to the Android app. Firebase receives a device push token, not your financial data or account contents</li>
+            </ul>
+            <p>None of these providers are permitted to use your data for their own advertising or profiling.</p>
           </Section>
 
           <Section title="5. Data storage and security">
@@ -87,7 +92,7 @@ export default function PrivacyPage() {
             <ul className="list-disc list-inside space-y-1 pl-2">
               <li>Export all your data — available in Settings → Download Data</li>
               <li>Correct your name or email — available in Settings → Profile</li>
-              <li>Deactivate your account — available in Settings → Close Account. Your data is retained and only an admin can reactivate it; email us at support@wealthynest.in if you need it permanently erased instead</li>
+              <li>Deactivate your account — available in Settings → Close Account, or see <a href="/delete-account" className="text-[#c2703d] hover:underline">wealthynest.in/delete-account</a>. Your data is retained and only an admin can reactivate it; email us at support@wealthynest.in if you need it permanently erased instead</li>
               <li>Opt out of notifications — available in Settings → Notification Preferences</li>
             </ul>
             <p>For requests that cannot be completed within the app, email us at support@wealthynest.in and we will respond within 7 business days.</p>
@@ -115,8 +120,9 @@ export default function PrivacyPage() {
 
           <Section title="10. Governing law">
             <p>
-              This Privacy Policy is governed by the laws of India, including the Information Technology Act, 2000
-              and applicable rules. Any disputes are subject to the exclusive jurisdiction of courts in India.
+              This Privacy Policy is governed by the laws of India, including the Information Technology Act, 2000,
+              the Digital Personal Data Protection Act, 2023, and applicable rules made under either. Any disputes
+              are subject to the exclusive jurisdiction of courts in India.
             </p>
           </Section>
 

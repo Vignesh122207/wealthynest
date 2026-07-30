@@ -52,6 +52,11 @@ public class MainActivity extends BridgeActivity {
         // gets a chance to run.
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
 
+        // Default BridgeWebViewClient has no onRenderProcessGone override, so any WebView renderer
+        // crash is fatal to the whole app — see ResilientWebViewClient's own comment for why this
+        // exists and what it does (reload once, don't loop forever on repeat crashes).
+        getBridge().setWebViewClient(new ResilientWebViewClient(getBridge()));
+
         // Plain addJavascriptInterface (not a full Capacitor plugin) — this is a one-way, one-shot
         // "I've painted" signal, not something that needs the plugin system's request/response
         // bridge or to be callable from a browser/PWA context at all.

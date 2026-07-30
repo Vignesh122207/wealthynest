@@ -17,6 +17,15 @@ const config: CapacitorConfig = {
     url: "https://wealthynest.in/home",
     androidScheme: "https",
     cleartext: false,
+    // wealthynest.in now permanently redirects (308) to www.wealthynest.in at the DNS/Vercel
+    // level (confirmed live, not something this repo controls). Without this, Capacitor's default
+    // behavior — "all external URLs are opened in the external browser, not the WebView" — treats
+    // that redirect's target host as external (it's a different hostname from server.url's),
+    // so the WebView bounces straight to Chrome on every single launch instead of showing the app
+    // at all. Reproduced on a real emulator build and confirmed this, not the new App Links
+    // intent-filter added alongside it, is the cause (same bounce happens with that intent-filter
+    // fully removed). This is a pre-existing production bug, not something introduced here.
+    allowNavigation: ["www.wealthynest.in"],
   },
   android: {
     allowMixedContent: false,
