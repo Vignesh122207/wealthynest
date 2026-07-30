@@ -23,7 +23,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -38,8 +40,13 @@ public class RecurringIncomeServiceImpl implements RecurringIncomeService {
     @Override
     @Transactional(readOnly = true)
     public List<RecurringIncomeResponse> getAll(UUID userId) {
-        return recurringIncomeRepository.findByUserIdOrderByCreatedAtDesc(userId)
-                .stream().map(this::toResponse).toList();
+        List<RecurringIncome> rules = recurringIncomeRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        Map<UUID, String> accountNames = walletAccountRepository
+                .findAllById(rules.stream().map(RecurringIncome::getAccountId).distinct().toList())
+                .stream().collect(Collectors.toMap(WalletAccount::getId, WalletAccount::getName));
+        return rules.stream()
+                .map(r -> toResponse(r, accountNames.getOrDefault(r.getAccountId(), "Unknown Account")))
+                .toList();
     }
 
     @Override
@@ -176,6 +183,10 @@ public class RecurringIncomeServiceImpl implements RecurringIncomeService {
     private RecurringIncomeResponse toResponse(RecurringIncome r) {
         String accountName = walletAccountRepository.findById(r.getAccountId())
                 .map(WalletAccount::getName).orElse("Unknown Account");
+        return toResponse(r, accountName);
+    }
+
+    private RecurringIncomeResponse toResponse(RecurringIncome r, String accountName) {
         return RecurringIncomeResponse.builder()
                 .id(r.getId())
                 .accountId(r.getAccountId())
