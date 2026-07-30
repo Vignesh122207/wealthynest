@@ -126,13 +126,15 @@ export function InvestmentPanel({ investments, chart }: InvestmentPanelProps) {
             {/* accessibilityLayer={false} on the chart handles the outer <svg role="application">
                 (see SixMonthTrend.tsx's identical wrapper), but <Pie> independently puts its own
                 tabindex="0" on its rendered <g class="recharts-pie"> layer for slice-level keyboard
-                nav — a second, separate focusable element inside this same aria-hidden div that
-                needed its own tabIndex={-1} (axe's own suggested remedy for this exact violation). */}
+                nav — a second, separate focusable element inside this same aria-hidden div. That
+                layer reads its own `rootTabIndex` prop (default 0), not `tabIndex` — passing
+                tabIndex={-1} here is a no-op since <Pie> doesn't forward an unrecognized prop;
+                confirmed still failing axe in CI with rootTabIndex still defaulted to 0. */}
             <div className="w-[120px] h-[120px] sm:w-[100px] sm:h-[100px] shrink-0" aria-hidden="true">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart accessibilityLayer={false}>
                   <Pie data={allocation} cx="50%" cy="50%" innerRadius={32} outerRadius={48}
-                    paddingAngle={3} dataKey="value" strokeWidth={0} tabIndex={-1}>
+                    paddingAngle={3} dataKey="value" strokeWidth={0} rootTabIndex={-1}>
                     {allocation.map((a) => <Cell key={a.bucket} fill={BUCKET_COLOR[a.bucket]} />)}
                   </Pie>
                   <Tooltip contentStyle={chart.tooltipStyle} labelStyle={chart.labelStyle} itemStyle={chart.itemStyle}

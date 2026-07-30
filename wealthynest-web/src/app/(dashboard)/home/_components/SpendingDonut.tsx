@@ -47,14 +47,16 @@ export function SpendingDonut({ categoryBreakdown, year, month, chart, onAddExpe
           {/* accessibilityLayer={false} on the chart handles the outer <svg role="application">
               (see SixMonthTrend.tsx's identical wrapper), but <Pie> independently puts its own
               tabindex="0" on its rendered <g class="recharts-pie"> layer for slice-level keyboard
-              nav — a second, separate focusable element inside this same aria-hidden div that
-              needed its own tabIndex={-1} (axe's own suggested remedy for this exact violation). */}
+              nav — a second, separate focusable element inside this same aria-hidden div. That
+              layer reads its own `rootTabIndex` prop (default 0), not `tabIndex` — passing
+              tabIndex={-1} here is a no-op since <Pie> doesn't forward an unrecognized prop;
+              confirmed still failing axe in CI with rootTabIndex still defaulted to 0. */}
           <div aria-hidden="true">
           <ResponsiveContainer width="100%" height={160}>
             <PieChart accessibilityLayer={false}>
               <Pie data={categoryBreakdown} cx="50%" cy="50%"
                 innerRadius={42} outerRadius={64} paddingAngle={3}
-                dataKey="amount" strokeWidth={0} tabIndex={-1}>
+                dataKey="amount" strokeWidth={0} rootTabIndex={-1}>
                 {categoryBreakdown.map((c) => (
                   <Cell key={c.categoryId} fill={getCategoryColor(c.categoryName, c.categoryColor)} />
                 ))}
@@ -81,7 +83,7 @@ export function SpendingDonut({ categoryBreakdown, year, month, chart, onAddExpe
                   <span className="text-xs text-muted-foreground truncate">{c.categoryName}</span>
                 </div>
                 <div className="flex items-center gap-2 shrink-0 ml-2">
-                  <span className="text-[11px] text-muted-foreground/60 tabular-nums">
+                  <span className="text-[11px] text-muted-foreground/80 tabular-nums">
                     {fmtC(c.amount)}
                   </span>
                   <span className="text-xs font-semibold text-foreground tabular-nums w-8 text-right">
