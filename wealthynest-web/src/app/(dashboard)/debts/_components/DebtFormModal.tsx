@@ -104,7 +104,7 @@ export function DebtFormModal({ initial, defaultType, accounts, onSave, onDelete
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Phone <span className="text-muted-foreground/60">(optional)</span></label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Phone <span className="text-muted-foreground/80">(optional)</span></label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50" />
                 <input placeholder="Number" data-testid="debt-contact-phone-input"
@@ -131,7 +131,7 @@ export function DebtFormModal({ initial, defaultType, accounts, onSave, onDelete
             )}
 
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Note <span className="text-muted-foreground/60">(optional)</span></label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Note <span className="text-muted-foreground/80">(optional)</span></label>
               <input placeholder="What's it for?" data-testid="debt-note-input"
                 className={cn("w-full h-11 px-3 rounded-xl text-sm bg-background border border-border text-foreground placeholder-muted-foreground/40 outline-none transition-all",
                   isLent ? "focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/40" : "focus:border-red-500 focus:ring-2 focus:ring-red-500/40")}

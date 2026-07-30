@@ -1,14 +1,9 @@
 "use client";
 
-import {useTheme} from "next-themes";
-import {useEffect, useState} from "react";
+import {useIsDark} from "./useIsDark";
 
 export function useChartTheme() {
-  const { resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
-  const isDark = mounted ? resolvedTheme === "dark" : true;
+  const isDark = useIsDark();
 
   return {
     isDark,

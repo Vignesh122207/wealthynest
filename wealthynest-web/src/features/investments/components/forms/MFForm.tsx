@@ -59,7 +59,7 @@ export function MFForm({ defaultValues, onSubmit, onCancel, isPending, bankAccou
               <p className="text-sm font-medium text-foreground leading-snug">{r.name}</p>
             )}
             onSelect={r => setSelected({ schemeCode: r.schemeCode ?? "", name: r.name })} />
-          <p className="text-xs text-muted-foreground/60 mt-1.5">Powered by MFAPI · Type at least 3 characters</p>
+          <p className="text-xs text-muted-foreground/80 mt-1.5">Powered by MFAPI · Type at least 3 characters</p>
         </div>
       )}
 

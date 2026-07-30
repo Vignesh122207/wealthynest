@@ -109,7 +109,7 @@ export function InvestmentCard({ inv, onEdit, dividendRecords, bankAccounts, inv
             </div>
             <div className="flex items-center gap-1.5 flex-wrap">
               {inv.symbol && <span className="text-xs text-muted-foreground/80">{inv.symbol} · {inv.exchange ?? "NSE"}</span>}
-              {inv.purchaseDate && <span className="text-xs text-muted-foreground/60">Since {formatDate(inv.purchaseDate)}</span>}
+              {inv.purchaseDate && <span className="text-xs text-muted-foreground/80">Since {formatDate(inv.purchaseDate)}</span>}
             </div>
           </div>
         </div>
@@ -147,7 +147,7 @@ export function InvestmentCard({ inv, onEdit, dividendRecords, bankAccounts, inv
               </span>
             )}
             {inv.priceLastUpdated && (
-              <span className="ml-1 text-muted-foreground/60" title={`Price as of ${new Date(inv.priceLastUpdated).toLocaleString()}`}>
+              <span className="ml-1 text-muted-foreground/80" title={`Price as of ${new Date(inv.priceLastUpdated).toLocaleString()}`}>
                 · {new Date(inv.priceLastUpdated).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
               </span>
             )}
@@ -157,7 +157,7 @@ export function InvestmentCard({ inv, onEdit, dividendRecords, bankAccounts, inv
           <span className="text-xs text-muted-foreground/80 tabular-nums whitespace-nowrap">
             {fmtNum(Number(inv.units))} u × {formatCurrency(inv.livePrice ?? inv.currentPrice ?? 0)}
             {inv.priceLastUpdated && (
-              <span className="ml-1 text-muted-foreground/60" title={`NAV as of ${new Date(inv.priceLastUpdated).toLocaleString()}`}>
+              <span className="ml-1 text-muted-foreground/80" title={`NAV as of ${new Date(inv.priceLastUpdated).toLocaleString()}`}>
                 · {new Date(inv.priceLastUpdated).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
               </span>
             )}
@@ -167,7 +167,7 @@ export function InvestmentCard({ inv, onEdit, dividendRecords, bankAccounts, inv
           <span className="text-xs text-muted-foreground/80 whitespace-nowrap">
             {inv.quantityGrams}g · {inv.goldKarat ?? 22}K
             {inv.priceLastUpdated && (
-              <span className="ml-1 text-muted-foreground/60" title={`Rate as of ${new Date(inv.priceLastUpdated).toLocaleString()}`}>
+              <span className="ml-1 text-muted-foreground/80" title={`Rate as of ${new Date(inv.priceLastUpdated).toLocaleString()}`}>
                 · {new Date(inv.priceLastUpdated).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
               </span>
             )}

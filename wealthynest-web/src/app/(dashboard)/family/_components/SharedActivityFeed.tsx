@@ -38,9 +38,9 @@ export function SharedActivityFeed({
               </GlossyBadge>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-foreground truncate">{e.description || e.categoryName || "Expense"}</p>
-                <p className="text-[10px] text-muted-foreground/60">
+                <p className="text-[10px] text-muted-foreground/80">
                   {who ? firstName(who) : "Member"} · {dayStr}
-                  {e.categoryName && e.description && <span className="ml-1 text-muted-foreground/40">· {e.categoryName}</span>}
+                  {e.categoryName && e.description && <span className="ml-1 text-muted-foreground/80">· {e.categoryName}</span>}
                 </p>
               </div>
               <p className="text-xs font-semibold text-red-500 dark:text-red-400 tabular-nums shrink-0">−{fmt(e.amount)}</p>
@@ -49,7 +49,7 @@ export function SharedActivityFeed({
         })}
         {totalMonthExpenses > 15 && (
           <div className="pt-1 text-center">
-            <span className="text-xs text-muted-foreground/60">+{totalMonthExpenses - 15} more this month</span>
+            <span className="text-xs text-muted-foreground/80">+{totalMonthExpenses - 15} more this month</span>
           </div>
         )}
       </div>

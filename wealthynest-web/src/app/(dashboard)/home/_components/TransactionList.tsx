@@ -120,7 +120,7 @@ export function TransactionList({ transactions, isLoading }: TransactionListProp
                 </p>
                 <p className="text-xs text-muted-foreground/80 mt-0.5">
                   {formatDate(t.date)}
-                  <span className="mx-1.5 text-muted-foreground/25">·</span>
+                  <span className="mx-1.5 text-muted-foreground/80">·</span>
                   <span>{t.accountName}</span>
                 </p>
               </div>

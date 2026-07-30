@@ -130,7 +130,7 @@ function RuleFormModal({
                       <button key={d} type="button" onClick={() => { setDay(String(d)); setDayOpen(false); }}
                         className={cn("aspect-square rounded-lg text-xs font-medium tabular-nums transition-colors",
                           String(d) === day ? "bg-indigo-500 text-white" : "text-foreground hover:bg-muted",
-                          d > 28 && String(d) !== day && "text-muted-foreground/50")}>
+                          d > 28 && String(d) !== day && "text-muted-foreground/80")}>
                         {d}
                       </button>
                     ))}
@@ -149,7 +149,7 @@ function RuleFormModal({
 
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-                Note <span className="text-muted-foreground/40">(optional)</span>
+                Note <span className="text-muted-foreground/80">(optional)</span>
               </label>
               <input value={description} onChange={e => setDescription(e.target.value)}
                 placeholder="e.g. Move to savings" data-testid="recurring-transfer-description-input"
@@ -230,7 +230,7 @@ function RuleCard({
             </span>
           </div>
           {rule.description && (
-            <p className="text-xs text-muted-foreground/60 mt-1 truncate">{rule.description}</p>
+            <p className="text-xs text-muted-foreground/80 mt-1 truncate">{rule.description}</p>
           )}
         </div>
 

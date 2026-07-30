@@ -85,7 +85,7 @@ export function StockForm({ defaultValues, onSubmit, onCancel, isPending, bankAc
               </div>
             )}
             onSelect={handleSelect} />
-          <p className="text-xs text-muted-foreground/60 mt-1.5">You must select from the list. Results from NSE and BSE.</p>
+          <p className="text-xs text-muted-foreground/80 mt-1.5">You must select from the list. Results from NSE and BSE.</p>
         </div>
       )}
 

@@ -49,7 +49,7 @@ export function StatCard({ title, value, subtitle, icon, tone = "indigo", trend,
 
       <p className="text-xl font-bold text-foreground tabular-nums tracking-tight leading-none mb-1">{value}</p>
       <p className="text-xs font-semibold text-muted-foreground">{title}</p>
-      {subtitle && <p className="text-[11px] text-muted-foreground/60 mt-0.5 truncate">{subtitle}</p>}
+      {subtitle && <p className="text-[11px] text-muted-foreground/80 mt-0.5 truncate">{subtitle}</p>}
     </div>
   );
 }

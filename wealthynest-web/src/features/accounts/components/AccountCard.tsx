@@ -298,7 +298,7 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
           <div>
             {account.recentTransactions.length > 2 && (
               <button onClick={() => {}}
-                className="mt-1 w-full text-xs text-muted-foreground/50 hover:text-muted-foreground py-1 transition-colors flex items-center justify-center gap-1">
+                className="mt-1 w-full text-xs text-muted-foreground/80 hover:text-muted-foreground py-1 transition-colors flex items-center justify-center gap-1">
                 <ChevronDown className="w-3 h-3" />
                 {`View ${account.recentTransactions.length - 2} more`}
               </button>
@@ -354,7 +354,7 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
               {account.bankName && account.bankName !== account.name && <p className="text-xs text-muted-foreground">{account.bankName}</p>}
               {account.accountNumber && (
                 <div className="flex items-center gap-1">
-                  <p className="text-xs text-muted-foreground/50 font-mono">
+                  <p className="text-xs text-muted-foreground/80 font-mono">
                     {revealAcctNum ? account.accountNumber : `•••• ${account.accountNumber.slice(-4)}`}
                   </p>
                   <button onClick={e => { e.stopPropagation(); setRevealAcctNum(v => !v); }}
@@ -489,7 +489,7 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
       {account.totalMoneyIn > 0 && (
         <div className="mb-3">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wide">Spending</span>
+            <span className="text-[10px] text-muted-foreground/80 uppercase tracking-wide">Spending</span>
             <span className={cn("text-xs font-semibold tabular-nums",
               pct > 90 ? "text-red-500" : pct > 70 ? "text-amber-500" : "text-muted-foreground/70")}>
               {pct.toFixed(0)}%

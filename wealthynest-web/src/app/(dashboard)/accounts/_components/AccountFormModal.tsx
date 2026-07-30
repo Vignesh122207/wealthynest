@@ -181,7 +181,7 @@ export function AccountFormModal({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-muted-foreground mb-1.5 font-medium">
-                    Last 4 digits <span className="text-muted-foreground/60">(optional)</span>
+                    Last 4 digits <span className="text-muted-foreground/80">(optional)</span>
                   </label>
                   <input {...createForm.register("accountNumber")} placeholder="e.g. 4567" maxLength={4}
                     className="w-full h-10 px-3 rounded-xl text-sm bg-background border border-border text-foreground placeholder-muted-foreground/40 outline-none focus:border-indigo-500 transition-all" />
@@ -189,7 +189,7 @@ export function AccountFormModal({
                 <div>
                   <label className="block text-xs text-muted-foreground mb-1.5 font-medium">Credit Limit</label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground/50">{currSymbol}</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground/80">{currSymbol}</span>
                     <input type="text" inputMode="decimal" placeholder="e.g. 100000" {...creditLimitField}
                       onChange={e => { e.target.value = e.target.value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1"); creditLimitField.onChange(e); }}
                       className="w-full h-10 pl-6 pr-3 rounded-xl text-sm bg-background border border-border text-foreground placeholder-muted-foreground/40 outline-none focus:border-indigo-500 transition-all" />
@@ -201,7 +201,7 @@ export function AccountFormModal({
             {isBankForm && (
               <div>
                 <label className="block text-xs text-muted-foreground mb-1.5 font-medium">
-                  Account Number <span className="text-muted-foreground/60">(last 4 digits, optional)</span>
+                  Account Number <span className="text-muted-foreground/80">(last 4 digits, optional)</span>
                 </label>
                 <input {...createForm.register("accountNumber")} placeholder="e.g. 4567"
                   className="w-full h-10 px-3 rounded-xl text-sm bg-background border border-border text-foreground placeholder-muted-foreground/40 outline-none focus:border-indigo-500 transition-all" />
@@ -263,7 +263,7 @@ export function AccountFormModal({
                     <div className="grid grid-cols-2 gap-3 items-end">
                       <div>
                         <label className="block text-xs text-muted-foreground mb-0.5 font-medium">Statement Day</label>
-                        <p className="text-xs text-muted-foreground/60 mb-1.5">Day of month (1–28)</p>
+                        <p className="text-xs text-muted-foreground/80 mb-1.5">Day of month (1–28)</p>
                         <input type="number" min={1} max={28} placeholder="e.g. 15"
                           {...createForm.register("statementDay")}
                           className={cn("w-full h-10 px-3 rounded-xl text-sm bg-background border text-foreground placeholder-muted-foreground/40 outline-none focus:border-indigo-500 transition-all",
@@ -272,7 +272,7 @@ export function AccountFormModal({
                       </div>
                       <div>
                         <label className="block text-xs text-muted-foreground mb-0.5 font-medium">Due Day</label>
-                        <p className="text-xs text-muted-foreground/60 mb-1.5">Day of month (1–28)</p>
+                        <p className="text-xs text-muted-foreground/80 mb-1.5">Day of month (1–28)</p>
                         <input type="number" min={1} max={28} placeholder="e.g. 5"
                           {...createForm.register("paymentDueDay")}
                           className={cn("w-full h-10 px-3 rounded-xl text-sm bg-background border text-foreground placeholder-muted-foreground/40 outline-none focus:border-indigo-500 transition-all",
@@ -293,7 +293,7 @@ export function AccountFormModal({
                     error={createForm.formState.errors.principalAmount?.message} />
                   <div>
                     <label className="block text-xs text-muted-foreground mb-1.5 font-medium">
-                      Interest Rate (% p.a.) <span className="text-muted-foreground/60">(optional)</span>
+                      Interest Rate (% p.a.) <span className="text-muted-foreground/80">(optional)</span>
                     </label>
                     <input type="number" step="0.01" min={0} max={100} placeholder="e.g. 8.5"
                       {...createForm.register("apr")}
@@ -307,7 +307,7 @@ export function AccountFormModal({
                     {...createForm.register("emiAmount")}
                     error={createForm.formState.errors.emiAmount?.message} />
                   <div>
-                    <label className="block text-xs text-muted-foreground mb-1.5 font-medium">EMI Day (1–28) <span className="text-muted-foreground/60">(optional)</span></label>
+                    <label className="block text-xs text-muted-foreground mb-1.5 font-medium">EMI Day (1–28) <span className="text-muted-foreground/80">(optional)</span></label>
                     <input type="number" min={1} max={28} placeholder="e.g. 5"
                       {...createForm.register("emiDay")}
                       className={cn("w-full h-10 px-3 rounded-xl text-sm bg-background border text-foreground placeholder-muted-foreground/40 outline-none focus:border-indigo-500 transition-all",

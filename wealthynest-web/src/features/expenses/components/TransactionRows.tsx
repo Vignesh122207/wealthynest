@@ -1,9 +1,10 @@
 import {memo} from "react";
 import {ArrowLeftRight, CreditCard, HandCoins, RefreshCw} from "lucide-react";
 import {getCategoryColor, getCategoryIcon, INCOME_ICON_MAP} from "@/lib/categoryMeta";
-import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {badgeTextColor, PremiumIcon} from "@/components/icons/PremiumIcon";
 import {cn} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {useIsDark} from "@/hooks/useIsDark";
 import {INCOME_SOURCES} from "@/lib/constants";
 import type {Expense} from "@/features/expenses/types/expense.types";
 import type {IncomeEntry} from "@/features/income/types/income.types";
@@ -29,6 +30,7 @@ export const ExpenseRow = memo(function ExpenseRow({ expense, accountName, onEdi
   onEdit:      () => void;
 }) {
   const { fmt } = useAmountFormatter();
+  const isDark = useIsDark();
   const catIcon  = getCategoryIcon({ name: expense.categoryName ?? "", icon: expense.categoryIcon });
   const catColor = getCategoryColor(expense.categoryName ?? "", expense.categoryColor);
   return (
@@ -43,10 +45,10 @@ export const ExpenseRow = memo(function ExpenseRow({ expense, accountName, onEdi
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           {expense.categoryName && (
             <span className="text-xs px-1.5 py-0.5 rounded-md font-medium"
-              style={{ backgroundColor: catColor + "18", color: catColor }}>{expense.categoryName}</span>
+              style={{ backgroundColor: catColor + "18", color: badgeTextColor(catColor, isDark) }}>{expense.categoryName}</span>
           )}
           {accountName && (
-            <span className="text-xs text-muted-foreground/50">{accountName}</span>
+            <span className="text-xs text-muted-foreground/80">{accountName}</span>
           )}
           {expense.paymentMethod === "CREDIT_CARD" && (
             <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-500/15 text-rose-500 dark:text-rose-400 font-medium">Card</span>
@@ -64,6 +66,7 @@ export const IncomeRow = memo(function IncomeRow({ entry, accountName, onEdit }:
   onEdit:      () => void;
 }) {
   const { fmt } = useAmountFormatter();
+  const isDark = useIsDark();
   const src     = INCOME_ICON_MAP[entry.source] ?? INCOME_ICON_MAP.OTHER;
   return (
     <button type="button" onClick={onEdit}
@@ -76,10 +79,10 @@ export const IncomeRow = memo(function IncomeRow({ entry, accountName, onEdit }:
         </p>
         <div className="flex items-center gap-1.5 mt-0.5">
           <span className="text-xs px-1.5 py-0.5 rounded-md font-medium"
-            style={{ backgroundColor: src.color + "20", color: src.color }}>
+            style={{ backgroundColor: src.color + "20", color: badgeTextColor(src.color, isDark) }}>
             {INCOME_SOURCES.find(s => s.value === entry.source)?.label ?? entry.source}
           </span>
-          {accountName && <span className="text-xs text-muted-foreground/50">{accountName}</span>}
+          {accountName && <span className="text-xs text-muted-foreground/80">{accountName}</span>}
         </div>
       </div>
       <p className="text-sm font-bold text-emerald-500 dark:text-emerald-400 tabular-nums shrink-0">+{fmt(entry.amount)}</p>
@@ -112,7 +115,7 @@ export const TransferRow = memo(function TransferRow({ transfer, onEdit }: {
             <DebtBadge debtLabel={transfer.debtLabel} debtContactName={transfer.debtContactName} />
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground/60 mt-0.5">
+          <p className="text-xs text-muted-foreground/80 mt-0.5">
             {transfer.fromAccountName} → {transfer.toAccountName}
           </p>
         )}

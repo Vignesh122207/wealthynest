@@ -151,7 +151,7 @@ function RuleFormModal({
                       <button key={d} type="button" onClick={() => { setDay(String(d)); setDayOpen(false); }}
                         className={cn("aspect-square rounded-lg text-xs font-medium tabular-nums transition-colors",
                           String(d) === day ? "bg-indigo-500 text-white" : "text-foreground hover:bg-muted",
-                          d > 28 && String(d) !== day && "text-muted-foreground/50")}>
+                          d > 28 && String(d) !== day && "text-muted-foreground/80")}>
                         {d}
                       </button>
                     ))}

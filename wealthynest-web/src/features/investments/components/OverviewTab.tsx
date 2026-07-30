@@ -93,7 +93,7 @@ export function OverviewTab({ investments, year, onYearChange, incomeHistory, po
             <div className="flex items-center gap-1.5 mb-2">
               <PremiumIcon icon={icon} tone={tone} size="xs" />
               <p className="text-xs text-muted-foreground/80 uppercase tracking-wide">
-                {label}{caption && <span className="normal-case text-muted-foreground/50"> · {caption}</span>}
+                {label}{caption && <span className="normal-case text-muted-foreground/80"> · {caption}</span>}
               </p>
             </div>
             <p className={cn("text-lg font-bold tabular-nums", color)}>{value}</p>
@@ -213,7 +213,7 @@ export function OverviewTab({ investments, year, onYearChange, incomeHistory, po
               </button>
             ))}
             {incomeFilter !== "ALL" && (
-              <span className="text-xs text-muted-foreground/60">
+              <span className="text-xs text-muted-foreground/80">
                 {(incomeHistory.records.filter(r => r.incomeType === incomeFilter)).length} records
               </span>
             )}
@@ -257,14 +257,14 @@ export function OverviewTab({ investments, year, onYearChange, incomeHistory, po
                               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/20">Sold</span>
                             )}
                           </div>
-                          {r.symbol && <p className="text-xs text-muted-foreground/60">{r.symbol}</p>}
+                          {r.symbol && <p className="text-xs text-muted-foreground/80">{r.symbol}</p>}
                         </td>
                         <td className="py-2.5 pr-4">
                           {r.credited
                             ? r.accountName
                               ? <span className="text-muted-foreground">{r.accountName}</span>
-                              : <span className="text-muted-foreground/60 italic">Not linked</span>
-                            : <span className="text-xs px-1.5 py-0.5 rounded bg-muted/60 text-muted-foreground/50 italic">History</span>
+                              : <span className="text-muted-foreground/80 italic">Not linked</span>
+                            : <span className="text-xs px-1.5 py-0.5 rounded bg-muted/60 text-muted-foreground/80 italic">History</span>
                           }
                         </td>
                         <td className="py-2.5 text-right font-semibold tabular-nums">

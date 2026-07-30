@@ -104,7 +104,7 @@ function BudgetRow({ budget, onEdit }: { budget: Budget; onEdit: () => void }) {
           <span className="text-xs text-muted-foreground/70 tabular-nums">
             {fmt(budget.spent)} / {fmt(budget.amount)}{budget.rolloverAmount > 0 && ` + ${fmt(budget.rolloverAmount)}`}
           </span>
-          <span className={cn("text-xs", budget.overBudget ? "text-red-600 dark:text-red-400 font-medium" : "text-muted-foreground/60")}>
+          <span className={cn("text-xs", budget.overBudget ? "text-red-600 dark:text-red-400 font-medium" : "text-muted-foreground/80")}>
             {budget.overBudget ? `Over by ${fmt(Math.abs(budget.remaining))}` : `${fmt(budget.remaining)} left`}
           </span>
         </div>

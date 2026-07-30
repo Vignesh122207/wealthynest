@@ -9,8 +9,9 @@ import {FormInput} from "@/components/forms/FormInput";
 import {Button} from "@/components/ui/Button";
 import {FormModalShell} from "@/components/ui/FormModalShell";
 import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
-import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {badgeTextColor, PremiumIcon} from "@/components/icons/PremiumIcon";
 import {cn} from "@/lib/utils";
+import {useIsDark} from "@/hooks/useIsDark";
 import {getVaultCategoryColor, resolveVaultIcon, VAULT_CATEGORY_META, VAULT_ICON_OPTIONS} from "@/lib/categoryMeta";
 import {type VaultItemFormValues, vaultItemSchema} from "../schemas/vault.schema";
 import {estimatePasswordStrength} from "../lib/passwordStrength";
@@ -47,6 +48,7 @@ export function VaultItemForm({ isCreate, accentColor, defaultValues, hasExistin
   onDelete?:      () => void;
   isPending:      boolean;
 }) {
+  const isDark = useIsDark();
   const [showSecret, setShowSecret]         = useState(isCreate);
   const [showIconPicker, setShowIconPicker] = useState(false);
   const [showGenerator, setShowGenerator]   = useState(false);
@@ -195,7 +197,7 @@ export function VaultItemForm({ isCreate, accentColor, defaultValues, hasExistin
                       "h-9 pl-1.5 pr-3.5 rounded-full text-xs font-semibold transition-all flex items-center gap-2 shrink-0",
                       !active && "bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted"
                     )}
-                    style={active ? { backgroundColor: meta.color + "1c", color: meta.color, boxShadow: `inset 0 0 0 1.5px ${meta.color}` } : undefined}>
+                    style={active ? { backgroundColor: meta.color + "1c", color: badgeTextColor(meta.color, isDark), boxShadow: `inset 0 0 0 1.5px ${meta.color}` } : undefined}>
                     <PremiumIcon icon={meta.icon} hex={meta.color} size="xs" />
                     {c}
                   </button>

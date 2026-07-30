@@ -112,7 +112,7 @@ export function MemberSpendingChart({
                       <span className="text-xs text-foreground truncate">{cat}</span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[10px] text-muted-foreground/60">{((amt / drillTotal) * 100).toFixed(0)}%</span>
+                      <span className="text-[10px] text-muted-foreground/80">{((amt / drillTotal) * 100).toFixed(0)}%</span>
                       <span className="text-xs font-semibold tabular-nums text-red-600 dark:text-red-400">−{fmtC(amt)}</span>
                     </div>
                   </div>

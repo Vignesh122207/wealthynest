@@ -108,7 +108,7 @@ export default function NewTicketPage() {
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground block">
                   Description
-                  <span className="ml-1 text-muted-foreground/50 font-normal">({description.length}/5000)</span>
+                  <span className="ml-1 text-muted-foreground/80 font-normal">({description.length}/5000)</span>
                 </label>
                 <textarea
                   value={description}

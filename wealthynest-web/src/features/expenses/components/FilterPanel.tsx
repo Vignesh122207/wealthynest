@@ -152,12 +152,12 @@ export function FilterPanel({
                   <input type="text" inputMode="decimal" placeholder="Min" value={minAmount}
                     onChange={e => { const v = e.target.value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1"); setMinAmount(v === "" ? "" : Number(v)); }}
                     className="w-full h-9 px-3 rounded-lg bg-background border border-border text-sm text-foreground placeholder-muted-foreground/40 focus:outline-none focus:border-indigo-500 transition-colors" />
-                  <span className="text-muted-foreground/50 text-xs">to</span>
+                  <span className="text-muted-foreground/80 text-xs">to</span>
                   <input type="text" inputMode="decimal" placeholder="Max" value={maxAmount}
                     onChange={e => { const v = e.target.value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1"); setMaxAmount(v === "" ? "" : Number(v)); }}
                     className="w-full h-9 px-3 rounded-lg bg-background border border-border text-sm text-foreground placeholder-muted-foreground/40 focus:outline-none focus:border-indigo-500 transition-colors" />
                 </div>
-                <p className="text-[11px] text-muted-foreground/50 mt-1.5">In {currSymbol}</p>
+                <p className="text-[11px] text-muted-foreground/80 mt-1.5">In {currSymbol}</p>
               </div>
 
               <div className="bg-card border border-border rounded-xl p-3">

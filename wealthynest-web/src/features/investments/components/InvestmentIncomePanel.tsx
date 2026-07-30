@@ -31,7 +31,7 @@ export function InvestmentIncomePanel({ records, label, accentColor }: {
       {open && (
         <div className="mt-2 space-y-1">
           {records.length === 0 ? (
-            <p className="text-xs text-muted-foreground/60 pl-1">
+            <p className="text-xs text-muted-foreground/80 pl-1">
               No {label.toLowerCase()} recorded yet. {label === "Dividends"
                 ? "Dividends are fetched automatically from NSE data each evening."
                 : "Coupons are calculated and logged automatically on payment dates."}
@@ -43,7 +43,7 @@ export function InvestmentIncomePanel({ records, label, accentColor }: {
                   <CalendarDays className="w-3 h-3 text-muted-foreground/60 shrink-0" />
                   <span className="text-xs text-muted-foreground tabular-nums">{formatDate(r.eventDate)}</span>
                   {r.perShare != null && (
-                    <span className="text-xs text-muted-foreground/60">{fmtExact(Number(r.perShare))}/sh</span>
+                    <span className="text-xs text-muted-foreground/80">{fmtExact(Number(r.perShare))}/sh</span>
                   )}
                 </div>
                 <span className={cn("text-xs font-semibold tabular-nums shrink-0", accentColor)}>

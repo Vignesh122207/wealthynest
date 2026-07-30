@@ -162,7 +162,7 @@ function NotifRow({
           <p className="text-sm font-semibold text-foreground leading-snug">{n.title}</p>
           <div className="flex items-center gap-2 shrink-0">
             {isNew && <span className="w-2 h-2 bg-indigo-500 rounded-full mt-1 shrink-0" />}
-            <span className="text-[11px] text-muted-foreground/60 whitespace-nowrap">{formatNotifDate(n.date)}</span>
+            <span className="text-[11px] text-muted-foreground/80 whitespace-nowrap">{formatNotifDate(n.date)}</span>
             <button
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDismiss(); }}
               className="opacity-0 group-hover:opacity-100 md:opacity-100 w-5 h-5 flex items-center justify-center rounded text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-all"

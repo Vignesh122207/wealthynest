@@ -7,7 +7,8 @@ import {AlertTriangle, Banknote, Check, Lock, type LucideIcon, Plus, Receipt, Ta
 import {cn} from "@/lib/utils";
 import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
 import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
-import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {badgeTextColor, PremiumIcon} from "@/components/icons/PremiumIcon";
+import {useIsDark} from "@/hooks/useIsDark";
 import {TabBar, type TabBarItem} from "@/components/ui/TabBar";
 import {FormModalHeader} from "@/components/transactions/FormModalHeader";
 import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
@@ -71,6 +72,7 @@ function CategoryFormModal({
   // list is using yet — most users never have to think about collisions at all.
   const suggested = useMemo(() => suggestUnusedCombo(others), [others]);
 
+  const isDark = useIsDark();
   const [name,  setName]  = useState(initial?.name  ?? "");
   const [icon,  setIcon]  = useState(initial?.icon  ?? suggested.icon);
   const [color, setColor] = useState(initial?.color ?? suggested.color);
@@ -137,7 +139,7 @@ function CategoryFormModal({
             <div className="max-h-52 overflow-y-auto pr-1 space-y-3" style={{ scrollbarWidth: "thin" }}>
               {CATEGORY_ICON_GROUPS.map(group => (
                 <div key={group.key}>
-                  <p className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wide mb-1.5">{group.title}</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground/80 uppercase tracking-wide mb-1.5">{group.title}</p>
                   <div className="grid grid-cols-8 gap-1.5">
                     {group.items.map(({ key: k, icon: Icon, label }) => {
                       const usedBy = categoriesUsingIcon(others, k);
@@ -167,7 +169,7 @@ function CategoryFormModal({
             </div>
             <div className="ml-auto">
               <span className="text-[10px] px-2 py-1 rounded-full font-medium"
-                style={{ backgroundColor: color + "15", color }}>
+                style={{ backgroundColor: color + "15", color: badgeTextColor(color, isDark) }}>
                 {isIncome ? "Income" : "Expense"}
               </span>
             </div>
@@ -219,7 +221,7 @@ function CategoryRow({ category, onEdit }: {
       <div className="flex items-center gap-3 px-4 py-3">
         <PremiumIcon icon={resolveIcon(category.icon, category.name)} hex={color} size="sm" className="shrink-0" />
         <span className="flex-1 text-sm font-medium text-foreground leading-none">{category.name}</span>
-        <span className="flex items-center gap-1 text-[10px] text-muted-foreground/50 font-medium px-2 py-1 bg-muted/60 rounded-lg shrink-0">
+        <span className="flex items-center gap-1 text-[10px] text-muted-foreground/80 font-medium px-2 py-1 bg-muted/60 rounded-lg shrink-0">
           <Lock className="w-2.5 h-2.5" /> System
         </span>
       </div>

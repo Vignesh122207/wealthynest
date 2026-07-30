@@ -1,11 +1,12 @@
 "use client";
 
 import {AlertTriangle} from "lucide-react";
-import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {badgeTextColor, PremiumIcon} from "@/components/icons/PremiumIcon";
 import {getLiabilityTypeMeta, typeLabel} from "@/lib/netWorthTypeMeta";
 import {LIABILITY_TYPES} from "@/lib/constants";
 import {cn, formatDate} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {useIsDark} from "@/hooks/useIsDark";
 import type {Liability} from "../types/liability.types";
 
 function paidPct(outstanding: number, principal: number) {
@@ -18,6 +19,7 @@ export function LiabilityRow({ liability, onEdit }: {
   onEdit:    () => void;
 }) {
   const { fmt } = useAmountFormatter();
+  const isDark = useIsDark();
   const meta  = getLiabilityTypeMeta(liability.liabilityType);
   const pct   = paidPct(liability.outstandingAmount, liability.principalAmount);
   // Compare date strings directly to avoid timezone-midnight false-positives
@@ -45,7 +47,7 @@ export function LiabilityRow({ liability, onEdit }: {
             </div>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               <span className="text-xs px-1.5 py-0.5 rounded font-medium"
-                style={{ backgroundColor: meta.hex + "18", color: meta.hex }}>
+                style={{ backgroundColor: meta.hex + "18", color: badgeTextColor(meta.hex, isDark) }}>
                 {typeLabel(LIABILITY_TYPES, liability.liabilityType)}
               </span>
               {liability.lenderName && <span className="text-xs text-muted-foreground/80">· {liability.lenderName}</span>}

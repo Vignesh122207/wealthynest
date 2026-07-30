@@ -74,7 +74,7 @@ export function NetWorthBanner({ summary, loadingSum, nwDelta, nwDeltaPct, debtR
               debtRatio > 50 ? "bg-red-500" : debtRatio > 30 ? "bg-amber-500" : "bg-emerald-500")}
               style={{ width: `${debtRatio}%` }} />
           </div>
-          <p className="text-xs text-muted-foreground/60 mt-1">
+          <p className="text-xs text-muted-foreground/80 mt-1">
             {debtRatio <= 30 ? "Healthy ratio — keep it up!" : debtRatio <= 50 ? "Moderate — consider reducing debt." : "High — prioritise debt reduction."}
           </p>
         </div>
