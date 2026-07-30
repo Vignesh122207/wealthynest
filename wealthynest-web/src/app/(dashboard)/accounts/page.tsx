@@ -27,7 +27,6 @@ import {
 import {CURRENCIES, usePrefsStore} from "@/store/preferences.store";
 import {AccountCard} from "@/features/accounts/components/AccountCard";
 import {LoanCard} from "@/features/accounts/components/LoanCard";
-import {downloadAccountStatement} from "@/features/accounts/utils/downloadAccountStatement";
 import {
     type CreateAccountForm,
     createAccountSchema,
@@ -361,7 +360,9 @@ export default function AccountsPage() {
   // Loan keeps its own bespoke layout (progress bar, EMI chips, Record Payment).
   const renderAccountCard = (a: WalletAccount) => a.accountType === "LOAN" ? (
     <LoanCard key={a.id} account={a}
-      onDownload={() => downloadAccountStatement(a)}
+      // Dynamic import — see AccountCard.tsx's identical fix; jsPDF has no reason to sit in every
+      // visitor's initial /accounts bundle just because one Loan card's icon might get clicked.
+      onDownload={() => { void import("@/features/accounts/utils/downloadAccountStatement").then(({ downloadAccountStatement }) => downloadAccountStatement(a)); }}
       onEdit={() => openEdit(a)}
       onRecordPayment={() => { setPayLoan(a); setPayAmount(a.emiAmount ? String(a.emiAmount) : ""); setPayFrom(a.autopayAccountId ?? ""); }} />
   ) : (
