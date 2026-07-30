@@ -461,11 +461,14 @@ class NotificationServiceImplTest {
         }
 
         @Test
-        @DisplayName("unregisterDeviceToken deletes by token")
-        void unregisterDeviceTokenDeletesByToken() {
-            service.unregisterDeviceToken("tok-1");
+        @DisplayName("unregisterDeviceToken deletes by userId+token, not token alone")
+        void unregisterDeviceTokenDeletesByUserIdAndToken() {
+            // Regression: an unscoped deleteByToken let any authenticated user unregister any
+            // other user's device token, since a token's only real secrecy is its own entropy —
+            // never checked against the request. Must always be scoped to the caller's own userId.
+            service.unregisterDeviceToken(userId, "tok-1");
 
-            verify(deviceTokenRepository).deleteByToken("tok-1");
+            verify(deviceTokenRepository).deleteByUserIdAndToken(userId, "tok-1");
         }
     }
 

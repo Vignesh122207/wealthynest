@@ -227,13 +227,13 @@ class NotificationControllerTest {
     }
 
     @Test
-    @DisplayName("DELETE /notifications/device-tokens delegates the token")
+    @DisplayName("DELETE /notifications/device-tokens delegates the authenticated user's id and the token")
     void unregisterDeviceTokenDelegatesToken() throws Exception {
         SecurityTestUtils.authenticateAs(userId, null);
 
         mockMvc.perform(delete("/api/v1/notifications/device-tokens").param("token", "fcm-token-123"))
                 .andExpect(status().isOk());
 
-        verify(notificationService).unregisterDeviceToken("fcm-token-123");
+        verify(notificationService).unregisterDeviceToken(userId, "fcm-token-123");
     }
 }

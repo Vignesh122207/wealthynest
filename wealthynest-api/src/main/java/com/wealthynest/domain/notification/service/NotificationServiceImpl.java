@@ -95,8 +95,8 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override @Transactional
-    public void unregisterDeviceToken(String token) {
-        deviceTokenRepository.deleteByToken(token);
+    public void unregisterDeviceToken(UUID userId, String token) {
+        deviceTokenRepository.deleteByUserIdAndToken(userId, token);
     }
 
     private NotificationPreferenceResponse toPreferenceResponse(NotificationPreference p) {
