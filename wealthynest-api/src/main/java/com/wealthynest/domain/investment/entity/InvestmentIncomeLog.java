@@ -21,6 +21,11 @@ public class InvestmentIncomeLog {
     @Column(name = "income_type", length = 20, nullable = false) private String incomeType;
     @Column(name = "event_date",  nullable = false) private LocalDate eventDate;
     @Column(nullable = false, precision = 14, scale = 2) private BigDecimal amount;
+    /** Shares/units actually held at the moment this was logged — null for rows logged before
+     * this column existed. See V53's own migration comment for why this matters: without it,
+     * a per-share amount has to be reconstructed from the investment's *current* unit count,
+     * which silently goes wrong the moment the user buys or sells more of that holding. */
+    @Column(name = "shares_held", precision = 18, scale = 4) private BigDecimal sharesHeld;
     @Column(name = "created_at") private Instant createdAt;
 
     @PrePersist void prePersist() { if (createdAt == null) createdAt = Instant.now(); }

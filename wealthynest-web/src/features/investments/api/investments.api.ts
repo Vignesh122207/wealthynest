@@ -69,7 +69,7 @@ export const investmentsApi = {
 
   // Manual income logging
   logIncome: async (investmentId: string, data: {
-    incomeType: string; exDate: string; amount: number; perShare?: number; shares?: number;
+    incomeType: string; exDate: string; amount: number;
   }): Promise<void> => {
     await apiClient.post(`/investments/${investmentId}/log-income`, data);
   },

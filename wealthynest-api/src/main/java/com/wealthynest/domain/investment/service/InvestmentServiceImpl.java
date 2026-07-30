@@ -510,6 +510,11 @@ public class InvestmentServiceImpl implements InvestmentService {
             .incomeType(req.getIncomeType())
             .eventDate(date)
             .amount(req.getAmount())
+            // Captured server-side from the authoritative current holding, not trusted from the
+            // request — see the entity field's own comment. Same value getDividendSuggestions
+            // itself just used to compute this suggestion moments earlier, so this is never
+            // meaningfully staler than what the user actually saw on screen.
+            .sharesHeld(inv.getUnits())
             .build());
     }
 
@@ -1043,10 +1048,14 @@ public class InvestmentServiceImpl implements InvestmentService {
             }
 
             BigDecimal units    = inv != null ? inv.getUnits() : null;
+            // Prefer the units actually held when this was logged (see the entity field's own
+            // comment) — falls back to the investment's current unit count only for rows logged
+            // before that column existed, which can be wrong if units have changed since.
+            BigDecimal unitsForPerShare = log.getSharesHeld() != null ? log.getSharesHeld() : units;
             BigDecimal perShare = null;
-            if ("DIVIDEND".equals(log.getIncomeType()) && units != null
-                    && units.compareTo(BigDecimal.ZERO) > 0) {
-                perShare = log.getAmount().divide(units, 4, RoundingMode.HALF_UP);
+            if ("DIVIDEND".equals(log.getIncomeType()) && unitsForPerShare != null
+                    && unitsForPerShare.compareTo(BigDecimal.ZERO) > 0) {
+                perShare = log.getAmount().divide(unitsForPerShare, 4, RoundingMode.HALF_UP);
             }
 
             creditedKeys.add(log.getInvestmentId() + "|" + log.getIncomeType() + "|" + log.getEventDate());

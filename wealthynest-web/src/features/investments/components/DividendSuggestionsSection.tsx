@@ -43,8 +43,6 @@ export function DividendSuggestionsSection({ stockCount }: { stockCount: number 
         incomeType: "DIVIDEND",
         exDate: s.exDate,
         amount: amt,
-        perShare: s.dividendPerShare,
-        shares: s.sharesHeld,
       },
     });
   };
