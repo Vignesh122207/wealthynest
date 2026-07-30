@@ -96,6 +96,19 @@ describe("useMarkAllServerRead", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["server-notifications"] });
   });
+
+  it("toasts on failure — regression: the caller's local markSeen() isn't gated on this succeeding, so a silent failure left the badge desynced with no indication anything went wrong", async () => {
+    mockedApi.markAllRead.mockRejectedValue(new Error("boom"));
+    const { Wrapper, queryClient } = createQueryClientWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const { result } = renderHook(() => useMarkAllServerRead(), { wrapper: Wrapper });
+    result.current.mutate();
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(invalidateSpy).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith("Couldn't mark notifications as read. Please try again.");
+  });
 });
 
 describe("useMarkServerRead", () => {
@@ -111,7 +124,7 @@ describe("useMarkServerRead", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["server-notifications"] });
   });
 
-  it("does not invalidate anything on failure", async () => {
+  it("does not invalidate anything on failure, and toasts", async () => {
     mockedApi.markRead.mockRejectedValue(new Error("boom"));
     const { Wrapper, queryClient } = createQueryClientWrapper();
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
@@ -121,6 +134,7 @@ describe("useMarkServerRead", () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(invalidateSpy).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith("Couldn't mark notification as read. Please try again.");
   });
 });
 
@@ -137,7 +151,7 @@ describe("useDeleteServerNotification", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["server-notifications"] });
   });
 
-  it("does not invalidate anything on failure", async () => {
+  it("does not invalidate anything on failure, and toasts", async () => {
     mockedApi.deleteNotification.mockRejectedValue(new Error("boom"));
     const { Wrapper, queryClient } = createQueryClientWrapper();
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
@@ -147,6 +161,7 @@ describe("useDeleteServerNotification", () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(invalidateSpy).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith("Couldn't dismiss notification. Please try again.");
   });
 });
 

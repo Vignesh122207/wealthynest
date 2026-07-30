@@ -1,6 +1,7 @@
 package com.wealthynest.domain.investment.service;
 
 import com.wealthynest.common.exception.AccessDeniedException;
+import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.domain.account.entity.AccountTransfer;
 import com.wealthynest.domain.account.repository.AccountTransferRepository;
@@ -22,6 +23,7 @@ import com.wealthynest.infra.scheduler.AutoIncomeScheduler;
 import com.wealthynest.infra.util.XirrCalculator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -1254,6 +1256,12 @@ public class InvestmentServiceImpl implements InvestmentService {
         Investment inv = investmentRepository.findById(investmentId)
             .orElseThrow(() -> new ResourceNotFoundException("Investment", "id", investmentId));
         if (!inv.getUserId().equals(userId)) throw new AccessDeniedException("Access denied");
+        // The Buy/Sell UI only ever shows for STOCK (InvestmentCard.tsx) — enforce that here too,
+        // since recalculateStockTotals' WAC math would otherwise silently corrupt units/avgBuyPrice
+        // for a BOND/FD/MUTUAL_FUND/GOLD investment reached by calling this endpoint directly.
+        if (inv.getInvestmentType() != InvestmentType.STOCK) {
+            throw new BusinessException("Buy/sell transactions are only supported for stocks", HttpStatus.BAD_REQUEST);
+        }
         accountOwnershipGuard.validateAccountOwnership(req.getDebitAccountId(), userId);
 
         boolean isSell = "SELL".equalsIgnoreCase(req.getTransactionType());
@@ -1335,7 +1343,12 @@ public class InvestmentServiceImpl implements InvestmentService {
         Investment inv = investmentRepository.findById(investmentId)
             .orElseThrow(() -> new ResourceNotFoundException("Investment", "id", investmentId));
         if (!inv.getUserId().equals(userId)) throw new AccessDeniedException("Access denied");
-        stockTransactionRepository.deleteById(txnId);
+        StockTransaction txn = stockTransactionRepository.findById(txnId)
+            .orElseThrow(() -> new ResourceNotFoundException("StockTransaction", "id", txnId));
+        // txnId is a raw auto-increment Long, guessable/enumerable across users — without this,
+        // any caller owning *some* investment could delete any other user's transaction row by id.
+        if (!txn.getInvestmentId().equals(investmentId)) throw new AccessDeniedException("Access denied");
+        stockTransactionRepository.delete(txn);
         recalculateStockTotals(inv, null);
     }
 
