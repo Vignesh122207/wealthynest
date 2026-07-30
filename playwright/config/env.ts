@@ -16,6 +16,11 @@ function required(name: string, fallback?: string): string {
 export const env = {
   baseUrl: process.env.BASE_URL ?? "http://localhost:3000",
   apiUrl:  process.env.API_URL ?? "http://localhost:8080/api/v1",
+  // Same var + same default the backend's WebAuthnConfig.getRpId() derives the relying-party ID
+  // from (see wealthynest-api's WebAuthnConfig.java) — WebAuthn strictly requires the page's own
+  // origin to match that rpId, so webauthn.spec.ts must navigate to whatever this actually
+  // resolves to per environment, not a hardcoded domain that only matches one specific setup.
+  webauthnOriginUrl: process.env.FRONTEND_URL ?? "http://localhost:3000",
 
   db: {
     host:     process.env.DB_HOST ?? "127.0.0.1",
