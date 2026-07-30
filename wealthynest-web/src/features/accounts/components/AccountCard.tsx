@@ -30,7 +30,6 @@ import {getBankMonogram} from "@/lib/bankLogos";
 import {cn, formatDate} from "@/lib/utils";
 import {getYears} from "@/lib/printReport";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
-import {downloadAccountStatement} from "../utils/downloadAccountStatement";
 import type {WalletAccount} from "../types/account.types";
 import type {DebtRecord} from "@/features/debts/types/debt.types";
 
@@ -55,7 +54,11 @@ function DownloadStatementButton({ account, dark }: { account: WalletAccount; da
 
   const pick = (year: number | "all") => {
     setOpen(false);
-    void downloadAccountStatement(account, year);
+    // Dynamic import — downloadAccountStatement pulls in jsPDF + jspdf-autotable (lib/pdf/
+    // reportPdf.ts), a genuinely heavy dependency that has no reason to sit in every visitor's
+    // initial /accounts bundle just because one AccountCard menu item might eventually need it.
+    void import("../utils/downloadAccountStatement").then(({ downloadAccountStatement }) =>
+      downloadAccountStatement(account, year));
   };
 
   return (

@@ -51,6 +51,21 @@ class NseCorporateActionRepositoryTest extends AbstractRepositoryTest {
     }
 
     @Test
+    @DisplayName("findBySymbolInAndExDateAfterOrderByExDateDesc batches multiple symbols, still excludes on/before the shared date")
+    void findBySymbolInBatchesAcrossSymbols() {
+        NseCorporateAction infyAfter = persistAction("INFY", "DIVIDEND", LocalDate.of(2026, 6, 1), new BigDecimal("5"));
+        NseCorporateAction tcsAfter  = persistAction("TCS",  "DIVIDEND", LocalDate.of(2026, 7, 1), new BigDecimal("8"));
+        persistAction("INFY", "DIVIDEND", LocalDate.of(2026, 1, 1), new BigDecimal("3")); // on/before floor
+        persistAction("WIPRO", "DIVIDEND", LocalDate.of(2026, 8, 1), new BigDecimal("2")); // symbol not requested
+        entityManager.flush();
+
+        List<NseCorporateAction> result = nseCorporateActionRepository.findBySymbolInAndExDateAfterOrderByExDateDesc(
+                List.of("INFY", "TCS"), LocalDate.of(2026, 3, 1));
+
+        assertThat(result).extracting(NseCorporateAction::getId).containsExactly(tcsAfter.getId(), infyAfter.getId());
+    }
+
+    @Test
     @DisplayName("findDividendsBySymbolsAndYear scopes to the calendar year and excludes non-DIVIDEND action types")
     void findDividendsScopesToYearAndType() {
         NseCorporateAction inYear = persistAction("INFY", "DIVIDEND", LocalDate.of(2026, 6, 1), new BigDecimal("5"));

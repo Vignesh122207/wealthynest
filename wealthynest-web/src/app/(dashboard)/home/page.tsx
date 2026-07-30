@@ -16,7 +16,7 @@ import {useDashboard} from "@/features/dashboard/hooks/useDashboard";
 import {useAccounts, useTransfer} from "@/features/accounts/hooks/useAccounts";
 import {useGoals} from "@/features/goals/hooks/useGoals";
 import {useCategories} from "@/features/categories/hooks/useCategories";
-import {useCreateExpense, useExpenses} from "@/features/expenses/hooks/useExpenses";
+import {useAllTimeExpenses, useCreateExpense, useExpenses} from "@/features/expenses/hooks/useExpenses";
 import {useCreateIncome, useIncome} from "@/features/income/hooks/useIncome";
 import {useInvestments} from "@/features/investments/hooks/useInvestments";
 import {useNetWorthHistory} from "@/features/networth/hooks/useNetWorth";
@@ -31,14 +31,10 @@ import {GreetingBanner} from "./_components/GreetingBanner";
 import {SecuritySetupPrompt} from "./_components/SecuritySetupPrompt";
 import {StatOverview} from "./_components/StatOverview";
 import {SmartAlerts} from "./_components/SmartAlerts";
-import {NetWorthTrend} from "./_components/NetWorthTrend";
 import {WalletOverview} from "./_components/WalletOverview";
-import {SpendingDonut} from "./_components/SpendingDonut";
 import {BudgetSection} from "./_components/BudgetSection";
-import {SixMonthTrend} from "./_components/SixMonthTrend";
 import {TransactionList} from "./_components/TransactionList";
 import {GoalsSummary} from "./_components/GoalsSummary";
-import {InvestmentPanel} from "./_components/InvestmentPanel";
 import {DebtPulse} from "./_components/DebtPulse";
 import {TwoColRow} from "./_components/TwoColRow";
 
@@ -47,6 +43,20 @@ import {TwoColRow} from "./_components/TwoColRow";
 const ExpenseForm      = dynamic(() => import("@/components/transactions/ExpenseForm").then(m => m.ExpenseForm), { ssr: false });
 const IncomeForm       = dynamic(() => import("@/components/transactions/IncomeForm").then(m => m.IncomeForm), { ssr: false });
 const TransferFormModal = dynamic(() => import("@/components/transactions/TransferFormModal").then(m => m.TransferFormModal), { ssr: false });
+
+// Lazy-loaded (kept SSR'd, unlike the forms above — these paint on first load, not after a click):
+// each of these four pulls in recharts, and being statically bundled into this route's main chunk
+// was measured — on a real emulator, via direct renderer-process RSS polling — pushing the
+// Capacitor WebView's V8 heap from a ~150MB baseline past 800MB within seconds of any cold launch
+// that reaches /home, crashing on "Ineffective mark-compacts near heap limit" regardless of
+// whether the visitor was even authenticated. Splitting these into their own chunks means their
+// parse cost lands only when each one actually mounts, spread across several ticks instead of one
+// synchronous block — and, for a visitor DashboardLayout redirects away before ever rendering
+// {children}, means these chunks are never fetched at all.
+const NetWorthTrend  = dynamic(() => import("./_components/NetWorthTrend").then(m => m.NetWorthTrend));
+const SpendingDonut  = dynamic(() => import("./_components/SpendingDonut").then(m => m.SpendingDonut));
+const SixMonthTrend  = dynamic(() => import("./_components/SixMonthTrend").then(m => m.SixMonthTrend));
+const InvestmentPanel = dynamic(() => import("./_components/InvestmentPanel").then(m => m.InvestmentPanel));
 
 // ── Quick-add modals ──────────────────────────────────────────────────────────
 
@@ -94,8 +104,8 @@ export default function DashboardPage() {
   // frequent" category and income-source defaults below, and to sort each picker most-used
   // first — without this, Home's quick-add forms always start with nothing selected and list
   // categories in whatever order the API returns them instead of Groceries/Salary-first.
-  const { data: allTimeExpensesData }   = useExpenses({ size: 2000, sortDir: "asc", includeDebt: true });
-  const allTimeExpenses = useMemo(() => allTimeExpensesData?.data ?? [], [allTimeExpensesData]);
+  const { data: allTimeExpensesData }   = useAllTimeExpenses();
+  const allTimeExpenses = useMemo(() => allTimeExpensesData ?? [], [allTimeExpensesData]);
   const { data: allTimeIncome = [] }    = useIncome(undefined, undefined, true);
 
   const expenseCategoryUsage = useMemo(() => buildUsageCounts(allTimeExpenses, e => e.categoryId), [allTimeExpenses]);

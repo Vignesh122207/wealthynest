@@ -65,5 +65,9 @@ export function useDisableBiometricUnlock() {
   return useMutation({
     mutationFn: disableBiometricUnlock,
     onSuccess: () => qc.invalidateQueries({ queryKey: NATIVE_BIOMETRIC_QUERY_KEY }),
+    // The toggle in NativeBiometricRow is driven by useNativeBiometricStatus's own query data, not
+    // local state, so a failure here can't leave the switch showing the wrong position — but
+    // without this, the user still got zero feedback that flipping it did nothing.
+    onError: () => toast.error("Couldn't disable fingerprint unlock"),
   });
 }

@@ -10,6 +10,4 @@ public class LogIncomeRequest {
     @NotNull private String     incomeType;   // "DIVIDEND"
     @NotNull private String     exDate;       // ISO date yyyy-MM-dd
     @NotNull @Positive private BigDecimal amount;
-    private BigDecimal perShare;
-    private BigDecimal shares;
 }

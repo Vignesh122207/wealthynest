@@ -27,13 +27,12 @@ import {
 import {CURRENCIES, usePrefsStore} from "@/store/preferences.store";
 import {AccountCard} from "@/features/accounts/components/AccountCard";
 import {LoanCard} from "@/features/accounts/components/LoanCard";
-import {downloadAccountStatement} from "@/features/accounts/utils/downloadAccountStatement";
 import {
     type CreateAccountForm,
     createAccountSchema,
     LOAN_TYPE_LABELS,
 } from "@/features/accounts/schemas/account.schema";
-import {useCreateExpense, useExpenses} from "@/features/expenses/hooks/useExpenses";
+import {useAllTimeExpenses, useCreateExpense, useExpenses} from "@/features/expenses/hooks/useExpenses";
 import {useCreateIncome, useIncome} from "@/features/income/hooks/useIncome";
 import {useDebts} from "@/features/debts/hooks/useDebts";
 import type {DebtRecord} from "@/features/debts/types/debt.types";
@@ -110,8 +109,8 @@ export default function AccountsPage() {
   // Same "last used, else most used" default as the Transactions page's Add Expense/Income —
   // reused via pickSmartDefault so opening these forms from an account card doesn't drop back to
   // an empty category picker just because it's a different entry point into the same forms.
-  const { data: allTimeExpensesData }      = useExpenses({ size: 2000, sortDir: "asc", includeDebt: true });
-  const allTimeExpenses = useMemo(() => allTimeExpensesData?.data ?? [], [allTimeExpensesData]);
+  const { data: allTimeExpensesData }      = useAllTimeExpenses();
+  const allTimeExpenses = useMemo(() => allTimeExpensesData ?? [], [allTimeExpensesData]);
   const { data: allTimeIncome = [] }       = useIncome(undefined, undefined, true);
   const defaultExpenseCategoryId = useMemo(() =>
     pickSmartDefault(allTimeExpenses, e => e.expenseDate, e => e.createdAt, e => e.categoryId),
@@ -361,7 +360,9 @@ export default function AccountsPage() {
   // Loan keeps its own bespoke layout (progress bar, EMI chips, Record Payment).
   const renderAccountCard = (a: WalletAccount) => a.accountType === "LOAN" ? (
     <LoanCard key={a.id} account={a}
-      onDownload={() => downloadAccountStatement(a)}
+      // Dynamic import — see AccountCard.tsx's identical fix; jsPDF has no reason to sit in every
+      // visitor's initial /accounts bundle just because one Loan card's icon might get clicked.
+      onDownload={() => { void import("@/features/accounts/utils/downloadAccountStatement").then(({ downloadAccountStatement }) => downloadAccountStatement(a)); }}
       onEdit={() => openEdit(a)}
       onRecordPayment={() => { setPayLoan(a); setPayAmount(a.emiAmount ? String(a.emiAmount) : ""); setPayFrom(a.autopayAccountId ?? ""); }} />
   ) : (

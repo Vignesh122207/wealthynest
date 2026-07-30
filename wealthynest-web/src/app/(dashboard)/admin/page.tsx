@@ -2,17 +2,21 @@
 
 import {useRouter} from "next/navigation";
 import {useEffect, useState} from "react";
+import dynamic from "next/dynamic";
 import {Clock, History, LayoutDashboard, Loader2, Ticket, Users,} from "lucide-react";
 import {Header} from "@/components/layout/Header";
 import {useAuthStore} from "@/features/auth/store/auth.store";
 import {useAdminStats} from "@/features/admin/hooks/useAdmin";
 import {useOpenTicketCount} from "@/features/support/hooks/useSupport";
-import {OverviewTab} from "@/features/admin/components/OverviewTab";
 import {UsersTab} from "@/features/admin/components/UsersTab";
 import {TicketsTab} from "@/features/admin/components/TicketsTab";
 import {AuditTab} from "@/features/admin/components/AuditTab";
 import {JobsTab} from "@/features/admin/components/JobsTab";
 import {TabBar, type TabBarItem} from "@/components/ui/TabBar";
+
+// Lazy-loaded (kept SSR'd — paints on first load, not after a click): pulls in recharts, same
+// fix as home/page.tsx's chart widgets (see that file's own comment for the measured cause/effect).
+const OverviewTab = dynamic(() => import("@/features/admin/components/OverviewTab").then(m => m.OverviewTab));
 
 type Tab = "overview" | "users" | "tickets" | "audit" | "jobs";
 

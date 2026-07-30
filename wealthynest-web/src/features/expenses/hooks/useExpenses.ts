@@ -4,6 +4,7 @@ import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {toast} from "sonner";
 import {QUERY_KEYS} from "@/lib/constants";
 import {apiErrorMessage} from "@/lib/utils";
+import {fetchAllPages} from "@/lib/pagination";
 import {expensesApi} from "../api/expenses.api";
 import type {CreateExpensePayload, ExpenseFilters} from "../types/expense.types";
 
@@ -12,6 +13,20 @@ export function useExpenses(filters: ExpenseFilters = {}, enabled = true) {
     queryKey: [...QUERY_KEYS.EXPENSES, filters],
     queryFn:  () => expensesApi.getExpenses(filters),
     enabled,
+  });
+}
+
+/** Home/Expenses/Accounts each need every expense ever recorded (for running totals/history), not
+ * one page of them — a single oversized `size` request used to cover this until the server-side
+ * size cap (added alongside the export flow's own paginated fetch) started rejecting it. Pages
+ * through in full via the same fetchAllPages helper the export flow already uses, instead of
+ * re-raising the cap that exists specifically to bound query size. */
+export function useAllTimeExpenses() {
+  return useQuery({
+    queryKey: [...QUERY_KEYS.EXPENSES, "all-time"],
+    queryFn: () => fetchAllPages(page =>
+      expensesApi.getExpenses({ sortDir: "asc", includeDebt: true, page, size: 500 })
+    ),
   });
 }
 

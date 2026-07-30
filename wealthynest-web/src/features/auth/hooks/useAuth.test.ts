@@ -272,7 +272,7 @@ describe("useChangeEmail", () => {
 });
 
 describe("useForgotPassword", () => {
-  it("has no onSuccess/onError side effects — just calls the api", async () => {
+  it("has no onSuccess toast — the form's own 'check your inbox' state is the success feedback", async () => {
     mockedApi.forgotPassword.mockResolvedValue(undefined as never);
     const { Wrapper } = createQueryClientWrapper();
 
@@ -282,6 +282,17 @@ describe("useForgotPassword", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(toast.success).not.toHaveBeenCalled();
     expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("toasts on failure — regression: this used to be completely silent on a real network/server error", async () => {
+    mockedApi.forgotPassword.mockRejectedValue({ response: { data: { message: "Rate limited" } } });
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useForgotPassword(), { wrapper: Wrapper });
+    result.current.mutate("a@x.com");
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(toast.error).toHaveBeenCalledWith("Rate limited");
   });
 });
 

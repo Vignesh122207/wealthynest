@@ -1,4 +1,10 @@
 import type {Page, Response} from "@playwright/test";
+import {env} from "../config/env";
+
+// Mirrors playwright.config.ts's own actionTimeout/navigationTimeout CI split — page.waitForResponse
+// and locator.waitFor aren't governed by those action-timeout settings (they're explicit waits, not
+// interactions), so this file needs its own CI-aware constant for the same reason.
+const WAIT_TIMEOUT = env.isCI ? 30000 : 15000;
 
 // Sonner (wealthynest-web/src/components/ui/ThemedToaster.tsx) stamps every toast it renders with
 // a `data-sonner-toast` attribute on its own — no custom data-testid needed on our side.
@@ -26,7 +32,7 @@ export async function waitForApiResponse(
       const matchesUrl = typeof urlPattern === "string" ? res.url().includes(urlPattern) : urlPattern.test(res.url());
       return matchesUrl && res.request().method() === method;
     },
-    { timeout: 15000 }
+    { timeout: WAIT_TIMEOUT }
   );
   if (!opts?.allowError && !res.ok()) {
     const body = await res.text().catch(() => "<unreadable body>");
@@ -44,7 +50,7 @@ export async function waitForApiResponse(
  * second modal right after) could still hit that backdrop intercepting the click. Call this after
  * a submit that closes one of these modals, before the next UI action. */
 export async function waitForDialogClosed(page: Page): Promise<void> {
-  await page.getByTestId("modal-overlay-backdrop").first().waitFor({ state: "detached", timeout: 15000 }).catch(() => {});
+  await page.getByTestId("modal-overlay-backdrop").first().waitFor({ state: "detached", timeout: WAIT_TIMEOUT }).catch(() => {});
 }
 
 // A previous version of waitForDialogClosed also called page.waitForLoadState("networkidle") here,

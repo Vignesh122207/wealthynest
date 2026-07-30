@@ -8,7 +8,6 @@ import {getStoredCurrency} from "@/lib/utils";
 import {expensesApi} from "@/features/expenses/api/expenses.api";
 import {incomeApi} from "@/features/income/api/income.api";
 import {downloadCsv, getYears, MONTH_NAMES} from "@/lib/printReport";
-import {addSectionTitle, addSummaryCards, addTable, createReportDoc, finalizePdf, pdfCurrencyPrefix, yieldToMain} from "@/lib/pdf/reportPdf";
 import {fetchAllPages} from "@/lib/pagination";
 
 export function AnnualTab() {
@@ -34,6 +33,11 @@ export function AnnualTab() {
   async function handlePdf() {
     setBusy("pdf");
     try {
+      // Dynamic import — see MonthlyTab.tsx's identical fix; jsPDF + jspdf-autotable have no
+      // reason to sit in every /reports visitor's initial bundle just because the PDF button
+      // might get clicked.
+      const { addSectionTitle, addSummaryCards, addTable, createReportDoc, finalizePdf, pdfCurrencyPrefix, yieldToMain } =
+        await import("@/lib/pdf/reportPdf");
       const [expenses, incomeEntries] = await Promise.all([
         fetchAllPages(page => expensesApi.getExpenses({ startDate: `${year}-01-01`, endDate: `${year}-12-31`, page, size: 500 })),
         incomeApi.getIncome(year),

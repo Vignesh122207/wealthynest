@@ -175,7 +175,7 @@ export function useLogIncome() {
   return useMutation({
     mutationFn: ({ investmentId, data }: {
       investmentId: string;
-      data: { incomeType: string; exDate: string; amount: number; perShare?: number; shares?: number };
+      data: { incomeType: string; exDate: string; amount: number };
     }) => investmentsApi.logIncome(investmentId, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["income-history"] });

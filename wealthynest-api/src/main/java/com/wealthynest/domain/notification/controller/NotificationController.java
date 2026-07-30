@@ -86,7 +86,7 @@ public class NotificationController {
     @DeleteMapping("/device-tokens")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> unregisterDeviceToken(@RequestParam String token) {
-        notificationService.unregisterDeviceToken(token);
+        notificationService.unregisterDeviceToken(SecurityUtils.requireCurrentUserId(), token);
         return ResponseEntity.ok(ApiResponse.noContent());
     }
 }

@@ -92,6 +92,33 @@ class InvestmentIncomeLogRepositoryTest extends AbstractRepositoryTest {
     }
 
     @Test
+    @DisplayName("findByInvestmentIdInAndIncomeType batches multiple investments, still filters by income type")
+    void findByInvestmentIdInBatchesAcrossInvestments() {
+        Asset secondAsset = Asset.builder().userId(userId).name("Second Bond").assetType(AssetType.BOND)
+                .currentValue(BigDecimal.ZERO).asOfDate(LocalDate.now()).build();
+        entityManager.persist(secondAsset);
+        Investment secondInvestment = Investment.builder().userId(userId).assetId(secondAsset.getId())
+                .investmentType(InvestmentType.BOND).investedAmount(new BigDecimal("5000"))
+                .currentValue(new BigDecimal("5000")).build();
+        entityManager.persist(secondInvestment);
+        UUID secondInvestmentId = secondInvestment.getId();
+
+        InvestmentIncomeLog firstDividend = persistLog("DIVIDEND", LocalDate.of(2026, 6, 1), new BigDecimal("100"));
+        persistLog("COUPON", LocalDate.of(2026, 6, 1), new BigDecimal("100")); // wrong income type — excluded
+        InvestmentIncomeLog secondDividend = InvestmentIncomeLog.builder().investmentId(secondInvestmentId)
+                .userId(userId).incomeType("DIVIDEND").eventDate(LocalDate.of(2026, 7, 1))
+                .amount(new BigDecimal("50")).build();
+        entityManager.persist(secondDividend);
+        entityManager.flush();
+
+        List<InvestmentIncomeLog> result = investmentIncomeLogRepository.findByInvestmentIdInAndIncomeType(
+                List.of(investmentId, secondInvestmentId), "DIVIDEND");
+
+        assertThat(result).extracting(InvestmentIncomeLog::getId)
+                .containsExactlyInAnyOrder(firstDividend.getId(), secondDividend.getId());
+    }
+
+    @Test
     @DisplayName("findByInvestmentId returns all logs for the investment")
     void findByInvestmentIdReturnsAll() {
         persistLog("COUPON", LocalDate.of(2026, 6, 1), new BigDecimal("100"));

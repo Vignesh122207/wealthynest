@@ -1,6 +1,7 @@
 "use client";
 
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {toast} from "sonner";
 import {notificationsApi, type NotificationPreferences, type ServerNotification} from "../api/notifications.api";
 import {type AppNotification, type NotifSeverity, useNotifications} from "@/hooks/useNotifications";
 import {type NotifPrefs, useNotificationStore} from "@/store/notification.store";
@@ -115,6 +116,12 @@ export function useUpdateNotificationPreferences() {
     onSuccess: (data) => {
       qc.setQueryData(["notification-preferences"], data);
     },
+    // NotificationsPage's toggle() flips its own local (persisted) Zustand store optimistically
+    // before this fires, and that store is never re-synced from server data — a silent failure
+    // here used to leave it permanently out of sync with what the server actually has saved, with
+    // zero indication anything went wrong. The toast alone doesn't fix the desync (the caller
+    // reverts its own optimistic state on error), but at minimum the user now knows to retry.
+    onError: () => toast.error("Couldn't save notification preference. Please try again."),
   });
 }
 

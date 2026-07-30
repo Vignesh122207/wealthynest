@@ -53,6 +53,20 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: vercel build --prod --token="${{ secrets.VERCEL_TOKEN }}"
 
+      # Vercel's "Sensitive" env var flag is write-only - it can't be read back even at build
+      # time, which silently breaks any NEXT_PUBLIC_* var marked that way: instead of the real
+      # value, the built bundle gets the literal string "[SENSITIVE]" baked in, with no build
+      # error. This shipped to production once already (broke Google sign-in for every user, only
+      # caught by manually diffing the live bundle) - fail loud here instead of relying on that
+      # again.
+      - name: Verify no Sensitive-var placeholder leaked into the build
+        run: |
+          set -euo pipefail
+          if grep -rl '\[SENSITIVE\]' .vercel/output/static 2>/dev/null; then
+            echo "::error::Found the literal string '[SENSITIVE]' in the built bundle - a NEXT_PUBLIC_* environment variable is marked 'Sensitive' in Vercel. NEXT_PUBLIC_* vars are already exposed client-side by design and must never be marked Sensitive. Fix: Vercel project settings -> Environment Variables -> delete and re-add the affected variable(s) without checking Sensitive, for every affected environment."
+            exit 1
+          fi
+
       - name: Deploy prebuilt output
         id: deploy
         env:

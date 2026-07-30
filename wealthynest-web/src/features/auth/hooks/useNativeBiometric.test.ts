@@ -113,4 +113,15 @@ describe("useDisableBiometricUnlock", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["auth", "nativeBiometric"] });
   });
+
+  it("shows an error toast on failure — regression: this used to be completely silent", async () => {
+    mockedDisableBiometricUnlock.mockRejectedValue(new Error("hardware error"));
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useDisableBiometricUnlock(), { wrapper: Wrapper });
+    act(() => { result.current.mutate(); });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(toast.error).toHaveBeenCalledWith("Couldn't disable fingerprint unlock");
+  });
 });

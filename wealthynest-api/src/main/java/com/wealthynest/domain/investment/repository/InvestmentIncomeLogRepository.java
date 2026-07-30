@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,6 +16,12 @@ public interface InvestmentIncomeLogRepository extends JpaRepository<InvestmentI
 
     boolean existsByInvestmentIdAndIncomeTypeAndEventDate(
             UUID investmentId, String incomeType, LocalDate eventDate);
+
+    /** Batched equivalent of existsByInvestmentIdAndIncomeTypeAndEventDate for a whole portfolio at
+     * once — see InvestmentServiceImpl#getDividendSuggestions, which used to call the single-row
+     * exists() once per (investment, corporate action) pair, an N×M query fan-out on every
+     * dashboard load. */
+    List<InvestmentIncomeLog> findByInvestmentIdInAndIncomeType(Collection<UUID> investmentIds, String incomeType);
 
     default List<InvestmentIncomeLog> findByUserIdAndYear(UUID userId, int year) {
         LocalDate start = LocalDate.of(year, 1, 1);

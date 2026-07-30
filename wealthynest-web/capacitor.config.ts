@@ -11,10 +11,15 @@ const config: CapacitorConfig = {
   appName: "WealthyNest",
   webDir: "public",
   server: {
-    // `/home` (not `/`) so an installed app never shows the marketing landing page — `/home`
-    // lives under (dashboard)'s layout, which already redirects to `/login` when there's no
-    // session, so this one URL correctly handles both the logged-in and logged-out cases.
-    url: "https://wealthynest.in/home",
+    // `/launch` (not `/`, not `/home` directly) so an installed app never shows the marketing
+    // landing page, and — the reason it's not `/home` itself — never pays /home's own bundle cost
+    // (9+ query hooks, every dashboard chart widget) before knowing whether this cold start is
+    // even going there. See src/app/launch/page.tsx's own comment: loading /home directly on cold
+    // launch was measured pushing the WebView renderer to 800MB+ and crashing on OOM, regardless
+    // of auth state, since DashboardLayout's redirect-when-logged-out only fires after that whole
+    // bundle already downloaded and got parsed. /launch checks auth from the already-loaded root
+    // layout's store and redirects to /home or /login — whichever this cold start actually needs.
+    url: "https://wealthynest.in/launch",
     androidScheme: "https",
     cleartext: false,
     // wealthynest.in now permanently redirects (308) to www.wealthynest.in at the DNS/Vercel

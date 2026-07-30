@@ -90,8 +90,8 @@ export function AllTabContent({
                   <span className="text-xs font-semibold text-foreground/60 uppercase tracking-widest">{formatDate(date)}</span>
                 </div>
                 <div className="divide-y divide-border/50">
-                  {allGrouped[date].map((row, i) => (
-                    <AllTransactionRow key={i} row={row} fmt={fmt} accountMap={accountMap} balanceMap={balanceMap}
+                  {allGrouped[date].map(row => (
+                    <AllTransactionRow key={`${row.kind}-${row.data.id}`} row={row} fmt={fmt} accountMap={accountMap} balanceMap={balanceMap}
                       onEditExpense={onEditExpense} onEditIncome={onEditIncome} onEditTransfer={onEditTransfer} />
                   ))}
                 </div>

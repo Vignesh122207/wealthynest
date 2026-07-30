@@ -9,6 +9,7 @@ import {
 import { notificationsApi } from "../api/notifications.api";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useNotificationStore } from "@/store/notification.store";
+import { toast } from "sonner";
 import type { ServerNotification } from "../api/notifications.api";
 
 vi.mock("../api/notifications.api", () => ({
@@ -18,6 +19,7 @@ vi.mock("../api/notifications.api", () => ({
   },
 }));
 vi.mock("@/hooks/useNotifications", () => ({ useNotifications: vi.fn() }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const mockedApi = vi.mocked(notificationsApi);
 const mockedUseNotifications = vi.mocked(useNotifications);
@@ -174,6 +176,21 @@ describe("useUpdateNotificationPreferences", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(queryClient.getQueryData(["notification-preferences"])).toEqual(updated);
+  });
+
+  it("toasts on failure — regression: this used to be completely silent, leaving the caller's own optimistic local toggle permanently out of sync with the server", async () => {
+    mockedApi.updatePreferences.mockRejectedValue(new Error("network error"));
+    const { Wrapper } = createQueryClientWrapper();
+    const prefs = {
+      budgetAlertEnabled: false, lowBalanceEnabled: true, spendAnomalyEnabled: true,
+      debtDueEnabled: true, loanEmiEnabled: true, sipReminderEnabled: true,
+    };
+
+    const { result } = renderHook(() => useUpdateNotificationPreferences(), { wrapper: Wrapper });
+    result.current.mutate(prefs);
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(toast.error).toHaveBeenCalledWith("Couldn't save notification preference. Please try again.");
   });
 });
 

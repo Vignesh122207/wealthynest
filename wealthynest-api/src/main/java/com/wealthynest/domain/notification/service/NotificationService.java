@@ -18,7 +18,7 @@ public interface NotificationService {
     NotificationPreferenceResponse getPreferences(UUID userId);
     NotificationPreferenceResponse updatePreferences(UUID userId, UpdateNotificationPreferenceRequest request);
     void registerDeviceToken(UUID userId, String token);
-    void unregisterDeviceToken(String token);
+    void unregisterDeviceToken(UUID userId, String token);
     void createBudgetBreachNotification(UUID userId, String categoryName, String budgetType, BigDecimal spent, BigDecimal budget, double pct);
     void createLowBalanceNotification(UUID userId, String accountName, BigDecimal balance, BigDecimal threshold);
     void createSpendAnomalyNotification(UUID userId, String categoryName, BigDecimal amount, BigDecimal average);
