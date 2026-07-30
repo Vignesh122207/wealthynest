@@ -136,6 +136,12 @@ export function useChangeEmail() {
 export function useForgotPassword() {
   return useMutation({
     mutationFn: (email: string) => authApi.forgotPassword(email),
+    // Safe to surface directly (not the anti-enumeration case) — the backend already returns a
+    // generic success regardless of whether the email is registered (see ForgotPasswordForm's own
+    // "If {email} is registered..." copy), so onError here only ever fires for a genuine
+    // network/server failure, not "no such account". Was previously silent — the button just
+    // reverted to its idle state with zero feedback on a real failure.
+    onError: (e: ApiError) => toast.error(e.response?.data?.message ?? "Could not send reset link. Please try again."),
   });
 }
 

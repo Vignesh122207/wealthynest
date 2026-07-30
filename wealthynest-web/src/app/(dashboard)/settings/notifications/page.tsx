@@ -45,6 +45,7 @@ export default function NotificationsPage() {
   const allOff = Object.values(prefs).every(v => !v);
 
   function toggle(key: keyof NotifPrefs, value: boolean) {
+    const previous = prefs[key];
     setPref(key, value);
     const backendKey = BACKEND_PREF_KEY[key];
     if (!backendKey) return;
@@ -52,7 +53,13 @@ export default function NotificationsPage() {
       budgetAlertEnabled: true, lowBalanceEnabled: true, spendAnomalyEnabled: true,
       debtDueEnabled: true, loanEmiEnabled: true, sipReminderEnabled: true,
     };
-    updateServerPrefs.mutate({ ...base, [backendKey]: value });
+    // This store persists to localStorage and is never re-synced from serverPrefs, so a failed
+    // save has to be reverted here — otherwise the toggle stays showing a state the server never
+    // actually saved, indefinitely (the useUpdateNotificationPreferences hook's own onError only
+    // covers the toast, not this).
+    updateServerPrefs.mutate({ ...base, [backendKey]: value }, {
+      onError: () => setPref(key, previous),
+    });
   }
 
   function toggleAll(value: boolean) {
