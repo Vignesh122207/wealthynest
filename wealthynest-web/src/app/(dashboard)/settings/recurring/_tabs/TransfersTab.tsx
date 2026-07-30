@@ -130,7 +130,7 @@ function RuleFormModal({
                       <button key={d} type="button" onClick={() => { setDay(String(d)); setDayOpen(false); }}
                         className={cn("aspect-square rounded-lg text-xs font-medium tabular-nums transition-colors",
                           String(d) === day ? "bg-indigo-500 text-white" : "text-foreground hover:bg-muted",
-                          d > 28 && String(d) !== day && "text-muted-foreground/50")}>
+                          d > 28 && String(d) !== day && "text-muted-foreground/80")}>
                         {d}
                       </button>
                     ))}
@@ -149,7 +149,7 @@ function RuleFormModal({
 
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-                Note <span className="text-muted-foreground/40">(optional)</span>
+                Note <span className="text-muted-foreground/80">(optional)</span>
               </label>
               <input value={description} onChange={e => setDescription(e.target.value)}
                 placeholder="e.g. Move to savings" data-testid="recurring-transfer-description-input"
@@ -189,13 +189,20 @@ function RuleCard({
   const { fmt } = useAmountFormatter();
 
   return (
-    <div onClick={onEdit} role="button" tabIndex={0} data-testid="recurring-transfer-rule-card"
-      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEdit(); } }}
-      aria-label={`Edit ${rule.fromAccountName} to ${rule.toAccountName} recurring transfer`}
+    <div onClick={onEdit} data-testid="recurring-transfer-rule-card"
       className={cn(
-      "bg-card border rounded-2xl p-4 transition-all cursor-pointer hover:border-indigo-500/40 hover:shadow-sm hover:-translate-y-0.5 duration-200",
+      "relative bg-card border rounded-2xl p-4 transition-all cursor-pointer hover:border-indigo-500/40 hover:shadow-sm hover:-translate-y-0.5 duration-200",
       rule.active ? "border-border" : "border-border opacity-60"
     )}>
+      {/* Real, separately-focusable control for the same action the card's plain onClick above
+          already does — a role="button" here would nest the toggle button below inside another
+          interactive widget (axe's nested-interactive rule), so the card itself stays a
+          non-widget div and this sr-only-until-focused button is the keyboard/screen-reader path
+          to Edit instead (see AccountCard.tsx's identical fix). */}
+      <button type="button" onClick={onEdit}
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-20 focus:px-3 focus:py-1.5 focus:rounded-lg focus:bg-primary focus:text-primary-foreground focus:text-xs focus:font-medium">
+        Edit {rule.fromAccountName} to {rule.toAccountName} recurring transfer
+      </button>
       <div className="flex items-start gap-3">
         <PremiumIcon icon={ArrowLeftRight} hex="#6366f1" size="md" className="w-10 h-10 shrink-0" />
         <div className="flex-1 min-w-0">
@@ -223,7 +230,7 @@ function RuleCard({
             </span>
           </div>
           {rule.description && (
-            <p className="text-xs text-muted-foreground/60 mt-1 truncate">{rule.description}</p>
+            <p className="text-xs text-muted-foreground/80 mt-1 truncate">{rule.description}</p>
           )}
         </div>
 

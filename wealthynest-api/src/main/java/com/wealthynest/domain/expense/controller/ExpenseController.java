@@ -8,6 +8,7 @@ import com.wealthynest.domain.expense.dto.request.UpdateExpenseRequest;
 import com.wealthynest.domain.expense.dto.response.ExpenseResponse;
 import com.wealthynest.domain.expense.service.ExpenseService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -51,7 +52,7 @@ public class ExpenseController {
             @RequestParam(defaultValue = "expenseDate") String sortBy,
             @RequestParam(defaultValue = "desc")        String sortDir,
             @RequestParam(defaultValue = "0")  int page,
-            @RequestParam(defaultValue = "50") int size) {
+            @RequestParam(defaultValue = "50") @Max(value = 500, message = "size must not exceed 500") int size) {
 
         UUID userId   = SecurityUtils.requireCurrentUserId();
         UUID familyId = SecurityUtils.getCurrentFamilyId().orElse(null);

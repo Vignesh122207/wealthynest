@@ -21,13 +21,22 @@ public interface AuthService {
      * verified until that link is clicked (see verifyEmail's pendingEmail branch). */
     void changeEmail(UUID userId, ChangeEmailRequest request, String ipAddress, String userAgent);
     void enablePin(UUID userId, EnablePinRequest request);
-    void disablePin(UUID userId);
+    /** Requires the current PIN to match before clearing it — unlike enablePin, this is guarding
+     * against someone with a few seconds' access to an already-unlocked device turning the
+     * protection off outright, not just planting a new one (see the impl's own comment). Shares
+     * pinLogin's brute-force lockout state, since it's the same secret being guessed either way. */
+    void disablePin(UUID userId, DisablePinRequest request, String ipAddress, String userAgent);
     AuthResponse pinLogin(PinLoginRequest request, String refreshToken, String ipAddress, String userAgent);
     AuthResponse googleLogin(GoogleLoginRequest request, String ipAddress, String userAgent);
     /** Native Android counterpart to googleLogin — exchanges an authorization code (not an ID
      * token) for one server-side, since the client secret that exchange requires can't safely
-     * live in the app. See GoogleNativeLoginRequest's own comment for the full why. */
-    AuthResponse googleLoginNative(GoogleNativeLoginRequest request, String ipAddress, String userAgent);
+     * live in the app. See GoogleCodeLoginRequest's own comment for the full why. */
+    AuthResponse googleLoginNative(GoogleCodeLoginRequest request, String ipAddress, String userAgent);
+    /** Web counterpart used only as a fallback when One Tap's silent prompt() is blocked/skipped
+     * (no FedCM support, third-party cookies blocked, or Google's own post-dismissal cooldown) —
+     * exchanges the popup code-flow's authorization code the same way googleLoginNative does, but
+     * against the "Web application" OAuth client's own id/secret, not the native one's. */
+    AuthResponse googleLoginPopup(GoogleCodeLoginRequest request, String ipAddress, String userAgent);
     /** Issues tokens for a user already authenticated by another factor (passkey) — the same
      * token-issuing core password/PIN login use, exposed for WebAuthnServiceImpl to reuse.
      * {@code previousRefreshToken} is whatever refresh token this device already had locally, if

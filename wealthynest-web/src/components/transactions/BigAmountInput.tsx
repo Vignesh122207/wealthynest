@@ -43,7 +43,7 @@ export function BigAmountInput({ label = "Amount", error, colorClass, inputProps
 
   return (
     <div className="text-center py-2">
-      <label className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-widest">{label}</label>
+      <label className="text-[11px] font-semibold text-muted-foreground/80 uppercase tracking-widest">{label}</label>
       {/* gap-0.5 + a `ch`-precise input width (instead of the browser's imprecise `size`
           attribute) keeps the symbol flush against the digits, so the pair reads as one
           unit and recenters together as you type rather than drifting apart. */}

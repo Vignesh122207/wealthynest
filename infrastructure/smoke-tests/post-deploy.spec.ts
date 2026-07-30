@@ -7,9 +7,14 @@ import { test, expect } from "@playwright/test";
  */
 
 const apiUrl = process.env.API_URL ?? "https://api.wealthynest.in/api/v1";
+// Actuator is mounted at the domain root by nginx.conf's own `location /actuator/health` block,
+// not under the API's /api/v1 prefix - concatenating it onto apiUrl directly hits a path Spring
+// Security has no mapping for (401, not 200), which is exactly what broke the first real deploy's
+// smoke check. Derive just the origin for this one endpoint instead.
+const apiOrigin = new URL(apiUrl).origin;
 
 test("API health endpoint reports UP", async ({ request }) => {
-  const response = await request.get(`${apiUrl}/actuator/health`);
+  const response = await request.get(`${apiOrigin}/actuator/health`);
   expect(response.ok()).toBeTruthy();
   const body = await response.json();
   expect(body.status).toBe("UP");

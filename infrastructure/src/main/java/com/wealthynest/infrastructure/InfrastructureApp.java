@@ -80,6 +80,7 @@ public final class InfrastructureApp {
             security.getDatabaseCredentialsSecret(),
             security.getJwtSecret(),
             security.getGoogleOAuthClientSecret(),
+            security.getGoogleOAuthWebClientSecret(),
             security.getSmtpCredentialsSecret(),
             security.getVaultEncryptionKeySecret(),
             security.getVaultHashPepperSecret(),

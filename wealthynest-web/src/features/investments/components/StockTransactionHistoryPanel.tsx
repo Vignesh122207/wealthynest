@@ -36,9 +36,9 @@ export function StockTransactionHistoryPanel({ investmentId }: { investmentId: s
       {open && (
         <div className="mt-2 space-y-1">
           {isLoading ? (
-            <p className="text-xs text-muted-foreground/60 pl-1">Loading…</p>
+            <p className="text-xs text-muted-foreground/80 pl-1">Loading…</p>
           ) : txns.length === 0 ? (
-            <p className="text-xs text-muted-foreground/60 pl-1">No transactions recorded yet.</p>
+            <p className="text-xs text-muted-foreground/80 pl-1">No transactions recorded yet.</p>
           ) : (
             txns.map(t => {
               const isSeed = t.notes === SEED_TXN_NOTE;

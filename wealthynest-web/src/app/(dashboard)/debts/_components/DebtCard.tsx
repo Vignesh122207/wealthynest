@@ -121,7 +121,7 @@ export function DebtCard({ debt, onEdit, onPayment }: {
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
                       <span className="truncate">{p.note || "Payment"}</span>
-                      <span className="text-muted-foreground/50 shrink-0">
+                      <span className="text-muted-foreground/80 shrink-0">
                         {new Date(p.paidAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
                       </span>
                     </div>

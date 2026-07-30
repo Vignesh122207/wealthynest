@@ -48,8 +48,17 @@ android {
     }
     buildTypes {
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // R8 shrinking/obfuscation for release builds. Safe for this app specifically: it's a
+            // server.url WebView shell (see capacitor.config.ts) with almost no custom native
+            // Java/Kotlin logic of its own, and every Capacitor plugin in use here bundles its own
+            // consumerProguardFiles (confirmed for @capacitor/android's core bridge — see
+            // node_modules/@capacitor/android/capacitor/proguard-rules.pro's @CapacitorPlugin/
+            // Plugin keep rules, wired via that module's own `consumerProguardFiles` — so the
+            // JS<->native bridge classes survive shrinking automatically without hand-written rules
+            // here.
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig keystorePropsFile.exists() ? signingConfigs.release : null
         }
     }

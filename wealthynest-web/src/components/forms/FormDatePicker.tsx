@@ -219,7 +219,7 @@ export function FormDatePicker({
                   sel     && "bg-primary text-primary-foreground font-bold",
                   !sel && today   && "ring-1 ring-primary text-primary font-semibold",
                   !sel && !today  && inMonth  && "text-foreground hover:bg-muted",
-                  !sel && !today  && !inMonth && "text-muted-foreground/40 hover:bg-muted",
+                  !sel && !today  && !inMonth && "text-muted-foreground/80 hover:bg-muted",
                 )}>
                 {format(day, "d")}
               </button>

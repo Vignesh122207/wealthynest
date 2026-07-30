@@ -25,6 +25,30 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- App Links: password-reset/email-verification links (AuthServiceImpl builds them as
+                 plain https://<frontend-url>/verify-email?token=... / /reset-password?token=...)
+                 currently always open the phone's default browser, even with the app installed,
+                 since nothing declares this app as a verified handler for those paths. Both hosts
+                 are listed because wealthynest.in currently permanently redirects to
+                 www.wealthynest.in at the DNS/Vercel level (not something this repo controls) —
+                 Android's Digital Asset Links verifier does not reliably follow that redirect, so
+                 auto-verification is only expected to actually succeed for www.wealthynest.in until
+                 that redirect is fixed to not apply to /.well-known/assetlinks.json specifically.
+                 assetlinks.json's fingerprint has been confirmed to match this app's real release
+                 signing key (see keystore/wealthynest-release.jks) and IS reachable at
+                 https://www.wealthynest.in/.well-known/assetlinks.json today. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="wealthynest.in" />
+                <data android:scheme="https" android:host="www.wealthynest.in" />
+                <data android:pathPrefix="/verify-email" />
+                <data android:pathPrefix="/reset-password" />
+                <data android:pathPrefix="/login" />
+                <data android:pathPrefix="/forgot-password" />
+            </intent-filter>
         </activity>
 
         <provider

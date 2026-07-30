@@ -36,3 +36,7 @@ wealthynest-web/android/local.properties
 
 # Claude Code local files
 .claude/
+
+# Scratch screenshots dropped at repo root during manual/agent verification passes — not a
+# deliverable, never meant to be tracked.
+.tmp-screenshots/

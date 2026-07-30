@@ -106,13 +106,13 @@ export function SmartAlerts({
                         <p className="text-xs font-bold text-red-500 dark:text-red-400 tabular-nums">
                           −{fmt(bill.amount)}
                         </p>
-                        <p className="text-[10px] text-muted-foreground/60">{dayName}</p>
+                        <p className="text-[10px] text-muted-foreground/80">{dayName}</p>
                       </div>
                     </div>
                   );
                 })}
                 {upcomingBills.length > 4 && (
-                  <p className="text-xs text-muted-foreground/60 pt-0.5">
+                  <p className="text-xs text-muted-foreground/80 pt-0.5">
                     +{upcomingBills.length - 4} more upcoming
                   </p>
                 )}

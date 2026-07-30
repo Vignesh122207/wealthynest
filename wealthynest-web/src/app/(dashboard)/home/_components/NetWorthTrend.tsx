@@ -56,9 +56,11 @@ export function NetWorthTrend({ history, netWorth, changePct, chart, isLoading }
 
       <div className="mt-4 flex-1 min-h-[180px]">
         {history.length > 1 ? (
+          /* accessibilityLayer={false} — see SixMonthTrend.tsx's identical wrapper for why: without
+             it, Recharts' own focusable <svg> inside this aria-hidden div is a real WCAG violation. */
           <div className="w-full h-full" aria-hidden="true">
           <ResponsiveContainer width="100%" height="100%" minHeight={180}>
-            <AreaChart data={history} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
+            <AreaChart data={history} margin={{ left: 0, right: 0, top: 4, bottom: 0 }} accessibilityLayer={false}>
               <defs>
                 <linearGradient id={GRAD_ID} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor={CHART_COLORS.primary} stopOpacity={0.25} />

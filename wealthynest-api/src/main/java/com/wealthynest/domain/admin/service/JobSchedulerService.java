@@ -51,6 +51,7 @@ public class JobSchedulerService {
     private final RecurringTransferScheduler  recurringTransferScheduler;
     private final RecurringGoalContributionScheduler recurringGoalContributionScheduler;
     private final MfMasterSyncScheduler       mfMasterSyncScheduler;
+    private final AuditLogCleanupScheduler    auditLogCleanupScheduler;
     private final DataSource                  dataSource;
 
     /** Namespaces this service's advisory-lock keys away from any future unrelated use of the
@@ -184,6 +185,7 @@ public class JobSchedulerService {
             case "NET_WORTH_SNAPSHOT"   -> netWorthSnapshotScheduler.takeMonthlySnapshots();
             case "STOCK_WEEKLY_REFRESH" -> stockDataScheduler.weeklyMasterRefresh();
             case "MF_MASTER_SYNC"       -> mfMasterSyncScheduler.weeklySync();
+            case "AUDIT_LOG_CLEANUP"    -> auditLogCleanupScheduler.purgeOldEntries();
             case "LOAN_EMI"             -> loanEmiScheduler.processDueEmis();
             case "LOW_BALANCE_CHECK"    -> lowBalanceScheduler.checkAllAccounts();
             case "SPEND_ANOMALY_CHECK"  -> spendAnomalyScheduler.checkRecentExpenses();

@@ -2,8 +2,9 @@ import Link from "next/link";
 import {Building2, ChevronDown, ChevronUp, Plus, TrendingUp} from "lucide-react";
 import {EmptyState} from "@/components/shared/EmptyState";
 import {QueryErrorState} from "@/components/shared/QueryErrorState";
-import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {badgeTextColor, PremiumIcon} from "@/components/icons/PremiumIcon";
 import {AssetRow} from "@/features/assets/components/AssetRow";
+import {useIsDark} from "@/hooks/useIsDark";
 import type {Asset} from "@/features/assets/types/asset.types";
 import type {NetWorthSummary} from "@/features/networth/types/networth.types";
 import {INV_TYPE_META} from "./netWorthMeta";
@@ -28,6 +29,7 @@ export function AssetsSection({
   onEdit: (a: Asset) => void;
   fmt: (n: number) => string;
 }) {
+  const isDark = useIsDark();
   return (
     <section>
       {/* Add Asset lived here too, redundant with the FAB's own "Add Asset" action. */}
@@ -68,7 +70,7 @@ export function AssetsSection({
                   {" · "}View in Investments
                 </p>
               </div>
-              <p className="text-sm font-bold tabular-nums shrink-0 min-w-[7rem] text-right" style={{ color: meta.color }}>
+              <p className="text-sm font-bold tabular-nums shrink-0 min-w-[7rem] text-right" style={{ color: badgeTextColor(meta.color, isDark) }}>
                 {fmt(b.totalValue)}
               </p>
             </Link>

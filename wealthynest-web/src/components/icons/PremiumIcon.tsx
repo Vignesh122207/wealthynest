@@ -55,6 +55,28 @@ export function lighten(hex: string, amount: number): string {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
+export function darken(hex: string, amount: number): string {
+  const clean = hex.replace("#", "");
+  const full = clean.length === 3 ? clean.split("").map((c) => c + c).join("") : clean;
+  const num = parseInt(full, 16);
+  const mix = (channel: number) => Math.round(channel * (1 - amount));
+  const r = mix((num >> 16) & 255), g = mix((num >> 8) & 255), b = mix(num & 255);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+// Category/type/income-source badges render `color: rawHex` as text against a background
+// tinted with that same raw hex at ~8-12% alpha — the tint barely moves the card's luminance,
+// so the raw palette hue alone has to carry 4.5:1 contrast, and most of TONE_HEX's "vivid candy"
+// colors don't: axe caught indigo/violet at ~2.8-3.5:1 in dark mode, and separately (unexercised
+// by any CI run yet, since the app's ThemeProvider defaultTheme is "dark" — see app/layout.tsx)
+// nearly the whole palette fails in light mode against a near-white card (e.g. lemon 1.4:1).
+// Verified against every TONE_HEX/GOAL_COLORS/VAULT_CATEGORY_META value at the highest tint alpha
+// used by any call site (12.5%): lightening 30% clears 4.5:1 in dark mode (worst case indigo at
+// 5.05:1), darkening 50% clears it in light mode (worst case lemon at 4.97:1).
+export function badgeTextColor(hex: string, isDark: boolean): string {
+  return isDark ? lighten(hex, 0.3) : darken(hex, 0.5);
+}
+
 // Shared interactive-state contract for every icon in the system — a plain
 // display badge by default; opting into `interactive` makes it a pressable
 // control (hover lift + press-in), `selected` gives it a persistent "chosen"

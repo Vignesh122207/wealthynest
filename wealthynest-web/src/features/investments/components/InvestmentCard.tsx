@@ -71,9 +71,17 @@ export function InvestmentCard({ inv, onEdit, dividendRecords, bankAccounts, inv
       <StockTransactionModal inv={inv} type={stockTxnModal} onClose={() => setStockTxnModal(null)}
         bankAccounts={bankAccounts ?? []} investmentAccounts={investmentAccounts ?? []} />
     )}
-    <div data-testid="investment-card" onClick={onEdit} role="button" tabIndex={0}
-      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEdit(); } }}
-      className="bg-card border border-border rounded-2xl p-4 hover:border-indigo-500/40 hover:shadow-sm hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
+    <div data-testid="investment-card" onClick={onEdit}
+      className="relative bg-card border border-border rounded-2xl p-4 hover:border-indigo-500/40 hover:shadow-sm hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
+      {/* Real, separately-focusable control for the same action the card's plain onClick above
+          already does — a role="button" here would nest the Buy/Sell controls below inside
+          another interactive widget (axe's nested-interactive rule), so the card itself stays a
+          non-widget div and this sr-only-until-focused button is the keyboard/screen-reader path
+          to Edit instead (see AccountCard.tsx's identical fix). */}
+      <button type="button" onClick={onEdit}
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-20 focus:px-3 focus:py-1.5 focus:rounded-lg focus:bg-primary focus:text-primary-foreground focus:text-xs focus:font-medium">
+        Edit {displayName}
+      </button>
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-3 min-w-0">
           {inv.investmentType === "STOCK" ? (
@@ -101,7 +109,7 @@ export function InvestmentCard({ inv, onEdit, dividendRecords, bankAccounts, inv
             </div>
             <div className="flex items-center gap-1.5 flex-wrap">
               {inv.symbol && <span className="text-xs text-muted-foreground/80">{inv.symbol} · {inv.exchange ?? "NSE"}</span>}
-              {inv.purchaseDate && <span className="text-xs text-muted-foreground/60">Since {formatDate(inv.purchaseDate)}</span>}
+              {inv.purchaseDate && <span className="text-xs text-muted-foreground/80">Since {formatDate(inv.purchaseDate)}</span>}
             </div>
           </div>
         </div>
@@ -139,7 +147,7 @@ export function InvestmentCard({ inv, onEdit, dividendRecords, bankAccounts, inv
               </span>
             )}
             {inv.priceLastUpdated && (
-              <span className="ml-1 text-muted-foreground/60" title={`Price as of ${new Date(inv.priceLastUpdated).toLocaleString()}`}>
+              <span className="ml-1 text-muted-foreground/80" title={`Price as of ${new Date(inv.priceLastUpdated).toLocaleString()}`}>
                 · {new Date(inv.priceLastUpdated).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
               </span>
             )}
@@ -149,7 +157,7 @@ export function InvestmentCard({ inv, onEdit, dividendRecords, bankAccounts, inv
           <span className="text-xs text-muted-foreground/80 tabular-nums whitespace-nowrap">
             {fmtNum(Number(inv.units))} u × {formatCurrency(inv.livePrice ?? inv.currentPrice ?? 0)}
             {inv.priceLastUpdated && (
-              <span className="ml-1 text-muted-foreground/60" title={`NAV as of ${new Date(inv.priceLastUpdated).toLocaleString()}`}>
+              <span className="ml-1 text-muted-foreground/80" title={`NAV as of ${new Date(inv.priceLastUpdated).toLocaleString()}`}>
                 · {new Date(inv.priceLastUpdated).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
               </span>
             )}
@@ -159,7 +167,7 @@ export function InvestmentCard({ inv, onEdit, dividendRecords, bankAccounts, inv
           <span className="text-xs text-muted-foreground/80 whitespace-nowrap">
             {inv.quantityGrams}g · {inv.goldKarat ?? 22}K
             {inv.priceLastUpdated && (
-              <span className="ml-1 text-muted-foreground/60" title={`Rate as of ${new Date(inv.priceLastUpdated).toLocaleString()}`}>
+              <span className="ml-1 text-muted-foreground/80" title={`Rate as of ${new Date(inv.priceLastUpdated).toLocaleString()}`}>
                 · {new Date(inv.priceLastUpdated).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
               </span>
             )}

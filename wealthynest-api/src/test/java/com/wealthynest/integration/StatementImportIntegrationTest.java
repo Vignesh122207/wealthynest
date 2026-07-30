@@ -2,9 +2,6 @@ package com.wealthynest.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.wealthynest.domain.category.entity.Category;
-import com.wealthynest.domain.category.entity.CategoryType;
-import com.wealthynest.domain.category.repository.CategoryRepository;
 import com.wealthynest.domain.user.repository.UserRepository;
 import com.wealthynest.testsupport.AbstractIntegrationTest;
 import com.wealthynest.testsupport.IntegrationAuthHelper;
@@ -29,10 +26,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** Exercises StatementImportServiceImpl's full CSV preview -> confirm flow over the real
  * HTTP/security/DB stack: a real multipart CSV upload is auto-detected and parsed into draft
- * rows, then confirmed into real Expense/Income rows fetchable from their own endpoints. Seeds
- * the system "Other" expense category directly via the repository since (unlike categories a
- * user creates through the API) no Flyway migration seeds one — confirm() requires it to exist
- * unconditionally as the categoryId fallback for any DEBIT row that doesn't set one explicitly. */
+ * rows, then confirmed into real Expense/Income rows fetchable from their own endpoints. The
+ * system "Other" expense category confirm() requires unconditionally (as the categoryId fallback
+ * for any DEBIT row that doesn't set one explicitly) comes from V52__seed_system_categories.sql,
+ * same as every other environment — this test used to seed its own copy via the repository
+ * directly, back when no migration did that at all. */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
 class StatementImportIntegrationTest extends AbstractIntegrationTest {
@@ -40,7 +38,6 @@ class StatementImportIntegrationTest extends AbstractIntegrationTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private UserRepository userRepository;
-    @Autowired private CategoryRepository categoryRepository;
 
     private String auth(String token) { return "Bearer " + token; }
 
@@ -49,9 +46,6 @@ class StatementImportIntegrationTest extends AbstractIntegrationTest {
     void csvPreviewThenConfirmCreatesRealTransactions() throws Exception {
         AuthResult auth = IntegrationAuthHelper.registerVerifyAndLogin(mockMvc, objectMapper, userRepository,
                 "stmt-import-" + UUID.randomUUID() + "@example.com", "Passw0rd1");
-
-        // Seed the "Other" system fallback category the confirm() flow depends on unconditionally.
-        categoryRepository.save(Category.builder().name("Other").type(CategoryType.EXPENSE).system(true).build());
 
         MvcResult accountResult = mockMvc.perform(post("/api/v1/accounts")
                         .header("Authorization", auth(auth.accessToken()))

@@ -182,9 +182,17 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
   if (isCreditCard) {
     // ── Credit card: premium card design ──────────────────────────────────────
     return (
-      <div onClick={onEdit} role="button" tabIndex={0}
-        onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEdit(); } }}
+      <div onClick={onEdit}
         className="relative rounded-2xl shadow-sm hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 animate-fade-in-up cursor-pointer">
+        {/* Real, separately-focusable control for the same action the card's plain onClick above
+            already does — a role="button" here would nest the View-transactions/Download/Actions
+            controls below inside another interactive widget (axe's nested-interactive rule), so
+            the card itself stays a non-widget div and this sr-only-until-focused button is the
+            keyboard/screen-reader path to Edit instead. */}
+        <button type="button" onClick={onEdit}
+          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-20 focus:px-3 focus:py-1.5 focus:rounded-lg focus:bg-primary focus:text-primary-foreground focus:text-xs focus:font-medium">
+          Edit {account.name}
+        </button>
         {/* Background layer — clipped to the rounded corners on its own, so content (like the
             action menu below) isn't also clipped when it needs to overflow the card bounds. */}
         <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
@@ -290,7 +298,7 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
           <div>
             {account.recentTransactions.length > 2 && (
               <button onClick={() => {}}
-                className="mt-1 w-full text-xs text-muted-foreground/50 hover:text-muted-foreground py-1 transition-colors flex items-center justify-center gap-1">
+                className="mt-1 w-full text-xs text-muted-foreground/80 hover:text-muted-foreground py-1 transition-colors flex items-center justify-center gap-1">
                 <ChevronDown className="w-3 h-3" />
                 {`View ${account.recentTransactions.length - 2} more`}
               </button>
@@ -305,9 +313,17 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
   const meta = ACCOUNT_TYPE_META[account.accountType];
 
   return (
-    <div onClick={onEdit} role="button" tabIndex={0}
-      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEdit(); } }}
+    <div onClick={onEdit}
       className="relative bg-card border border-border/50 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 animate-fade-in-up flex flex-col cursor-pointer overflow-hidden">
+      {/* Real, separately-focusable control for the same action the card's plain onClick above
+          already does — a role="button" here would nest the View-transactions/Download/Actions
+          controls below inside another interactive widget (axe's nested-interactive rule), so
+          the card itself stays a non-widget div and this sr-only-until-focused button is the
+          keyboard/screen-reader path to Edit instead. */}
+      <button type="button" onClick={onEdit}
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-20 focus:px-3 focus:py-1.5 focus:rounded-lg focus:bg-primary focus:text-primary-foreground focus:text-xs focus:font-medium">
+        Edit {account.name}
+      </button>
       {/* Same premium gradient-edge treatment as the form modal headers, tinted to this account
           type's own Apple system color — a lighter touch than the credit card's full "physical
           card" face, but still gives every type its own visible identity rather than just a
@@ -338,7 +354,7 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
               {account.bankName && account.bankName !== account.name && <p className="text-xs text-muted-foreground">{account.bankName}</p>}
               {account.accountNumber && (
                 <div className="flex items-center gap-1">
-                  <p className="text-xs text-muted-foreground/50 font-mono">
+                  <p className="text-xs text-muted-foreground/80 font-mono">
                     {revealAcctNum ? account.accountNumber : `•••• ${account.accountNumber.slice(-4)}`}
                   </p>
                   <button onClick={e => { e.stopPropagation(); setRevealAcctNum(v => !v); }}
@@ -429,7 +445,7 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
         <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl px-3 py-2">
           <div className="flex items-center gap-1 mb-0.5">
             <TrendingUp className="w-3 h-3 text-emerald-500" />
-            <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">In</p>
+            <p className="text-[10px] text-muted-foreground/80 uppercase tracking-wide">In</p>
           </div>
           <p className="text-sm font-bold text-emerald-500 dark:text-emerald-400 tabular-nums">
             {fmt(account.totalMoneyIn)}
@@ -438,7 +454,7 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
         <div className="bg-red-500/5 border border-red-500/10 rounded-xl px-3 py-2">
           <div className="flex items-center gap-1 mb-0.5">
             <TrendingDown className="w-3 h-3 text-red-500" />
-            <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">Out</p>
+            <p className="text-[10px] text-muted-foreground/80 uppercase tracking-wide">Out</p>
           </div>
           <p className="text-sm font-bold text-red-500 dark:text-red-400 tabular-nums">
             {fmt(account.totalMoneyOut)}
@@ -473,7 +489,7 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
       {account.totalMoneyIn > 0 && (
         <div className="mb-3">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wide">Spending</span>
+            <span className="text-[10px] text-muted-foreground/80 uppercase tracking-wide">Spending</span>
             <span className={cn("text-xs font-semibold tabular-nums",
               pct > 90 ? "text-red-500" : pct > 70 ? "text-amber-500" : "text-muted-foreground/70")}>
               {pct.toFixed(0)}%

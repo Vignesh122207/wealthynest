@@ -57,7 +57,7 @@ export function IncomeTabContent({
             action={
               !hasIncomeAccounts ? addAccountCta
                 : <button onClick={onAddIncome}
-                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
+                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
                 <Plus className="w-4 h-4" /> Add Income
               </button>
             } />

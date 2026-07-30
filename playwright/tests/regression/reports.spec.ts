@@ -1,7 +1,7 @@
 import {expect, test} from "../../fixtures";
 
-// Serial — see debts.spec.ts's comment. Every action here is a client-side blob download or a
-// window.open print view (see ReportsPage.ts) — no mutations, so cross-test data isolation isn't
+// Serial — see debts.spec.ts's comment. Every action here is a client-side blob download,
+// CSV or PDF alike (see ReportsPage.ts) — no mutations, so cross-test data isolation isn't
 // a concern the way it is for the CRUD-heavy regression files.
 test.describe.configure({ mode: "serial" });
 
@@ -13,11 +13,10 @@ test.describe("Reports", () => {
     expect(download.suggestedFilename()).toMatch(/^WealthyNest-\d{4}-\d{2}-Monthly\.csv$/);
   });
 
-  test("Monthly tab's PDF button opens a branded print window @regression", async ({ reportsPage }) => {
+  test("Monthly tab's PDF button downloads a PDF named for the selected period @regression", async ({ reportsPage }) => {
     await reportsPage.gotoReports();
-    const popup = await reportsPage.openMonthlyPdf();
-    await expect(popup.locator(".brand-name")).toHaveText("WealthyNest");
-    await popup.close();
+    const download = await reportsPage.downloadMonthlyPdf();
+    expect(download.suggestedFilename()).toMatch(/^WealthyNest-\d{4}-\d{2}-Monthly\.pdf$/);
   });
 
   test("Annual tab downloads a CSV named for the selected year @regression", async ({ reportsPage }) => {

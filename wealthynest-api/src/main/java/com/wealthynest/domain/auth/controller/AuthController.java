@@ -87,8 +87,17 @@ public class AuthController {
 
     @PostMapping("/google-login-native")
     public ResponseEntity<ApiResponse<AuthResponse>> googleLoginNative(
-            @Valid @RequestBody GoogleNativeLoginRequest request, HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
+            @Valid @RequestBody GoogleCodeLoginRequest request, HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
         return ok(authService.googleLoginNative(request, httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent")), httpResponse);
+    }
+
+    // Web counterpart — see AuthService.googleLoginPopup's own comment for why this exists
+    // alongside googleLogin (One Tap's silent prompt() being blocked/skipped on a lot of mobile
+    // browsers).
+    @PostMapping("/google-login-popup")
+    public ResponseEntity<ApiResponse<AuthResponse>> googleLoginPopup(
+            @Valid @RequestBody GoogleCodeLoginRequest request, HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
+        return ok(authService.googleLoginPopup(request, httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent")), httpResponse);
     }
 
     @PostMapping("/pin-login")

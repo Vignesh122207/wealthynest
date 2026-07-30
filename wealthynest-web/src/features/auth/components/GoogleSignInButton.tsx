@@ -6,11 +6,11 @@ import {Capacitor} from "@capacitor/core";
 import {GenericOAuth2} from "@capacitor-community/generic-oauth2";
 import {Loader2} from "lucide-react";
 import {toast} from "sonner";
-import {useGoogleLogin, useGoogleLoginNative} from "../hooks/useAuth";
+import {useGoogleLogin, useGoogleLoginNative, useGoogleLoginPopup} from "../hooks/useAuth";
 
 // Minimal shape of the Google Identity Services API this component actually calls —
 // https://accounts.google.com/gsi/client doesn't ship its own types, and pulling in a full
-// @types package for two methods isn't worth the dependency.
+// @types package for a handful of methods isn't worth the dependency.
 interface PromptMomentNotification {
   isNotDisplayed(): boolean;
   isSkippedMoment(): boolean;
@@ -20,9 +20,20 @@ interface GoogleAccountsId {
   initialize(config: { client_id: string; callback: (response: { credential: string }) => void }): void;
   prompt(momentListener?: (notification: PromptMomentNotification) => void): void;
 }
+interface GoogleCodeClient {
+  requestCode(): void;
+}
+interface GoogleAccountsOAuth2 {
+  initCodeClient(config: {
+    client_id: string;
+    scope: string;
+    ux_mode: "popup";
+    callback: (response: { code?: string; error?: string }) => void;
+  }): GoogleCodeClient;
+}
 declare global {
   interface Window {
-    google?: { accounts: { id: GoogleAccountsId } };
+    google?: { accounts: { id: GoogleAccountsId; oauth2: GoogleAccountsOAuth2 } };
   }
 }
 
@@ -93,8 +104,10 @@ function GoogleButtonChrome({ onClick, busy, testId }: { onClick: () => void; bu
 // reach Google's token endpoint and get rejected there, one step past the account picker. Instead
 // the code + PKCE verifier go to useGoogleLoginNative, which hits a backend endpoint that holds
 // the secret server-side and does the exchange itself (see AuthServiceImpl.googleLoginNative).
-// The web flow below still gets its ID token directly from GIS and calls useGoogleLogin as before
-// — only the native path needed this detour.
+// The web flow below still gets its ID token directly from GIS via useGoogleLogin as its primary
+// path — WebGoogleSignInButton's own runPopupFallback covers the same "no client secret in the
+// browser" problem for its one code-based path (the popup fallback), the same way this native
+// button's detour does for all of native.
 function NativeGoogleSignInButton() {
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_NATIVE_CLIENT_ID;
   const { mutate: googleLoginNative, isPending } = useGoogleLoginNative();
@@ -143,6 +156,7 @@ function NativeGoogleSignInButton() {
 function WebGoogleSignInButton() {
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
   const { mutate: googleLogin } = useGoogleLogin();
+  const { mutate: googleLoginPopup } = useGoogleLoginPopup();
   const [pending, setPending] = useState(false);
 
   const handleScriptLoad = () => {
@@ -163,6 +177,32 @@ function WebGoogleSignInButton() {
 
   if (!clientId) return null;
 
+  // One Tap's silent prompt() gets blocked or skipped outright on a lot of mobile browsers —
+  // blocked third-party cookies on browsers without FedCM support, or Google's own cooldown after
+  // a prior dismissal — which used to dead-end here with a "try again" toast the user had no way
+  // to act on. GIS's interactive popup code-flow (a real accounts.google.com consent screen, not
+  // a silent iframe) doesn't have that restriction, so it's the fallback exactly for the browsers
+  // where prompt() doesn't work; the fast prompt() path stays as the first attempt everywhere else
+  // since it doesn't need the extra popup round trip. Backend side: AuthServiceImpl.googleLoginPopup.
+  const runPopupFallback = () => {
+    if (!window.google) { setPending(false); return; }
+    window.google.accounts.oauth2.initCodeClient({
+      client_id: clientId,
+      scope: "openid email profile",
+      ux_mode: "popup",
+      callback: (response) => {
+        setPending(false);
+        // No code means the user closed the popup — silent, same as the native Custom Tab's
+        // USER_CANCELLED handling above, not a failure worth surfacing.
+        if (!response.code) return;
+        // "postmessage" is Google's own documented sentinel redirect_uri for JS client libraries
+        // doing a server-side code exchange in popup mode — not a real URL, and not something
+        // that needs registering as an authorized redirect URI on the OAuth client.
+        googleLoginPopup({ code: response.code, redirectUri: "postmessage", rememberMe: true });
+      },
+    }).requestCode();
+  };
+
   // No rendered widget to click — google.accounts.id.prompt() triggers the same underlying GIS
   // sign-in flow (One Tap / FedCM depending on browser) programmatically, calling back to
   // initialize()'s callback above with the ID token exactly like clicking Google's own button
@@ -176,8 +216,7 @@ function WebGoogleSignInButton() {
     setPending(true);
     window.google.accounts.id.prompt((notification) => {
       if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-        setPending(false);
-        toast.error("Google sign-in isn't available right now. Please try again.");
+        runPopupFallback();
       } else if (notification.isDismissedMoment()) {
         // Covers both "user cancelled" (silent, same as the biometric/passkey cancel paths
         // elsewhere in this app) and "succeeded" (initialize()'s callback already fired above).

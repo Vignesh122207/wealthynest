@@ -125,11 +125,31 @@ class UserControllerTest {
     void disablePinDelegatesToAuthService() throws Exception {
         SecurityTestUtils.authenticateAs(userId, null);
 
-        mockMvc.perform(post("/api/v1/users/me/pin/disable"))
+        mockMvc.perform(post("/api/v1/users/me/pin/disable")
+                        .contentType("application/json")
+                        .content("""
+                                {"pin": "1234"}
+                                """))
                 .andExpect(status().isOk());
 
-        verify(authService).disablePin(userId);
+        verify(authService).disablePin(eq(userId), any(), any(), any());
         org.mockito.Mockito.verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("POST /me/pin/disable with a blank pin fails @NotBlank validation before the service is called")
+    void disablePinBlankPinFailsValidation() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null);
+
+        mockMvc.perform(post("/api/v1/users/me/pin/disable")
+                        .contentType("application/json")
+                        .content("""
+                                {"pin": ""}
+                                """))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.fieldErrors.pin").exists());
+
+        verify(authService, never()).disablePin(any(), any(), any(), any());
     }
 
     @Test

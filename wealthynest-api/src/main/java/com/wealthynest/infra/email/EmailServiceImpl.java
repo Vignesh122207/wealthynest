@@ -5,6 +5,8 @@ import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
@@ -14,6 +16,21 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class EmailServiceImpl implements EmailService {
+
+    // The brand ribbon-W mark (RibbonWMark, tone="mono", in BrandMark.tsx), rasterized to PNG and
+    // sent as a CID inline attachment rather than a remote <img src> or raw <svg> — Outlook desktop
+    // doesn't render SVG at all, and a remote-hosted image depends on frontendUrl being publicly
+    // reachable, which it isn't in local/dev. See scripts that regenerate this asset if the glyph
+    // in BrandMark.tsx ever changes: wealthynest-web/public/icons/favicon.svg has the same geometry.
+    private static final String LOGO_CID = "logo-mark";
+    private static final ClassPathResource LOGO_RESOURCE = new ClassPathResource("email/logo-mark.png");
+
+    // Matches the web app's `new Date().getFullYear()` footer/copyright convention (see
+    // AuthBrandPanel consumers, PublicNav, the landing page) instead of a literal year that goes
+    // stale every January — pinned to IST since that's the app's stated audience/timezone.
+    private static int currentYear() {
+        return java.time.Year.now(java.time.ZoneId.of("Asia/Kolkata")).getValue();
+    }
 
     private final JavaMailSender mailSender;
 
@@ -61,9 +78,10 @@ public class EmailServiceImpl implements EmailService {
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(html, true);
+            helper.addInline(LOGO_CID, LOGO_RESOURCE, "image/png");
             mailSender.send(message);
             log.info("Email sent to {} — subject: {}", to, subject);
-        } catch (MessagingException e) {
+        } catch (MessagingException | MailException e) {
             log.error("Failed to send email to {}: {}", to, e.getMessage(), e);
         }
     }
@@ -87,7 +105,7 @@ public class EmailServiceImpl implements EmailService {
                         <table cellpadding="0" cellspacing="0" align="center">
                           <tr>
                             <td style="background:rgba(255,255,255,0.15);border-radius:12px;width:44px;height:44px;text-align:center;vertical-align:middle;">
-                              <span style="font-size:22px;font-weight:800;line-height:44px;color:#ffffff;font-family:'Segoe UI',Arial,sans-serif;">W</span>
+                              <img src="cid:logo-mark" width="26" height="26" alt="WealthyNest" style="display:inline-block;vertical-align:middle;" />
                             </td>
                             <td style="padding-left:10px;vertical-align:middle;">
                               <span style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">WealthyNest</span>
@@ -123,7 +141,7 @@ public class EmailServiceImpl implements EmailService {
                     </tr>
                     <tr>
                       <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:24px 40px;text-align:center;">
-                        <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;">© 2025 WealthyNest · Built with ♥ for Indian families</p>
+                        <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;">© %d WealthyNest · Built with ♥ for Indian families</p>
                         <p style="margin:0;font-size:12px;color:#cbd5e1;">noreply@wealthynest.in · Do not reply to this email</p>
                       </td>
                     </tr>
@@ -132,7 +150,7 @@ public class EmailServiceImpl implements EmailService {
               </table>
             </body>
             </html>
-            """.formatted(firstName, link, link);
+            """.formatted(firstName, link, link, currentYear());
     }
 
     private String buildVerificationHtml(String name, String link) {
@@ -154,7 +172,7 @@ public class EmailServiceImpl implements EmailService {
                         <table cellpadding="0" cellspacing="0" align="center">
                           <tr>
                             <td style="background:rgba(255,255,255,0.15);border-radius:12px;width:44px;height:44px;text-align:center;vertical-align:middle;">
-                              <span style="font-size:22px;font-weight:800;line-height:44px;color:#ffffff;font-family:'Segoe UI',Arial,sans-serif;">W</span>
+                              <img src="cid:logo-mark" width="26" height="26" alt="WealthyNest" style="display:inline-block;vertical-align:middle;" />
                             </td>
                             <td style="padding-left:10px;vertical-align:middle;">
                               <span style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">WealthyNest</span>
@@ -173,7 +191,7 @@ public class EmailServiceImpl implements EmailService {
                         <table cellpadding="0" cellspacing="0" width="100%%">
                           <tr>
                             <td align="center" style="padding:8px 0 32px;">
-                              <a href="%s" style="display:inline-block;background:linear-gradient(135deg,#059669,#0d9488);color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 36px;border-radius:10px;letter-spacing:0.2px;">
+                              <a href="%s" style="display:inline-block;background:linear-gradient(135deg,#27272a,#c2703d);color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 36px;border-radius:10px;letter-spacing:0.2px;">
                                 Verify Email Address
                               </a>
                             </td>
@@ -190,7 +208,7 @@ public class EmailServiceImpl implements EmailService {
                     </tr>
                     <tr>
                       <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:24px 40px;text-align:center;">
-                        <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;">© 2026 WealthyNest · Built with ♥ for Indian families</p>
+                        <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;">© %d WealthyNest · Built with ♥ for Indian families</p>
                         <p style="margin:0;font-size:12px;color:#cbd5e1;">noreply@wealthynest.in · Do not reply to this email</p>
                       </td>
                     </tr>
@@ -199,7 +217,7 @@ public class EmailServiceImpl implements EmailService {
               </table>
             </body>
             </html>
-            """.formatted(firstName, link, link);
+            """.formatted(firstName, link, link, currentYear());
     }
 
     private String buildAccountExistsHtml(String name, String loginLink, String resetLink) {
@@ -221,7 +239,7 @@ public class EmailServiceImpl implements EmailService {
                         <table cellpadding="0" cellspacing="0" align="center">
                           <tr>
                             <td style="background:rgba(255,255,255,0.15);border-radius:12px;width:44px;height:44px;text-align:center;vertical-align:middle;">
-                              <span style="font-size:22px;font-weight:800;line-height:44px;color:#ffffff;font-family:'Segoe UI',Arial,sans-serif;">W</span>
+                              <img src="cid:logo-mark" width="26" height="26" alt="WealthyNest" style="display:inline-block;vertical-align:middle;" />
                             </td>
                             <td style="padding-left:10px;vertical-align:middle;">
                               <span style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">WealthyNest</span>
@@ -261,7 +279,7 @@ public class EmailServiceImpl implements EmailService {
                     </tr>
                     <tr>
                       <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:24px 40px;text-align:center;">
-                        <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;">© 2026 WealthyNest · Built with ♥ for Indian families</p>
+                        <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;">© %d WealthyNest · Built with ♥ for Indian families</p>
                         <p style="margin:0;font-size:12px;color:#cbd5e1;">noreply@wealthynest.in · Do not reply to this email</p>
                       </td>
                     </tr>
@@ -270,7 +288,7 @@ public class EmailServiceImpl implements EmailService {
               </table>
             </body>
             </html>
-            """.formatted(firstName, loginLink, resetLink);
+            """.formatted(firstName, loginLink, resetLink, currentYear());
     }
 
     private String buildNewSignInHtml(String name, String when, String ipAddress, String userAgent, String securityLink) {
@@ -294,7 +312,7 @@ public class EmailServiceImpl implements EmailService {
                         <table cellpadding="0" cellspacing="0" align="center">
                           <tr>
                             <td style="background:rgba(255,255,255,0.15);border-radius:12px;width:44px;height:44px;text-align:center;vertical-align:middle;">
-                              <span style="font-size:22px;font-weight:800;line-height:44px;color:#ffffff;font-family:'Segoe UI',Arial,sans-serif;">W</span>
+                              <img src="cid:logo-mark" width="26" height="26" alt="WealthyNest" style="display:inline-block;vertical-align:middle;" />
                             </td>
                             <td style="padding-left:10px;vertical-align:middle;">
                               <span style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">WealthyNest</span>
@@ -335,7 +353,7 @@ public class EmailServiceImpl implements EmailService {
                     </tr>
                     <tr>
                       <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:24px 40px;text-align:center;">
-                        <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;">© 2026 WealthyNest · Built with ♥ for Indian families</p>
+                        <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;">© %d WealthyNest · Built with ♥ for Indian families</p>
                         <p style="margin:0;font-size:12px;color:#cbd5e1;">noreply@wealthynest.in · Do not reply to this email</p>
                       </td>
                     </tr>
@@ -344,6 +362,6 @@ public class EmailServiceImpl implements EmailService {
               </table>
             </body>
             </html>
-            """.formatted(firstName, when, ip, device, securityLink);
+            """.formatted(firstName, when, ip, device, securityLink, currentYear());
     }
 }

@@ -101,6 +101,19 @@
      to it. */
   body { @apply bg-background text-foreground; }
 
+  /* iOS Safari force-zooms the whole page in on focus for any text input/select/textarea whose
+     computed font-size is below 16px, then frequently fails to zoom back out on blur — this is
+     the actual mechanism behind "the UI looks zoomed in" on phones, not a viewport misconfig
+     (viewport above is already correct: width=device-width, initial-scale=1). Most inputs in this
+     app render at text-sm/text-xs (14px/12px). Scoped to the mobile breakpoint and to form
+     controls only, so desktop/tablet typography is untouched. */
+  @media (max-width: 767px) {
+    /* !important: Tailwind's text-sm/text-xs utility classes live in the `utilities` cascade
+       layer, which beats this `base`-layer rule on layer order alone regardless of selector
+       specificity — importance is the one thing that overrides layer order. */
+    input, select, textarea { font-size: 16px !important; }
+  }
+
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { @apply bg-slate-300 dark:bg-slate-700 rounded-full; }

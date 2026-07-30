@@ -340,6 +340,18 @@ class AuthControllerTest {
     }
 
     @Test
+    @DisplayName("googleLoginPopup delegates the request and client metadata to the service")
+    void googleLoginPopupDelegatesToService() throws Exception {
+        when(authService.googleLoginPopup(any(), any(), any())).thenReturn(sampleAuthResponse());
+
+        mockMvc.perform(post("/api/v1/auth/google-login-popup")
+                        .contentType("application/json")
+                        .content("{\"code\":\"auth-code\",\"redirectUri\":\"postmessage\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accessToken").value("access"));
+    }
+
+    @Test
     @DisplayName("pinLogin reads the anchoring refresh token from the cookie and the PIN from the body")
     void pinLoginDelegatesToService() throws Exception {
         when(authService.pinLogin(any(), eq("some-token"), any(), any())).thenReturn(sampleAuthResponse());

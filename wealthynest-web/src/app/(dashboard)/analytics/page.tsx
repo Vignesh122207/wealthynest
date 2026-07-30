@@ -339,7 +339,7 @@ export default function AnalyticsPage() {
                     </div>
                   ))}
                   {categoryData.length > 10 && (
-                    <p className="text-[10px] text-muted-foreground/40 pt-1">+{categoryData.length - 10} more</p>
+                    <p className="text-[10px] text-muted-foreground/80 pt-1">+{categoryData.length - 10} more</p>
                   )}
                 </div>
               </div>

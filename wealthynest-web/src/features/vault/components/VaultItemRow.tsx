@@ -1,9 +1,10 @@
 "use client";
 
 import {Copy, Eye, ShieldAlert, ShieldX, Star} from "lucide-react";
-import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {badgeTextColor, PremiumIcon} from "@/components/icons/PremiumIcon";
 import {resolveVaultIcon} from "@/lib/categoryMeta";
 import {cn, formatDate} from "@/lib/utils";
+import {useIsDark} from "@/hooks/useIsDark";
 import type {VaultItem} from "../types/vault.types";
 
 const FLAG_META = {
@@ -27,6 +28,7 @@ export function VaultItemRow({ item, accentColor, healthFlag, onReveal, onEdit, 
   onEdit: () => void;
   onToggleFavorite: () => void;
 }) {
+  const isDark = useIsDark();
   const icon = resolveVaultIcon(item);
   const flag = healthFlag ? FLAG_META[healthFlag] : null;
   return (
@@ -38,7 +40,7 @@ export function VaultItemRow({ item, accentColor, healthFlag, onReveal, onEdit, 
             {item.title}
             {item.hasTotp && (
               <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded shrink-0"
-                style={{ backgroundColor: accentColor + "18", color: accentColor }}>
+                style={{ backgroundColor: accentColor + "18", color: badgeTextColor(accentColor, isDark) }}>
                 2FA
               </span>
             )}
@@ -47,17 +49,17 @@ export function VaultItemRow({ item, accentColor, healthFlag, onReveal, onEdit, 
             {item.username && <span className="text-xs text-muted-foreground/80 truncate">{item.username}</span>}
             {item.category && (
               <span className="text-xs px-1.5 py-0.5 rounded font-medium shrink-0"
-                style={{ backgroundColor: accentColor + "18", color: accentColor }}>
+                style={{ backgroundColor: accentColor + "18", color: badgeTextColor(accentColor, isDark) }}>
                 {item.category}
               </span>
             )}
             {flag && (
-              <span className="text-xs font-semibold flex items-center gap-1 shrink-0" style={{ color: flag.color }}>
+              <span className="text-xs font-semibold flex items-center gap-1 shrink-0" style={{ color: badgeTextColor(flag.color, isDark) }}>
                 <flag.icon className="w-3 h-3" /> {flag.label}
               </span>
             )}
             {item.lastRevealedAt && (
-              <span className="text-xs text-muted-foreground/60 shrink-0">· viewed {formatDate(item.lastRevealedAt)}</span>
+              <span className="text-xs text-muted-foreground/80 shrink-0">· viewed {formatDate(item.lastRevealedAt)}</span>
             )}
           </div>
         </div>

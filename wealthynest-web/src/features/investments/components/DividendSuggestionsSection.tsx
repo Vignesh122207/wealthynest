@@ -26,7 +26,7 @@ export function DividendSuggestionsSection({ stockCount }: { stockCount: number 
         <Banknote className="w-4 h-4 text-muted-foreground/80 shrink-0 mt-0.5" />
         <div>
           <p className="text-xs font-medium text-muted-foreground">Dividend data updates at 8 PM on trading days</p>
-          <p className="text-[11px] text-muted-foreground/60 mt-0.5">
+          <p className="text-[11px] text-muted-foreground/80 mt-0.5">
             To add dividend income now, go to <strong className="text-muted-foreground/80">Accounts → Add Money</strong> and select <em>Dividend</em> as the source.
           </p>
         </div>
@@ -118,7 +118,7 @@ export function DividendSuggestionsSection({ stockCount }: { stockCount: number 
               );
             })}
           </div>
-          <p className="text-xs text-muted-foreground/60">
+          <p className="text-xs text-muted-foreground/80">
             Edit the amount if needed, then click <strong className="text-muted-foreground/80">Log</strong> to record each dividend.
             Click <X className="w-3 h-3 inline" /> to dismiss a suggestion permanently.
           </p>

@@ -85,7 +85,7 @@ export function TransferFormModal({ onSubmit, onCancel, onDelete, isPending, acc
               <span className="font-medium text-foreground">{editTransferRef.fromAccountName}</span>
               <ArrowLeftRight className="w-3.5 h-3.5 text-muted-foreground/80 shrink-0" />
               <span className="font-medium text-foreground">{editTransferRef.toAccountName}</span>
-              <span className="ml-auto text-xs text-muted-foreground/50">accounts can&apos;t be changed</span>
+              <span className="ml-auto text-xs text-muted-foreground/80">accounts can&apos;t be changed</span>
             </div>
           ) : (
             <>

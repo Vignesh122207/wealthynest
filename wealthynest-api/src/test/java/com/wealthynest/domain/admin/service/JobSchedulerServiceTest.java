@@ -52,6 +52,7 @@ class JobSchedulerServiceTest {
     @Mock private RecurringTransferScheduler          recurringTransferScheduler;
     @Mock private RecurringGoalContributionScheduler  recurringGoalContributionScheduler;
     @Mock private MfMasterSyncScheduler                mfMasterSyncScheduler;
+    @Mock private AuditLogCleanupScheduler            auditLogCleanupScheduler;
     @Mock private DataSource                          dataSource;
 
     private JobSchedulerService service;
@@ -63,7 +64,7 @@ class JobSchedulerServiceTest {
                 netWorthSnapshotScheduler, stockDataScheduler, loanEmiScheduler, lowBalanceScheduler,
                 spendAnomalyScheduler, debtReminderScheduler, emiReminderScheduler, sipReminderScheduler,
                 recurringTransferScheduler, recurringGoalContributionScheduler, mfMasterSyncScheduler,
-                dataSource);
+                auditLogCleanupScheduler, dataSource);
     }
 
     @AfterEach
@@ -258,6 +259,8 @@ class JobSchedulerServiceTest {
             verify(recurringTransferScheduler).processRecurringTransfers();
             run("RECURRING_GOAL_CONTRIBUTION");
             verify(recurringGoalContributionScheduler).processRecurringGoalContributions();
+            run("AUDIT_LOG_CLEANUP");
+            verify(auditLogCleanupScheduler).purgeOldEntries();
         }
 
         @Test

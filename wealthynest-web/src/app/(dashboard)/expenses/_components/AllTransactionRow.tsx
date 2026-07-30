@@ -3,7 +3,8 @@
 import {memo} from "react";
 import {ArrowLeftRight, CreditCard, HandCoins, RefreshCw} from "lucide-react";
 import {getCategoryColor, getCategoryIcon, INCOME_ICON_MAP} from "@/lib/categoryMeta";
-import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {badgeTextColor, PremiumIcon} from "@/components/icons/PremiumIcon";
+import {useIsDark} from "@/hooks/useIsDark";
 import {DebtBadge} from "@/features/expenses/components/TransactionRows";
 import {INCOME_SOURCES} from "@/lib/constants";
 import {cn} from "@/lib/utils";
@@ -27,6 +28,7 @@ interface AllTransactionRowProps {
 // balance), so this stays one component switching on `row.kind` rather than three near-identical
 // ones.
 export const AllTransactionRow = memo(function AllTransactionRow({ row, fmt, accountMap, balanceMap, onEditExpense, onEditIncome, onEditTransfer }: AllTransactionRowProps) {
+  const isDark = useIsDark();
   if (row.kind === "expense") {
     const e = row.data;
     const catIcon  = getCategoryIcon({ name: e.categoryName ?? "", icon: e.categoryIcon });
@@ -43,10 +45,10 @@ export const AllTransactionRow = memo(function AllTransactionRow({ row, fmt, acc
           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
             {e.categoryName && (
               <span className="text-xs px-1.5 py-0.5 rounded-md font-medium"
-                style={{ backgroundColor: catColor + "18", color: catColor }}>{e.categoryName}</span>
+                style={{ backgroundColor: catColor + "18", color: badgeTextColor(catColor, isDark) }}>{e.categoryName}</span>
             )}
             {e.accountId && accountMap[e.accountId] && (
-              <span className="text-xs text-muted-foreground/50">{accountMap[e.accountId]}</span>
+              <span className="text-xs text-muted-foreground/80">{accountMap[e.accountId]}</span>
             )}
             {e.paymentMethod === "CREDIT_CARD" && (
               <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-500/15 text-rose-500 dark:text-rose-400 font-medium">Card</span>
@@ -56,7 +58,7 @@ export const AllTransactionRow = memo(function AllTransactionRow({ row, fmt, acc
         <div className="text-right shrink-0">
           <p className="text-sm font-bold text-red-500 dark:text-red-400 tabular-nums">−{fmt(e.amount)}</p>
           {e.accountId && balanceMap.has(`expense-${e.id}`) && (
-            <p className="text-[11px] text-muted-foreground/50 tabular-nums mt-0.5">Bal {fmt(balanceMap.get(`expense-${e.id}`)!)}</p>
+            <p className="text-[11px] text-muted-foreground/80 tabular-nums mt-0.5">Bal {fmt(balanceMap.get(`expense-${e.id}`)!)}</p>
           )}
         </div>
       </button>
@@ -77,18 +79,18 @@ export const AllTransactionRow = memo(function AllTransactionRow({ row, fmt, acc
           </p>
           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
             <span className="text-xs px-1.5 py-0.5 rounded-md font-medium"
-              style={{ backgroundColor: src.color + "20", color: src.color }}>
+              style={{ backgroundColor: src.color + "20", color: badgeTextColor(src.color, isDark) }}>
               {INCOME_SOURCES.find(s => s.value === income.source)?.label ?? income.source}
             </span>
             {income.accountId && accountMap[income.accountId] && (
-              <span className="text-xs text-muted-foreground/50">{accountMap[income.accountId]}</span>
+              <span className="text-xs text-muted-foreground/80">{accountMap[income.accountId]}</span>
             )}
           </div>
         </div>
         <div className="text-right shrink-0">
           <p className="text-sm font-bold text-emerald-500 dark:text-emerald-400 tabular-nums">+{fmt(income.amount)}</p>
           {income.accountId && balanceMap.has(`income-${income.id}`) && (
-            <p className="text-[11px] text-muted-foreground/50 tabular-nums mt-0.5">Bal {fmt(balanceMap.get(`income-${income.id}`)!)}</p>
+            <p className="text-[11px] text-muted-foreground/80 tabular-nums mt-0.5">Bal {fmt(balanceMap.get(`income-${income.id}`)!)}</p>
           )}
         </div>
       </button>
@@ -121,7 +123,7 @@ export const AllTransactionRow = memo(function AllTransactionRow({ row, fmt, acc
           {isDebt ? (
             <DebtBadge debtLabel={transfer.debtLabel} debtContactName={transfer.debtContactName} />
           ) : (
-            <span className="text-xs text-muted-foreground/60">{transfer.fromAccountName} → {transfer.toAccountName}</span>
+            <span className="text-xs text-muted-foreground/80">{transfer.fromAccountName} → {transfer.toAccountName}</span>
           )}
         </div>
       </div>
@@ -132,7 +134,7 @@ export const AllTransactionRow = memo(function AllTransactionRow({ row, fmt, acc
           {txnSign}{fmt(transfer.amount)}
         </p>
         {balanceMap.has(balanceKey) && (
-          <p className="text-[11px] text-muted-foreground/50 tabular-nums mt-0.5">Bal {fmt(balanceMap.get(balanceKey)!)}</p>
+          <p className="text-[11px] text-muted-foreground/80 tabular-nums mt-0.5">Bal {fmt(balanceMap.get(balanceKey)!)}</p>
         )}
       </div>
     </button>

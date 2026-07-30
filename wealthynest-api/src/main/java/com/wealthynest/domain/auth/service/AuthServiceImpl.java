@@ -29,6 +29,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
@@ -77,6 +79,11 @@ public class AuthServiceImpl implements AuthService {
 
     @Value("${wealthynest.google.client-id:}")
     private String googleClientId;
+
+    // Only needed for the web popup-code fallback's server-side exchange (see googleLoginPopup) —
+    // the primary web flow (googleLogin) verifies an ID token directly and never touches this.
+    @Value("${wealthynest.google.client-secret:}")
+    private String googleClientSecret;
 
     @Value("${wealthynest.google.native.client-id:}")
     private String googleNativeClientId;
@@ -391,16 +398,37 @@ public class AuthServiceImpl implements AuthService {
         log.info("PIN unlock enabled for user {}", userId);
     }
 
+    // Unlike enablePin, this DOES require proving the current PIN first — turning protection OFF
+    // is the more sensitive direction: anyone holding an already-unlocked device for a few seconds
+    // could otherwise disable it outright (not just plant a backdoor PIN the way a missing check
+    // on enablePin would allow). Shares pinLogin's own attempt counter/lockout fields rather than
+    // adding separate ones — it's the same secret being brute-forced either way.
     @Override
-    @Transactional
-    public void disablePin(UUID userId) {
+    @Transactional(noRollbackFor = BusinessException.class)
+    public void disablePin(UUID userId, DisablePinRequest request, String ipAddress, String userAgent) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException("User not found", HttpStatus.NOT_FOUND));
+
+        if (user.getPinHash() == null) {
+            throw new BusinessException("PIN unlock isn't enabled for this account.", HttpStatus.BAD_REQUEST);
+        }
+        if (user.getPinLockedUntil() != null && user.getPinLockedUntil().isAfter(Instant.now())) {
+            throw new BusinessException(
+                    "Too many incorrect PIN attempts. Please try again later.",
+                    HttpStatus.LOCKED, "PIN_LOCKED",
+                    Map.of("lockedUntil", DateTimeFormatter.ISO_INSTANT.format(user.getPinLockedUntil())));
+        }
+        if (!passwordEncoder.matches(request.getPin(), user.getPinHash())) {
+            registerFailedPin(user, ipAddress, userAgent, "PIN_DISABLE_FAILED");
+            throw new BusinessException("Incorrect PIN", HttpStatus.UNAUTHORIZED, "INVALID_PIN");
+        }
+
         user.setPinHash(null);
         user.setPinEnabledAt(null);
         user.setPinFailedAttempts(0);
         user.setPinLockedUntil(null);
         userRepository.save(user);
+        auditService.log(userId, "PIN_DISABLED", "USER", userId, null, null, ipAddress, userAgent);
         log.info("PIN unlock disabled for user {}", userId);
     }
 
@@ -437,7 +465,7 @@ public class AuthServiceImpl implements AuthService {
                     Map.of("lockedUntil", DateTimeFormatter.ISO_INSTANT.format(user.getPinLockedUntil())));
         }
         if (!passwordEncoder.matches(request.getPin(), user.getPinHash())) {
-            registerFailedPin(user, ipAddress, userAgent);
+            registerFailedPin(user, ipAddress, userAgent, "PIN_LOGIN_FAILED");
             throw new BusinessException("Incorrect PIN", HttpStatus.UNAUTHORIZED, "INVALID_PIN");
         }
 
@@ -455,7 +483,10 @@ public class AuthServiceImpl implements AuthService {
         return buildAuthResponse(user, stored.isRememberMe(), ipAddress, userAgent);
     }
 
-    private void registerFailedPin(User user, String ipAddress, String userAgent) {
+    // failedAction distinguishes which flow the failure came from (login vs disable-verification)
+    // in the audit trail — both draw from and feed the same pinFailedAttempts/pinLockedUntil state
+    // on User, since it's the same PIN being brute-forced either way.
+    private void registerFailedPin(User user, String ipAddress, String userAgent, String failedAction) {
         int attempts = user.getPinFailedAttempts() + 1;
         if (attempts >= MAX_PIN_ATTEMPTS) {
             user.setPinFailedAttempts(0);
@@ -466,7 +497,7 @@ public class AuthServiceImpl implements AuthService {
             user.setPinFailedAttempts(attempts);
         }
         userRepository.save(user);
-        auditService.log(user.getId(), "PIN_LOGIN_FAILED", "USER", user.getId(), null, null, ipAddress, userAgent);
+        auditService.log(user.getId(), failedAction, "USER", user.getId(), null, null, ipAddress, userAgent);
     }
 
     @Override
@@ -552,17 +583,61 @@ public class AuthServiceImpl implements AuthService {
      */
     @Override
     @Transactional
-    public AuthResponse googleLoginNative(GoogleNativeLoginRequest request, String ipAddress, String userAgent) {
+    public AuthResponse googleLoginNative(GoogleCodeLoginRequest request, String ipAddress, String userAgent) {
         if (googleNativeClientId == null || googleNativeClientId.isBlank()
                 || googleNativeClientSecret == null || googleNativeClientSecret.isBlank()) {
             throw new BusinessException("Google Sign-In isn't configured yet.", HttpStatus.SERVICE_UNAVAILABLE);
         }
-        String idTokenString = exchangeGoogleAuthorizationCode(request);
+        String idTokenString = exchangeGoogleAuthorizationCode(request, googleNativeClientId, googleNativeClientSecret);
+        GoogleIdToken.Payload payload = verifyGoogleIdToken(idTokenString);
+        return signInWithGooglePayload(payload, request.isRememberMe(), ipAddress, userAgent);
+    }
+
+    /**
+     * Web counterpart to googleLoginNative — see AuthService's own comment for why this exists:
+     * One Tap's silent prompt() is unreliable on a lot of mobile browsers (blocked third-party
+     * cookies, no FedCM support, or a post-dismissal cooldown), so WebGoogleSignInButton falls
+     * back to GIS's interactive popup code-flow when that happens. Same server-side exchange as
+     * the native path, just against the "Web application" OAuth client's own id/secret.
+     */
+    @Override
+    @Transactional
+    public AuthResponse googleLoginPopup(GoogleCodeLoginRequest request, String ipAddress, String userAgent) {
+        if (googleClientId == null || googleClientId.isBlank()
+                || googleClientSecret == null || googleClientSecret.isBlank()) {
+            throw new BusinessException("Google Sign-In isn't configured yet.", HttpStatus.SERVICE_UNAVAILABLE);
+        }
+        String idTokenString = exchangeGoogleAuthorizationCode(request, googleClientId, googleClientSecret);
         GoogleIdToken.Payload payload = verifyGoogleIdToken(idTokenString);
         return signInWithGooglePayload(payload, request.isRememberMe(), ipAddress, userAgent);
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
+
+    /**
+     * auditService.log() is {@code @Async} + {@code REQUIRES_NEW} — it runs on its own connection
+     * that doesn't wait for the CALLER's transaction to commit. That's harmless when the referenced
+     * user already existed before this request (already committed by some earlier transaction), but
+     * signInWithGooglePayload's new-account branch audits a user row created in this very
+     * transaction — the audit insert's FK can then lose the race against this transaction's own
+     * commit, intermittently failing with "not present in table users" (reproduced in prod on
+     * brand-new Google signups). Deferring to {@code afterCommit()} closes that race; it's harmless
+     * to use unconditionally for the already-existing-user case too, so callers don't need to know
+     * which case they're in. {@code isSynchronizationActive()} is false outside a real transaction
+     * (e.g. a plain Mockito unit test with no Spring context), where logging immediately is correct.
+     */
+    private void logAfterCommit(UUID actorId, String action, UUID entityId, String ipAddress, String userAgent) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    auditService.log(actorId, action, "USER", entityId, null, null, ipAddress, userAgent);
+                }
+            });
+        } else {
+            auditService.log(actorId, action, "USER", entityId, null, null, ipAddress, userAgent);
+        }
+    }
 
     private GoogleIdToken.Payload verifyGoogleIdToken(String idTokenString) {
         try {
@@ -579,15 +654,20 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
-    /** POSTs the authorization code + PKCE verifier to Google's token endpoint, alongside the
-     * client secret Google requires for this client type, and returns the resulting ID token. */
+    /** POSTs the authorization code (plus PKCE verifier, when the caller has one) to Google's
+     * token endpoint, alongside the client id/secret for whichever OAuth client this request
+     * belongs to, and returns the resulting ID token. */
     @SuppressWarnings("unchecked")
-    private String exchangeGoogleAuthorizationCode(GoogleNativeLoginRequest request) {
+    private String exchangeGoogleAuthorizationCode(GoogleCodeLoginRequest request, String clientId, String clientSecret) {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-        form.add("client_id", googleNativeClientId);
-        form.add("client_secret", googleNativeClientSecret);
+        form.add("client_id", clientId);
+        form.add("client_secret", clientSecret);
         form.add("code", request.getCode());
-        form.add("code_verifier", request.getCodeVerifier());
+        // The web popup fallback has no PKCE verifier to send — GIS's initCodeClient popup mode
+        // never establishes a code_challenge, so there's nothing for Google to check it against.
+        if (request.getCodeVerifier() != null && !request.getCodeVerifier().isBlank()) {
+            form.add("code_verifier", request.getCodeVerifier());
+        }
         form.add("redirect_uri", request.getRedirectUri());
         form.add("grant_type", "authorization_code");
 
@@ -600,7 +680,7 @@ public class AuthServiceImpl implements AuthService {
                     .retrieve()
                     .body(Map.class);
         } catch (RestClientException e) {
-            log.warn("Google native token exchange failed: {}", e.getMessage());
+            log.warn("Google authorization code exchange failed: {}", e.getMessage());
             throw new BusinessException("Google sign-in failed. Please try again.", HttpStatus.UNAUTHORIZED);
         }
         Object idToken = tokenResponse == null ? null : tokenResponse.get("id_token");
@@ -628,13 +708,16 @@ public class AuthServiceImpl implements AuthService {
                     .authProvider("GOOGLE")
                     .build());
             log.info("New user registered via Google Sign-In: {}", created.getId());
-            auditService.log(created.getId(), "GOOGLE_SIGNUP", "USER", created.getId(), null, null, ipAddress, userAgent);
+            logAfterCommit(created.getId(), "GOOGLE_SIGNUP", created.getId(), ipAddress, userAgent);
             return created;
         });
 
         user.setLastLoginAt(Instant.now());
         userRepository.save(user);
-        auditService.log(user.getId(), "GOOGLE_LOGIN_SUCCESS", "USER", user.getId(), null, null, ipAddress, userAgent);
+        // Also goes through logAfterCommit — for the just-created branch above, `user` is that same
+        // uncommitted row (identical race), and deferring costs nothing extra for the ordinary
+        // already-committed-user case, so there's no need to special-case which branch ran.
+        logAfterCommit(user.getId(), "GOOGLE_LOGIN_SUCCESS", user.getId(), ipAddress, userAgent);
         emailService.sendNewSignInEmail(user.getEmail(), user.getFullName(), ipAddress, userAgent, Instant.now());
         return buildAuthResponse(user, rememberMe, ipAddress, userAgent);
     }

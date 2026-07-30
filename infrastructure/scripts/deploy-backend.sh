@@ -27,6 +27,12 @@ RELEASES_DIR="$APP_DIR/releases"
 CURRENT_LINK="$APP_DIR/current"
 ENV_FILE="$APP_DIR/current.env"
 STATE_FILE="$APP_DIR/current-version"
+# Deliberately separate from STATE_FILE: deploy() writes STATE_FILE the moment its own *local*
+# health check passes, which happens before backend.yml's separate, external `smoke` job runs -
+# so by the time a `--rollback` triggered by a smoke failure runs (a fresh, later invocation of
+# this script with no memory of deploy()'s local variables), STATE_FILE already points at the
+# just-deployed release, not a genuinely earlier one. rollback() targets this file instead.
+PREVIOUS_STATE_FILE="$APP_DIR/previous-version"
 SERVICE=wealthynest-backend
 HEALTH_URL="http://127.0.0.1:8080/actuator/health"
 KEEP_RELEASES=5
@@ -71,12 +77,20 @@ write_env_file() {
     echo "VAULT_ENCRYPTION_KEY=$(secret_value vault-encryption-key)"
     echo "VAULT_HASH_PEPPER=$(secret_value vault-hash-pepper)"
     echo "GOOGLE_NATIVE_CLIENT_SECRET=$(secret_value google-oauth-client-secret)"
+    # Web counterpart — only used by AuthServiceImpl.googleLoginPopup (the popup-code fallback for
+    # when One Tap's silent prompt() is blocked/skipped on mobile). Separate secret from the native
+    # one above because it belongs to a different Google OAuth client ("Web application", not
+    # "Desktop app") with its own id/secret pair.
+    echo "GOOGLE_CLIENT_SECRET=$(secret_value google-oauth-web-client-secret)"
     echo "MAIL_HOST=smtp-relay.brevo.com"
     echo "MAIL_PORT=587"
     echo "MAIL_USERNAME=$(secret_field smtp-credentials .MAIL_USERNAME)"
     echo "MAIL_PASSWORD=$(secret_field smtp-credentials .MAIL_PASSWORD)"
     echo "FCM_SERVICE_ACCOUNT_JSON=$(secret_value fcm-service-account)"
-    echo "CORS_ORIGINS=https://wealthynest.in"
+    # Vercel serves the site canonically from www (wealthynest.in redirects there) - confirmed
+    # live: an OPTIONS preflight with Origin: https://www.wealthynest.in got a flat 403 with no
+    # CORS headers at all while the naked domain was allowed, breaking every real browser request.
+    echo "CORS_ORIGINS=https://wealthynest.in,https://www.wealthynest.in"
     echo "FRONTEND_URL=https://wealthynest.in"
     echo "RATE_LIMIT_TRUSTED_PROXIES=$(ssm_value rate-limit-trusted-proxies)"
     # GOOGLE_CLIENT_ID / GOOGLE_NATIVE_CLIENT_ID are public (non-secret) OAuth client IDs, not
@@ -117,12 +131,21 @@ prune_old_releases() {
 
 rollback() {
   log "Rollback requested"
-  if [ ! -f "$STATE_FILE" ]; then
+  # PREVIOUS_STATE_FILE (the version live before the most recent deploy) is what an externally
+  # triggered rollback - e.g. backend.yml's smoke-check failure - actually wants; STATE_FILE would
+  # just point back at the same release that failed smoke. Fall back to STATE_FILE only if
+  # PREVIOUS_STATE_FILE has never been written (e.g. rollback invoked by hand with no deploy since
+  # boot), which is strictly better than refusing to roll back at all.
+  local state_source="$PREVIOUS_STATE_FILE"
+  if [ ! -f "$state_source" ]; then
+    state_source="$STATE_FILE"
+  fi
+  if [ ! -f "$state_source" ]; then
     log "No recorded previous version - nothing to roll back to"
     exit 1
   fi
   local previous
-  previous=$(cat "$STATE_FILE")
+  previous=$(cat "$state_source")
   if [ ! -d "$RELEASES_DIR/$previous" ]; then
     log "Recorded version ${previous} is no longer on disk - cannot roll back"
     exit 1
@@ -149,6 +172,13 @@ deploy() {
   mkdir -p "$release_dir"
   aws s3 cp "s3://${bucket}/${s3_key}" "$release_dir/app.jar"
   chown -R wealthynest:wealthynest "$release_dir"
+
+  # Written *before* switching, regardless of whether this deploy's own health check ends up
+  # passing - a later, separate `--rollback` invocation (from an external smoke-test failure) has
+  # no memory of this function call's local $previous_version, only what's on disk.
+  if [ -n "$previous_version" ]; then
+    echo "$previous_version" > "$PREVIOUS_STATE_FILE"
+  fi
 
   write_env_file
   switch_to "$version"

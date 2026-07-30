@@ -170,7 +170,7 @@ export function AccountsGrid({
           ) : (
             <div className="bg-card border border-dashed border-border rounded-2xl p-5 text-center">
               <p className="text-sm text-muted-foreground">No investment accounts</p>
-              <p className="text-xs text-muted-foreground/60 mt-1">Track cash parked with your broker (Zerodha, Groww…) and buy investments from it.</p>
+              <p className="text-xs text-muted-foreground/80 mt-1">Track cash parked with your broker (Zerodha, Groww…) and buy investments from it.</p>
               <button onClick={() => onCreate("INVESTMENT")} className="mt-2 text-xs text-sky-500 dark:text-sky-400 hover:underline transition-colors">+ Add Investment Account</button>
             </div>
           )}
@@ -227,7 +227,7 @@ export function AccountsGrid({
           ) : (
             <div className="bg-card border border-dashed border-border rounded-2xl p-5 text-center">
               <p className="text-sm text-muted-foreground">No loans tracked</p>
-              <p className="text-xs text-muted-foreground/60 mt-1">Track EMIs and see loans reflected in your net worth automatically.</p>
+              <p className="text-xs text-muted-foreground/80 mt-1">Track EMIs and see loans reflected in your net worth automatically.</p>
               <button onClick={() => onCreate("LOAN")} className="mt-2 text-xs text-rose-500 dark:text-rose-400 hover:underline transition-colors">+ Add Loan</button>
             </div>
           )}

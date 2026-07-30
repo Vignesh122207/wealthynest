@@ -1,13 +1,15 @@
 "use client";
 
 import {useState} from "react";
-import {FileSpreadsheet, Loader2, Printer} from "lucide-react";
+import {FileSpreadsheet, FileText, Loader2} from "lucide-react";
 import {toast} from "sonner";
 import {PremiumIcon} from "@/components/icons/PremiumIcon";
-import {escapeHtml, getCurrencySymbol} from "@/lib/utils";
+import {getStoredCurrency} from "@/lib/utils";
 import {expensesApi} from "@/features/expenses/api/expenses.api";
 import {incomeApi} from "@/features/income/api/income.api";
-import {downloadCsv, getYears, MONTH_NAMES, openPrintWindow} from "@/lib/printReport";
+import {downloadCsv, getYears, MONTH_NAMES} from "@/lib/printReport";
+import {addSectionTitle, addSummaryCards, addTable, createReportDoc, finalizePdf, pdfCurrencyPrefix, yieldToMain} from "@/lib/pdf/reportPdf";
+import {fetchAllPages} from "@/lib/pagination";
 
 export function MonthlyTab() {
   const years  = getYears();
@@ -38,27 +40,26 @@ export function MonthlyTab() {
   async function handlePdf() {
     setBusy("pdf");
     try {
-      const [expRes, incomeEntries] = await Promise.all([
-        expensesApi.getExpenses({ startDate: `${year}-${mm}-01`, endDate: `${year}-${mm}-${lastDay}`, size: 500 }),
+      const [expenses, incomeEntries] = await Promise.all([
+        fetchAllPages(page => expensesApi.getExpenses({ startDate: `${year}-${mm}-01`, endDate: `${year}-${mm}-${lastDay}`, page, size: 500 })),
         incomeApi.getIncome(year, month),
       ]);
-      const expenses = expRes.data ?? [];
-      const totalExp = expenses.reduce((s: number, e: { amount: number }) => s + Number(e.amount), 0);
+      const totalExp = expenses.reduce((s, e) => s + Number(e.amount), 0);
       const totalInc = incomeEntries.reduce((s, e) => s + Number(e.amount), 0);
       const savings  = totalInc - totalExp;
-      const currSymbol = getCurrencySymbol();
-      const fmt = (v: number) => `${currSymbol}${Math.abs(v).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+      const prefix = pdfCurrencyPrefix(getStoredCurrency());
+      const fmt = (v: number) => `${v < 0 ? "-" : ""}${prefix}${Math.abs(v).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 
       // Category breakdown
       const catMap: Record<string, number> = {};
-      expenses.forEach((e: { categoryName?: string; amount: number }) => {
+      expenses.forEach(e => {
         const cat = e.categoryName ?? "Other";
         catMap[cat] = (catMap[cat] ?? 0) + Number(e.amount);
       });
-      const catRows = Object.entries(catMap)
-        .sort((a, b) => b[1] - a[1])
-        .map(([cat, amt]) => `<tr><td>${escapeHtml(cat)}</td><td style="text-align:right">${fmt(amt)}</td><td style="text-align:right;color:#999">${totalExp > 0 ? ((amt/totalExp)*100).toFixed(1) : 0}%</td></tr>`)
-        .join("") || `<tr><td colspan="3" style="color:#999;text-align:center;padding:12px">No expenses this month</td></tr>`;
+      const catEntries = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
+      const catRows = catEntries.map(([cat, amt]) => [
+        cat, fmt(amt), totalExp > 0 ? `${((amt / totalExp) * 100).toFixed(1)}%` : "0%",
+      ]);
 
       // Income by source
       const incMap: Record<string, number> = {};
@@ -66,32 +67,35 @@ export function MonthlyTab() {
         const src = e.source.replace(/_/g, " ");
         incMap[src] = (incMap[src] ?? 0) + Number(e.amount);
       });
-      const incRows = Object.entries(incMap)
-        .map(([src, amt]) => `<tr><td>${escapeHtml(src)}</td><td style="text-align:right;color:#16a34a">${fmt(amt)}</td></tr>`)
-        .join("") || `<tr><td colspan="2" style="color:#999;text-align:center;padding:12px">No income recorded</td></tr>`;
+      const incRows = Object.entries(incMap).map(([src, amt]) => [src, fmt(amt)]);
 
-      const html = `
-        <h1>${label}</h1>
-        <p class="sub">Monthly Report</p>
-        <div class="summary">
-          <div class="card"><div class="card-label">Total Income</div><div class="card-value positive">${fmt(totalInc)}</div></div>
-          <div class="card"><div class="card-label">Total Expenses</div><div class="card-value negative">${fmt(totalExp)}</div></div>
-          <div class="card"><div class="card-label">Net Savings</div><div class="card-value ${savings >= 0 ? "positive" : "negative"}">${savings < 0 ? "−" : ""}${fmt(savings)}</div></div>
-        </div>
-        <div class="section-title">Expenses by Category (${expenses.length} transactions)</div>
-        <table>
-          <thead><tr><th>Category</th><th style="text-align:right">Amount</th><th style="text-align:right">Share</th></tr></thead>
-          <tbody>${catRows}</tbody>
-          ${Object.keys(catMap).length > 0 ? `<tfoot><tr style="font-weight:700"><td>Total</td><td style="text-align:right">${fmt(totalExp)}</td><td></td></tr></tfoot>` : ""}
-        </table>
-        <div class="section-title">Income by Source</div>
-        <table>
-          <thead><tr><th>Source</th><th style="text-align:right">Amount</th></tr></thead>
-          <tbody>${incRows}</tbody>
-          ${Object.keys(incMap).length > 0 ? `<tfoot><tr style="font-weight:700"><td>Total</td><td style="text-align:right;color:#16a34a">${fmt(totalInc)}</td></tr></tfoot>` : ""}
-        </table>`;
+      await yieldToMain();
+      const { doc, y } = createReportDoc(label, "Monthly Report");
+      let cursor = addSummaryCards(doc, y, [
+        { label: "Total Income", value: fmt(totalInc), tone: "positive" },
+        { label: "Total Expenses", value: fmt(totalExp), tone: "negative" },
+        { label: "Net Savings", value: fmt(savings), tone: savings >= 0 ? "positive" : "negative" },
+      ]);
 
-      await openPrintWindow(`WealthyNest ${label}`, html);
+      cursor = addSectionTitle(doc, cursor, `Expenses by Category (${expenses.length} transactions)`);
+      cursor = addTable(doc, cursor, ["Category", "Amount", "Share"],
+        catRows.length > 0 ? catRows : [["No expenses this month", "", ""]],
+        {
+          foot: catRows.length > 0 ? [["Total", fmt(totalExp), ""]] : undefined,
+          columnStyles: { 1: { halign: "right" }, 2: { halign: "right" } },
+        }
+      );
+
+      cursor = addSectionTitle(doc, cursor, "Income by Source");
+      addTable(doc, cursor, ["Source", "Amount"],
+        incRows.length > 0 ? incRows : [["No income recorded", ""]],
+        {
+          foot: incRows.length > 0 ? [["Total", fmt(totalInc)]] : undefined,
+          columnStyles: { 1: { halign: "right" } },
+        }
+      );
+
+      await finalizePdf(doc, `WealthyNest-${year}-${mm}-Monthly.pdf`);
     } catch {
       toast.error("Could not generate PDF. Please try again.");
     } finally {
@@ -154,12 +158,12 @@ export function MonthlyTab() {
               data-testid="monthly-report-pdf-button"
               className="group flex items-center gap-3 p-4 rounded-2xl border border-border bg-muted/30 hover:border-red-500/40 hover:bg-red-500/5 transition-all text-left disabled:opacity-60"
             >
-              <PremiumIcon icon={Printer} tone="red" size="sm" className={busy === "pdf" ? "animate-pulse" : undefined} />
+              <PremiumIcon icon={FileText} tone="red" size="sm" className={busy === "pdf" ? "animate-pulse" : undefined} />
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
                   PDF {busy === "pdf" && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
                 </p>
-                <p className="text-xs text-muted-foreground mt-0.5">Print-ready summary — save from your browser&apos;s print dialog</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Branded summary report, downloads instantly</p>
               </div>
             </button>
           </div>

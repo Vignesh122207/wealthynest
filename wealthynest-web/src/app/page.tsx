@@ -196,7 +196,7 @@ export default function LandingPage() {
               <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
                 <CountUp to={14.2} decimals={1} prefix="+" suffix="%" />
               </p>
-              <p className="text-[10px] text-muted-foreground/60 mt-0.5">XIRR, all holdings</p>
+              <p className="text-[10px] text-muted-foreground/80 mt-0.5">XIRR, all holdings</p>
             </div>
 
             {/* Main card */}

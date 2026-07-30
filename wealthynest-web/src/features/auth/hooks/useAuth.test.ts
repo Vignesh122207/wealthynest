@@ -5,7 +5,7 @@ import {
   useLogin, useRegister, useLogout, useVerifyEmail, useResendVerification, useUpdateProfile,
   useChangePassword, useChangeEmail, useForgotPassword, useResetPassword, useEnablePin,
   useDisablePin, usePinLogin, usePasskeys, useRegisterPasskey, useDeletePasskey,
-  useGoogleLogin, useCloseAccount, useUnlockWithPin, useUnlockWithPasskey,
+  useGoogleLogin, useGoogleLoginPopup, useCloseAccount, useUnlockWithPin, useUnlockWithPasskey,
   useSessions, useRevokeSession, useRevokeOtherSessions,
 } from "./useAuth";
 import { authApi } from "../api/auth.api";
@@ -25,7 +25,7 @@ vi.mock("../api/auth.api", () => ({
     enablePin: vi.fn(), disablePin: vi.fn(), pinLogin: vi.fn(),
     listPasskeys: vi.fn(), getPasskeyRegistrationOptions: vi.fn(), verifyPasskeyRegistration: vi.fn(),
     deletePasskey: vi.fn(), getPasskeyLoginOptions: vi.fn(), passkeyLogin: vi.fn(),
-    googleLogin: vi.fn(), closeAccount: vi.fn(),
+    googleLogin: vi.fn(), googleLoginNative: vi.fn(), googleLoginPopup: vi.fn(), closeAccount: vi.fn(),
     listSessions: vi.fn(), revokeSession: vi.fn(), revokeOtherSessions: vi.fn(),
   },
 }));
@@ -312,16 +312,39 @@ describe("useEnablePin / useDisablePin", () => {
     expect(mockedApi.enablePin).toHaveBeenCalledWith("1234");
   });
 
-  it("useDisablePin sets pinEnabled=false on the user", async () => {
+  it("useDisablePin sets pinEnabled=false on the user, passing the confirmed PIN through", async () => {
     useAuthStore.setState({ user: { ...baseUser, pinEnabled: true } });
     mockedApi.disablePin.mockResolvedValue(undefined as never);
     const { Wrapper } = createQueryClientWrapper();
 
     const { result } = renderHook(() => useDisablePin(), { wrapper: Wrapper });
-    result.current.mutate();
+    result.current.mutate("1234");
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(useAuthStore.getState().user?.pinEnabled).toBe(false);
+    expect(mockedApi.disablePin).toHaveBeenCalledWith("1234");
+  });
+
+  it("useDisablePin stays silent (no toast) on an INVALID_PIN failure — the call site shakes the cells inline instead", async () => {
+    mockedApi.disablePin.mockRejectedValue({ response: { data: { error: "INVALID_PIN", message: "Incorrect PIN" } } });
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useDisablePin(), { wrapper: Wrapper });
+    result.current.mutate("0000");
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("useDisablePin still toasts a fallback message for an unexpected failure", async () => {
+    mockedApi.disablePin.mockRejectedValue({});
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useDisablePin(), { wrapper: Wrapper });
+    result.current.mutate("1234");
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(toast.error).toHaveBeenCalledWith("Failed to disable PIN");
   });
 });
 
@@ -581,6 +604,31 @@ describe("useGoogleLogin", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(readPersistedHiddenAt()).toBeNull();
     expect(useAppLockStore.getState().isLocked).toBe(false);
+  });
+});
+
+describe("useGoogleLoginPopup", () => {
+  it("clears cache, sets auth, and navigates on success", async () => {
+    mockedApi.googleLoginPopup.mockResolvedValue(authResponse);
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useGoogleLoginPopup(), { wrapper: Wrapper });
+    result.current.mutate({ code: "auth-code", redirectUri: "postmessage", rememberMe: true });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("shows the backend's error message on failure", async () => {
+    mockedApi.googleLoginPopup.mockRejectedValue({ response: { data: { message: "Google sign-in failed" } } });
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useGoogleLoginPopup(), { wrapper: Wrapper });
+    result.current.mutate({ code: "auth-code", redirectUri: "postmessage", rememberMe: true });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(toast.error).toHaveBeenCalledWith("Google sign-in failed");
   });
 });
 

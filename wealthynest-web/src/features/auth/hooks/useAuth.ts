@@ -10,6 +10,7 @@ import {deriveLockoutState} from "../utils/lockout";
 import type {LoginFormValues, RegisterFormValues} from "../schemas/auth.schema";
 import {notificationsApi} from "@/features/notifications/api/notifications.api";
 import {getLastRegisteredPushToken} from "@/features/notifications/utils/nativePush";
+import {apiErrorCode} from "@/lib/utils";
 
 type ApiError = { response?: { data?: { message?: string; error?: string } } };
 
@@ -166,12 +167,18 @@ export function useEnablePin() {
 export function useDisablePin() {
   const { user, setUser } = useAuthStore();
   return useMutation({
-    mutationFn: () => authApi.disablePin(),
+    mutationFn: (pin: string) => authApi.disablePin(pin),
     onSuccess: () => {
       if (user) setUser({ ...user, pinEnabled: false });
       toast.success("PIN unlock disabled");
     },
-    onError: () => toast.error("Failed to disable PIN"),
+    // PIN_LOCKED renders as a LockoutBanner and a wrong PIN as a cell shake, both inline at the
+    // call site (PinVerifyModal) — same reasoning as useUnlockWithPin's own comment on skipping
+    // the toast for those. Only something genuinely unexpected still toasts here.
+    onError: (e: ApiError) => {
+      if (deriveLockoutState(e) || apiErrorCode(e) === "INVALID_PIN") return;
+      toast.error(e.response?.data?.message ?? "Failed to disable PIN");
+    },
   });
 }
 
@@ -283,20 +290,27 @@ export function useDeletePasskey() {
   });
 }
 
-export function useGoogleLogin() {
+// Shared onSuccess for every Google sign-in mutation below (ID token, native code, web popup
+// fallback code) — all three land the user the same way once the backend hands back a session.
+function useGoogleAuthOnSuccess() {
   const { setAuth } = useAuthStore();
   const router = useRouter();
   const qc = useQueryClient();
+  return (data: Awaited<ReturnType<typeof authApi.googleLogin>>) => {
+    qc.clear();
+    setAuth(data.user, data.accessToken);
+    useAppLockStore.getState().unlock(); // see useLogin's own comment for why
+    router.push("/home");
+  };
+}
+
+export function useGoogleLogin() {
+  const onSuccess = useGoogleAuthOnSuccess();
   return useMutation({
     mutationFn: ({ idToken, rememberMe }: { idToken: string; rememberMe: boolean }) =>
       authApi.googleLogin(idToken, rememberMe),
     // No success toast — see useLogin's comment for why.
-    onSuccess: (data) => {
-      qc.clear();
-      setAuth(data.user, data.accessToken);
-      useAppLockStore.getState().unlock(); // see useLogin's own comment for why
-      router.push("/home");
-    },
+    onSuccess,
     onError: (e: ApiError) => toast.error(e.response?.data?.message ?? "Google sign-in failed"),
   });
 }
@@ -304,17 +318,21 @@ export function useGoogleLogin() {
 // Native Android counterpart — see auth.api.ts's googleLoginNative comment for why this posts an
 // authorization code + PKCE verifier instead of an ID token.
 export function useGoogleLoginNative() {
-  const { setAuth } = useAuthStore();
-  const router = useRouter();
-  const qc = useQueryClient();
+  const onSuccess = useGoogleAuthOnSuccess();
   return useMutation({
     mutationFn: authApi.googleLoginNative,
-    onSuccess: (data) => {
-      qc.clear();
-      setAuth(data.user, data.accessToken);
-      useAppLockStore.getState().unlock(); // see useLogin's own comment for why
-      router.push("/home");
-    },
+    onSuccess,
+    onError: (e: ApiError) => toast.error(e.response?.data?.message ?? "Google sign-in failed"),
+  });
+}
+
+// Web fallback used when One Tap's silent prompt() is blocked/skipped — see auth.api.ts's
+// googleLoginPopup comment.
+export function useGoogleLoginPopup() {
+  const onSuccess = useGoogleAuthOnSuccess();
+  return useMutation({
+    mutationFn: authApi.googleLoginPopup,
+    onSuccess,
     onError: (e: ApiError) => toast.error(e.response?.data?.message ?? "Google sign-in failed"),
   });
 }

@@ -104,7 +104,7 @@ function BudgetRow({ budget, onEdit }: { budget: Budget; onEdit: () => void }) {
           <span className="text-xs text-muted-foreground/70 tabular-nums">
             {fmt(budget.spent)} / {fmt(budget.amount)}{budget.rolloverAmount > 0 && ` + ${fmt(budget.rolloverAmount)}`}
           </span>
-          <span className={cn("text-xs", budget.overBudget ? "text-red-600 dark:text-red-400 font-medium" : "text-muted-foreground/60")}>
+          <span className={cn("text-xs", budget.overBudget ? "text-red-600 dark:text-red-400 font-medium" : "text-muted-foreground/80")}>
             {budget.overBudget ? `Over by ${fmt(Math.abs(budget.remaining))}` : `${fmt(budget.remaining)} left`}
           </span>
         </div>
@@ -252,7 +252,7 @@ export default function BudgetsPage() {
                     onClick={() => { setBudgetType(t); form.setValue("budgetType", t); }}
                     className={cn("flex items-center gap-2 px-4 h-9 rounded-xl text-sm font-medium transition-all border",
                       budgetType === t
-                        ? "bg-amber-600 border-amber-500 text-white"
+                        ? "bg-amber-700 border-amber-500 text-white"
                         : "bg-muted/60 border-border text-muted-foreground hover:text-foreground")}>
                     {t === "MONTHLY" ? <Calendar className="w-3.5 h-3.5" /> : <CalendarDays className="w-3.5 h-3.5" />}
                     {t === "MONTHLY" ? "Monthly" : "Yearly"}
@@ -302,7 +302,7 @@ export default function BudgetsPage() {
                       </div>
                     </div>
                     <button type="button" onClick={handleAddCategory} disabled={!newCatName.trim() || creatingCat}
-                      className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium bg-amber-600 hover:bg-amber-500 text-white disabled:opacity-60 transition-all">
+                      className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium bg-amber-700 hover:bg-amber-600 text-white disabled:opacity-60 transition-all">
                       <Check className="w-3.5 h-3.5" /> {creatingCat ? "Adding…" : "Add"}
                     </button>
                   </div>
@@ -453,7 +453,7 @@ export default function BudgetsPage() {
                   description={`Create a ${isMonthly ? "monthly" : "yearly"} budget to track spending limits.`}
                   action={
                     <button onClick={() => { setShowForm(true); setBudgetType(activeType); }}
-                      className="flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
+                      className="flex items-center gap-2 bg-amber-700 hover:bg-amber-600 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
                       <Plus className="w-4 h-4" /> Create {isMonthly ? "Monthly" : "Yearly"} Budget
                     </button>
                   } />

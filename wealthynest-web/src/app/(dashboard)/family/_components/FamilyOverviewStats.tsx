@@ -32,7 +32,7 @@ export function FamilyOverviewStats({
           <div>
             <p className="text-xs font-semibold text-indigo-600/80 dark:text-indigo-400/80 uppercase tracking-wider mb-0.5">Family Net Worth</p>
             <p className="text-2xl font-bold text-foreground tabular-nums leading-none">{fmt(familyNetWorth)}</p>
-            <p className="text-[11px] text-muted-foreground/60 mt-1">{membersCount} member{membersCount !== 1 ? "s" : ""} combined</p>
+            <p className="text-[11px] text-muted-foreground/80 mt-1">{membersCount} member{membersCount !== 1 ? "s" : ""} combined</p>
           </div>
         </div>
 
@@ -67,7 +67,7 @@ export function FamilyOverviewStats({
           <p className="text-lg font-bold text-emerald-500 dark:text-emerald-400 tabular-nums leading-none">
             {monthlyStats ? fmt(monthlyStats.totalIncome) : "—"}
           </p>
-          <p className="text-[10px] text-muted-foreground/50 mt-1">This month</p>
+          <p className="text-[10px] text-muted-foreground/80 mt-1">This month</p>
         </div>
 
         {/* Expense */}
@@ -77,7 +77,7 @@ export function FamilyOverviewStats({
           <p className="text-lg font-bold text-red-500 dark:text-red-400 tabular-nums leading-none">
             {monthlyStats ? fmt(monthlyStats.totalExpense) : "—"}
           </p>
-          <p className="text-[10px] text-muted-foreground/50 mt-1">This month</p>
+          <p className="text-[10px] text-muted-foreground/80 mt-1">This month</p>
         </div>
 
         {/* Savings */}
@@ -90,7 +90,7 @@ export function FamilyOverviewStats({
               : "text-sky-500 dark:text-sky-400")}>
             {monthlyStats ? fmt(monthlyStats.savings) : "—"}
           </p>
-          <p className="text-[10px] text-muted-foreground/50 mt-1">This month</p>
+          <p className="text-[10px] text-muted-foreground/80 mt-1">This month</p>
         </div>
 
         {/* Highest Spender */}
@@ -107,7 +107,7 @@ export function FamilyOverviewStats({
               </p>
             </>
           ) : (
-            <p className="text-lg font-bold text-muted-foreground/40 leading-none">—</p>
+            <p className="text-lg font-bold text-muted-foreground/80 leading-none">—</p>
           )}
         </div>
       </div>

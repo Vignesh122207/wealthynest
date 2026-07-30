@@ -17,9 +17,17 @@ export const LoanCard = memo(function LoanCard({ account: a, onDownload, onEdit,
   const paidPct     = principal > 0 ? Math.min(100, Math.max(0, ((principal - outstanding) / principal) * 100)) : 0;
   const closed      = outstanding <= 0;
   return (
-    <div onClick={onEdit} role="button" tabIndex={0}
-      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEdit(); } }}
+    <div onClick={onEdit}
       className="relative bg-card border border-border rounded-2xl p-5 space-y-4 cursor-pointer">
+      {/* Real, separately-focusable control for the same action the card's plain onClick above
+          already does — a role="button" here would nest the Download/Record Payment controls
+          below inside another interactive widget (axe's nested-interactive rule), so the card
+          itself stays a non-widget div and this sr-only-until-focused button is the
+          keyboard/screen-reader path to Edit instead (see AccountCard.tsx's identical fix). */}
+      <button type="button" onClick={onEdit}
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-20 focus:px-3 focus:py-1.5 focus:rounded-lg focus:bg-primary focus:text-primary-foreground focus:text-xs focus:font-medium">
+        Edit {a.name}
+      </button>
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-rose-500/10">

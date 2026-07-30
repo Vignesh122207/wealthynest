@@ -176,7 +176,7 @@ function RuleCard({
             <span>Next: {expense.expenseDate} → {accountName}</span>
           </div>
           {expense.description && (
-            <p className="text-xs text-muted-foreground/60 mt-1 truncate">{expense.description}</p>
+            <p className="text-xs text-muted-foreground/80 mt-1 truncate">{expense.description}</p>
           )}
         </div>
       </div>

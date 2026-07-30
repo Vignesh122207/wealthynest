@@ -595,16 +595,63 @@ class AuthServiceImplTest {
             assertThat(user.getPinLockedUntil()).isNull();
         }
 
+        private DisablePinRequest disableReq(String pin) {
+            DisablePinRequest r = mock(DisablePinRequest.class);
+            lenient().when(r.getPin()).thenReturn(pin);
+            return r;
+        }
+
         @Test
-        @DisplayName("disablePin clears the PIN and all lockout state")
-        void disablePinClearsState() {
-            User user = withId(baseUser().pinHash("existing").pinFailedAttempts(2).build());
+        @DisplayName("disablePin throws when PIN unlock isn't enabled for the account")
+        void disablePinThrowsWhenNotEnabled() {
+            User user = withId(baseUser().pinHash(null).build());
             when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
-            service.disablePin(userId);
+            assertThatThrownBy(() -> service.disablePin(userId, disableReq("1234"), ip, ua))
+                    .isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("disablePin throws LOCKED with a structured PIN_LOCKED code while the lockout window is active, without checking the PIN")
+        void disablePinThrowsWhenLocked() {
+            User user = withId(baseUser().pinHash("hash").pinLockedUntil(Instant.now().plusSeconds(120)).build());
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+            assertThatThrownBy(() -> service.disablePin(userId, disableReq("1234"), ip, ua))
+                    .isInstanceOfSatisfying(BusinessException.class, e -> {
+                        assertThat(e.getCode()).isEqualTo("PIN_LOCKED");
+                        assertThat(e.getDetails()).containsKey("lockedUntil");
+                    });
+            verify(passwordEncoder, never()).matches(any(), any());
+        }
+
+        @Test
+        @DisplayName("disablePin rejects a wrong PIN, leaves the PIN enabled, and increments the shared failure counter")
+        void disablePinRejectsWrongPin() {
+            User user = withId(baseUser().pinHash("hash").pinFailedAttempts(1).build());
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(passwordEncoder.matches("0000", "hash")).thenReturn(false);
+
+            assertThatThrownBy(() -> service.disablePin(userId, disableReq("0000"), ip, ua))
+                    .isInstanceOfSatisfying(BusinessException.class, e -> assertThat(e.getCode()).isEqualTo("INVALID_PIN"));
+
+            assertThat(user.getPinHash()).isEqualTo("hash");
+            assertThat(user.getPinFailedAttempts()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("disablePin clears the PIN and all lockout state once the current PIN is confirmed")
+        void disablePinClearsStateOnCorrectPin() {
+            User user = withId(baseUser().pinHash("existing").pinFailedAttempts(2).build());
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(passwordEncoder.matches("1234", "existing")).thenReturn(true);
+
+            service.disablePin(userId, disableReq("1234"), ip, ua);
 
             assertThat(user.getPinHash()).isNull();
+            assertThat(user.getPinEnabledAt()).isNull();
             assertThat(user.getPinFailedAttempts()).isEqualTo(0);
+            assertThat(user.getPinLockedUntil()).isNull();
         }
     }
 
@@ -793,6 +840,40 @@ class AuthServiceImplTest {
             assertThat(saved.isEmailVerified()).isTrue();
             verify(auditService).log(eq(userId), eq("GOOGLE_SIGNUP"), any(), any(), any(), any(), any(), any());
         }
+
+        @Test
+        @DisplayName("defers the GOOGLE_SIGNUP audit log to after commit when a real transaction is active")
+        void newUserAuditLogIsDeferredToAfterCommit() throws Exception {
+            // auditService.log() is @Async + REQUIRES_NEW, so it runs on a connection that can't
+            // see this transaction's own not-yet-committed INSERT of the new user row — logging
+            // immediately risks the audit row's FK losing that race (reproduced in prod: brand-new
+            // Google signups intermittently failed with "not present in table users"). Simulating a
+            // real active transaction here (Mockito's own service instance has none by default,
+            // which is exactly why the test above sees the call happen immediately instead) proves
+            // the fix actually defers to afterCommit() rather than logging eagerly.
+            when(googleIdTokenValidator.verify("raw-id-token")).thenReturn(payload);
+            when(payload.getEmailVerified()).thenReturn(true);
+            when(payload.getEmail()).thenReturn("deferred@example.com");
+            when(payload.get("name")).thenReturn("Deferred Person");
+            when(userRepository.findByEmail("deferred@example.com")).thenReturn(Optional.empty());
+            when(passwordEncoder.encode(anyString())).thenReturn("random-hash");
+            when(userRepository.save(any(User.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
+            stubAuthResponseBuilding();
+
+            org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+            try {
+                service.googleLogin(req(), ip, ua);
+
+                verifyNoInteractions(auditService);
+                org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations()
+                        .forEach(org.springframework.transaction.support.TransactionSynchronization::afterCommit);
+            } finally {
+                org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization();
+            }
+
+            verify(auditService).log(eq(userId), eq("GOOGLE_SIGNUP"), any(), any(), any(), any(), any(), any());
+            verify(auditService).log(eq(userId), eq("GOOGLE_LOGIN_SUCCESS"), any(), any(), any(), any(), any(), any());
+        }
     }
 
     // ─── googleLoginNative ───────────────────────────────────────────────────────
@@ -809,8 +890,8 @@ class AuthServiceImplTest {
         @org.mockito.Mock private RestClient.RequestBodyUriSpec requestSpec;
         @org.mockito.Mock private RestClient.ResponseSpec       responseSpec;
 
-        private GoogleNativeLoginRequest req() {
-            GoogleNativeLoginRequest r = mock(GoogleNativeLoginRequest.class);
+        private GoogleCodeLoginRequest req() {
+            GoogleCodeLoginRequest r = mock(GoogleCodeLoginRequest.class);
             lenient().when(r.getCode()).thenReturn("auth-code");
             lenient().when(r.getCodeVerifier()).thenReturn("pkce-verifier");
             lenient().when(r.getRedirectUri()).thenReturn("com.googleusercontent.apps.test:/oauth2redirect");
@@ -841,7 +922,7 @@ class AuthServiceImplTest {
         @DisplayName("throws SERVICE_UNAVAILABLE when the native client id/secret aren't configured")
         void throwsWhenNotConfigured() {
             ReflectionTestUtils.setField(service, "googleNativeClientId", "");
-            GoogleNativeLoginRequest req = mock(GoogleNativeLoginRequest.class);
+            GoogleCodeLoginRequest req = mock(GoogleCodeLoginRequest.class);
 
             assertThatThrownBy(() -> service.googleLoginNative(req, ip, ua)).isInstanceOf(BusinessException.class);
             // Not googleOAuthClient too — wireGoogleNative()'s own stub setup above already calls
@@ -915,6 +996,79 @@ class AuthServiceImplTest {
             assertThat(saved.getAuthProvider()).isEqualTo("GOOGLE");
             assertThat(saved.getFullName()).isEqualTo("New Person");
             verify(auditService).log(eq(userId), eq("GOOGLE_SIGNUP"), any(), any(), any(), any(), any(), any());
+        }
+    }
+
+    // ─── googleLoginPopup ────────────────────────────────────────────────────────
+    // Web counterpart to googleLoginNative above — same exchange-then-verify-then-sign-in shape,
+    // just reading googleClientId/googleClientSecret (the "Web application" client) instead of the
+    // native fields, and never sending a code_verifier. Doesn't re-cover every branch
+    // GoogleLoginNativeTests already exercises against the shared exchange/verify helpers — only
+    // what's actually distinct about this method: its own config guard, and that it reaches
+    // sign-in successfully end to end.
+
+    @Nested
+    @DisplayName("googleLoginPopup")
+    class GoogleLoginPopupTests {
+
+        @org.mockito.Mock private com.google.api.client.googleapis.auth.oauth2.GoogleIdToken.Payload payload;
+        @org.mockito.Mock private RestClient.RequestBodyUriSpec requestSpec;
+        @org.mockito.Mock private RestClient.ResponseSpec       responseSpec;
+
+        private GoogleCodeLoginRequest req() {
+            GoogleCodeLoginRequest r = mock(GoogleCodeLoginRequest.class);
+            lenient().when(r.getCode()).thenReturn("auth-code");
+            lenient().when(r.getCodeVerifier()).thenReturn(null); // GIS's popup code-flow never has one
+            lenient().when(r.getRedirectUri()).thenReturn("postmessage");
+            lenient().when(r.isRememberMe()).thenReturn(false);
+            return r;
+        }
+
+        @BeforeEach
+        void wireGooglePopup() {
+            ReflectionTestUtils.setField(service, "googleClientId", "test-web-client-id");
+            ReflectionTestUtils.setField(service, "googleClientSecret", "test-web-secret");
+            lenient().when(googleOAuthClient.post()).thenReturn(requestSpec);
+            lenient().when(requestSpec.uri(anyString())).thenReturn(requestSpec);
+            lenient().when(requestSpec.contentType(any())).thenReturn(requestSpec);
+            lenient().when(requestSpec.body(any(Object.class))).thenReturn(requestSpec);
+            lenient().when(requestSpec.retrieve()).thenReturn(responseSpec);
+        }
+
+        @Test
+        @DisplayName("throws SERVICE_UNAVAILABLE when the web client id/secret aren't configured")
+        void throwsWhenNotConfigured() {
+            ReflectionTestUtils.setField(service, "googleClientSecret", "");
+
+            assertThatThrownBy(() -> service.googleLoginPopup(req(), ip, ua)).isInstanceOf(BusinessException.class);
+            verifyNoInteractions(userRepository);
+        }
+
+        @Test
+        @DisplayName("throws UNAUTHORIZED when Google's token endpoint rejects the exchange")
+        void throwsWhenExchangeFails() {
+            when(responseSpec.body(Map.class)).thenThrow(new RestClientException("invalid_grant"));
+
+            assertThatThrownBy(() -> service.googleLoginPopup(req(), ip, ua)).isInstanceOf(BusinessException.class);
+            verifyNoInteractions(userRepository);
+        }
+
+        @Test
+        @DisplayName("an existing user signs in via the web popup fallback without creating a duplicate account")
+        void existingUserSignsIn() throws Exception {
+            when(responseSpec.body(Map.class)).thenReturn(Map.of("id_token", "raw-id-token"));
+            when(googleIdTokenValidator.verify("raw-id-token")).thenReturn(payload);
+            when(payload.getEmailVerified()).thenReturn(true);
+            when(payload.getEmail()).thenReturn("alice@example.com");
+            User existing = withId(baseUser().build());
+            when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(existing));
+            stubAuthResponseBuilding();
+
+            AuthResponse response = service.googleLoginPopup(req(), ip, ua);
+
+            assertThat(response.getAccessToken()).isEqualTo("access-token");
+            verify(userRepository, never()).save(argThat(u -> "GOOGLE".equals(u.getAuthProvider())));
+            verify(auditService).log(eq(userId), eq("GOOGLE_LOGIN_SUCCESS"), any(), any(), any(), any(), any(), any());
         }
     }
 

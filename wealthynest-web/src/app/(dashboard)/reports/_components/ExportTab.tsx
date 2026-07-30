@@ -10,6 +10,7 @@ import {investmentsApi} from "@/features/investments/api/investments.api";
 import {incomeApi} from "@/features/income/api/income.api";
 import type {IncomeEntry} from "@/features/income/types/income.types";
 import {getYears, triggerLocalCsv} from "@/lib/printReport";
+import {fetchAllPages} from "@/lib/pagination";
 
 export function ExportTab() {
   const years  = getYears();
@@ -26,10 +27,12 @@ export function ExportTab() {
     setL(type, true);
     try {
       if (type === "expenses") {
-        const res = await expensesApi.getExpenses({ startDate: `${year}-01-01`, endDate: `${year}-12-31`, size: 1000 });
+        const expenses = await fetchAllPages(page =>
+          expensesApi.getExpenses({ startDate: `${year}-01-01`, endDate: `${year}-12-31`, page, size: 500 })
+        );
         triggerCsv(`expenses-${year}.csv`,
           ["Date", "Category", "Amount", "Description", "Payment Method", "Recurring"],
-          (res.data ?? []).map((e: { expenseDate: string; categoryName?: string; amount: number; description?: string; paymentMethod?: string; recurring?: boolean }) => [
+          expenses.map(e => [
             e.expenseDate, e.categoryName ?? "", e.amount.toString(),
             e.description ?? "", e.paymentMethod ?? "", e.recurring ? "Yes" : "No",
           ])
@@ -86,14 +89,12 @@ export function ExportTab() {
             ])
         );
       } else if (type === "transfers") {
-        // Fetch with large page size and filter client-side by year
-        const res = await accountsApi.getTransfers(0, 1000);
-        const transfers = (res.data ?? []).filter((t: { transferDate: string }) =>
-          t.transferDate.startsWith(String(year))
-        );
+        // The transfers endpoint has no date filter — page through everything, then filter by year client-side
+        const allTransfers = await fetchAllPages(page => accountsApi.getTransfers(page, 500));
+        const transfers = allTransfers.filter(t => t.transferDate.startsWith(String(year)));
         triggerCsv(`transfers-${year}.csv`,
           ["Date", "From Account", "To Account", "Amount", "Description"],
-          transfers.map((t: { transferDate: string; fromAccountName: string; toAccountName: string; amount: number; description?: string }) => [
+          transfers.map(t => [
             t.transferDate, t.fromAccountName, t.toAccountName,
             t.amount.toString(), t.description ?? "",
           ])

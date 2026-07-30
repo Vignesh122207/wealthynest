@@ -123,11 +123,18 @@ export function InvestmentPanel({ investments, chart }: InvestmentPanelProps) {
         <div className="grid sm:grid-cols-2 gap-5 mb-5">
           {/* Allocation donut */}
           <div className="flex items-center gap-4">
+            {/* accessibilityLayer={false} on the chart handles the outer <svg role="application">
+                (see SixMonthTrend.tsx's identical wrapper), but <Pie> independently puts its own
+                tabindex="0" on its rendered <g class="recharts-pie"> layer for slice-level keyboard
+                nav — a second, separate focusable element inside this same aria-hidden div. That
+                layer reads its own `rootTabIndex` prop (default 0), not `tabIndex` — passing
+                tabIndex={-1} here is a no-op since <Pie> doesn't forward an unrecognized prop;
+                confirmed still failing axe in CI with rootTabIndex still defaulted to 0. */}
             <div className="w-[120px] h-[120px] sm:w-[100px] sm:h-[100px] shrink-0" aria-hidden="true">
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
+                <PieChart accessibilityLayer={false}>
                   <Pie data={allocation} cx="50%" cy="50%" innerRadius={32} outerRadius={48}
-                    paddingAngle={3} dataKey="value" strokeWidth={0}>
+                    paddingAngle={3} dataKey="value" strokeWidth={0} rootTabIndex={-1}>
                     {allocation.map((a) => <Cell key={a.bucket} fill={BUCKET_COLOR[a.bucket]} />)}
                   </Pie>
                   <Tooltip contentStyle={chart.tooltipStyle} labelStyle={chart.labelStyle} itemStyle={chart.itemStyle}
@@ -182,7 +189,7 @@ export function InvestmentPanel({ investments, chart }: InvestmentPanelProps) {
               <p className="text-xs text-muted-foreground font-medium flex-1">{s.label}</p>
               <div className="text-right shrink-0">
                 <p className={cn("text-sm font-bold tabular-nums", s.valueColor)}>{s.value}</p>
-                {s.sub && <p className="text-[11px] text-muted-foreground/60 mt-0.5">{s.sub}</p>}
+                {s.sub && <p className="text-[11px] text-muted-foreground/80 mt-0.5">{s.sub}</p>}
               </div>
             </div>
           ))}
@@ -194,10 +201,10 @@ export function InvestmentPanel({ investments, chart }: InvestmentPanelProps) {
             <div key={s.key} className={cn("rounded-2xl p-4 border border-border/30", s.cardBg)}>
               <div className="flex items-center gap-2 mb-2">
                 <PremiumIcon icon={s.icon} tone={s.tone} size="xs" />
-                <p className="text-xs text-muted-foreground/70 font-medium">{s.label}</p>
+                <p className="text-xs text-muted-foreground/80 font-medium">{s.label}</p>
               </div>
               <div className={cn("text-base font-bold tabular-nums", s.valueColor)}>{s.value}</div>
-              {s.sub && <p className="text-[11px] text-muted-foreground/60 mt-1">{s.sub}</p>}
+              {s.sub && <p className="text-[11px] text-muted-foreground/80 mt-1">{s.sub}</p>}
             </div>
           ))}
         </div>

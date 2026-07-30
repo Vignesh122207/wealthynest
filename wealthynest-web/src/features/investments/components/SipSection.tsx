@@ -67,14 +67,14 @@ export function SipSection({ investmentId }: { investmentId: string }) {
           {sipsLoading ? (
             <div className="h-8 bg-muted/30 rounded-lg animate-pulse" />
           ) : sips.length === 0 ? (
-            <p className="text-xs text-muted-foreground/60 pl-1">No SIP entries yet.</p>
+            <p className="text-xs text-muted-foreground/80 pl-1">No SIP entries yet.</p>
           ) : (
             sips.map((s: SipTransaction) => (
               <div key={s.id} className="flex items-center justify-between bg-muted/30 rounded-lg px-2.5 py-1.5 group/sip">
                 <div className="flex items-center gap-1.5">
                   <CalendarDays className="w-3 h-3 text-muted-foreground/60 shrink-0" />
                   <span className="text-xs text-muted-foreground">{formatDate(s.transactionDate)}</span>
-                  {s.units && <span className="text-xs text-muted-foreground/60">{Number(s.units).toFixed(3)} u</span>}
+                  {s.units && <span className="text-xs text-muted-foreground/80">{Number(s.units).toFixed(3)} u</span>}
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className={cn("text-xs font-semibold tabular-nums", s.transactionType === "REDEEM" ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400")}>
@@ -111,7 +111,7 @@ export function SipSection({ investmentId }: { investmentId: string }) {
               </div>
               <div className="flex gap-1.5">
                 <button type="submit" disabled={isPending}
-                  className="flex-1 h-8 rounded-lg text-[11px] font-medium bg-emerald-600/80 hover:bg-emerald-600 text-white transition-all disabled:opacity-60">
+                  className="flex-1 h-8 rounded-lg text-[11px] font-medium bg-emerald-700 hover:bg-emerald-600 text-white transition-all disabled:opacity-60">
                   {isPending ? "Saving…" : "Add SIP"}
                 </button>
                 <button type="button" onClick={() => setShowAdd(false)}

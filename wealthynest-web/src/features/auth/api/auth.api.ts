@@ -36,8 +36,10 @@ export const authApi = {
   enablePin: async (pin: string): Promise<void> => {
     await apiClient.post("/users/me/pin/enable", { pin });
   },
-  disablePin: async (): Promise<void> => {
-    await apiClient.post("/users/me/pin/disable");
+  // Requires the current PIN — see AuthServiceImpl#disablePin's own comment for why turning PIN
+  // unlock OFF gets a step-up check that turning it on deliberately doesn't.
+  disablePin: async (pin: string): Promise<void> => {
+    await apiClient.post("/users/me/pin/disable", { pin });
   },
   // No refreshToken param — the anchoring session is read off the httpOnly cookie server-side.
   pinLogin: async (pin: string): Promise<AuthResponse> =>
@@ -54,6 +56,15 @@ export const authApi = {
     params: { code: string; redirectUri: string; codeVerifier: string; rememberMe: boolean }
   ): Promise<AuthResponse> =>
     (await apiClient.post<ApiResponse<AuthResponse>>("/auth/google-login-native", params)).data.data,
+
+  // Web fallback used only when One Tap's silent prompt() is blocked/skipped (see
+  // GoogleSignInButton.tsx's runPopupFallback) — same authorization-code shape as
+  // googleLoginNative, minus codeVerifier, since GIS's initCodeClient popup mode never
+  // establishes a PKCE challenge.
+  googleLoginPopup: async (
+    params: { code: string; redirectUri: string; rememberMe: boolean }
+  ): Promise<AuthResponse> =>
+    (await apiClient.post<ApiResponse<AuthResponse>>("/auth/google-login-popup", params)).data.data,
 
   getPasskeyRegistrationOptions: async (): Promise<PublicKeyCredentialCreationOptionsJSON> =>
     (await apiClient.post<ApiResponse<PublicKeyCredentialCreationOptionsJSON>>("/users/me/webauthn/register/options")).data.data,

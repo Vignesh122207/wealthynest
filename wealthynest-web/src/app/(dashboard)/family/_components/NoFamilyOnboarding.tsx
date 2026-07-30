@@ -137,7 +137,7 @@ export function NoFamilyOnboarding({
           </div>
           <div className="flex gap-2 pt-1">
             <button onClick={handleJoin} disabled={inviteCode.length < 4 || joining} data-testid="family-join-submit"
-              className="flex-1 h-10 rounded-xl text-sm font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-all disabled:opacity-60 flex items-center justify-center gap-2">
+              className="flex-1 h-10 rounded-xl text-sm font-medium bg-emerald-700 hover:bg-emerald-600 text-white transition-all disabled:opacity-60 flex items-center justify-center gap-2">
               {joining ? <><Loader2 className="w-4 h-4 animate-spin" /> Joining…</> : "Join Family"}
             </button>
             <button onClick={() => { reset(); setInviteCode(""); }}

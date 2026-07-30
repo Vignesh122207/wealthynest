@@ -194,10 +194,10 @@ function TicketDetail({ ticketId, onBack }: { ticketId: string; onBack: () => vo
                 </div>
                 <p className="text-xs text-muted-foreground">
                   <span className="font-medium text-foreground">{ticket.userName ?? "Unknown"}</span>
-                  {ticket.userEmail && <span className="opacity-60"> · {ticket.userEmail}</span>}
+                  {ticket.userEmail && <span> · {ticket.userEmail}</span>}
                 </p>
               </div>
-              <p className="text-xs text-muted-foreground/60">
+              <p className="text-xs text-muted-foreground/80">
                 {new Date(ticket.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
               </p>
             </div>
@@ -373,7 +373,7 @@ function TicketCard({ ticket, onClick }: { ticket: TicketType; onClick: () => vo
               <p className="text-sm font-semibold text-foreground truncate leading-snug">{ticket.subject}</p>
               <p className="text-xs text-muted-foreground truncate mt-0.5">
                 {ticket.userName ?? "Unknown"}
-                {ticket.userEmail && <span className="opacity-60"> · {ticket.userEmail}</span>}
+                {ticket.userEmail && <span> · {ticket.userEmail}</span>}
               </p>
             </div>
           </div>

@@ -156,6 +156,32 @@ class ExpenseControllerTest {
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.error").value("MALFORMED_REQUEST"));
         }
+
+        @Test
+        @DisplayName("GET /expenses?size over 500 is rejected with 422 instead of running an unbounded query")
+        void oversizedPageSizeIsRejected() throws Exception {
+            SecurityTestUtils.authenticateAs(userId, null);
+
+            mockMvc.perform(get("/api/v1/expenses").param("size", "1000000"))
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.error").value("VALIDATION_FAILED"))
+                    .andExpect(jsonPath("$.fieldErrors.size").exists());
+
+            verify(expenseService, org.mockito.Mockito.never()).getExpenses(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("GET /expenses?size=500 (the max) is accepted")
+        void maxPageSizeIsAccepted() throws Exception {
+            SecurityTestUtils.authenticateAs(userId, null);
+            Page<ExpenseResponse> page = new PageImpl<>(List.of(), Pageable.ofSize(500), 0);
+            when(expenseService.getExpenses(eq(userId), eq(null), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                    .thenReturn(page);
+
+            mockMvc.perform(get("/api/v1/expenses").param("size", "500"))
+                    .andExpect(status().isOk());
+        }
     }
 
     @Nested

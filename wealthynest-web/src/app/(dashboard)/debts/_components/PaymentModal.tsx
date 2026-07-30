@@ -69,7 +69,7 @@ export function PaymentModal({ debt, onSave, onClose, saving }: {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Note <span className="text-muted-foreground/60">(optional)</span></label>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Note <span className="text-muted-foreground/80">(optional)</span></label>
             <input value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. UPI transfer"
               className="w-full h-11 px-3 rounded-xl text-sm bg-background border border-border text-foreground placeholder-muted-foreground/40 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/40 transition-all" />
           </div>

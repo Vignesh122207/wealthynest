@@ -93,8 +93,8 @@ wealthynest:
     cors:
       allowed-origins: ${CORS_ORIGINS:http://localhost:3000}
     rate-limit:
-      auth-requests-per-minute: 10
-      api-requests-per-minute: 200
+      auth-requests-per-minute: ${RATE_LIMIT_AUTH_PER_MINUTE:10}
+      api-requests-per-minute: ${RATE_LIMIT_API_PER_MINUTE:200}
       trusted-proxies: ${RATE_LIMIT_TRUSTED_PROXIES:}
   cookie:
     # Must be true for the httpOnly refresh-token cookie in any environment served over HTTPS —
@@ -104,6 +104,11 @@ wealthynest:
   pagination:
     default-page-size: 20
     max-page-size: 100
+  audit:
+    # AuditLogCleanupScheduler (AUDIT_LOG_CLEANUP job) deletes rows older than this every night.
+    # 180 days balances having enough history for a security investigation/dispute against letting
+    # the table grow forever - adjust per your own compliance/retention needs.
+    retention-days: ${AUDIT_LOG_RETENTION_DAYS:180}
   mail:
     from: "WealthyNest <noreply@wealthynest.in>"
     frontend-url: ${FRONTEND_URL:http://localhost:3000}
@@ -113,6 +118,10 @@ wealthynest:
     rp-name: WealthyNest
   google:
     client-id: ${GOOGLE_CLIENT_ID:}
+    # Only needed for the web popup-code fallback (AuthServiceImpl.googleLoginPopup) — the primary
+    # web sign-in (ID token, googleLogin) never needs a secret. Same "Web application" OAuth
+    # client as client-id above; fetch its secret from Google Cloud Console > Credentials.
+    client-secret: ${GOOGLE_CLIENT_SECRET:}
     native:
       client-id: ${GOOGLE_NATIVE_CLIENT_ID:}
       client-secret: ${GOOGLE_NATIVE_CLIENT_SECRET:}

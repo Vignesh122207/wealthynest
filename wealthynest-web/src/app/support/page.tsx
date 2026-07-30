@@ -17,7 +17,7 @@ const FAQS = [
   },
   {
     q: "How do I track my investments?",
-    a: "Open the Investments tab. You can add stocks (NSE), mutual funds, gold, fixed deposits, bonds, PPF and NPS. The app loads live NSE prices and calculates your XIRR automatically.",
+    a: "Open the Investments tab. You can add stocks (NSE), mutual funds, gold, fixed deposits and bonds. The app loads live NSE prices and calculates your XIRR automatically. EPF/PPF can be tracked as a net-worth asset from the Assets tab.",
   },
   {
     q: "Is my financial data safe?",
@@ -36,8 +36,12 @@ const FAQS = [
     a: "Create a budget in the Budgets tab. You can set an alert threshold (e.g. 80%). When your spending crosses that threshold, you'll get a notification in the app.",
   },
   {
+    q: "Why am I getting push notifications on my phone, and how do I turn them off?",
+    a: "The Android app sends a push notification for the same alerts you see in-app — budget breaches, low balance, spend anomalies, upcoming EMI/SIP due dates, and debt due dates. Go to Settings → Notifications to turn off any alert type; turning it off there stops both the in-app notification and the push notification for that type.",
+  },
+  {
     q: "How do I delete my account?",
-    a: "Go to Settings → scroll to the bottom → Close Account. This deactivates your account and your data is retained; only an admin can reactivate it. Email support@wealthynest.in if you need your data permanently erased instead.",
+    a: "Go to Settings → Profile → scroll to the bottom → Close Account. This deactivates your account and your data is retained; only an admin can reactivate it. See wealthynest.in/delete-account for full details, or email support@wealthynest.in if you need your data permanently erased instead.",
   },
   {
     q: "Can I import transactions from a bank or UPI statement?",

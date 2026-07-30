@@ -94,7 +94,7 @@ export default function DebtsPage() {
             action={
               <div className="flex gap-2">
                 <button onClick={() => setModal({ mode: "create", defaultType: "LENT" })}
-                  className="flex items-center gap-1.5 h-10 px-4 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-all">
+                  className="flex items-center gap-1.5 h-10 px-4 rounded-xl text-sm font-semibold bg-emerald-700 hover:bg-emerald-600 text-white transition-all">
                   <ArrowUpRight className="w-4 h-4" /> I Lent
                 </button>
                 <button onClick={() => setModal({ mode: "create", defaultType: "BORROWED" })}
