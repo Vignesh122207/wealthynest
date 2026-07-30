@@ -144,6 +144,21 @@ class WalletAccountControllerTest {
                     .andExpect(status().isUnprocessableEntity())
                     .andExpect(jsonPath("$.fieldErrors.amount").exists());
         }
+
+        @Test
+        @DisplayName("GET /accounts/transfers?size over 500 is rejected with 422 instead of running an unbounded query")
+        void oversizedTransfersPageSizeIsRejected() throws Exception {
+            SecurityTestUtils.authenticateAs(userId, null);
+
+            mockMvc.perform(get("/api/v1/accounts/transfers").param("size", "1000000"))
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.error").value("VALIDATION_FAILED"))
+                    .andExpect(jsonPath("$.fieldErrors.size").exists());
+
+            org.mockito.Mockito.verify(accountService, org.mockito.Mockito.never())
+                    .getTransfers(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        }
     }
 
     @Nested

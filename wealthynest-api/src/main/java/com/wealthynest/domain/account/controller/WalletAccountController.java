@@ -13,6 +13,7 @@ import com.wealthynest.domain.account.dto.response.TransferResponse;
 import com.wealthynest.domain.account.service.LoanPaymentService;
 import com.wealthynest.domain.account.service.WalletAccountService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -81,7 +82,7 @@ public class WalletAccountController {
     @GetMapping("/transfers")
     public ResponseEntity<PagedResponse<TransferResponse>> getTransfers(
             @RequestParam(defaultValue = "0")  int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") @Max(value = 500, message = "size must not exceed 500") int size) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by("transferDate").descending());
         return ResponseEntity.ok(accountService.getTransfers(SecurityUtils.requireCurrentUserId(), pageable));
     }
