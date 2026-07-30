@@ -127,9 +127,24 @@ jobs:
             exit 1
           fi
 
+      # continue-on-error here on purpose: a bare failure on this step used to fail the whole
+      # `deploy` job, which skips `smoke` (needs: deploy) and blocks `rollback` (needs
+      # deploy.result == 'success') - so a release that was actually fine but just took slightly
+      # longer than 90s to become reachable through Cloudflare (a real, reproduced case: a
+      # symlink-flip restart flap that self-resolved) reported as a total failure with no
+      # automatic rollback for the one case a rollback would matter. Letting this step fail softly
+      # hands the real go/no-go decision to `smoke`'s actual Playwright round trip against the live
+      # site, which already has correct rollback wiring below - a release that's truly broken will
+      # fail smoke too and roll back for real; one that just needed a few more seconds won't.
       - name: External health check (through Cloudflare, not just localhost)
+        id: healthcheck
+        continue-on-error: true
         run: |
           timeout 90 bash -c 'until curl -sf https://${{ vars.AWS_API_DOMAIN }}/actuator/health | grep -q "\"status\":\"UP\""; do sleep 5; done'
+
+      - name: Warn if the external health check didn't pass within the timeout
+        if: steps.healthcheck.outcome == 'failure'
+        run: echo "::warning::External health check timed out - deploy-backend.sh's own local health check already passed before this ran. Not treating this alone as a failed release; the smoke job's real round trip against the live site decides whether to roll back."
 
   smoke:
     needs: deploy
