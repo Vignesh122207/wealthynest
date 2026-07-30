@@ -746,25 +746,40 @@ public class InvestmentServiceImpl implements InvestmentService {
                       && i.getUnits() != null
                       && i.getPurchaseDate() != null)
             .toList();
+        if (stocks.isEmpty()) return List.of();
 
         // Collect dismissed dividends for this user once to avoid per-action DB hits
         Set<String> dismissed = dismissedDividendRepository.findByUserId(userId).stream()
             .map(d -> d.getInvestmentId() + "|" + d.getExDate())
             .collect(Collectors.toSet());
 
+        // Batched instead of one findBySymbolAndExDateAfter call per stock + one
+        // existsByInvestmentIdAndIncomeTypeAndEventDate call per (stock, corporate action) pair —
+        // an N+N*M query fan-out this endpoint used to run on every dashboard load. Symbol lookups
+        // still need each stock's own purchaseDate applied as the real per-stock floor (this shared
+        // "earliest across the portfolio" floor is deliberately loose, see the repository method's
+        // own comment).
+        Set<String> symbols = stocks.stream().map(Investment::getSymbol).collect(Collectors.toSet());
+        LocalDate earliestPurchase = stocks.stream().map(Investment::getPurchaseDate).min(LocalDate::compareTo).orElseThrow();
+        Map<String, List<NseCorporateAction>> actionsBySymbol =
+            corpActionRepository.findBySymbolInAndExDateAfterOrderByExDateDesc(symbols, earliestPurchase).stream()
+                .collect(Collectors.groupingBy(NseCorporateAction::getSymbol));
+
+        Set<UUID> investmentIds = stocks.stream().map(Investment::getId).collect(Collectors.toSet());
+        Set<String> logged = incomeLogRepository.findByInvestmentIdInAndIncomeType(investmentIds, "DIVIDEND").stream()
+            .map(l -> l.getInvestmentId() + "|" + l.getEventDate())
+            .collect(Collectors.toSet());
+
         List<DividendSuggestionResponse> suggestions = new ArrayList<>();
         for (Investment inv : stocks) {
-            List<NseCorporateAction> actions =
-                corpActionRepository.findBySymbolAndExDateAfterOrderByExDateDesc(
-                    inv.getSymbol(), inv.getPurchaseDate());
+            List<NseCorporateAction> actions = actionsBySymbol.getOrDefault(inv.getSymbol(), List.of());
             for (NseCorporateAction ca : actions) {
+                if (!ca.getExDate().isAfter(inv.getPurchaseDate())) continue;
                 BigDecimal dps = ca.getDividendPerShare() != null ? ca.getDividendPerShare() : BigDecimal.ZERO;
                 if (dps.compareTo(BigDecimal.ZERO) <= 0) continue;
                 // Skip dismissed suggestions (issue #3)
                 if (dismissed.contains(inv.getId() + "|" + ca.getExDate())) continue;
                 BigDecimal suggested = inv.getUnits().multiply(dps).setScale(2, RoundingMode.HALF_UP);
-                boolean logged = incomeLogRepository.existsByInvestmentIdAndIncomeTypeAndEventDate(
-                    inv.getId(), "DIVIDEND", ca.getExDate());
                 suggestions.add(DividendSuggestionResponse.builder()
                     .investmentId(inv.getId())
                     .symbol(inv.getSymbol())
@@ -773,7 +788,7 @@ public class InvestmentServiceImpl implements InvestmentService {
                     .dividendPerShare(dps)
                     .sharesHeld(inv.getUnits())
                     .suggestedIncome(suggested)
-                    .alreadyLogged(logged)
+                    .alreadyLogged(logged.contains(inv.getId() + "|" + ca.getExDate()))
                     .build());
             }
         }

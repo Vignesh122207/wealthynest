@@ -1819,16 +1819,39 @@ class InvestmentServiceImplTest {
                     .symbol("TCS").exDate(LocalDate.now().minusDays(10)).dividendPerShare(new BigDecimal("5")).build();
             when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(stock));
             when(dismissedDividendRepository.findByUserId(userId)).thenReturn(List.of());
-            when(corpActionRepository.findBySymbolAndExDateAfterOrderByExDateDesc("TCS", stock.getPurchaseDate()))
+            when(corpActionRepository.findBySymbolInAndExDateAfterOrderByExDateDesc(Set.of("TCS"), stock.getPurchaseDate()))
                     .thenReturn(List.of(ca));
-            when(incomeLogRepository.existsByInvestmentIdAndIncomeTypeAndEventDate(
-                    investmentId, "DIVIDEND", ca.getExDate())).thenReturn(false);
+            when(incomeLogRepository.findByInvestmentIdInAndIncomeType(Set.of(investmentId), "DIVIDEND"))
+                    .thenReturn(List.of());
 
             List<DividendSuggestionResponse> result = service.getDividendSuggestions(userId);
 
             assertThat(result).hasSize(1);
             assertThat(result.get(0).getSuggestedIncome()).isEqualByComparingTo("50");
             assertThat(result.get(0).isAlreadyLogged()).isFalse();
+        }
+
+        @Test
+        @DisplayName("marks a suggestion already logged when a matching income log exists")
+        void marksAlreadyLoggedDividend() {
+            Investment stock = withId(baseInvestment().investmentType(InvestmentType.STOCK)
+                    .symbol("TCS").units(new BigDecimal("10")).purchaseDate(LocalDate.now().minusYears(1)).build());
+            LocalDate exDate = LocalDate.now().minusDays(10);
+            NseCorporateAction ca = NseCorporateAction.builder()
+                    .symbol("TCS").exDate(exDate).dividendPerShare(new BigDecimal("5")).build();
+            InvestmentIncomeLog log = InvestmentIncomeLog.builder()
+                    .investmentId(investmentId).incomeType("DIVIDEND").eventDate(exDate).build();
+            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(stock));
+            when(dismissedDividendRepository.findByUserId(userId)).thenReturn(List.of());
+            when(corpActionRepository.findBySymbolInAndExDateAfterOrderByExDateDesc(Set.of("TCS"), stock.getPurchaseDate()))
+                    .thenReturn(List.of(ca));
+            when(incomeLogRepository.findByInvestmentIdInAndIncomeType(Set.of(investmentId), "DIVIDEND"))
+                    .thenReturn(List.of(log));
+
+            List<DividendSuggestionResponse> result = service.getDividendSuggestions(userId);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).isAlreadyLogged()).isTrue();
         }
 
         @Test
@@ -1843,13 +1866,14 @@ class InvestmentServiceImplTest {
                     .userId(userId).investmentId(investmentId).exDate(exDate).build();
             when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(stock));
             when(dismissedDividendRepository.findByUserId(userId)).thenReturn(List.of(dismissed));
-            when(corpActionRepository.findBySymbolAndExDateAfterOrderByExDateDesc("TCS", stock.getPurchaseDate()))
+            when(corpActionRepository.findBySymbolInAndExDateAfterOrderByExDateDesc(Set.of("TCS"), stock.getPurchaseDate()))
                     .thenReturn(List.of(ca));
+            when(incomeLogRepository.findByInvestmentIdInAndIncomeType(Set.of(investmentId), "DIVIDEND"))
+                    .thenReturn(List.of());
 
             List<DividendSuggestionResponse> result = service.getDividendSuggestions(userId);
 
             assertThat(result).isEmpty();
-            verify(incomeLogRepository, never()).existsByInvestmentIdAndIncomeTypeAndEventDate(any(), any(), any());
         }
 
         @Test
@@ -1861,10 +1885,39 @@ class InvestmentServiceImplTest {
                     .symbol("TCS").exDate(LocalDate.now().minusDays(10)).dividendPerShare(BigDecimal.ZERO).build();
             when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(stock));
             when(dismissedDividendRepository.findByUserId(userId)).thenReturn(List.of());
-            when(corpActionRepository.findBySymbolAndExDateAfterOrderByExDateDesc("TCS", stock.getPurchaseDate()))
+            when(corpActionRepository.findBySymbolInAndExDateAfterOrderByExDateDesc(Set.of("TCS"), stock.getPurchaseDate()))
                     .thenReturn(List.of(ca));
+            when(incomeLogRepository.findByInvestmentIdInAndIncomeType(Set.of(investmentId), "DIVIDEND"))
+                    .thenReturn(List.of());
 
             assertThat(service.getDividendSuggestions(userId)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("skips a corporate action whose ex-date isn't after this stock's own purchase date")
+        void skipsActionBeforeThisStocksPurchase() {
+            // Two stocks, same symbol, different purchase dates — exercises the shared-floor batch
+            // query needing its own per-stock exDate.isAfter(purchaseDate) filter back in Java,
+            // since the SQL-side "after" is now a single shared floor across the whole portfolio.
+            Investment older = withId(baseInvestment().investmentType(InvestmentType.STOCK)
+                    .symbol("TCS").units(new BigDecimal("10")).purchaseDate(LocalDate.now().minusYears(2)).build());
+            Investment newer = withId(baseInvestment().investmentType(InvestmentType.STOCK)
+                    .symbol("TCS").units(new BigDecimal("5")).purchaseDate(LocalDate.now().minusDays(5)).build());
+            NseCorporateAction ca = NseCorporateAction.builder()
+                    .symbol("TCS").exDate(LocalDate.now().minusDays(10)).dividendPerShare(new BigDecimal("5")).build();
+            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(older, newer));
+            when(dismissedDividendRepository.findByUserId(userId)).thenReturn(List.of());
+            when(corpActionRepository.findBySymbolInAndExDateAfterOrderByExDateDesc(Set.of("TCS"), older.getPurchaseDate()))
+                    .thenReturn(List.of(ca));
+            when(incomeLogRepository.findByInvestmentIdInAndIncomeType(any(), eq("DIVIDEND")))
+                    .thenReturn(List.of());
+
+            List<DividendSuggestionResponse> result = service.getDividendSuggestions(userId);
+
+            // Only "older" (purchased before the ex-date) gets a suggestion — "newer" was bought
+            // after the ex-date and never held the stock when this dividend was declared.
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getSharesHeld()).isEqualByComparingTo(older.getUnits());
         }
 
         @Test
@@ -1872,10 +1925,11 @@ class InvestmentServiceImplTest {
         void filtersIneligibleInvestments() {
             Investment fd = withId(baseInvestment().investmentType(InvestmentType.FD).build());
             when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(fd));
-            when(dismissedDividendRepository.findByUserId(userId)).thenReturn(List.of());
 
             assertThat(service.getDividendSuggestions(userId)).isEmpty();
-            verifyNoInteractions(corpActionRepository);
+            // Short-circuits on the empty eligible-stocks list before any further lookup —
+            // dismissedDividendRepository included, not just corpActionRepository/incomeLogRepository.
+            verifyNoInteractions(dismissedDividendRepository, corpActionRepository, incomeLogRepository);
         }
     }
 
