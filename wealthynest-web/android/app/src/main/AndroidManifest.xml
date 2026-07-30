@@ -59,11 +59,16 @@
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- Default icon/color for a background FCM push when the payload doesn't specify its own
-             — reuses the same launcher icon and brand color already defined for the app, not new
-             assets. See @capacitor/push-notifications' own docs for why these two keys specifically
-             are read by the OS notification tray rather than anything set in JS at receive time. -->
-        <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@mipmap/ic_launcher" />
+        <!-- Default icon/color for a background FCM push when the payload doesn't specify its own.
+             Notification icons are the one Android surface that ignores color entirely and renders
+             only the alpha channel as solid white — pointing this at the full-color launcher icon
+             (an opaque mark on an opaque white background) rendered as a plain white block in the
+             status bar instead of the W mark. ic_notification is a flat white silhouette on a
+             transparent background, generated from the same source mark, at the sizes Android's
+             notification icon (not launcher icon) spec expects. See @capacitor/push-notifications'
+             own docs for why these two keys specifically are read by the OS notification tray
+             rather than anything set in JS at receive time. -->
+        <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_notification" />
         <meta-data android:name="com.google.firebase.messaging.default_notification_color" android:resource="@color/colorPrimary" />
     </application>
 
