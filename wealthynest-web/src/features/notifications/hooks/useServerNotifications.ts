@@ -78,6 +78,11 @@ export function useMarkAllServerRead() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["server-notifications"] });
     },
+    // NotificationsPage's handleMarkAllRead calls markSeen() (local Zustand store) unconditionally,
+    // before this mutation even settles — a silent failure here left the badge count permanently
+    // wrong (locally "seen" forever) with zero indication the server never actually recorded it,
+    // e.g. still showing unread on another device/session where the local seenIds store doesn't apply.
+    onError: () => toast.error("Couldn't mark notifications as read. Please try again."),
   });
 }
 
@@ -88,6 +93,9 @@ export function useMarkServerRead() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["server-notifications"] });
     },
+    // Same desync risk as useMarkAllServerRead — handleOpen's markSeen() call isn't gated on this
+    // mutation succeeding.
+    onError: () => toast.error("Couldn't mark notification as read. Please try again."),
   });
 }
 
@@ -98,6 +106,7 @@ export function useDeleteServerNotification() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["server-notifications"] });
     },
+    onError: () => toast.error("Couldn't dismiss notification. Please try again."),
   });
 }
 
