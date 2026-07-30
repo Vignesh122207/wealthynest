@@ -20,13 +20,31 @@ const apiOrigin = new URL(apiUrl).origin;
 // polling/timeout shape. A single fast request here (Playwright's default retry fires almost
 // immediately, not with real delay) was catching that same window and rolling back releases that
 // were actually fine moments later.
+//
+// test.setTimeout(...) here, not a bump to the whole file/project's `timeout` in
+// playwright.config.ts: the first version of this fix used expect.poll()'s own 90s/2s timeout but
+// left the *test's* timeout at the config's global 30s default, which killed the test (and the
+// poll along with it) at ~28-30s every time, before the poll ever got the extra 60s it was
+// supposedly given - confirmed by the real failure timing (three ~28.3s failures, not the
+// expected up-to-90s). The other three tests in this file are fast checks with no reason to
+// share this one test's patience, so this stays scoped to just the test that needs it.
+//
+// 150s poll / 170s test timeout, not 90s: deploy-backend.sh's own wait_for_health() already
+// confirms the app itself is healthy *locally* before SSM ever reports success, so whatever gap
+// remains before the site is reachable externally is somewhere in the nginx/Cloudflare path, not
+// app startup - and the only real data point on how long that gap lasts (one observed incident,
+// ~90-110s before external recovery) was a single sample, not a proven ceiling. Two real deploys
+// in a row have now hit this exact window; picking a number that just barely matches the one
+// anecdote risks a third false rollback for the same reason. 150s gives real margin beyond that
+// single observation instead of re-guessing the same number again.
 test("API health endpoint reports UP", async ({ request }) => {
+  test.setTimeout(170_000);
   await expect.poll(async () => {
     const response = await request.get(`${apiOrigin}/actuator/health`);
     if (!response.ok()) return null;
     const body = await response.json();
     return body.status;
-  }, { timeout: 90_000, intervals: [2_000] }).toBe("UP");
+  }, { timeout: 150_000, intervals: [3_000] }).toBe("UP");
 });
 
 test("landing page loads", async ({ page }) => {
