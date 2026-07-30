@@ -2,6 +2,7 @@ import {expect, test} from "../../fixtures";
 import {
     randomBankAccount,
     randomBudget,
+    randomCategoryName,
     randomExpense,
     randomFixedDeposit,
     randomGoal,
@@ -9,6 +10,8 @@ import {
     randomTransfer,
 } from "../../test-data/factory";
 import {ROUTES} from "../../constants/routes";
+import {provisionE2EUser} from "../../helpers/auth.helper";
+import {api} from "../../helpers/api.helper";
 import {AccountsPage} from "../../pages/AccountsPage";
 import {TransactionsPage} from "../../pages/TransactionsPage";
 import {BudgetsPage} from "../../pages/BudgetsPage";
@@ -32,13 +35,25 @@ import {InvestmentsPage} from "../../pages/InvestmentsPage";
 // was actually rendering regressionUser's).
 test.describe("Critical Business Flow @smoke @critical", () => {
   test("a new user can complete the full core workflow in one session", async ({
-    page, loginPage, homePage, e2eUser,
+    page, loginPage, homePage,
   }) => {
     const accountsPage = new AccountsPage(page);
     const transactionsPage = new TransactionsPage(page);
     const budgetsPage = new BudgetsPage(page);
     const goalsPage = new GoalsPage(page);
     const investmentsPage = new InvestmentsPage(page);
+
+    // Provisioned fresh here rather than via the shared e2eUser fixture (global-setup's single
+    // user, reused across CI's retries): this test creates a real, persistent account/expense/
+    // budget/goal/investment trail, so a first attempt that gets far enough to create the Cash
+    // Wallet before failing on a later step leaves that account behind — the retry then hits
+    // "only one Cash Wallet allowed" and fails immediately, masking whatever the real problem was
+    // (confirmed via a real CI run: retries 1-2 both failed at account-creation, not the original
+    // failure point). provisionE2EUser()'s unique-suffixed email makes every attempt, including
+    // retries, start from a genuinely clean account — same pattern family.spec.ts already uses for
+    // its own ad-hoc second user.
+    const e2eUser = await provisionE2EUser();
+    const category = await api.createCategory(e2eUser.auth.accessToken, { name: randomCategoryName(), type: "EXPENSE" });
 
     const bank = randomBankAccount();
     const expense = randomExpense();
@@ -58,7 +73,14 @@ test.describe("Critical Business Flow @smoke @critical", () => {
     await accountsPage.createBankAccount({ bankName: bank.bankName, openingBalance: bank.openingBalance });
     await accountsPage.expectAccountVisible(bank.bankName);
 
-    await accountsPage.createCashWalletAccount(1000);
+    // Comfortably above randomTransfer()'s max (2000, see factory.ts) — at 1000 this transfer step
+    // silently blocked on "Insufficient balance in Cash Wallet" roughly half the time (whenever the
+    // random amount rolled above 1000), which submitBtn's client-side validation prevents from ever
+    // firing the API call the next line waits on, so it just ran out the clock at a 15/30s
+    // waitForResponse timeout that had nothing to do with the network or CI load — confirmed by
+    // reproducing this locally, single worker, zero contention, same "Insufficient balance" text
+    // visible in the error-context snapshot.
+    await accountsPage.createCashWalletAccount(5000);
     await accountsPage.expectAccountVisible("Cash Wallet");
 
     // ── 3. Add Income (to the bank account) ────────────────────────────────
@@ -70,7 +92,7 @@ test.describe("Critical Business Flow @smoke @critical", () => {
 
     // ── 4. Add Expense (against the seeded E2E category) ───────────────────
     await transactionsPage.addExpense({
-      amount: expense.amount, categoryName: e2eUser.expenseCategoryName, description: expense.description,
+      amount: expense.amount, categoryName: category.name, description: expense.description,
     });
     await transactionsPage.expectRowVisible(expense.description);
 
@@ -79,8 +101,8 @@ test.describe("Critical Business Flow @smoke @critical", () => {
 
     // ── 6. Create Budget (same category as the expense above) ──────────────
     await budgetsPage.gotoBudgets();
-    await budgetsPage.createMonthlyBudget({ categoryName: e2eUser.expenseCategoryName, amount: budget.amount });
-    await budgetsPage.expectBudgetVisible(e2eUser.expenseCategoryName);
+    await budgetsPage.createMonthlyBudget({ categoryName: category.name, amount: budget.amount });
+    await budgetsPage.expectBudgetVisible(category.name);
 
     // ── 7. Create Goal ───────────────────────────────────────────────────────
     await goalsPage.gotoGoals();
