@@ -69,15 +69,15 @@ export function MemberSpendingChart({
                 formatter={(v: TooltipValueType | undefined, _: number | string | undefined, props: { payload?: { fullName?: string } }) => [fmt(chartValueToNumber(v)), props.payload?.fullName ?? "Spending"]} />
               <Bar dataKey="amount" radius={[0, 6, 6, 0]} style={{ cursor: "pointer" }}
                 onClick={(data: { id?: string }) => setDrillMemberId(prev => prev === data.id ? null : (data.id ?? null))}>
-                {memberSpending.map((m, i) => (
-                  <Cell key={i} fill={m.color} opacity={drillMemberId && drillMemberId !== m.id ? 0.35 : 1} />
+                {memberSpending.map(m => (
+                  <Cell key={m.id} fill={m.color} opacity={drillMemberId && drillMemberId !== m.id ? 0.35 : 1} />
                 ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
           <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3">
-            {memberSpending.map((m, i) => (
-              <button key={i} onClick={() => setDrillMemberId(prev => prev === m.id ? null : m.id)}
+            {memberSpending.map(m => (
+              <button key={m.id} onClick={() => setDrillMemberId(prev => prev === m.id ? null : m.id)}
                 className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
                 <div className="w-2 h-2 rounded-full shrink-0" style={{ background: m.color }} />
                 <span className="text-xs text-muted-foreground">{m.fullName}</span>
