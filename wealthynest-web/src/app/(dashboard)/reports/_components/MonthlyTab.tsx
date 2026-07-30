@@ -95,7 +95,7 @@ export function MonthlyTab() {
         }
       );
 
-      finalizePdf(doc, `WealthyNest-${year}-${mm}-Monthly.pdf`);
+      await finalizePdf(doc, `WealthyNest-${year}-${mm}-Monthly.pdf`);
     } catch {
       toast.error("Could not generate PDF. Please try again.");
     } finally {

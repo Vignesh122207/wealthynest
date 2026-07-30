@@ -59,7 +59,7 @@ export async function downloadAccountStatement(account: WalletAccount, year: num
     );
 
     const filenameSafe = account.name.replace(/[^a-zA-Z0-9-_]+/g, "-");
-    finalizePdf(doc, `WealthyNest-${filenameSafe}-Statement.pdf`);
+    await finalizePdf(doc, `WealthyNest-${filenameSafe}-Statement.pdf`);
   } catch {
     toast.error("Failed to generate statement");
   }

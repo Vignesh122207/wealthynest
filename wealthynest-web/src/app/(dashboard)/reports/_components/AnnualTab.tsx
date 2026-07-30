@@ -79,7 +79,7 @@ export function AnnualTab() {
         columnStyles: { 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" } },
       });
 
-      finalizePdf(doc, `WealthyNest-${year}-Annual.pdf`);
+      await finalizePdf(doc, `WealthyNest-${year}-Annual.pdf`);
     } catch {
       toast.error("Could not generate PDF. Please try again.");
     } finally {

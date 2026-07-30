@@ -57,7 +57,7 @@ describe("downloadAccountStatement", () => {
       addTableCalls.push({ head, body: body as string[][] });
       return y + 10;
     });
-    vi.spyOn(reportPdf, "finalizePdf").mockImplementation((_doc, filename) => { savedFilename = filename; });
+    vi.spyOn(reportPdf, "finalizePdf").mockImplementation(async (_doc, filename) => { savedFilename = filename; });
     vi.spyOn(reportPdf, "yieldToMain").mockResolvedValue(undefined);
   });
 

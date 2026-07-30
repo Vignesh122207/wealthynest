@@ -1,5 +1,6 @@
 import {jsPDF} from "jspdf";
 import autoTable, {type RowInput, type Styles} from "jspdf-autotable";
+import {downloadBlob} from "@/lib/downloadFile";
 
 /** Building a large report is synchronous (autoTable + jsPDF's encoder both run on the main
  * thread with no async points) and can take a couple hundred ms for a few thousand rows.
@@ -166,8 +167,10 @@ export function addTable(doc: jsPDF, y: number, head: string[], body: RowInput[]
 }
 
 /** Stamps the footer (tagline + page number) on every page and triggers the actual file
- * download — no popup window, no browser print dialog. */
-export function finalizePdf(doc: jsPDF, filename: string): void {
+ * download — no popup window, no browser print dialog. Goes through downloadBlob() rather than
+ * jsPDF's own doc.save() so this also works inside the Android WebView shell, not just a browser
+ * tab — see that function's own comment for why doc.save()'s anchor-click approach doesn't. */
+export async function finalizePdf(doc: jsPDF, filename: string): Promise<void> {
   const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
@@ -180,5 +183,5 @@ export function finalizePdf(doc: jsPDF, filename: string): void {
     doc.text("WealthyNest · Free forever · No ads", MARGIN, FOOTER_Y);
     doc.text(`Page ${i} of ${pageCount}`, PAGE_WIDTH - MARGIN, FOOTER_Y, {align: "right"});
   }
-  doc.save(filename);
+  await downloadBlob(doc.output("blob"), filename);
 }

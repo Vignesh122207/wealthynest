@@ -1,5 +1,6 @@
 import {escapeCsvField, getCurrencySymbol} from "@/lib/utils";
 import {INCOME_SOURCES} from "@/lib/constants";
+import {downloadBlob} from "@/lib/downloadFile";
 import type {Expense} from "@/features/expenses/types/expense.types";
 import type {IncomeEntry} from "@/features/income/types/income.types";
 import type {AccountTransfer} from "@/features/accounts/types/account.types";
@@ -7,12 +8,8 @@ import type {AccountTransfer} from "@/features/accounts/types/account.types";
 // Shared by every CSV export below — was previously copy-pasted blob/anchor/click/cleanup
 // boilerplate in four places.
 function triggerCsvDownload(filename: string, header: string[], rows: string[][]) {
-  const csv  = [header, ...rows].map(r => r.join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url  = URL.createObjectURL(blob);
-  const a    = Object.assign(document.createElement("a"), { href: url, download: filename });
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
+  const csv = [header, ...rows].map(r => r.join(",")).join("\n");
+  void downloadBlob(new Blob([csv], { type: "text/csv" }), filename);
 }
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {

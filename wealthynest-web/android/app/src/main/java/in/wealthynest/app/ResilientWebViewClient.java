@@ -5,6 +5,7 @@ import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebView;
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeWebViewClient;
+import java.util.ArrayDeque;
 
 /**
  * Capacitor's default BridgeWebViewClient has no onRenderProcessGone override, so ANY renderer
@@ -14,18 +15,24 @@ import com.getcapacitor.BridgeWebViewClient;
  * down the entire app is bad resilience for any WebView-shell app, independent of what's actually
  * causing a given crash.
  *
- * Recovery here is deliberately simple and bounded: reload once on the first crash (a fresh
- * renderer process is spun up automatically by WebView.reload()/loadUrl() — no need to tear down
- * and recreate the WebView object itself, which is where most home-grown recovery attempts go
- * wrong). If it crashes again shortly after, don't keep reloading forever — fall through to the
- * platform's default handling (same as today) rather than risk a silent reload loop that burns
- * battery/CPU without ever telling the user anything is wrong.
+ * Recovery reloads on every crash (a fresh renderer process is spun up automatically by
+ * WebView.reload() — no need to tear down and recreate the WebView object itself, which is where
+ * most home-grown recovery attempts go wrong), but stops once a real loop is detected — otherwise
+ * this falls through to the platform's default handling instead of reloading forever.
+ *
+ * Loop detection is a rolling count, not a fixed "crashed again within N ms of the last one"
+ * check: an on-emulator repro of the underlying OOM bug this was built for showed crashes
+ * recurring roughly every 40-47s, not back-to-back — an earlier version of this class used a flat
+ * 30s window, so every single one of those was more than 30s after the previous and got treated
+ * as a fresh "first" crash forever, defeating the whole point of loop detection. Counting crashes
+ * within a longer rolling window catches that pattern instead.
  */
 public class ResilientWebViewClient extends BridgeWebViewClient {
     private static final String TAG = "WealthyNest";
-    private static final long CRASH_LOOP_WINDOW_MS = 30_000;
+    private static final long CRASH_LOOP_WINDOW_MS = 5 * 60_000;
+    private static final int MAX_CRASHES_IN_WINDOW = 3;
 
-    private long lastCrashAtMs = 0;
+    private final ArrayDeque<Long> recentCrashTimestamps = new ArrayDeque<>();
 
     public ResilientWebViewClient(Bridge bridge) {
         super(bridge);
@@ -34,16 +41,20 @@ public class ResilientWebViewClient extends BridgeWebViewClient {
     @Override
     public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
         long now = System.currentTimeMillis();
-        boolean crashedAgainQuickly = (now - lastCrashAtMs) < CRASH_LOOP_WINDOW_MS && lastCrashAtMs != 0;
-        lastCrashAtMs = now;
+        recentCrashTimestamps.addLast(now);
+        while (!recentCrashTimestamps.isEmpty() && now - recentCrashTimestamps.peekFirst() > CRASH_LOOP_WINDOW_MS) {
+            recentCrashTimestamps.removeFirst();
+        }
 
+        boolean loopDetected = recentCrashTimestamps.size() >= MAX_CRASHES_IN_WINDOW;
         Log.w(TAG, "WebView render process gone (didCrash=" + detail.didCrash() + "). "
-            + (crashedAgainQuickly ? "Crashed again within " + CRASH_LOOP_WINDOW_MS + "ms — not retrying again."
-                                    : "Reloading once to recover."));
+            + (loopDetected ? recentCrashTimestamps.size() + " crashes within "
+                + (CRASH_LOOP_WINDOW_MS / 1000) + "s — not retrying again."
+                : "Reloading to recover."));
 
-        if (crashedAgainQuickly) {
-            // Let the platform's default fatal handling take over, same as before this class
-            // existed, rather than loop indefinitely on a renderer that can't stay up.
+        if (loopDetected) {
+            // Let the platform's default fatal handling take over rather than keep reloading a
+            // renderer that demonstrably can't stay up.
             return false;
         }
 

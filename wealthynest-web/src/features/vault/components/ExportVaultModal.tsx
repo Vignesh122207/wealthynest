@@ -7,6 +7,7 @@ import {Button} from "@/components/ui/Button";
 import {FormModalShell} from "@/components/ui/FormModalShell";
 import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
 import {useAuthStore} from "@/features/auth/store/auth.store";
+import {downloadBlob} from "@/lib/downloadFile";
 import {useExportVault} from "../hooks/useVault";
 import {type RevealFormValues, revealSchema} from "../schemas/vault.schema";
 import {VaultModalHeader} from "./VaultModalHeader";
@@ -16,15 +17,6 @@ import {VaultStepUpFields} from "./VaultStepUpFields";
 const VAULT_BRASS = "#d4a72c";
 
 type ApiError = { response?: { status?: number; data?: { message?: string } } };
-
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 export function ExportVaultModal({ onClose }: { onClose: () => void }) {
   const { mutate: exportCsv, isPending, error } = useExportVault();

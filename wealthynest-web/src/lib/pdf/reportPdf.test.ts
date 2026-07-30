@@ -1,8 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
 import type { jsPDF } from "jspdf";
+import { downloadBlob } from "@/lib/downloadFile";
 import {
   addSectionTitle, addSummaryCards, addTable, createReportDoc, finalizePdf, pdfCurrencyPrefix, yieldToMain,
 } from "./reportPdf";
+
+vi.mock("@/lib/downloadFile", () => ({ downloadBlob: vi.fn() }));
 
 describe("yieldToMain", () => {
   it("resolves on a later macrotask rather than synchronously", async () => {
@@ -93,16 +96,15 @@ describe("addTable", () => {
 });
 
 describe("finalizePdf", () => {
-  it("stamps a footer on every page and saves under the given filename", () => {
+  it("stamps a footer on every page and downloads under the given filename", async () => {
     const { doc, y } = createReportDoc("Title", "Subtitle");
     const manyRows = Array.from({ length: 80 }, (_, i) => [`2026-01-${(i % 28) + 1}`, "Category", "Description", "Rs. 100"]);
     addTable(doc, y, ["Date", "Category", "Description", "Amount"], manyRows);
     const pageCountBefore = doc.getNumberOfPages();
-    const saveSpy = vi.spyOn(doc, "save").mockImplementation(() => doc);
 
-    finalizePdf(doc, "WealthyNest-2026-Annual.pdf");
+    await finalizePdf(doc, "WealthyNest-2026-Annual.pdf");
 
-    expect(saveSpy).toHaveBeenCalledWith("WealthyNest-2026-Annual.pdf");
+    expect(downloadBlob).toHaveBeenCalledWith(expect.anything(), "WealthyNest-2026-Annual.pdf");
     expect(doc.getNumberOfPages()).toBe(pageCountBefore); // footer drawing doesn't add pages
   });
 });
