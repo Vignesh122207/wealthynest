@@ -1,6 +1,7 @@
 package com.wealthynest.domain.investment.service;
 
 import com.wealthynest.common.exception.AccessDeniedException;
+import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.domain.account.entity.AccountTransfer;
 import com.wealthynest.domain.account.repository.AccountTransferRepository;
@@ -1418,18 +1419,54 @@ class InvestmentServiceImplTest {
         }
 
         @Test
+        @DisplayName("addStockTransaction rejects a non-STOCK investment (Buy/Sell UI never shows for BOND/FD/etc)")
+        void rejectsNonStockInvestmentType() {
+            Investment inv = withId(baseInvestment().investmentType(InvestmentType.BOND).build());
+            when(investmentRepository.findById(investmentId)).thenReturn(Optional.of(inv));
+            CreateStockTransactionRequest req = buyRequest(new BigDecimal("10"), new BigDecimal("100"), BigDecimal.ZERO);
+
+            assertThatThrownBy(() -> service.addStockTransaction(investmentId, userId, req))
+                    .isInstanceOf(BusinessException.class);
+            verifyNoInteractions(stockTransactionRepository);
+        }
+
+        @Test
         @DisplayName("deleteStockTransaction removes the row and recalculates WAC totals")
         void deleteRecalculatesTotals() {
             Investment inv = withId(baseInvestment().investmentType(InvestmentType.STOCK).symbol("TCS").build());
+            StockTransaction txn = StockTransaction.builder().investmentId(investmentId)
+                    .transactionDate(LocalDate.now()).transactionType("BUY")
+                    .quantity(BigDecimal.TEN).pricePerShare(new BigDecimal("100")).build();
+            ReflectionTestUtils.setField(txn, "id", 5L);
             when(investmentRepository.findById(investmentId)).thenReturn(Optional.of(inv));
+            when(stockTransactionRepository.findById(5L)).thenReturn(Optional.of(txn));
             when(stockTransactionRepository.sumBuyQuantityByInvestmentId(investmentId)).thenReturn(new BigDecimal("10"));
             when(stockTransactionRepository.sumBuyAmountByInvestmentId(investmentId)).thenReturn(new BigDecimal("1000"));
             when(stockTransactionRepository.sumNetQuantityByInvestmentId(investmentId)).thenReturn(new BigDecimal("10"));
 
             service.deleteStockTransaction(investmentId, 5L, userId);
 
-            verify(stockTransactionRepository).deleteById(5L);
+            verify(stockTransactionRepository).delete(txn);
             assertThat(inv.getAvgBuyPrice()).isEqualByComparingTo("100");
+        }
+
+        @Test
+        @DisplayName("deleteStockTransaction rejects a transaction that belongs to a different investment (cross-user IDOR)")
+        void rejectsTransactionFromAnotherInvestment() {
+            Investment inv = withId(baseInvestment().investmentType(InvestmentType.STOCK).symbol("TCS").build());
+            // Row 5 actually belongs to some OTHER investment (e.g. another user's) — the caller
+            // only owns `investmentId`, and must not be able to delete this by guessing its raw id.
+            StockTransaction foreignTxn = StockTransaction.builder().investmentId(UUID.randomUUID())
+                    .transactionDate(LocalDate.now()).transactionType("BUY")
+                    .quantity(BigDecimal.TEN).pricePerShare(new BigDecimal("100")).build();
+            ReflectionTestUtils.setField(foreignTxn, "id", 5L);
+            when(investmentRepository.findById(investmentId)).thenReturn(Optional.of(inv));
+            when(stockTransactionRepository.findById(5L)).thenReturn(Optional.of(foreignTxn));
+
+            assertThatThrownBy(() -> service.deleteStockTransaction(investmentId, 5L, userId))
+                    .isInstanceOf(AccessDeniedException.class);
+            verify(stockTransactionRepository, never()).delete(any());
+            verify(stockTransactionRepository, never()).deleteById(any());
         }
     }
 
