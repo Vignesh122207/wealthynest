@@ -2,6 +2,24 @@ import {apiClient} from "@/lib/axios";
 import type {ApiResponse, PagedResponse} from "@/types/api.types";
 import type {User} from "@/features/auth/types/auth.types";
 
+// Actuator is mounted at the API server's root, not under /api/v1 — same reasoning as
+// infrastructure/smoke-tests/post-deploy.spec.ts's own apiOrigin derivation. apiClient's request
+// interceptor attaches the Authorization header to any request through this instance regardless
+// of the URL being absolute, so reusing it here (instead of a bare fetch/new axios instance)
+// still gets the real logged-in admin's token — SecurityConfig now requires ADMIN for anything
+// under /actuator/** beyond health/info.
+const ACTUATOR_ORIGIN = new URL(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/api/v1").origin;
+
+export interface ActuatorHealthComponent {
+  status: string;
+  details?: Record<string, unknown>;
+}
+
+export interface ActuatorHealth {
+  status: string;
+  components?: Record<string, ActuatorHealthComponent>;
+}
+
 export interface JobScheduleConfig {
   jobName:         string;
   displayName:     string;
@@ -76,4 +94,9 @@ export const adminApi = {
   updateSchedule: async (jobName: string, cron: string): Promise<JobScheduleConfig> =>
     (await apiClient.put<ApiResponse<JobScheduleConfig>>(
       `/admin/jobs/${jobName}/schedule?cron=${encodeURIComponent(cron)}`)).data.data,
+
+  // ── System Health (Actuator) ─────────────────────────────────────────────────
+
+  getSystemHealth: async (): Promise<ActuatorHealth> =>
+    (await apiClient.get<ActuatorHealth>(`${ACTUATOR_ORIGIN}/actuator/health`)).data,
 };

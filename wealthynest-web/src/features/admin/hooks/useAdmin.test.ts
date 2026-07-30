@@ -4,6 +4,7 @@ import { createQueryClientWrapper } from "@/test-utils/queryClientWrapper";
 import {
   useAdminStats, useAdminUsers, useToggleUserActive, useUpdateUserRole, useResetUserPassword,
   useAdminAuditLogs, useUserGrowth, useAdminJobs, useTriggerJob, useUpdateJobSchedule,
+  useSystemHealth,
 } from "./useAdmin";
 import { adminApi } from "../api/admin.api";
 import { toast } from "sonner";
@@ -12,7 +13,7 @@ vi.mock("../api/admin.api", () => ({
   adminApi: {
     getStats: vi.fn(), listUsers: vi.fn(), toggleActive: vi.fn(), updateRole: vi.fn(),
     resetPassword: vi.fn(), getAuditLogs: vi.fn(), getUserGrowth: vi.fn(),
-    listJobs: vi.fn(), triggerJob: vi.fn(), updateSchedule: vi.fn(),
+    listJobs: vi.fn(), triggerJob: vi.fn(), updateSchedule: vi.fn(), getSystemHealth: vi.fn(),
   },
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -181,6 +182,29 @@ describe("useTriggerJob", () => {
 
     await vi.waitFor(() => expect(result.current.isError).toBe(true));
     expect(toast.error).toHaveBeenCalledWith("Job already running");
+  });
+});
+
+describe("useSystemHealth", () => {
+  it("does not fetch on mount — only when explicitly refetched", () => {
+    const { Wrapper } = createQueryClientWrapper();
+    const { result } = renderHook(() => useSystemHealth(), { wrapper: Wrapper });
+    expect(result.current.fetchStatus).toBe("idle");
+    expect(mockedApi.getSystemHealth).not.toHaveBeenCalled();
+  });
+
+  it("fetches health details on refetch()", async () => {
+    mockedApi.getSystemHealth.mockResolvedValue({
+      status: "UP",
+      components: { db: { status: "UP" } },
+    } as never);
+    const { Wrapper } = createQueryClientWrapper();
+    const { result } = renderHook(() => useSystemHealth(), { wrapper: Wrapper });
+
+    result.current.refetch();
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual({ status: "UP", components: { db: { status: "UP" } } });
   });
 });
 

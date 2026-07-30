@@ -96,6 +96,17 @@ export function useTriggerJob() {
   });
 }
 
+// enabled: false — an admin diagnostic check, not something to fetch on every JobsTab mount;
+// fires only when triggered via the returned refetch().
+export function useSystemHealth() {
+  return useQuery({
+    queryKey: ["admin", "system-health"],
+    queryFn:  adminApi.getSystemHealth,
+    enabled:  false,
+    retry:    false,
+  });
+}
+
 export function useUpdateJobSchedule() {
   const qc = useQueryClient();
   return useMutation({

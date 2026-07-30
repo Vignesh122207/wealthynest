@@ -1,8 +1,72 @@
 import {useState} from "react";
-import {Check, CheckCircle2, Clock, Loader2, Pencil, Play, RefreshCw, XCircle} from "lucide-react";
-import {useAdminJobs, useTriggerJob, useUpdateJobSchedule} from "@/features/admin/hooks/useAdmin";
+import {Activity, Check, CheckCircle2, Clock, Loader2, Pencil, Play, RefreshCw, XCircle} from "lucide-react";
+import {useAdminJobs, useSystemHealth, useTriggerJob, useUpdateJobSchedule} from "@/features/admin/hooks/useAdmin";
 import type {JobScheduleConfig} from "@/features/admin/api/admin.api";
 import {cn} from "@/lib/utils";
+
+// Same status vocabulary as JobStatusBadge below, but Actuator health components report
+// UP/DOWN/OUT_OF_SERVICE/UNKNOWN, not SUCCESS/FAILED/RUNNING — a separate small map rather than
+// bending one map to cover both vocabularies.
+function HealthStatusPill({ status }: { status: string }) {
+  const isUp = status === "UP";
+  return (
+    <span className={cn(
+      "inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full",
+      isUp ? "bg-emerald-500/15 text-emerald-500" : "bg-red-500/15 text-red-500"
+    )}>
+      {isUp ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+      {status}
+    </span>
+  );
+}
+
+function SystemHealthCard() {
+  const { data, isFetching, isError, error, refetch } = useSystemHealth();
+  const checked = data !== undefined || isError;
+  const errorStatus = (error as { response?: { status?: number } } | null)?.response?.status;
+
+  return (
+    <div className="bg-card border border-border rounded-2xl overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <div className="flex items-center gap-2">
+          <Activity className="w-4 h-4 text-muted-foreground" />
+          <h2 className="text-sm font-semibold text-foreground">System Health</h2>
+          {checked && !isError && data && <HealthStatusPill status={data.status} />}
+        </div>
+        <button onClick={() => refetch()} disabled={isFetching}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-indigo-600/15 text-indigo-500 hover:bg-indigo-600/25 border border-indigo-500/20 transition-colors disabled:opacity-50">
+          {isFetching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+          {checked ? "Refresh" : "Check now"}
+        </button>
+      </div>
+      {isError && (
+        <p className="px-4 py-4 text-sm text-red-500">
+          {errorStatus === 403 ? "Admin access required." : "Couldn't reach the health endpoint."}
+        </p>
+      )}
+      {data?.components && (
+        <div className="divide-y divide-border">
+          {Object.entries(data.components).map(([name, component]) => (
+            <div key={name} className="px-4 py-3 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">{name}</p>
+                {component.details && (
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                    {Object.entries(component.details).map(([k, v]) => `${k}: ${v}`).join(" · ")}
+                  </p>
+                )}
+              </div>
+              <HealthStatusPill status={component.status} />
+            </div>
+          ))}
+        </div>
+      )}
+      {!checked && !isFetching && (
+        <p className="px-4 py-6 text-center text-sm text-muted-foreground">Click &quot;Check now&quot; to fetch live status</p>
+      )}
+    </div>
+  );
+}
 
 function JobStatusBadge({ status }: { status?: string }) {
   if (!status) return <span className="text-xs text-muted-foreground">Never run</span>;
@@ -80,7 +144,9 @@ export function JobsTab() {
   const { mutate: updateSchedule }                                            = useUpdateJobSchedule();
 
   return (
-    <div className="bg-card border border-border rounded-2xl overflow-hidden">
+    <div className="space-y-4">
+      <SystemHealthCard />
+      <div className="bg-card border border-border rounded-2xl overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <h2 className="text-sm font-semibold text-foreground">Scheduled Jobs</h2>
         {isLoading && <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" />}
@@ -107,6 +173,7 @@ export function JobsTab() {
           </div>
         ))}
         {jobs.length === 0 && !isLoading && <p className="px-4 py-8 text-center text-sm text-muted-foreground">No jobs configured</p>}
+      </div>
       </div>
     </div>
   );
