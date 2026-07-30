@@ -109,7 +109,7 @@ function BudgetProgressTile({ onTrack, total, alertBannerVisible, delay = "delay
     <div className={cn("bg-card rounded-2xl p-4 shadow-sm border border-border/50 card-hover animate-fade-in-up", delay)}>
       <div className="flex items-center gap-2 mb-3">
         <PremiumIcon icon={Target} tone="orange" size="sm" />
-        <p className="text-xs font-semibold text-muted-foreground/70 truncate">Budget Progress</p>
+        <p className="text-xs font-semibold text-muted-foreground/80 truncate">Budget Progress</p>
       </div>
       <div className="flex items-center gap-3">
         <div className="relative w-14 h-14 shrink-0">

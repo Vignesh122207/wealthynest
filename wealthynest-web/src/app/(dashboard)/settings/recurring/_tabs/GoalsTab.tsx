@@ -202,13 +202,20 @@ function RuleCard({
   const icon = resolveGoalIcon({ name: rule.goalName, icon: rule.goalIcon });
 
   return (
-    <div onClick={onEdit} role="button" tabIndex={0} data-testid="recurring-goal-rule-card"
-      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEdit(); } }}
-      aria-label={`Edit ${rule.goalName} recurring contribution`}
+    <div onClick={onEdit} data-testid="recurring-goal-rule-card"
       className={cn(
-      "bg-card border rounded-2xl p-4 transition-all cursor-pointer hover:border-indigo-500/40 hover:shadow-sm hover:-translate-y-0.5 duration-200",
+      "relative bg-card border rounded-2xl p-4 transition-all cursor-pointer hover:border-indigo-500/40 hover:shadow-sm hover:-translate-y-0.5 duration-200",
       rule.active ? "border-border" : "border-border opacity-60"
     )}>
+      {/* Real, separately-focusable control for the same action the card's plain onClick above
+          already does — a role="button" here would nest the toggle button below inside another
+          interactive widget (axe's nested-interactive rule), so the card itself stays a
+          non-widget div and this sr-only-until-focused button is the keyboard/screen-reader path
+          to Edit instead (see AccountCard.tsx's identical fix). */}
+      <button type="button" onClick={onEdit}
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-20 focus:px-3 focus:py-1.5 focus:rounded-lg focus:bg-primary focus:text-primary-foreground focus:text-xs focus:font-medium">
+        Edit {rule.goalName} recurring contribution
+      </button>
       <div className="flex items-start gap-3">
         <PremiumIcon icon={icon} hex={rule.goalColor ?? GOAL_COLORS[0]} size="md" className="w-10 h-10 shrink-0" />
         <div className="flex-1 min-w-0">
