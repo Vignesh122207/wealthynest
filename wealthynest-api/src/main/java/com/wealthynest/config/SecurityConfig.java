@@ -93,6 +93,14 @@ public class SecurityConfig {
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", config);
+        // /actuator/health sits outside /api/** (mounted at the domain root by nginx, see
+        // post-deploy.spec.ts's own comment on that) but the admin System Health panel fetches
+        // it from the browser via apiClient like any other endpoint - without a CORS registration
+        // covering it, Spring's CorsFilter rejects the preflight with a bare "Invalid CORS
+        // request" before authorizeHttpRequests' permitAll on this exact path ever gets a chance
+        // to apply. Registered narrowly (this path only, not /actuator/**) since that's all the
+        // panel actually calls and the rest of /actuator/** is locked to ADMIN role anyway.
+        source.registerCorsConfiguration("/actuator/health", config);
         return source;
     }
 
