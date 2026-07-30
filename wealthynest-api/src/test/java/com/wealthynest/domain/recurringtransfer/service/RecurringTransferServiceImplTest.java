@@ -3,6 +3,7 @@ package com.wealthynest.domain.recurringtransfer.service;
 import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.domain.account.dto.request.TransferRequest;
+import com.wealthynest.domain.account.entity.WalletAccount;
 import com.wealthynest.domain.account.repository.WalletAccountRepository;
 import com.wealthynest.domain.account.service.AccountOwnershipGuard;
 import com.wealthynest.domain.account.service.WalletAccountService;
@@ -62,6 +63,51 @@ class RecurringTransferServiceImplTest {
     private RecurringTransfer withId(RecurringTransfer r) {
         ReflectionTestUtils.setField(r, "id", ruleId);
         return r;
+    }
+
+    private WalletAccount walletAccountOf(UUID id, String name) {
+        WalletAccount account = WalletAccount.builder().userId(userId).name(name).build();
+        ReflectionTestUtils.setField(account, "id", id);
+        return account;
+    }
+
+    // ─── getAll ──────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("getAll")
+    class GetAllTests {
+
+        @Test
+        @DisplayName("maps each rule to a response, resolving both account names via a batched lookup")
+        void mapsRulesToResponses() {
+            RecurringTransfer rule = withId(baseRule(1).build());
+            WalletAccount fromAccount = walletAccountOf(fromAccountId, "From Wallet");
+            WalletAccount toAccount   = walletAccountOf(toAccountId, "To Wallet");
+            when(recurringTransferRepository.findByUserIdOrderByCreatedAtDesc(userId)).thenReturn(List.of(rule));
+            when(walletAccountRepository.findAllById(List.of(fromAccountId, toAccountId)))
+                    .thenReturn(List.of(fromAccount, toAccount));
+
+            var result = service.getAll(userId);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getFromAccountName()).isEqualTo("From Wallet");
+            assertThat(result.get(0).getToAccountName()).isEqualTo("To Wallet");
+        }
+
+        @Test
+        @DisplayName("a linked account no longer existing falls back to \"Unknown Account\" for just that side")
+        void missingAccount_fallsBackToUnknownAccount() {
+            RecurringTransfer rule = withId(baseRule(1).build());
+            WalletAccount toAccount = walletAccountOf(toAccountId, "To Wallet");
+            when(recurringTransferRepository.findByUserIdOrderByCreatedAtDesc(userId)).thenReturn(List.of(rule));
+            when(walletAccountRepository.findAllById(List.of(fromAccountId, toAccountId)))
+                    .thenReturn(List.of(toAccount));
+
+            var result = service.getAll(userId);
+
+            assertThat(result.get(0).getFromAccountName()).isEqualTo("Unknown Account");
+            assertThat(result.get(0).getToAccountName()).isEqualTo("To Wallet");
+        }
     }
 
     // ─── create ──────────────────────────────────────────────────────────────────

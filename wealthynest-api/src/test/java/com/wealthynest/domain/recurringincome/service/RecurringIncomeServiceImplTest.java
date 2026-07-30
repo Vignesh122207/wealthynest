@@ -289,13 +289,14 @@ class RecurringIncomeServiceImplTest {
     class GetAllTests {
 
         @Test
-        @DisplayName("maps each rule to a response, resolving the account name")
+        @DisplayName("maps each rule to a response, resolving the account name via a batched lookup")
         void mapsRulesToResponses() {
             UUID userId = UUID.randomUUID();
             RecurringIncome rule = buildRule(1, null);
             WalletAccount account = walletAccountOf(AccountType.BANK_ACCOUNT);
+            ReflectionTestUtils.setField(account, "id", rule.getAccountId());
             when(recurringIncomeRepository.findByUserIdOrderByCreatedAtDesc(userId)).thenReturn(List.of(rule));
-            when(walletAccountRepository.findById(rule.getAccountId())).thenReturn(Optional.of(account));
+            when(walletAccountRepository.findAllById(List.of(rule.getAccountId()))).thenReturn(List.of(account));
 
             var result = service.getAll(userId);
 
@@ -309,7 +310,7 @@ class RecurringIncomeServiceImplTest {
             UUID userId = UUID.randomUUID();
             RecurringIncome rule = buildRule(1, null);
             when(recurringIncomeRepository.findByUserIdOrderByCreatedAtDesc(userId)).thenReturn(List.of(rule));
-            when(walletAccountRepository.findById(rule.getAccountId())).thenReturn(Optional.empty());
+            when(walletAccountRepository.findAllById(List.of(rule.getAccountId()))).thenReturn(List.of());
 
             var result = service.getAll(userId);
 

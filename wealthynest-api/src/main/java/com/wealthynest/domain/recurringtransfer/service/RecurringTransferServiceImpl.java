@@ -23,7 +23,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Slf4j
 @Service
@@ -38,8 +41,17 @@ public class RecurringTransferServiceImpl implements RecurringTransferService {
     @Override
     @Transactional(readOnly = true)
     public List<RecurringTransferResponse> getAll(UUID userId) {
-        return recurringTransferRepository.findByUserIdOrderByCreatedAtDesc(userId)
-                .stream().map(this::toResponse).toList();
+        List<RecurringTransfer> rules = recurringTransferRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        List<UUID> accountIds = rules.stream()
+                .flatMap(r -> Stream.of(r.getFromAccountId(), r.getToAccountId()))
+                .distinct().toList();
+        Map<UUID, String> accountNames = walletAccountRepository.findAllById(accountIds)
+                .stream().collect(Collectors.toMap(WalletAccount::getId, WalletAccount::getName));
+        return rules.stream()
+                .map(r -> toResponse(r,
+                        accountNames.getOrDefault(r.getFromAccountId(), "Unknown Account"),
+                        accountNames.getOrDefault(r.getToAccountId(), "Unknown Account")))
+                .toList();
     }
 
     @Override
@@ -170,6 +182,10 @@ public class RecurringTransferServiceImpl implements RecurringTransferService {
                 .map(WalletAccount::getName).orElse("Unknown Account");
         String toName = walletAccountRepository.findById(r.getToAccountId())
                 .map(WalletAccount::getName).orElse("Unknown Account");
+        return toResponse(r, fromName, toName);
+    }
+
+    private RecurringTransferResponse toResponse(RecurringTransfer r, String fromName, String toName) {
         return RecurringTransferResponse.builder()
                 .id(r.getId())
                 .fromAccountId(r.getFromAccountId())
