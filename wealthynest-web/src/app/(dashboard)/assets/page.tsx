@@ -26,14 +26,19 @@ import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {INV_TYPE_META, INVESTMENT_TYPE_KEYS} from "./_components/netWorthMeta";
 import {NetWorthBanner} from "./_components/NetWorthBanner";
 import {AutoLinkedAssets} from "./_components/AutoLinkedAssets";
-import {AssetAllocationChart} from "./_components/AssetAllocationChart";
 import {AssetsSection} from "./_components/AssetsSection";
 import {LiabilitiesSection} from "./_components/LiabilitiesSection";
-import {NetWorthHistoryChart} from "./_components/NetWorthHistoryChart";
 
 // Lazy-loaded: only fetched once a user actually opens the add/edit form.
 const AssetForm     = dynamic(() => import("@/features/assets/components/AssetForm").then(m => m.AssetForm), { ssr: false });
 const LiabilityForm = dynamic(() => import("@/features/liability/components/LiabilityForm").then(m => m.LiabilityForm), { ssr: false });
+
+// Lazy-loaded (kept SSR'd — these paint on first load, not after a click): both pull in
+// recharts, same fix as home/page.tsx's chart widgets (see that file's own comment for the
+// measured cause/effect) — splits their parse cost into their own chunk instead of this
+// route's main one.
+const AssetAllocationChart = dynamic(() => import("./_components/AssetAllocationChart").then(m => m.AssetAllocationChart));
+const NetWorthHistoryChart = dynamic(() => import("./_components/NetWorthHistoryChart").then(m => m.NetWorthHistoryChart));
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 

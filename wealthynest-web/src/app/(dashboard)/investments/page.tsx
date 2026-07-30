@@ -29,7 +29,6 @@ import {SORT_OPTIONS, type SortKey, TAB_TO_INVESTMENT_TYPE, type TabId, TABS,} f
 import {InvestmentCard} from "@/features/investments/components/InvestmentCard";
 import {DividendSuggestionsSection} from "@/features/investments/components/DividendSuggestionsSection";
 import {TabSummaryBar} from "@/features/investments/components/TabSummaryBar";
-import {OverviewTab} from "@/features/investments/components/OverviewTab";
 import dynamic from "next/dynamic";
 import type {StockFormDefaults, StockSubmitValues} from "@/features/investments/components/forms/StockForm";
 import type {MFFormDefaults, MFSubmitValues} from "@/features/investments/components/forms/MFForm";
@@ -49,6 +48,10 @@ const FDForm    = dynamic(() => import("@/features/investments/components/forms/
 const BondForm  = dynamic(() => import("@/features/investments/components/forms/BondForm").then(m => m.BondForm), { ssr: false });
 const ImportCasModal = dynamic(
   () => import("@/features/casimport/components/ImportCasModal").then(m => m.ImportCasModal), { ssr: false });
+
+// Lazy-loaded (kept SSR'd — paints on first load, not after a click): pulls in recharts, same
+// fix as home/page.tsx's chart widgets (see that file's own comment for the measured cause/effect).
+const OverviewTab = dynamic(() => import("@/features/investments/components/OverviewTab").then(m => m.OverviewTab));
 
 // The single shared submit handler below is wired to whichever of these 5 forms is showing for
 // the active tab — each form only ever calls it with its own shape, but there's no single static

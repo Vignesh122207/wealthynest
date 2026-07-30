@@ -1,6 +1,7 @@
 "use client";
 
 import {useMemo, useState} from "react";
+import dynamic from "next/dynamic";
 import {Loader2} from "lucide-react";
 import {Header} from "@/components/layout/Header";
 import {PageWrapper} from "@/components/layout/PageWrapper";
@@ -35,8 +36,11 @@ import {FamilyOverviewStats} from "./_components/FamilyOverviewStats";
 import {FamilyHeaderCard} from "./_components/FamilyHeaderCard";
 import {MembersListCard} from "./_components/MembersListCard";
 import {BudgetOverviewCard} from "./_components/BudgetOverviewCard";
-import {MemberSpendingChart} from "./_components/MemberSpendingChart";
 import {SharedActivityFeed} from "./_components/SharedActivityFeed";
+
+// Lazy-loaded (kept SSR'd — paints on first load, not after a click): pulls in recharts, same
+// fix as home/page.tsx's chart widgets (see that file's own comment for the measured cause/effect).
+const MemberSpendingChart = dynamic(() => import("./_components/MemberSpendingChart").then(m => m.MemberSpendingChart));
 
 type Mode =
   | "idle" | "create" | "join" | "rename"
