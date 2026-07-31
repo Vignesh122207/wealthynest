@@ -314,6 +314,8 @@ export default function DashboardPage() {
             month={month}
             isCurrentMonth={isCurrentMonth}
             onNavigate={navigate}
+            income={data?.monthlyIncome}
+            expenses={data?.monthlyExpenses}
             savingsRate={data?.savingsRate}
           />
 

@@ -1,7 +1,7 @@
 "use client";
 
 import {ChevronLeft, ChevronRight, Zap} from "lucide-react";
-import {getGreeting, monthLabel} from "@/lib/utils";
+import {formatCurrency, getGreeting, monthLabel} from "@/lib/utils";
 
 interface GreetingBannerProps {
   firstName:      string;
@@ -9,23 +9,39 @@ interface GreetingBannerProps {
   month:          number;
   isCurrentMonth: boolean;
   onNavigate:     (dir: -1 | 1) => void;
+  income:         number | undefined;
+  expenses:       number | undefined;
   savingsRate:    number | undefined;
 }
 
+// Exported as a pure function so it's testable without rendering the component.
+// savingsRate is left un-floored by the API now, so a genuine overspend (expenses > income)
+// reads as negative and an exact break-even month reads as a true 0 — the two used to be
+// indistinguishable (both landed on 0) and both got the same "exceeded" wording, which was wrong
+// for break-even. Separately, logging expenses against zero income used to go silent (same `!income`
+// guard that correctly suppresses the "no data at all" case) — that's worth its own callout instead.
+export function getSavingsInsight(
+  income: number | undefined, expenses: number | undefined, savingsRate: number | undefined,
+): string | null {
+  if (savingsRate == null) return null;
+  if (!income) {
+    if (!expenses) return null;
+    return `No income logged this month, but ${formatCurrency(expenses)} in expenses — that's coming out of savings.`;
+  }
+  if (savingsRate >= 40) return "Outstanding savings rate. You're building real wealth!";
+  if (savingsRate >= 25) return "Strong savings discipline. Keep the momentum going.";
+  if (savingsRate >= 15) return "Good progress. A little more savings each month adds up fast.";
+  if (savingsRate >= 5)  return "You're saving something — let's work on growing that.";
+  if (savingsRate > 0)   return "Small wins count. Try to cut one expense this week.";
+  if (savingsRate === 0) return "You spent exactly what you earned this month — nothing left over.";
+  return `Expenses exceeded income by ${Math.abs(Math.round(savingsRate))}% this month.`;
+}
+
 export function GreetingBanner({
-  firstName, year, month, isCurrentMonth, onNavigate, savingsRate,
+  firstName, year, month, isCurrentMonth, onNavigate, income, expenses, savingsRate,
 }: GreetingBannerProps) {
   const label = monthLabel(year, month);
-
-  const insight = (() => {
-    if (savingsRate == null) return null;
-    if (savingsRate >= 40) return "Outstanding savings rate. You're building real wealth!";
-    if (savingsRate >= 25) return "Strong savings discipline. Keep the momentum going.";
-    if (savingsRate >= 15) return "Good progress. A little more savings each month adds up fast.";
-    if (savingsRate >= 5)  return "You're saving something — let's work on growing that.";
-    if (savingsRate > 0)   return "Small wins count. Try to cut one expense this week.";
-    return "Expenses exceeded income this month. Let's review your spending.";
-  })();
+  const insight = getSavingsInsight(income, expenses, savingsRate);
 
   return (
     <div data-testid="greeting-banner" className="animate-fade-in-up flex flex-row items-start justify-between gap-3">

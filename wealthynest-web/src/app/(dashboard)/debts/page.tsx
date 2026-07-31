@@ -93,14 +93,18 @@ export default function DebtsPage() {
             }
             action={
               <div className="flex gap-2">
-                <button onClick={() => setModal({ mode: "create", defaultType: "LENT" })}
-                  className="flex items-center gap-1.5 h-10 px-4 rounded-xl text-sm font-semibold bg-gradient-to-br from-emerald-700 to-emerald-600 shadow-lg shadow-emerald-600/30 hover:shadow-xl hover:shadow-emerald-600/40 hover:-translate-y-0.5 text-white transition-all">
-                  <ArrowUpRight className="w-4 h-4" /> I Lent
-                </button>
-                <button onClick={() => setModal({ mode: "create", defaultType: "BORROWED" })}
-                  className="flex items-center gap-1.5 h-10 px-4 rounded-xl text-sm font-semibold bg-gradient-to-br from-rose-600 to-rose-500 shadow-lg shadow-rose-500/30 hover:shadow-xl hover:shadow-rose-500/40 hover:-translate-y-0.5 text-white transition-all">
-                  <ArrowDownLeft className="w-4 h-4" /> I Borrowed
-                </button>
+                {tab !== "BORROWED" && (
+                  <button onClick={() => setModal({ mode: "create", defaultType: "LENT" })}
+                    className="flex items-center gap-1.5 h-10 px-4 rounded-xl text-sm font-semibold bg-gradient-to-br from-emerald-700 to-emerald-600 shadow-lg shadow-emerald-600/30 hover:shadow-xl hover:shadow-emerald-600/40 hover:-translate-y-0.5 text-white transition-all">
+                    <ArrowUpRight className="w-4 h-4" /> I Lent
+                  </button>
+                )}
+                {tab !== "LENT" && (
+                  <button onClick={() => setModal({ mode: "create", defaultType: "BORROWED" })}
+                    className="flex items-center gap-1.5 h-10 px-4 rounded-xl text-sm font-semibold bg-gradient-to-br from-rose-600 to-rose-500 shadow-lg shadow-rose-500/30 hover:shadow-xl hover:shadow-rose-500/40 hover:-translate-y-0.5 text-white transition-all">
+                    <ArrowDownLeft className="w-4 h-4" /> I Borrowed
+                  </button>
+                )}
               </div>
             }
           />
@@ -185,10 +189,10 @@ export default function DebtsPage() {
         />
       )}
 
-      {/* ── Floating Action Button ── */}
+      {/* ── Floating Action Button — only offers the type matching the active tab ── */}
       <FloatingActionButton actions={[
-        { icon: ArrowUpRight,   label: "I Lent",     color: "emerald", testId: "fab-add-debt-lent",     onClick: () => setModal({ mode: "create", defaultType: "LENT" }) },
-        { icon: ArrowDownLeft,  label: "I Borrowed",  color: "rose",    testId: "fab-add-debt-borrowed", onClick: () => setModal({ mode: "create", defaultType: "BORROWED" }) },
+        { icon: ArrowUpRight,   label: "I Lent",     color: "emerald", testId: "fab-add-debt-lent",     onClick: () => setModal({ mode: "create", defaultType: "LENT" }),     hidden: tab === "BORROWED" },
+        { icon: ArrowDownLeft,  label: "I Borrowed",  color: "rose",    testId: "fab-add-debt-borrowed", onClick: () => setModal({ mode: "create", defaultType: "BORROWED" }), hidden: tab === "LENT" },
       ]} />
     </div>
   );

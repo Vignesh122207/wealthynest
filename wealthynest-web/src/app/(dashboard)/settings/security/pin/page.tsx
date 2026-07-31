@@ -48,7 +48,10 @@ export default function SetupPinPage() {
   );
 
   const card = (
-    <AuthCard>
+    // scale-in, not the default fade-in-up: this card sits inside an overflow-y-auto wrapper
+    // (native branch below) same as the popup versions did — fade-in-up's translateY overshoot
+    // there flickered/dragged the close button, which is why those were switched already.
+    <AuthCard animation="scale-in">
       <div className="mb-7 text-center">
         <div className="w-14 h-14 rounded-2xl bg-brand-500/10 flex items-center justify-center mx-auto mb-4">
           <KeyRound className="w-6 h-6 text-brand-500" />
