@@ -51,7 +51,7 @@ export function PinVerifyModal({ onClose, onVerified }: { onClose: () => void; o
 
   return (
     <TransactionModalOverlay onDismiss={onClose} maxWidth="max-w-[360px]">
-      <AuthCard className="px-5 pt-5 pb-6">
+      <AuthCard animation="scale-in" className="px-5 pt-5 pb-6">
         <button onClick={onClose} aria-label="Close" data-testid="pin-verify-close"
           className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
           <X className="w-4 h-4" />
