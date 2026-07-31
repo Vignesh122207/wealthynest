@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import type {Page} from "@playwright/test";
 import {expect, test} from "../../fixtures";
 import {ROUTES} from "../../constants/routes";
+import {TEST_IDS} from "../../constants/testIds";
 
 // Read-only — same rationale as responsive.spec.ts: no mutations, so safe to run against the
 // shared regressionUser without any of the serial-mode data-collision concerns documented for
@@ -47,6 +48,18 @@ async function waitForSkeletonsGone(page: Page): Promise<void> {
   await expect(page.locator(".animate-pulse")).toHaveCount(0, { timeout: 15000 }).catch(() => {});
 }
 
+// Every dashboard page shares Header.tsx's <h1 data-testid="page-header-title"> — present the
+// instant the page shell mounts, independent of any data query. Waiting for it first closes a gap
+// waitForSkeletonsGone alone doesn't cover: a heavier page (e.g. investments, which fetches half a
+// dozen queries and was CI's slowest regression file) can still be navigating/hydrating with
+// *nothing* on the page yet — no skeleton rendered either, since nothing has rendered — which made
+// toHaveCount(0) resolve immediately for the wrong reason and left axe scanning a blank shell (its
+// own "no main landmark"/"no h1" findings, confirmed against a real failing run, not assumed).
+async function waitForPageReady(page: Page): Promise<void> {
+  await page.getByTestId(TEST_IDS.header.title).waitFor({ state: "visible", timeout: 15000 }).catch(() => {});
+  await waitForSkeletonsGone(page);
+}
+
 test.describe("Accessibility (axe)", () => {
   test("login page has no a11y violations @a11y", async ({ page }) => {
     await page.goto(ROUTES.login);
@@ -74,7 +87,7 @@ test.describe("Accessibility (axe)", () => {
   ] as const) {
     test(`${name} page has no a11y violations @a11y`, async ({ accountsPage }) => {
       await accountsPage.goto(route);
-      await waitForSkeletonsGone(accountsPage.rawPage);
+      await waitForPageReady(accountsPage.rawPage);
       await accountsPage.rawPage.waitForTimeout(ANIMATION_SETTLE_MS);
       const results = await new AxeBuilder({ page: accountsPage.rawPage }).analyze();
       expect(anyViolation(results), JSON.stringify(anyViolation(results), null, 2)).toEqual([]);
