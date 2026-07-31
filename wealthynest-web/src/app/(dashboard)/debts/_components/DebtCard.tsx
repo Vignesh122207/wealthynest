@@ -95,7 +95,7 @@ export function DebtCard({ debt, onEdit, onPayment }: {
           <button onClick={() => setExpanded(v => !v)}
             className="flex-1 min-w-0 flex items-center justify-between gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors bg-muted/40 rounded-full px-3.5 py-2">
             <span className="truncate">
-              {debt.payments.length} payment{debt.payments.length !== 1 ? "s" : ""} · {fmt(debt.amountSettled)} so far
+              {debt.payments.length} payment{debt.payments.length !== 1 ? "s" : ""} · {fmt(debt.amountSettled)} paid · {fmt(debt.amountRemaining)} left
             </span>
             {expanded ? <ChevronUp className="w-3.5 h-3.5 shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 shrink-0" />}
           </button>
