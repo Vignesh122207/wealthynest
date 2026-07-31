@@ -213,8 +213,11 @@ function PasskeyRow() {
   };
 
   return (
-    <div className="px-4 py-4 space-y-3">
-      <div className="flex items-center gap-3.5">
+    <div>
+      {/* px-4 py-4 min-h-[64px] on this row itself (not an outer wrapper) — same reasoning as
+          EmailRow's own matching comment: padding and min-height need to live on the same element
+          for the row to come out the same 64px PIN/Biometric rows use for their Toggle. */}
+      <div className="flex items-center gap-3.5 px-4 py-4 min-h-[64px]">
         <PremiumIcon icon={Fingerprint} tone={enabled ? "green" : "gray"} size="sm" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-foreground flex items-center gap-2 flex-wrap">
@@ -232,10 +235,18 @@ function PasskeyRow() {
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">Unlock instantly with your fingerprint, face, or screen lock — no separate biometric setup, it&apos;s all part of the passkey</p>
         </div>
+        {/* Same right-edge slot PIN/biometric rows give their Toggle, and EmailRow now gives
+            "Change email" — kept out of the flow below so this row matches the rest of the card. */}
+        {!showAdd && (
+          <button onClick={() => setShowAdd(true)} data-testid="security-passkey-add-toggle"
+            className="h-9 px-3.5 rounded-xl text-xs font-medium bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 dark:text-brand-300 border border-brand-500/20 transition-colors shrink-0">
+            {enabled ? "Add another" : "Enable passkey unlock"}
+          </button>
+        )}
       </div>
 
       {!isLoading && passkeys.length > 0 && (
-        <div className="space-y-2 sm:pl-[46px]">
+        <div className="space-y-2 px-4 pb-3 sm:pl-[46px]">
           {passkeys.map(p => (
             <div key={p.id} className="flex items-center justify-between gap-3 bg-muted/40 rounded-xl px-3 py-2.5">
               <div className="min-w-0">
@@ -253,8 +264,8 @@ function PasskeyRow() {
         </div>
       )}
 
-      <div className="sm:pl-[46px]">
-        {showAdd ? (
+      {showAdd && (
+        <div className="px-4 pb-4 sm:pl-[46px]">
           <div className="flex gap-2 items-start">
             <div className="flex-1">
               <FormInput
@@ -275,13 +286,8 @@ function PasskeyRow() {
               <X className="w-4 h-4" />
             </button>
           </div>
-        ) : (
-          <button onClick={() => setShowAdd(true)} data-testid="security-passkey-add-toggle"
-            className="h-10 px-3.5 rounded-xl text-xs font-medium bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 dark:text-brand-300 border border-brand-500/20 transition-colors">
-            {enabled ? "Add another device" : "Enable passkey unlock"}
-          </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
