@@ -166,7 +166,7 @@ class AuthServiceImplTest {
             User user = withId(baseUser().failedLoginAttempts(2).build());
             when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(user));
 
-            assertThatThrownBy(() -> service.login(req(false), ip, ua)).isInstanceOf(BadCredentialsException.class);
+            assertThatThrownBy(() -> service.login(req(false), ip, ua, null)).isInstanceOf(BadCredentialsException.class);
 
             assertThat(user.getFailedLoginAttempts()).isEqualTo(3);
             verify(userRepository).save(user);
@@ -179,7 +179,7 @@ class AuthServiceImplTest {
             User user = withId(baseUser().failedLoginAttempts(4).build());
             when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(user));
 
-            assertThatThrownBy(() -> service.login(req(false), ip, ua)).isInstanceOf(BadCredentialsException.class);
+            assertThatThrownBy(() -> service.login(req(false), ip, ua, null)).isInstanceOf(BadCredentialsException.class);
 
             assertThat(user.getFailedLoginAttempts()).isEqualTo(0); // reset on lock
             assertThat(user.getLockedUntil()).isAfter(Instant.now());
@@ -192,7 +192,7 @@ class AuthServiceImplTest {
             User user = withId(baseUser().lockedUntil(lockedUntil).build());
             when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(user));
 
-            assertThatThrownBy(() -> service.login(req(false), ip, ua))
+            assertThatThrownBy(() -> service.login(req(false), ip, ua, null))
                     .isInstanceOfSatisfying(BusinessException.class, e -> {
                         assertThat(e.getCode()).isEqualTo("ACCOUNT_LOCKED");
                         assertThat(e.getDetails()).containsKey("lockedUntil");
@@ -207,7 +207,7 @@ class AuthServiceImplTest {
             User user = withId(baseUser().emailVerified(false).build());
             when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(user));
 
-            assertThatThrownBy(() -> service.login(req(false), ip, ua)).isInstanceOf(BusinessException.class);
+            assertThatThrownBy(() -> service.login(req(false), ip, ua, null)).isInstanceOf(BusinessException.class);
         }
 
         @Test
@@ -218,7 +218,7 @@ class AuthServiceImplTest {
             when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(user));
             stubAuthResponseBuilding();
 
-            AuthResponse response = service.login(req(true), ip, ua);
+            AuthResponse response = service.login(req(true), ip, ua, null);
 
             assertThat(user.getFailedLoginAttempts()).isEqualTo(0);
             assertThat(response.getAccessToken()).isEqualTo("access-token");
@@ -235,9 +235,29 @@ class AuthServiceImplTest {
             when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(user));
             stubAuthResponseBuilding();
 
-            service.login(req(false), ip, ua);
+            service.login(req(false), ip, ua, null);
 
             verify(emailService).sendNewSignInEmail(eq("alice@example.com"), eq("Alice"), eq(ip), eq(ua), any());
+        }
+
+        // Regression coverage for a real bug: logging in again from a device that still held an
+        // earlier valid session (never explicitly signed out) left that row un-revoked, so it kept
+        // accumulating as a duplicate "active session" entry every time — see
+        // revokeIfOwnedByUser's own comment for why this now runs on every login path, not just
+        // issueTokensForVerifiedUser's passkey ceremony.
+        @Test
+        @DisplayName("on success, revokes this device's previous refresh token when one is supplied")
+        void successRevokesPreviousToken() {
+            when(authenticationManager.authenticate(any())).thenReturn(null);
+            User user = withId(baseUser().build());
+            when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(user));
+            stubAuthResponseBuilding();
+            RefreshToken previous = RefreshToken.builder().userId(userId).revoked(false).build();
+            when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(previous));
+
+            service.login(req(false), ip, ua, "old-refresh-token");
+
+            assertThat(previous.isRevoked()).isTrue();
         }
     }
 
@@ -771,7 +791,7 @@ class AuthServiceImplTest {
             ReflectionTestUtils.setField(service, "googleClientId", "");
             GoogleLoginRequest req = mock(GoogleLoginRequest.class);
 
-            assertThatThrownBy(() -> service.googleLogin(req, ip, ua)).isInstanceOf(BusinessException.class);
+            assertThatThrownBy(() -> service.googleLogin(req, ip, ua, null)).isInstanceOf(BusinessException.class);
             verifyNoInteractions(userRepository);
         }
 
@@ -780,7 +800,7 @@ class AuthServiceImplTest {
         void throwsWhenTokenInvalid() throws Exception {
             when(googleIdTokenValidator.verify("raw-id-token")).thenReturn(null);
 
-            assertThatThrownBy(() -> service.googleLogin(req(), ip, ua)).isInstanceOf(BusinessException.class);
+            assertThatThrownBy(() -> service.googleLogin(req(), ip, ua, null)).isInstanceOf(BusinessException.class);
         }
 
         @Test
@@ -788,7 +808,7 @@ class AuthServiceImplTest {
         void throwsWhenVerifyThrows() throws Exception {
             when(googleIdTokenValidator.verify("raw-id-token")).thenThrow(new java.security.GeneralSecurityException("boom"));
 
-            assertThatThrownBy(() -> service.googleLogin(req(), ip, ua)).isInstanceOf(BusinessException.class);
+            assertThatThrownBy(() -> service.googleLogin(req(), ip, ua, null)).isInstanceOf(BusinessException.class);
         }
 
         @Test
@@ -797,7 +817,7 @@ class AuthServiceImplTest {
             when(googleIdTokenValidator.verify("raw-id-token")).thenReturn(payload);
             when(payload.getEmailVerified()).thenReturn(false);
 
-            assertThatThrownBy(() -> service.googleLogin(req(), ip, ua)).isInstanceOf(BusinessException.class);
+            assertThatThrownBy(() -> service.googleLogin(req(), ip, ua, null)).isInstanceOf(BusinessException.class);
         }
 
         @Test
@@ -810,12 +830,33 @@ class AuthServiceImplTest {
             when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(existing));
             stubAuthResponseBuilding();
 
-            AuthResponse response = service.googleLogin(req(), ip, ua);
+            AuthResponse response = service.googleLogin(req(), ip, ua, null);
 
             assertThat(response.getAccessToken()).isEqualTo("access-token");
             verify(userRepository, never()).save(argThat(u -> "GOOGLE".equals(u.getAuthProvider())));
             verify(auditService).log(eq(userId), eq("GOOGLE_LOGIN_SUCCESS"), any(), any(), any(), any(), any(), any());
             verify(emailService).sendNewSignInEmail(eq("alice@example.com"), any(), eq(ip), eq(ua), any());
+        }
+
+        // Regression coverage for a real bug: signing in again via Google from a device that still
+        // held an earlier valid session left that row un-revoked, accumulating as a duplicate
+        // "active session" entry every time — see login's own matching test / revokeIfOwnedByUser's
+        // comment for the full why.
+        @Test
+        @DisplayName("on success, revokes this device's previous refresh token when one is supplied")
+        void successRevokesPreviousToken() throws Exception {
+            when(googleIdTokenValidator.verify("raw-id-token")).thenReturn(payload);
+            when(payload.getEmailVerified()).thenReturn(true);
+            when(payload.getEmail()).thenReturn("alice@example.com");
+            User existing = withId(baseUser().build());
+            when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(existing));
+            stubAuthResponseBuilding();
+            RefreshToken previous = RefreshToken.builder().userId(userId).revoked(false).build();
+            when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(previous));
+
+            service.googleLogin(req(), ip, ua, "old-refresh-token");
+
+            assertThat(previous.isRevoked()).isTrue();
         }
 
         @Test
@@ -830,7 +871,7 @@ class AuthServiceImplTest {
             when(userRepository.save(any(User.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
             stubAuthResponseBuilding();
 
-            service.googleLogin(req(), ip, ua);
+            service.googleLogin(req(), ip, ua, null);
 
             ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
             verify(userRepository, atLeastOnce()).save(captor.capture());
@@ -862,7 +903,7 @@ class AuthServiceImplTest {
 
             org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
             try {
-                service.googleLogin(req(), ip, ua);
+                service.googleLogin(req(), ip, ua, null);
 
                 verifyNoInteractions(auditService);
                 org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations()
@@ -924,7 +965,7 @@ class AuthServiceImplTest {
             ReflectionTestUtils.setField(service, "googleNativeClientId", "");
             GoogleCodeLoginRequest req = mock(GoogleCodeLoginRequest.class);
 
-            assertThatThrownBy(() -> service.googleLoginNative(req, ip, ua)).isInstanceOf(BusinessException.class);
+            assertThatThrownBy(() -> service.googleLoginNative(req, ip, ua, null)).isInstanceOf(BusinessException.class);
             // Not googleOAuthClient too — wireGoogleNative()'s own stub setup above already calls
             // .post() once to build the chain, so "no interactions" wouldn't hold for that mock.
             verifyNoInteractions(userRepository);
@@ -935,7 +976,7 @@ class AuthServiceImplTest {
         void throwsWhenExchangeFails() {
             when(responseSpec.body(Map.class)).thenThrow(new RestClientException("invalid_client"));
 
-            assertThatThrownBy(() -> service.googleLoginNative(req(), ip, ua)).isInstanceOf(BusinessException.class);
+            assertThatThrownBy(() -> service.googleLoginNative(req(), ip, ua, null)).isInstanceOf(BusinessException.class);
             verifyNoInteractions(userRepository);
         }
 
@@ -944,7 +985,7 @@ class AuthServiceImplTest {
         void throwsWhenNoIdTokenInResponse() {
             stubTokenExchange(Map.of("access_token", "some-access-token"));
 
-            assertThatThrownBy(() -> service.googleLoginNative(req(), ip, ua)).isInstanceOf(BusinessException.class);
+            assertThatThrownBy(() -> service.googleLoginNative(req(), ip, ua, null)).isInstanceOf(BusinessException.class);
             verifyNoInteractions(googleIdTokenValidator, userRepository);
         }
 
@@ -954,7 +995,7 @@ class AuthServiceImplTest {
             stubTokenExchange(Map.of("id_token", "raw-id-token"));
             when(googleIdTokenValidator.verify("raw-id-token")).thenReturn(null);
 
-            assertThatThrownBy(() -> service.googleLoginNative(req(), ip, ua)).isInstanceOf(BusinessException.class);
+            assertThatThrownBy(() -> service.googleLoginNative(req(), ip, ua, null)).isInstanceOf(BusinessException.class);
         }
 
         @Test
@@ -968,7 +1009,7 @@ class AuthServiceImplTest {
             when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(existing));
             stubAuthResponseBuilding();
 
-            AuthResponse response = service.googleLoginNative(req(), ip, ua);
+            AuthResponse response = service.googleLoginNative(req(), ip, ua, null);
 
             assertThat(response.getAccessToken()).isEqualTo("access-token");
             verify(userRepository, never()).save(argThat(u -> "GOOGLE".equals(u.getAuthProvider())));
@@ -988,7 +1029,7 @@ class AuthServiceImplTest {
             when(userRepository.save(any(User.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
             stubAuthResponseBuilding();
 
-            service.googleLoginNative(req(), ip, ua);
+            service.googleLoginNative(req(), ip, ua, null);
 
             ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
             verify(userRepository, atLeastOnce()).save(captor.capture());
@@ -1040,7 +1081,7 @@ class AuthServiceImplTest {
         void throwsWhenNotConfigured() {
             ReflectionTestUtils.setField(service, "googleClientSecret", "");
 
-            assertThatThrownBy(() -> service.googleLoginPopup(req(), ip, ua)).isInstanceOf(BusinessException.class);
+            assertThatThrownBy(() -> service.googleLoginPopup(req(), ip, ua, null)).isInstanceOf(BusinessException.class);
             verifyNoInteractions(userRepository);
         }
 
@@ -1049,7 +1090,7 @@ class AuthServiceImplTest {
         void throwsWhenExchangeFails() {
             when(responseSpec.body(Map.class)).thenThrow(new RestClientException("invalid_grant"));
 
-            assertThatThrownBy(() -> service.googleLoginPopup(req(), ip, ua)).isInstanceOf(BusinessException.class);
+            assertThatThrownBy(() -> service.googleLoginPopup(req(), ip, ua, null)).isInstanceOf(BusinessException.class);
             verifyNoInteractions(userRepository);
         }
 
@@ -1064,7 +1105,7 @@ class AuthServiceImplTest {
             when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(existing));
             stubAuthResponseBuilding();
 
-            AuthResponse response = service.googleLoginPopup(req(), ip, ua);
+            AuthResponse response = service.googleLoginPopup(req(), ip, ua, null);
 
             assertThat(response.getAccessToken()).isEqualTo("access-token");
             verify(userRepository, never()).save(argThat(u -> "GOOGLE".equals(u.getAuthProvider())));

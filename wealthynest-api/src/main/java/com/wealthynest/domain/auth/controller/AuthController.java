@@ -35,7 +35,10 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<AuthResponse>> login(
             @Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
-        return ok(authService.login(request, httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent")), httpResponse);
+        // Optional — see AuthService#login's own comment for why this lets the server revoke this
+        // device's prior session instead of leaving it to accumulate as a duplicate.
+        String previousRefreshToken = refreshCookieService.read(httpRequest).orElse(null);
+        return ok(authService.login(request, httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"), previousRefreshToken), httpResponse);
     }
 
     @PostMapping("/refresh")
@@ -82,13 +85,17 @@ public class AuthController {
     @PostMapping("/google-login")
     public ResponseEntity<ApiResponse<AuthResponse>> googleLogin(
             @Valid @RequestBody GoogleLoginRequest request, HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
-        return ok(authService.googleLogin(request, httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent")), httpResponse);
+        // Optional — see AuthService#login's own comment for why this lets the server revoke this
+        // device's prior session instead of leaving it to accumulate as a duplicate.
+        String previousRefreshToken = refreshCookieService.read(httpRequest).orElse(null);
+        return ok(authService.googleLogin(request, httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"), previousRefreshToken), httpResponse);
     }
 
     @PostMapping("/google-login-native")
     public ResponseEntity<ApiResponse<AuthResponse>> googleLoginNative(
             @Valid @RequestBody GoogleCodeLoginRequest request, HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
-        return ok(authService.googleLoginNative(request, httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent")), httpResponse);
+        String previousRefreshToken = refreshCookieService.read(httpRequest).orElse(null);
+        return ok(authService.googleLoginNative(request, httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"), previousRefreshToken), httpResponse);
     }
 
     // Web counterpart — see AuthService.googleLoginPopup's own comment for why this exists
@@ -97,7 +104,8 @@ public class AuthController {
     @PostMapping("/google-login-popup")
     public ResponseEntity<ApiResponse<AuthResponse>> googleLoginPopup(
             @Valid @RequestBody GoogleCodeLoginRequest request, HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
-        return ok(authService.googleLoginPopup(request, httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent")), httpResponse);
+        String previousRefreshToken = refreshCookieService.read(httpRequest).orElse(null);
+        return ok(authService.googleLoginPopup(request, httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"), previousRefreshToken), httpResponse);
     }
 
     @PostMapping("/pin-login")

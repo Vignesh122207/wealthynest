@@ -419,8 +419,15 @@ function EmailRow() {
   };
 
   return (
-    <div className="px-4 py-4 space-y-3">
-      <div className="flex items-center gap-3.5">
+    <div>
+      {/* px-4 py-4 min-h-[64px] here (not on an outer wrapper) matches PasswordRow's own header
+          button exactly, which is what PinRow/NativeBiometricRow's row height also comes from —
+          padding and min-height need to live on the same element (border-box) for the row to
+          actually come out 64px tall. Splitting them across an outer wrapper's padding and an
+          inner min-height (as this used to) stacks the two instead, making this row visibly
+          taller than its neighbors and throwing the button's position off relative to the rest
+          of the card even though it was centered within its own (mismatched) row. */}
+      <div className="flex items-center gap-3.5 px-4 py-4 min-h-[64px]">
         <PremiumIcon icon={Mail} tone="teal" size="sm" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -428,10 +435,18 @@ function EmailRow() {
           </p>
           <p className="text-xs text-muted-foreground mt-0.5 truncate">{user?.email}</p>
         </div>
+        {/* Same right-edge slot PIN/biometric rows give their Toggle — kept out of the flow below
+            (rather than its own line under the row) so this row matches the rest of the card. */}
+        {!showForm && (
+          <button onClick={() => setShowForm(true)} data-testid="security-email-change-toggle"
+            className="h-9 px-3.5 rounded-xl text-xs font-medium bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 dark:text-brand-300 border border-brand-500/20 transition-colors shrink-0">
+            {user?.pendingEmail ? "Change again" : "Change email"}
+          </button>
+        )}
       </div>
 
       {user?.pendingEmail && (
-        <div className="flex items-center gap-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2.5 sm:ml-[46px]">
+        <div className="flex items-center gap-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2.5 mx-4 mb-3 sm:ml-[46px]">
           <Loader2 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
           <p className="text-xs text-amber-700 dark:text-amber-300">
             Verification link sent to <strong>{user.pendingEmail}</strong> — check that inbox to confirm the change.
@@ -439,8 +454,8 @@ function EmailRow() {
         </div>
       )}
 
-      <div className="sm:pl-[46px]">
-        {showForm ? (
+      {showForm && (
+        <div className="px-4 pb-4 sm:pl-[46px]">
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
             <FormInput
               {...form.register("newEmail")}
@@ -463,13 +478,8 @@ function EmailRow() {
               </button>
             </div>
           </form>
-        ) : (
-          <button onClick={() => setShowForm(true)}
-            className="h-9 px-3.5 rounded-xl text-xs font-medium bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 dark:text-brand-300 border border-brand-500/20 transition-colors">
-            {user?.pendingEmail ? "Change to a different email" : "Change email"}
-          </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

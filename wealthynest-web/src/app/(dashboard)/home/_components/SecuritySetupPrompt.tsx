@@ -3,7 +3,7 @@
 import {useState} from "react";
 import Link from "next/link";
 import {Capacitor} from "@capacitor/core";
-import {Check, Fingerprint, KeyRound, Lock, X} from "lucide-react";
+import {Fingerprint, KeyRound, Lock, X} from "lucide-react";
 import {PremiumIcon} from "@/components/icons/PremiumIcon";
 import {useAuthStore} from "@/features/auth/store/auth.store";
 import {useNativeBiometricStatus} from "@/features/auth/hooks/useNativeBiometric";
@@ -24,9 +24,11 @@ export function SecuritySetupPrompt() {
 
   if (!Capacitor.isNativePlatform() || !user || dismissed) return null;
 
-  const pinDone = user.pinEnabled;
-  const fingerprintDone = !!nativeBiometric?.enabled;
-  if (pinDone && fingerprintDone) return null;
+  // Either one alone already delivers what this card promises ("skip typing your password") —
+  // PIN and fingerprint are independent options here (see this component's own top comment), not
+  // a pair that both need checking off before the nudge goes away. Reaching the JSX below means
+  // neither is done, so it only ever needs to offer both as actions — never a "done" state.
+  if (user.pinEnabled || nativeBiometric?.enabled) return null;
 
   const dismiss = () => {
     localStorage.setItem(DISMISS_KEY_PREFIX + user.id, "true");
@@ -50,31 +52,17 @@ export function SecuritySetupPrompt() {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        {pinDone ? (
-          <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/8 px-3 py-2.5">
-            <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">PIN unlock enabled</span>
-          </div>
-        ) : (
-          <Link href="/settings/security" data-testid="security-setup-prompt-pin"
-            className="flex items-center gap-2 rounded-xl border border-indigo-500/20 bg-indigo-600/10 hover:bg-indigo-600/20 px-3 py-2.5 transition-colors">
-            <KeyRound className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-            <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400">Set up PIN</span>
-          </Link>
-        )}
+        <Link href="/settings/security" data-testid="security-setup-prompt-pin"
+          className="flex items-center gap-2 rounded-xl border border-indigo-500/20 bg-indigo-600/10 hover:bg-indigo-600/20 px-3 py-2.5 transition-colors">
+          <KeyRound className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+          <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400">Set up PIN</span>
+        </Link>
 
-        {fingerprintDone ? (
-          <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/8 px-3 py-2.5">
-            <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Fingerprint enabled</span>
-          </div>
-        ) : (
-          <Link href="/settings/security" data-testid="security-setup-prompt-fingerprint"
-            className="flex items-center gap-2 rounded-xl border border-indigo-500/20 bg-indigo-600/10 hover:bg-indigo-600/20 px-3 py-2.5 transition-colors">
-            <Fingerprint className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-            <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400">Set up fingerprint</span>
-          </Link>
-        )}
+        <Link href="/settings/security" data-testid="security-setup-prompt-fingerprint"
+          className="flex items-center gap-2 rounded-xl border border-indigo-500/20 bg-indigo-600/10 hover:bg-indigo-600/20 px-3 py-2.5 transition-colors">
+          <Fingerprint className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+          <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400">Set up fingerprint</span>
+        </Link>
       </div>
     </div>
   );

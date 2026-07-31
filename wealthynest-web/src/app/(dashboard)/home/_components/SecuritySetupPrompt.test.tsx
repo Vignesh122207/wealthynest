@@ -53,6 +53,21 @@ describe("SecuritySetupPrompt", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  // PIN and fingerprint are independent options (see this component's own top comment) — either
+  // one alone already delivers what the card promises, so it shouldn't keep nudging once one is
+  // done just because the other isn't.
+  it("renders nothing once PIN alone is set up", () => {
+    useAuthStore.setState({ user: { ...user, pinEnabled: true } });
+    const { container } = renderPrompt();
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("renders nothing once fingerprint alone is set up", () => {
+    mockedUseNativeBiometricStatus.mockReturnValue({ data: { available: true, enabled: true } } as never);
+    const { container } = renderPrompt();
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it("offers 'Set up PIN' when PIN isn't enabled", () => {
     renderPrompt();
     expect(screen.getByTestId("security-setup-prompt-pin")).toHaveTextContent("Set up PIN");
@@ -66,12 +81,6 @@ describe("SecuritySetupPrompt", () => {
     const link = screen.getByTestId("security-setup-prompt-fingerprint");
     expect(link).toHaveTextContent("Set up fingerprint");
     expect(screen.queryByTestId("security-setup-prompt-fingerprint-locked")).not.toBeInTheDocument();
-  });
-
-  it("shows 'Fingerprint enabled' once the device has fingerprint unlock turned on", () => {
-    mockedUseNativeBiometricStatus.mockReturnValue({ data: { available: true, enabled: true } } as never);
-    renderPrompt();
-    expect(screen.getByText("Fingerprint enabled")).toBeInTheDocument();
   });
 
   it("dismisses and persists the dismissal per-user", () => {
