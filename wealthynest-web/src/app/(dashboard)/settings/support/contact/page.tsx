@@ -33,7 +33,7 @@ export default function ContactPage() {
                 <span className="text-sm font-mono text-foreground">support@wealthynest.in</span>
                 <a
                   href="mailto:support@wealthynest.in"
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded-lg transition-colors shrink-0 ml-2"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold bg-gradient-to-br from-teal-700 to-teal-600 shadow-lg shadow-teal-600/30 hover:shadow-xl hover:shadow-teal-600/40 hover:-translate-y-0.5 text-white px-3 py-1.5 rounded-lg transition-all shrink-0 ml-2"
                 >
                   <Mail className="w-3 h-3" /> Send
                 </a>

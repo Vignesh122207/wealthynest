@@ -42,7 +42,7 @@ describe("Button", () => {
 
   it("applies the variant's classes (defaulting to primary)", () => {
     render(<Button>Save</Button>);
-    expect(screen.getByRole("button").className).toContain("bg-[#a85f30]");
+    expect(screen.getByRole("button").className).toContain("from-brand-600");
   });
 
   it("a caller-supplied className can override the variant's default background (twMerge)", () => {

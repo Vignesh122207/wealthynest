@@ -611,7 +611,7 @@ export default function TransactionsPage() {
   // AccountPicker has nothing to pick from (the FAB blocks this path, but these buttons didn't).
   const addAccountCta = (
     <Link href="/accounts"
-      className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
+      className="flex items-center gap-2 bg-gradient-to-br from-indigo-600 to-indigo-500 shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 hover:-translate-y-0.5 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
       <Wallet className="w-4 h-4" /> Add an Account
     </Link>
   );

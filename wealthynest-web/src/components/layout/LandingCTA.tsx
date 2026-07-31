@@ -4,7 +4,7 @@ import Link from "next/link";
 import {ArrowRight} from "lucide-react";
 import {useAuthStore} from "@/features/auth/store/auth.store";
 
-const PRIMARY_BTN = "bg-[#a85f30] hover:bg-[#c2703d] text-white transition-all";
+const PRIMARY_BTN = "bg-gradient-to-br from-brand-600 to-brand-500 text-white transition-all";
 
 // The landing page ("/") is reachable while already signed in — a bookmark, a direct link, or
 // just navigating back to "/" from inside the app — and every primary CTA here used to hardcode

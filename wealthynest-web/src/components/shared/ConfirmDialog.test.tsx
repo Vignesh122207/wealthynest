@@ -91,7 +91,7 @@ describe("ConfirmDialog", () => {
 
   it("uses the danger styling and 'danger' button variant when danger=true", () => {
     render(<ConfirmDialog open danger title="Delete?" description="Sure?" onConfirm={vi.fn()} onCancel={vi.fn()} />);
-    expect(screen.getByTestId("confirm-dialog-confirm").className).toContain("bg-red-600");
+    expect(screen.getByTestId("confirm-dialog-confirm").className).toContain("from-red-600");
   });
 
   it("uses custom confirm/cancel labels when provided", () => {

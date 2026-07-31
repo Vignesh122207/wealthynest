@@ -174,7 +174,7 @@ export default function GoalsPage() {
             description="Set a financial goal — buying a house, emergency fund, or a dream vacation — and track your progress."
             action={
               <button onClick={() => setShowCreate(true)}
-                className="flex items-center gap-2 bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-5 h-10 rounded-xl text-sm font-semibold transition-all">
+                className="flex items-center gap-2 bg-gradient-to-br from-fuchsia-600 to-fuchsia-500 shadow-lg shadow-fuchsia-500/30 hover:shadow-xl hover:shadow-fuchsia-500/40 hover:-translate-y-0.5 text-white px-5 h-10 rounded-xl text-sm font-semibold transition-all">
                 <Plus className="w-4 h-4" /> Create First Goal
               </button>
             } />

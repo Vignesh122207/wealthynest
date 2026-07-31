@@ -145,7 +145,7 @@ export default function TicketPage({ params }: { params: Promise<{ id: string }>
                 className="w-full bg-card border border-border rounded-2xl px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/40 resize-none"
               />
               <button type="submit" disabled={isPending || !message.trim()}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors">
+                className="flex items-center gap-2 bg-gradient-to-br from-blue-700 to-blue-600 shadow-lg shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/40 hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all">
                 {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 Send reply
               </button>

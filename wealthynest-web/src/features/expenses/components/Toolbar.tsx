@@ -26,7 +26,7 @@ export function Toolbar({
       </button>
       <button onClick={onImportStatement} disabled={!hasAccounts}
         aria-label="Import statement" title={!hasAccounts ? "Add an account first" : undefined}
-        className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 h-10 rounded-xl text-sm font-medium transition-all whitespace-nowrap shrink-0">
+        className="flex items-center gap-2 bg-gradient-to-br from-indigo-600 to-indigo-500 shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 text-white px-4 h-10 rounded-xl text-sm font-medium transition-all whitespace-nowrap shrink-0">
         <Upload className="w-4 h-4" /> <span className="hidden sm:inline">Import</span>
       </button>
     </div>

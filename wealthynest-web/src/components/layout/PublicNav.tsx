@@ -43,7 +43,7 @@ export function PublicNav() {
       <div className="flex items-center gap-3">
         {user ? (
           <Link href="/home"
-            className="text-sm bg-[#a85f30] hover:bg-[#c2703d] text-white px-4 py-2 rounded-xl transition-colors font-medium shadow-sm">
+            className="text-sm bg-gradient-to-br from-brand-600 to-brand-500 shadow-[0_10px_24px_-10px_rgb(var(--brand-500)/65%),inset_0_1px_0_rgba(255,255,255,0.18)] hover:shadow-[0_14px_28px_-10px_rgb(var(--brand-500)/75%),inset_0_1px_0_rgba(255,255,255,0.22)] hover:-translate-y-0.5 text-white px-4 py-2 rounded-xl transition-all font-medium">
             Go to Home
           </Link>
         ) : (
@@ -53,7 +53,7 @@ export function PublicNav() {
               Sign in
             </Link>
             <Link href="/signup"
-              className="text-sm bg-[#a85f30] hover:bg-[#c2703d] text-white px-4 py-2 rounded-xl transition-colors font-medium shadow-sm">
+              className="text-sm bg-gradient-to-br from-brand-600 to-brand-500 shadow-[0_10px_24px_-10px_rgb(var(--brand-500)/65%),inset_0_1px_0_rgba(255,255,255,0.18)] hover:shadow-[0_14px_28px_-10px_rgb(var(--brand-500)/75%),inset_0_1px_0_rgba(255,255,255,0.22)] hover:-translate-y-0.5 text-white px-4 py-2 rounded-xl transition-all font-medium">
               Get started
             </Link>
           </>

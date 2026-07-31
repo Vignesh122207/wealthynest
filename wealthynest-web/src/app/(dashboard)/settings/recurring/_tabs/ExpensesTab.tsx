@@ -235,7 +235,7 @@ export function ExpensesTab() {
             Add a rule to auto-log a subscription, rent, or any bill that repeats on a schedule.
           </p>
           <button onClick={() => setModal("create")}
-            className="mt-4 flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-rose-600 hover:bg-rose-500 text-white transition-all">
+            className="mt-4 flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-gradient-to-br from-rose-600 to-rose-500 shadow-lg shadow-rose-500/30 hover:shadow-xl hover:shadow-rose-500/40 hover:-translate-y-0.5 text-white transition-all">
             <Plus className="w-4 h-4" /> Add First Rule
           </button>
         </div>

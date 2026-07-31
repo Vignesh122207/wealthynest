@@ -332,7 +332,7 @@ export function AccountFormModal({
 
             <div className="flex gap-2 pt-1">
               <button type="submit" data-testid="account-form-submit" disabled={creating || updating || adjusting}
-                className="flex-1 h-10 rounded-xl text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-all disabled:opacity-60">
+                className="flex-1 h-10 rounded-xl text-sm font-medium bg-gradient-to-br from-indigo-600 to-indigo-500 shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 hover:-translate-y-0.5 text-white transition-all disabled:opacity-60 disabled:hover:translate-y-0">
                 {creating || updating || adjusting ? "Saving…" : modal === "edit" ? "Save Changes" : "Create Account"}
               </button>
               <button type="button" onClick={onClose}

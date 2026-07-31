@@ -302,7 +302,7 @@ export default function BudgetsPage() {
                       </div>
                     </div>
                     <button type="button" onClick={handleAddCategory} disabled={!newCatName.trim() || creatingCat}
-                      className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium bg-amber-700 hover:bg-amber-600 text-white disabled:opacity-60 transition-all">
+                      className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium bg-gradient-to-br from-amber-700 to-amber-600 shadow-lg shadow-amber-600/30 hover:shadow-xl hover:shadow-amber-600/40 hover:-translate-y-0.5 text-white disabled:opacity-60 disabled:hover:translate-y-0 transition-all">
                       <Check className="w-3.5 h-3.5" /> {creatingCat ? "Adding…" : "Add"}
                     </button>
                   </div>
@@ -453,7 +453,7 @@ export default function BudgetsPage() {
                   description={`Create a ${isMonthly ? "monthly" : "yearly"} budget to track spending limits.`}
                   action={
                     <button onClick={() => { setShowForm(true); setBudgetType(activeType); }}
-                      className="flex items-center gap-2 bg-amber-700 hover:bg-amber-600 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
+                      className="flex items-center gap-2 bg-gradient-to-br from-amber-700 to-amber-600 shadow-lg shadow-amber-600/30 hover:shadow-xl hover:shadow-amber-600/40 hover:-translate-y-0.5 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
                       <Plus className="w-4 h-4" /> Create {isMonthly ? "Monthly" : "Yearly"} Budget
                     </button>
                   } />

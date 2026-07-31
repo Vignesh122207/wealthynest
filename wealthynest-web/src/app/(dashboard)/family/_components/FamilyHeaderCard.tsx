@@ -38,7 +38,7 @@ export function FamilyHeaderCard({
                 className="h-8 px-2.5 rounded-xl bg-muted border border-border text-sm text-foreground focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/40 w-36"
                 autoFocus />
               <button onClick={handleRename} disabled={!renameName.trim() || renaming} data-testid="family-rename-submit"
-                className="h-8 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium disabled:opacity-60 transition-all flex items-center gap-1.5">
+                className="h-8 px-3 rounded-lg bg-gradient-to-br from-indigo-600 to-indigo-500 shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 hover:-translate-y-0.5 text-white text-xs font-medium disabled:opacity-60 disabled:hover:translate-y-0 transition-all flex items-center gap-1.5">
                 {renaming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Save"}
               </button>
               <button onClick={onReset} className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-muted text-muted-foreground transition-all">

@@ -23,14 +23,14 @@ describe("FormButtons", () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
-  it("applies the given color's background class", () => {
+  it("applies the given color's gradient class", () => {
     render(<FormButtons onCancel={vi.fn()} isPending={false} label="Save" color="emerald" />);
-    expect(screen.getByTestId("investment-form-submit").className).toContain("bg-emerald-600");
+    expect(screen.getByTestId("investment-form-submit").className).toContain("from-emerald-600");
   });
 
   it("falls back to indigo for an unrecognized color", () => {
     render(<FormButtons onCancel={vi.fn()} isPending={false} label="Save" color="not-a-real-color" />);
-    expect(screen.getByTestId("investment-form-submit").className).toContain("bg-indigo-600");
+    expect(screen.getByTestId("investment-form-submit").className).toContain("from-indigo-600");
   });
 
   it("the submit button has type=submit (so it triggers the enclosing form's onSubmit)", () => {

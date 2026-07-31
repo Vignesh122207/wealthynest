@@ -75,7 +75,7 @@ export default function SupportWealthyNestPage() {
               mobile-only; the QR code above is the desktop-appropriate way to pay instead. */}
           <div className="md:hidden">
             <a href={UPI_LINK}
-              className="flex items-center justify-center gap-2.5 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm py-3.5 rounded-2xl transition-colors">
+              className="flex items-center justify-center gap-2.5 w-full bg-gradient-to-br from-indigo-700 to-indigo-600 shadow-lg shadow-indigo-600/30 hover:shadow-xl hover:shadow-indigo-600/40 hover:-translate-y-0.5 text-white font-semibold text-sm py-3.5 rounded-2xl transition-all">
               <ExternalLink className="w-4 h-4" />
               Open UPI App to Pay
             </a>

@@ -10,7 +10,7 @@ export default function NotFoundPage() {
       <h1 className="text-xl font-semibold mb-2">Page not found</h1>
       <p className="text-sm text-muted-foreground mb-6 max-w-sm">The page you are looking for does not exist or has been moved.</p>
       <Link href="/home"
-        className="flex items-center gap-2 bg-[#a85f30] hover:bg-[#c2703d] text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-all">
+        className="flex items-center gap-2 bg-gradient-to-br from-brand-600 to-brand-500 shadow-[0_10px_24px_-10px_rgb(var(--brand-500)/65%),inset_0_1px_0_rgba(255,255,255,0.18)] hover:shadow-[0_14px_28px_-10px_rgb(var(--brand-500)/75%),inset_0_1px_0_rgba(255,255,255,0.22)] hover:-translate-y-0.5 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-all">
         <Home className="w-4 h-4" /> Back to Home
       </Link>
     </div>

@@ -108,7 +108,7 @@ export function NoFamilyOnboarding({
           </div>
           <div className="flex gap-2 pt-1">
             <button onClick={handleCreate} disabled={!familyName.trim() || creating} data-testid="family-create-submit"
-              className="flex-1 h-10 rounded-xl text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-all disabled:opacity-60 flex items-center justify-center gap-2">
+              className="flex-1 h-10 rounded-xl text-sm font-medium bg-gradient-to-br from-indigo-600 to-indigo-500 shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 hover:-translate-y-0.5 text-white transition-all disabled:opacity-60 disabled:hover:translate-y-0 flex items-center justify-center gap-2">
               {creating ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating…</> : "Create Family"}
             </button>
             <button onClick={() => { reset(); setFamilyName(""); }}
@@ -137,7 +137,7 @@ export function NoFamilyOnboarding({
           </div>
           <div className="flex gap-2 pt-1">
             <button onClick={handleJoin} disabled={inviteCode.length < 4 || joining} data-testid="family-join-submit"
-              className="flex-1 h-10 rounded-xl text-sm font-medium bg-emerald-700 hover:bg-emerald-600 text-white transition-all disabled:opacity-60 flex items-center justify-center gap-2">
+              className="flex-1 h-10 rounded-xl text-sm font-medium bg-gradient-to-br from-emerald-700 to-emerald-600 shadow-lg shadow-emerald-600/30 hover:shadow-xl hover:shadow-emerald-600/40 hover:-translate-y-0.5 text-white transition-all disabled:opacity-60 disabled:hover:translate-y-0 flex items-center justify-center gap-2">
               {joining ? <><Loader2 className="w-4 h-4 animate-spin" /> Joining…</> : "Join Family"}
             </button>
             <button onClick={() => { reset(); setInviteCode(""); }}

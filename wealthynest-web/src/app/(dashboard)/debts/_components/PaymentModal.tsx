@@ -91,8 +91,10 @@ export function PaymentModal({ debt, onSave, onClose, saving }: {
           <button data-testid="debt-payment-submit" onClick={() => Number(amount) > 0 && onSave(Number(amount), note)}
             disabled={saving || !amount || Number(amount) <= 0}
             className={cn(
-              "flex-1 h-12 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2",
-              isLent ? "bg-emerald-600 hover:bg-emerald-500" : "bg-indigo-600 hover:bg-indigo-500"
+              "flex-1 h-12 rounded-xl text-sm font-semibold text-white hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:hover:translate-y-0 flex items-center justify-center gap-2",
+              isLent
+                ? "bg-gradient-to-br from-emerald-600 to-emerald-500 shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40"
+                : "bg-gradient-to-br from-indigo-600 to-indigo-500 shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40"
             )}>
             {saving ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <Check className="w-4 h-4" />}
             {saving ? "Saving…" : isLent ? "Mark Received" : "Record Payment"}

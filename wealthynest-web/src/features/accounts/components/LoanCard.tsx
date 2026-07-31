@@ -83,7 +83,7 @@ export const LoanCard = memo(function LoanCard({ account: a, onDownload, onEdit,
 
       {!closed && (
         <button onClick={e => { e.stopPropagation(); onRecordPayment(); }}
-          className="w-full h-9 rounded-xl text-xs font-medium bg-rose-600 hover:bg-rose-500 text-white transition-all">
+          className="w-full h-9 rounded-xl text-xs font-medium bg-gradient-to-br from-rose-600 to-rose-500 shadow-lg shadow-rose-500/30 hover:shadow-xl hover:shadow-rose-500/40 hover:-translate-y-0.5 text-white transition-all">
           Record Payment
         </button>
       )}

@@ -278,7 +278,7 @@ function PasskeyRow() {
               />
             </div>
             <button onClick={handleAdd} disabled={registering} data-testid="security-passkey-submit"
-              className="h-9 px-3.5 rounded-xl text-xs font-medium bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-60 transition-colors flex items-center gap-1.5">
+              className="h-9 px-3.5 rounded-xl text-xs font-medium bg-gradient-to-br from-brand-600 to-brand-500 text-white shadow-[0_10px_24px_-10px_rgb(var(--brand-500)/65%),inset_0_1px_0_rgba(255,255,255,0.18)] hover:shadow-[0_14px_28px_-10px_rgb(var(--brand-500)/75%),inset_0_1px_0_rgba(255,255,255,0.22)] hover:-translate-y-0.5 disabled:opacity-60 disabled:hover:translate-y-0 transition-all flex items-center gap-1.5">
               {registering && <Loader2 className="w-3.5 h-3.5 animate-spin" />} {registering ? "Follow your device's prompt…" : "Continue"}
             </button>
             <button onClick={() => setShowAdd(false)}
@@ -393,7 +393,7 @@ function PasswordRow() {
             type="submit"
             disabled={isPending}
             data-testid="security-password-submit"
-            className="w-full flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-60 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors"
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-br from-brand-600 to-brand-500 shadow-[0_10px_24px_-10px_rgb(var(--brand-500)/65%),inset_0_1px_0_rgba(255,255,255,0.18)] hover:shadow-[0_14px_28px_-10px_rgb(var(--brand-500)/75%),inset_0_1px_0_rgba(255,255,255,0.22)] hover:-translate-y-0.5 disabled:opacity-60 disabled:hover:translate-y-0 text-white text-sm font-semibold py-2.5 rounded-xl transition-all"
           >
             {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             Update password
@@ -475,7 +475,7 @@ function EmailRow() {
               error={form.formState.errors.currentPassword?.message} />
             <div className="flex gap-2">
               <button type="submit" disabled={isPending}
-                className="flex-1 flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-60 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors">
+                className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-br from-brand-600 to-brand-500 shadow-[0_10px_24px_-10px_rgb(var(--brand-500)/65%),inset_0_1px_0_rgba(255,255,255,0.18)] hover:shadow-[0_14px_28px_-10px_rgb(var(--brand-500)/75%),inset_0_1px_0_rgba(255,255,255,0.22)] hover:-translate-y-0.5 disabled:opacity-60 disabled:hover:translate-y-0 text-white text-sm font-semibold py-2.5 rounded-xl transition-all">
                 {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Send verification link
               </button>
               <button type="button" onClick={() => { setShowForm(false); form.reset(); }}
@@ -538,7 +538,7 @@ function SessionsCard() {
               <button
                 onClick={() => revokeOthers(undefined, { onSuccess: () => setConfirmRevokeOthers(false) })}
                 disabled={revokingOthers} data-testid="security-sessions-revoke-others-confirm"
-                className="h-7 px-2.5 rounded-lg text-xs font-medium bg-red-600 hover:bg-red-500 text-white disabled:opacity-60"
+                className="h-7 px-2.5 rounded-lg text-xs font-medium bg-gradient-to-br from-red-600 to-red-500 shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40 hover:-translate-y-0.5 text-white disabled:opacity-60 disabled:hover:translate-y-0 transition-all"
               >
                 Sign out
               </button>
