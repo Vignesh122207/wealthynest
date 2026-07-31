@@ -52,9 +52,9 @@ export class SettingsPage extends BasePage {
   }
 
   // ── Security ────────────────────────────────────────────────────────────
-  /** The password form is collapsed behind a row by default (see security/page.tsx's own
-   * comment on why: it's a rare action, demoted below the unlock-methods card) — expand it
-   * before either password flow below tries to fill the now-hidden fields. */
+  /** The password form lives behind a popup (same TransactionModalOverlay/AuthCard chrome as PIN
+   * setup) rather than the row itself — open it before either password flow below tries to fill
+   * the not-yet-rendered fields. */
   async expandPasswordForm(): Promise<void> {
     await this.page.getByTestId("security-password-toggle").click();
   }
