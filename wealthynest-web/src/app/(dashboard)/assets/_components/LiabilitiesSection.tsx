@@ -47,7 +47,7 @@ export function LiabilitiesSection({
             description="Add loans, EMIs, or credit card debt to get a true net worth picture."
             action={
               <button onClick={onAdd}
-                className="flex items-center gap-2 bg-red-600/80 hover:bg-red-500 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
+                className="flex items-center gap-2 bg-gradient-to-br from-red-600 to-red-500 shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40 hover:-translate-y-0.5 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
                 <Plus className="w-4 h-4" /> Add Liability
               </button>
             } />

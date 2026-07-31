@@ -65,7 +65,7 @@ export function DividendSuggestionsSection({ stockCount }: { stockCount: number 
               <button
                 disabled={logging || dismissing}
                 onClick={handleLogAll} data-testid="dividend-log-all-button"
-                className="h-7 px-3 rounded-lg text-xs font-semibold bg-indigo-600/80 hover:bg-indigo-600 text-white transition-all disabled:opacity-50 whitespace-nowrap">
+                className="h-7 px-3 rounded-lg text-xs font-semibold bg-gradient-to-br from-indigo-600 to-indigo-500 shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 hover:-translate-y-0.5 text-white transition-all disabled:opacity-50 disabled:hover:translate-y-0 whitespace-nowrap">
                 Log All
               </button>
             )}
@@ -108,7 +108,7 @@ export function DividendSuggestionsSection({ stockCount }: { stockCount: number 
                       disabled={logging || dismissing}
                       onClick={() => handleLog(s)}
                       data-testid="dividend-log-button"
-                      className="h-8 px-3 rounded-lg text-xs font-semibold bg-indigo-600/80 hover:bg-indigo-600 text-white transition-all disabled:opacity-50 whitespace-nowrap">
+                      className="h-8 px-3 rounded-lg text-xs font-semibold bg-gradient-to-br from-indigo-600 to-indigo-500 shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 hover:-translate-y-0.5 text-white transition-all disabled:opacity-50 disabled:hover:translate-y-0 whitespace-nowrap">
                       Log
                     </button>
                   </div>
