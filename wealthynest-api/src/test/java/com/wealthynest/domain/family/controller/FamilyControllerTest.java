@@ -2,6 +2,7 @@ package com.wealthynest.domain.family.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthynest.common.exception.AccessDeniedException;
+import com.wealthynest.common.util.ClientIpResolver;
 import com.wealthynest.config.RateLimitConfig;
 import com.wealthynest.config.SecurityConfig;
 import com.wealthynest.domain.expense.repository.ExpenseRepository;
@@ -66,6 +67,7 @@ class FamilyControllerTest {
     @MockitoBean private IncomeRepository incomeRepository;
     @MockitoBean private ExpenseRepository expenseRepository;
     @MockitoBean private UserRepository userRepository;
+    @MockitoBean private ClientIpResolver clientIpResolver;
 
     private final UUID userId = UUID.randomUUID();
     private final UUID familyId = UUID.randomUUID();

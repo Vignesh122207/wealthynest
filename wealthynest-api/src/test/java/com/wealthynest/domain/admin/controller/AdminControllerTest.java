@@ -1,5 +1,6 @@
 package com.wealthynest.domain.admin.controller;
 
+import com.wealthynest.common.util.ClientIpResolver;
 import com.wealthynest.config.RateLimitConfig;
 import com.wealthynest.config.SecurityConfig;
 import com.wealthynest.domain.admin.entity.JobScheduleConfig;
@@ -50,6 +51,7 @@ class AdminControllerTest {
     @Autowired private MockMvc mockMvc;
     @MockitoBean private AdminService adminService;
     @MockitoBean private JobSchedulerService jobSchedulerService;
+    @MockitoBean private ClientIpResolver clientIpResolver;
 
     private final UUID userId = UUID.randomUUID();
 

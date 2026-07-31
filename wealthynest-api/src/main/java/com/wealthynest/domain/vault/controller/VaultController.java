@@ -2,6 +2,7 @@ package com.wealthynest.domain.vault.controller;
 
 import com.wealthynest.common.response.ApiResponse;
 import com.wealthynest.common.security.SecurityUtils;
+import com.wealthynest.common.util.ClientIpResolver;
 import com.wealthynest.domain.vault.dto.request.RevealVaultItemRequest;
 import com.wealthynest.domain.vault.dto.request.VaultItemRequest;
 import com.wealthynest.domain.vault.dto.response.VaultItemResponse;
@@ -22,6 +23,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class VaultController {
     private final VaultService vaultService;
+    private final ClientIpResolver clientIpResolver;
 
     @PostMapping
     @PreAuthorize("isAuthenticated()")
@@ -70,6 +72,6 @@ public class VaultController {
             @PathVariable UUID id, @Valid @RequestBody RevealVaultItemRequest request, HttpServletRequest httpRequest) {
         return ResponseEntity.ok(ApiResponse.success(vaultService.revealSecret(
                 id, SecurityUtils.requireCurrentUserId(), request,
-                httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"))));
+                clientIpResolver.resolve(httpRequest), httpRequest.getHeader("User-Agent"))));
     }
 }

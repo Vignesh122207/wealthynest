@@ -1,6 +1,7 @@
 package com.wealthynest.domain.vault.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wealthynest.common.util.ClientIpResolver;
 import com.wealthynest.config.RateLimitConfig;
 import com.wealthynest.config.SecurityConfig;
 import com.wealthynest.domain.vault.dto.request.RevealVaultItemRequest;
@@ -41,6 +42,7 @@ class VaultUtilityControllerTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @MockitoBean private VaultService vaultService;
+    @MockitoBean private ClientIpResolver clientIpResolver;
 
     private final UUID userId = UUID.randomUUID();
 

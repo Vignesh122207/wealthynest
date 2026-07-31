@@ -3,6 +3,7 @@ package com.wealthynest.domain.auth.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.security.RefreshCookieService;
+import com.wealthynest.common.util.ClientIpResolver;
 import com.wealthynest.config.RateLimitConfig;
 import com.wealthynest.config.SecurityConfig;
 import com.wealthynest.domain.auth.dto.request.LoginRequest;
@@ -60,6 +61,7 @@ class AuthControllerTest {
     @Autowired private ObjectMapper objectMapper;
     @MockitoBean private AuthService authService;
     @MockitoBean private WebAuthnService webAuthnService;
+    @MockitoBean private ClientIpResolver clientIpResolver;
 
     @AfterEach
     void clearSecurityContext() {

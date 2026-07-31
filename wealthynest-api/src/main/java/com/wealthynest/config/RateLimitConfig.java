@@ -1,5 +1,6 @@
 package com.wealthynest.config;
 
+import com.wealthynest.common.util.ClientIpResolver;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -14,10 +15,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.time.Duration;
-import java.util.Arrays;
 
 @Configuration
 public class RateLimitConfig {
@@ -51,13 +49,14 @@ public class RateLimitConfig {
     public static class RateLimitFilter implements Filter {
         private final RateLimitProperties props;
         private final StringRedisTemplate redisTemplate;
+        private final ClientIpResolver    clientIpResolver;
 
         @Override
         public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
                 throws IOException, ServletException {
             HttpServletRequest  request  = (HttpServletRequest) req;
             HttpServletResponse response = (HttpServletResponse) res;
-            String ip   = resolveClientIp(request);
+            String ip   = clientIpResolver.resolve(request);
             String path = request.getRequestURI();
             boolean isAuthPath = path.startsWith("/api/v1/auth/");
 
@@ -107,67 +106,6 @@ public class RateLimitConfig {
             } catch (Exception e) {
                 log.warn("Rate limiter Redis error, failing open: {}", e.getMessage());
                 return true;
-            }
-        }
-
-        // wealthynest-api sits behind cloudflared (see docker-compose.yml's `tunnel` service),
-        // which proxies straight to http://wealthynest-api:8080 over the docker network — every
-        // request arriving through the public domain therefore has the SAME remoteAddr (the
-        // tunnel container's), which used to mean every real user shared one rate-limit bucket.
-        // Fixed by trusting that container's subnet (RATE_LIMIT_TRUSTED_PROXIES, pinned in
-        // docker-compose.yml's networks.wealthynest-net.ipam) and reading the true client IP
-        // Cloudflare's edge attaches to the request instead.
-        private String resolveClientIp(HttpServletRequest request) {
-            String remoteAddr = request.getRemoteAddr();
-            if (!isTrustedProxy(remoteAddr)) {
-                return remoteAddr;
-            }
-            // Set by Cloudflare's edge to the real visitor IP — preferred over X-Forwarded-For,
-            // which a multi-hop chain could pad with attacker-controlled entries before it ever
-            // reaches cloudflared.
-            String cfConnectingIp = request.getHeader("CF-Connecting-IP");
-            if (cfConnectingIp != null && !cfConnectingIp.isBlank()) {
-                return cfConnectingIp.trim();
-            }
-            String forwarded = request.getHeader("X-Forwarded-For");
-            if (forwarded != null && !forwarded.isBlank()) {
-                return forwarded.split(",")[0].trim();
-            }
-            return remoteAddr;
-        }
-
-        private boolean isTrustedProxy(String remoteAddr) {
-            String trustedProxies = props.getTrustedProxies();
-            if (trustedProxies == null || trustedProxies.isBlank()) return false;
-            return Arrays.stream(trustedProxies.split(","))
-                    .map(String::trim)
-                    .filter(p -> !p.isEmpty())
-                    .anyMatch(entry -> matchesEntry(remoteAddr, entry));
-        }
-
-        private boolean matchesEntry(String remoteAddr, String entry) {
-            if (!entry.contains("/")) {
-                return entry.equals(remoteAddr);
-            }
-            try {
-                String[] parts = entry.split("/", 2);
-                byte[] network = InetAddress.getByName(parts[0]).getAddress();
-                byte[] address = InetAddress.getByName(remoteAddr).getAddress();
-                int prefixLength = Integer.parseInt(parts[1]);
-                if (network.length != address.length) return false;
-
-                int fullBytes = prefixLength / 8;
-                for (int i = 0; i < fullBytes; i++) {
-                    if (network[i] != address[i]) return false;
-                }
-                int remainingBits = prefixLength % 8;
-                if (remainingBits > 0) {
-                    int mask = 0xFF00 >> remainingBits & 0xFF;
-                    if ((network[fullBytes] & mask) != (address[fullBytes] & mask)) return false;
-                }
-                return true;
-            } catch (UnknownHostException | NumberFormatException | IndexOutOfBoundsException e) {
-                return false;
             }
         }
     }

@@ -2,6 +2,7 @@ package com.wealthynest.domain.vault.controller;
 
 import com.wealthynest.common.response.ApiResponse;
 import com.wealthynest.common.security.SecurityUtils;
+import com.wealthynest.common.util.ClientIpResolver;
 import com.wealthynest.domain.vault.dto.request.RevealVaultItemRequest;
 import com.wealthynest.domain.vault.dto.response.VaultHealthResponse;
 import com.wealthynest.domain.vault.service.VaultService;
@@ -32,6 +33,7 @@ import java.time.LocalDate;
 @RequiredArgsConstructor
 public class VaultUtilityController {
     private final VaultService vaultService;
+    private final ClientIpResolver clientIpResolver;
 
     @GetMapping("/health")
     @PreAuthorize("isAuthenticated()")
@@ -44,7 +46,7 @@ public class VaultUtilityController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<byte[]> export(@Valid @RequestBody RevealVaultItemRequest request, HttpServletRequest httpRequest) {
         String csv = vaultService.exportCsv(SecurityUtils.requireCurrentUserId(), request,
-                httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"));
+                clientIpResolver.resolve(httpRequest), httpRequest.getHeader("User-Agent"));
         String filename = "wealthynest-vault-export-" + LocalDate.now() + ".csv";
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("text/csv"))

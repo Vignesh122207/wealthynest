@@ -1,5 +1,6 @@
 package com.wealthynest.config;
 
+import com.wealthynest.common.util.ClientIpResolver;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -36,7 +37,10 @@ class RateLimitFilterTest {
         props = new RateLimitConfig.RateLimitProperties();
         props.setAuthRequestsPerMinute(10);
         props.setApiRequestsPerMinute(200);
-        filter = new RateLimitConfig.RateLimitFilter(props, redisTemplate);
+        // Real (not mocked) — ClientIpResolverTest covers its own logic in isolation; here it's
+        // just wired through so this file's existing trusted-proxy/CIDR cases keep exercising the
+        // real end-to-end resolution behavior through doFilter, same as before the extraction.
+        filter = new RateLimitConfig.RateLimitFilter(props, redisTemplate, new ClientIpResolver(props));
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         lenient().when(request.getRemoteAddr()).thenReturn("10.0.0.5");
         // Every trusted-proxy test checks CF-Connecting-IP before X-Forwarded-For — default it to
