@@ -41,9 +41,14 @@ export class AppLockScreen {
     await expect(this.dialog).not.toBeVisible();
   }
 
+  /** Fills the PIN and lets AppLockScreen.tsx's own effect auto-submit the moment the 4th digit
+   * lands — matching a real user's flow. Explicitly clicking pinSubmit after fill() used to race
+   * that auto-submit: fill() sets the full value in one go, the effect fires and calls the mutation
+   * before this method's own click() gets a turn, and the button is then disabled (pinPending, or
+   * — on a wrong PIN — reset back to an empty pin) by the time click() runs, hanging until its
+   * 30s timeout. */
   async unlockWithPin(pin: string): Promise<void> {
     await this.pinInput.fill(pin);
-    await this.pinSubmit.click();
   }
 
   /** Directly manipulates document.visibilityState + fires the real event

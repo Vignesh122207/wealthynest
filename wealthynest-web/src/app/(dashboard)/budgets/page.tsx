@@ -384,12 +384,12 @@ export default function BudgetsPage() {
                 <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                   {monthlyBudgeted > 0 && (
                     <span className="inline-flex items-center gap-1 pl-1 pr-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-medium tabular-nums">
-                      <Calendar className="w-2.5 h-2.5" /> {fmt(monthlyBudgeted)}<span className="opacity-60">/mo×12</span>
+                      <Calendar className="w-2.5 h-2.5" /> {fmt(monthlyBudgeted)}/mo×12
                     </span>
                   )}
                   {yearlyBudgeted > 0 && (
                     <span className="inline-flex items-center gap-1 pl-1 pr-1.5 py-0.5 rounded-md bg-violet-500/10 text-violet-600 dark:text-violet-400 text-[10px] font-medium tabular-nums">
-                      <CalendarDays className="w-2.5 h-2.5" /> {fmt(yearlyBudgeted)}<span className="opacity-60">/yr</span>
+                      <CalendarDays className="w-2.5 h-2.5" /> {fmt(yearlyBudgeted)}/yr
                     </span>
                   )}
                 </div>

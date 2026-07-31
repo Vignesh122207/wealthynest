@@ -42,14 +42,14 @@ describe("Button", () => {
 
   it("applies the variant's classes (defaulting to primary)", () => {
     render(<Button>Save</Button>);
-    expect(screen.getByRole("button").className).toContain("bg-[#c2703d]");
+    expect(screen.getByRole("button").className).toContain("bg-[#a85f30]");
   });
 
   it("a caller-supplied className can override the variant's default background (twMerge)", () => {
     render(<Button className="bg-emerald-600">Save</Button>);
     const className = screen.getByRole("button").className;
     expect(className).toContain("bg-emerald-600");
-    expect(className).not.toContain("bg-[#c2703d]");
+    expect(className).not.toContain("bg-[#a85f30]");
   });
 
   it("forwards a ref to the underlying button element", () => {

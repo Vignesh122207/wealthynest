@@ -1,4 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
+import type {Page} from "@playwright/test";
 import {expect, test} from "../../fixtures";
 import {ROUTES} from "../../constants/routes";
 
@@ -28,9 +29,28 @@ function anyViolation(results: Awaited<ReturnType<AxeBuilder["analyze"]>>) {
 // scanning so this suite asserts on the resting UI, not a transient animation frame.
 const ANIMATION_SETTLE_MS = 900;
 
+// This 900ms budget is measured from navigation, but a widget's entrance animation only starts
+// once its own data query resolves and it actually mounts — e.g. home/page.tsx's dataLoading
+// gates several widgets on BOTH the dashboard and accounts queries together (see that file's own
+// comment on why), so under CI load the accounts query can still be in flight well past 900ms
+// from goto(), and axe then catches those widgets' skeleton->content swap mid fade-in (reported as
+// a false-positive color-contrast violation on still-transitioning near-transparent text).
+// Waiting for every loading skeleton to be gone first anchors the settle window to when content
+// actually mounted instead of to navigation time. A no-op on pages with no skeleton at scan time —
+// toHaveCount(0) resolves immediately when nothing matches. Waits for the *count* to reach zero,
+// not just the first match to disappear: a page with several independently-gated widgets (e.g.
+// home's dataLoading-gated cards vs its own separately-mounted ones) can clear its skeletons in
+// more than one batch, and resolving on the first batch alone left the fixed settle window too
+// short for whichever widget's skeleton cleared last — observed as that widget's own text still
+// mid fade-in (e.g. a hair under the 4.5:1 threshold) at scan time.
+async function waitForSkeletonsGone(page: Page): Promise<void> {
+  await expect(page.locator(".animate-pulse")).toHaveCount(0, { timeout: 15000 }).catch(() => {});
+}
+
 test.describe("Accessibility (axe)", () => {
   test("login page has no a11y violations @a11y", async ({ page }) => {
     await page.goto(ROUTES.login);
+    await waitForSkeletonsGone(page);
     await page.waitForTimeout(ANIMATION_SETTLE_MS);
     const results = await new AxeBuilder({ page }).analyze();
     expect(anyViolation(results), JSON.stringify(anyViolation(results), null, 2)).toEqual([]);
@@ -54,6 +74,7 @@ test.describe("Accessibility (axe)", () => {
   ] as const) {
     test(`${name} page has no a11y violations @a11y`, async ({ accountsPage }) => {
       await accountsPage.goto(route);
+      await waitForSkeletonsGone(accountsPage.rawPage);
       await accountsPage.rawPage.waitForTimeout(ANIMATION_SETTLE_MS);
       const results = await new AxeBuilder({ page: accountsPage.rawPage }).analyze();
       expect(anyViolation(results), JSON.stringify(anyViolation(results), null, 2)).toEqual([]);

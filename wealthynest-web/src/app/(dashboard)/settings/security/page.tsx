@@ -553,7 +553,7 @@ function SessionsCard() {
                       </span>
                     )}
                   </p>
-                  <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                  <p className="text-[11px] text-muted-foreground/80 mt-0.5">
                     {s.ipAddress ? `${s.ipAddress} · ` : ""}Last active {formatDate(s.createdAt)}
                   </p>
                 </div>

@@ -45,10 +45,14 @@ export class LoginPage {
 
   /** Only ever shown when the persisted auth store already has pinEnabled set from a prior login
    * on this device (see LoginForm.tsx's pinCandidate check) — call loginWithPassword (or otherwise
-   * arrive at that state) before this, not instead of it. */
+   * arrive at that state) before this, not instead of it.
+   *
+   * Fills the PIN and lets PinLoginStep's own effect auto-submit the moment the 4th digit lands,
+   * matching a real user's flow — same reasoning as AppLockScreen.unlockWithPin, which this
+   * mirrors: an explicit click() after fill() races that auto-submit and can hang on a disabled
+   * button until its 30s timeout. */
   async loginWithPin(pin: string): Promise<void> {
     await this.pinInput.fill(pin);
-    await this.pinSubmit.click();
   }
 
   /** Moves from the choose-method screen (Google / "Continue with email") into the combined
