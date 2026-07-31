@@ -19,17 +19,25 @@ const config: CapacitorConfig = {
     // of auth state, since DashboardLayout's redirect-when-logged-out only fires after that whole
     // bundle already downloaded and got parsed. /launch checks auth from the already-loaded root
     // layout's store and redirects to /home or /login — whichever this cold start actually needs.
-    url: "https://wealthynest.in/launch",
+    // MUST be the exact host the app actually ends up on, not one that redirects elsewhere.
+    // This was "https://wealthynest.in/launch" — wealthynest.in permanently redirects (308) to
+    // www.wealthynest.in at the DNS/Vercel level (confirmed live, not something this repo
+    // controls) — and that one-hostname gap silently broke Capacitor's entire native bridge, not
+    // just navigation: Bridge.java scopes its native-bridge.js/PluginHeaders JS injection to
+    // server.url's own configured authority (bare wealthynest.in), so once the WebView landed on
+    // the redirect's target (www.wealthynest.in), that injection never applied there. Every
+    // native plugin call app-wide silently rejected with "X plugin is not implemented on
+    // android" (window.Capacitor.nativeCallback/PluginHeaders confirmed permanently undefined,
+    // not just slow — waited 60s with no change) - reproduced on a real emulator, and confirmed
+    // fixed the same way (native bridge present immediately, a real Google OAuth Custom Tab
+    // opens on click) once server.url pointed at www.wealthynest.in directly.
+    url: "https://www.wealthynest.in/launch",
     androidScheme: "https",
     cleartext: false,
-    // wealthynest.in now permanently redirects (308) to www.wealthynest.in at the DNS/Vercel
-    // level (confirmed live, not something this repo controls). Without this, Capacitor's default
-    // behavior — "all external URLs are opened in the external browser, not the WebView" — treats
-    // that redirect's target host as external (it's a different hostname from server.url's),
-    // so the WebView bounces straight to Chrome on every single launch instead of showing the app
-    // at all. Reproduced on a real emulator build and confirmed this, not the new App Links
-    // intent-filter added alongside it, is the cause (same bounce happens with that intent-filter
-    // fully removed). This is a pre-existing production bug, not something introduced here.
+    // Kept defensively even though server.url's own host no longer needs to self-list here:
+    // if anything in the app ever links to the bare wealthynest.in domain, this is what stops
+    // that redirect's target from bouncing out to the external browser the way server.url's old
+    // value did. Harmless no-op if nothing does.
     allowNavigation: ["www.wealthynest.in"],
   },
   android: {
