@@ -36,16 +36,11 @@ function processQueue(error: unknown, token: string | null): void {
 }
 
 // ── Request Interceptor ────────────────────────────────────────────────────────
+// Reads the in-memory store directly (not localStorage) — the access token is deliberately not
+// persisted there, see auth.store.ts's own comment on why.
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  if (typeof window !== "undefined") {
-    try {
-      const raw = localStorage.getItem("wealthynest-auth");
-      if (raw) {
-        const token = JSON.parse(raw)?.state?.accessToken;
-        if (token) config.headers.Authorization = `Bearer ${token}`;
-      }
-    } catch { /* ignore parse errors */ }
-  }
+  const token = useAuthStore.getState().accessToken;
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 

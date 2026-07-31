@@ -4,6 +4,14 @@ import type {User} from "../types/auth.types";
 
 interface AuthState {
   user:            User | null;
+  // In-memory only — deliberately NOT in `partialize` below. Persisting it to localStorage would
+  // make it readable by any script that runs on the page (an XSS foothold anywhere in the app
+  // could exfiltrate a live, hours-long-valid Bearer token usable directly against the API from
+  // outside the browser entirely, bypassing cookies/CORS/SameSite). A reload starts this at null;
+  // `isAuthenticated` (which does persist) still renders the dashboard shell immediately, and the
+  // first API call 401s and runs the ordinary refresh-token flow (axios.ts's interceptor) to
+  // silently re-populate it from the httpOnly refresh cookie — no separate boot-time refresh
+  // needed, that path already exists for an ordinary expired token.
   accessToken:     string | null;
   isAuthenticated: boolean;
   /** Bumped on every `setUser`/`setAuth`/`logout` call — lets an in-flight async update (e.g.
@@ -31,7 +39,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: "wealthynest-auth",
-      partialize: (s) => ({ user: s.user, accessToken: s.accessToken, isAuthenticated: s.isAuthenticated }),
+      partialize: (s) => ({ user: s.user, isAuthenticated: s.isAuthenticated }),
     }
   )
 );

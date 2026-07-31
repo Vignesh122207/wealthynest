@@ -109,6 +109,7 @@ class AuthServiceImplTest {
         void sendsAccountExistsNoticeInsteadOfLeakingEnumeration() {
             RegisterRequest req = mock(RegisterRequest.class);
             when(req.getEmail()).thenReturn("Taken@Example.com");
+            when(req.getPassword()).thenReturn("Password1");
             User existing = withId(baseUser().email("taken@example.com").fullName("Existing User").build());
             when(userRepository.findByEmail("taken@example.com")).thenReturn(Optional.of(existing));
 
@@ -119,6 +120,9 @@ class AuthServiceImplTest {
             verify(emailService, never()).sendVerificationEmail(any(), any(), any());
             assertThat(response.getAccessToken()).isNull();
             assertThat(response.getRefreshToken()).isNull();
+            // The BCrypt cost is what makes the new-account branch slow — this branch must pay the
+            // same cost, or response latency alone reveals that the email is already registered.
+            verify(passwordEncoder).encode("Password1");
         }
 
         @Test
@@ -275,11 +279,40 @@ class AuthServiceImplTest {
         }
 
         @Test
-        @DisplayName("throws when the token is revoked")
+        @DisplayName("throws when the token is revoked, and does not escalate when revokedAt is unset (logout/reset/explicit-revoke paths)")
         void throwsWhenRevoked() {
             RefreshToken stored = RefreshToken.builder().userId(userId).revoked(true).expiresAt(Instant.now().plusSeconds(60)).build();
             when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(stored));
             assertThatThrownBy(() -> service.refresh("t", ip, ua)).isInstanceOf(BusinessException.class);
+            verify(refreshTokenRepository, never()).revokeAllByUserId(any());
+            verify(tokenRevocationService, never()).revokeAllTokensFor(any());
+        }
+
+        @Test
+        @DisplayName("reuse shortly after rotation (multi-tab race) rejects the request without revoking the session")
+        void reuseWithinGraceWindowDoesNotEscalate() {
+            RefreshToken stored = RefreshToken.builder().userId(userId).revoked(true)
+                    .revokedAt(Instant.now().minusMillis(1_000)).expiresAt(Instant.now().plusSeconds(60)).build();
+            when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(stored));
+
+            assertThatThrownBy(() -> service.refresh("t", ip, ua)).isInstanceOf(BusinessException.class);
+
+            verify(refreshTokenRepository, never()).revokeAllByUserId(any());
+            verify(tokenRevocationService, never()).revokeAllTokensFor(any());
+        }
+
+        @Test
+        @DisplayName("reuse well after rotation is treated as theft — revokes every session for that user")
+        void reuseAfterGraceWindowRevokesAllSessions() {
+            RefreshToken stored = RefreshToken.builder().userId(userId).revoked(true)
+                    .revokedAt(Instant.now().minusSeconds(30)).expiresAt(Instant.now().plusSeconds(60)).build();
+            when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(stored));
+
+            assertThatThrownBy(() -> service.refresh("t", ip, ua)).isInstanceOf(BusinessException.class);
+
+            verify(refreshTokenRepository).revokeAllByUserId(userId);
+            verify(tokenRevocationService).revokeAllTokensFor(userId);
+            verify(auditService).log(eq(userId), eq("REFRESH_TOKEN_REUSE_DETECTED"), eq("USER"), eq(userId), any(), any(), eq(ip), eq(ua));
         }
 
         @Test
@@ -302,6 +335,7 @@ class AuthServiceImplTest {
             service.refresh("t", ip, ua);
 
             assertThat(stored.isRevoked()).isTrue();
+            assertThat(stored.getRevokedAt()).isNotNull();
             ArgumentCaptor<RefreshToken> captor = ArgumentCaptor.forClass(RefreshToken.class);
             verify(refreshTokenRepository, times(2)).save(captor.capture());
             RefreshToken newToken = captor.getAllValues().get(1);

@@ -25,6 +25,12 @@ public class RefreshToken {
     @Builder.Default
     private boolean revoked = false;
 
+    /** Set only by refresh()'s own rotation, so reuse-detection there can tell a benign multi-tab
+     * race apart from real theft — see V54's own migration comment. Null for every other
+     * revocation path (logout, password reset, explicit session revoke). */
+    @Column(name = "revoked_at")
+    private Instant revokedAt;
+
     @Column(name = "remember_me", nullable = false)
     @Builder.Default
     private boolean rememberMe = true;

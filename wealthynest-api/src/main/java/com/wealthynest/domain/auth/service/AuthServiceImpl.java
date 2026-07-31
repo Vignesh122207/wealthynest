@@ -106,10 +106,24 @@ public class AuthServiceImpl implements AuthService {
     private static final int  MAX_PIN_ATTEMPTS       = 5;
     private static final long PIN_LOCKOUT_DURATION_MS = 15L * 60 * 1000;
 
+    /** Refresh-token reuse-detection grace window — see refresh()'s own comment. Wide enough to
+     * absorb an ordinary multi-tab rotation race (two tabs sharing the same refresh cookie both
+     * hit a 401 and refresh within moments of each other), narrow enough that a real attacker
+     * racing a stolen token this tightly gains nothing beyond what today's reject-only behavior
+     * already denies them. */
+    private static final long REFRESH_REUSE_GRACE_MS = 10_000;
+
     @Override
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         String email = request.getEmail().toLowerCase();
+        // Hashed unconditionally, before the existence check below, so both branches pay the same
+        // ~250ms BCrypt cost — otherwise the already-registered branch returns near-instantly
+        // (email dispatch is @Async) while the new-account branch always pays that cost, and
+        // response latency alone reveals whether an email is registered despite the identical
+        // response body, undermining the enumeration protection that body is there for.
+        String passwordHash = passwordEncoder.encode(request.getPassword());
+
         // Same enumeration posture as forgotPassword/resendVerification: the external response
         // shape never reveals whether this email was already registered. An existing owner gets a
         // "someone tried to sign up with your email" notice (with a login/reset link) instead of a
@@ -124,7 +138,7 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.save(User.builder()
                 .fullName(request.getFullName())
                 .email(email)
-                .passwordHash(passwordEncoder.encode(request.getPassword()))
+                .passwordHash(passwordHash)
                 .emailVerified(false)
                 .build());
 
@@ -215,10 +229,30 @@ public class AuthServiceImpl implements AuthService {
         String tokenHash = hashToken(refreshToken);
         RefreshToken stored = refreshTokenRepository.findByTokenHash(tokenHash)
                 .orElseThrow(() -> new BusinessException("Invalid refresh token", HttpStatus.UNAUTHORIZED, "INVALID_TOKEN"));
-        if (stored.isRevoked() || stored.getExpiresAt().isBefore(Instant.now())) {
+        if (stored.isRevoked()) {
+            // Reused after rotation already moved this session on to a newer token. Presented again
+            // within REFRESH_REUSE_GRACE_MS of that rotation, this is almost always the benign
+            // multi-tab race described on that constant — reject just this one request, same as
+            // always. Presented well after, there's no ordinary reason this exact, already-superseded
+            // token would resurface: treat it as the token having been stolen and used alongside the
+            // legitimate device, and revoke the whole session rather than just this one request.
+            // revokedAt is null for every other revocation path (logout, password reset, explicit
+            // session revoke), which this always treats as within grace — those are the user's own
+            // deliberate actions, not a rotation this check needs to police.
+            if (stored.getRevokedAt() != null
+                    && stored.getRevokedAt().isBefore(Instant.now().minusMillis(REFRESH_REUSE_GRACE_MS))) {
+                refreshTokenRepository.revokeAllByUserId(stored.getUserId());
+                tokenRevocationService.revokeAllTokensFor(stored.getUserId());
+                log.warn("Refresh token reuse detected outside rotation grace window — revoking all sessions for user {}", stored.getUserId());
+                auditService.log(stored.getUserId(), "REFRESH_TOKEN_REUSE_DETECTED", "USER", stored.getUserId(), null, null, ipAddress, userAgent);
+            }
+            throw new BusinessException("Refresh token expired or revoked", HttpStatus.UNAUTHORIZED, "TOKEN_EXPIRED");
+        }
+        if (stored.getExpiresAt().isBefore(Instant.now())) {
             throw new BusinessException("Refresh token expired or revoked", HttpStatus.UNAUTHORIZED, "TOKEN_EXPIRED");
         }
         stored.setRevoked(true);
+        stored.setRevokedAt(Instant.now());
         refreshTokenRepository.save(stored);
         User user = userRepository.findById(stored.getUserId())
                 .orElseThrow(() -> new BusinessException("User not found", HttpStatus.NOT_FOUND));
