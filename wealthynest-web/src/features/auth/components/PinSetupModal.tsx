@@ -28,7 +28,7 @@ export function PinSetupModal({ onClose, onSuccess }: { onClose: () => void; onS
 
   return (
     <TransactionModalOverlay onDismiss={onClose} maxWidth="max-w-[360px]">
-      <AuthCard className="px-5 pt-5 pb-6">
+      <AuthCard animation="scale-in" className="px-5 pt-5 pb-6">
         {step === "confirm" ? (
           <button onClick={startOver} data-testid="pin-setup-start-over" aria-label="Start over"
             className="absolute top-3 left-3 w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">

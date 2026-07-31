@@ -17,7 +17,7 @@ export function Summary({ debts }: { debts: DebtRecord[] }) {
     <div className="grid grid-cols-3 gap-2 sm:gap-3">
       <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-3 sm:p-4">
         <div className="flex items-center gap-1.5 mb-2">
-          <PremiumIcon icon={ArrowUpRight} tone="emerald" size="xs" />
+          <PremiumIcon icon={ArrowUpRight} tone="emerald" size="xs" className="rounded-md" />
           <p className="text-xs text-muted-foreground">You&apos;re owed</p>
         </div>
         <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{fmt(lentAmt)}</p>
@@ -27,7 +27,7 @@ export function Summary({ debts }: { debts: DebtRecord[] }) {
       </div>
       <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-3 sm:p-4">
         <div className="flex items-center gap-1.5 mb-2">
-          <PremiumIcon icon={ArrowDownLeft} tone="red" size="xs" />
+          <PremiumIcon icon={ArrowDownLeft} tone="red" size="xs" className="rounded-md" />
           <p className="text-xs text-muted-foreground">You owe</p>
         </div>
         <p className="text-lg font-bold text-red-600 dark:text-red-400 tabular-nums">{fmt(borrowAmt)}</p>
@@ -37,7 +37,7 @@ export function Summary({ debts }: { debts: DebtRecord[] }) {
       </div>
       <div className="bg-card border border-border rounded-2xl p-3 sm:p-4">
         <div className="flex items-center gap-1.5 mb-2">
-          <PremiumIcon icon={net >= 0 ? TrendingUp : TrendingDown} tone={(net >= 0 ? "emerald" : "red") as IconTone} size="xs" />
+          <PremiumIcon icon={net >= 0 ? TrendingUp : TrendingDown} tone={(net >= 0 ? "emerald" : "red") as IconTone} size="xs" className="rounded-md" />
           <p className="text-xs text-muted-foreground">Net</p>
         </div>
         <p className={cn("text-lg font-bold tabular-nums", net >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>

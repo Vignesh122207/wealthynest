@@ -12,6 +12,7 @@ import {
     Fingerprint,
     KeyRound,
     Loader2,
+    LogOut,
     Mail,
     Monitor,
     Smartphone,
@@ -212,7 +213,7 @@ function PasskeyAddModal({ enabled, onClose }: { enabled: boolean; onClose: () =
 
   return (
     <TransactionModalOverlay onDismiss={onClose} maxWidth="max-w-[400px]">
-      <AuthCard className="px-5 pt-5 pb-6">
+      <AuthCard animation="scale-in" className="px-5 pt-5 pb-6">
         <button onClick={onClose} aria-label="Close" data-testid="passkey-add-close"
           className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
           <X className="w-4 h-4" />
@@ -355,7 +356,7 @@ function PasswordChangeModal({ onClose, onSuccess }: { onClose: () => void; onSu
 
   return (
     <TransactionModalOverlay onDismiss={onClose} maxWidth="max-w-[400px]">
-      <AuthCard className="px-5 pt-5 pb-6">
+      <AuthCard animation="scale-in" className="px-5 pt-5 pb-6">
         <button onClick={onClose} aria-label="Close" data-testid="password-change-close"
           className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
           <X className="w-4 h-4" />
@@ -472,7 +473,7 @@ function EmailChangeModal({ pendingEmail, onClose }: { pendingEmail?: string; on
 
   return (
     <TransactionModalOverlay onDismiss={onClose} maxWidth="max-w-[400px]">
-      <AuthCard className="px-5 pt-5 pb-6">
+      <AuthCard animation="scale-in" className="px-5 pt-5 pb-6">
         <button onClick={onClose} aria-label="Close" data-testid="email-change-close"
           className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
           <X className="w-4 h-4" />
@@ -559,6 +560,48 @@ function PasswordEmailCard() {
   );
 }
 
+// Popup — same TransactionModalOverlay + AuthCard chrome as every other Security popup
+// (PasswordChangeModal/EmailChangeModal/PinSetupModal/PinVerifyModal), replacing what used to be
+// an inline amber confirmation row wedged above the session list.
+function RevokeOtherSessionsModal({ count, onClose, onConfirm, isPending }: {
+  count: number;
+  onClose: () => void;
+  onConfirm: () => void;
+  isPending: boolean;
+}) {
+  return (
+    <TransactionModalOverlay onDismiss={onClose} maxWidth="max-w-[360px]">
+      <AuthCard animation="scale-in" className="px-5 pt-5 pb-6">
+        <button onClick={onClose} aria-label="Close" data-testid="security-sessions-revoke-others-close"
+          className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+          <X className="w-4 h-4" />
+        </button>
+
+        <div className="mb-5 pt-2 text-center">
+          <div className="w-11 h-11 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto mb-3">
+            <LogOut className="w-5 h-5 text-red-500" />
+          </div>
+          <h2 className="font-serif text-lg font-semibold text-foreground mb-1">Sign out other devices?</h2>
+          <p className="text-muted-foreground text-xs leading-relaxed">
+            You&apos;ll be signed out of {count} other {count === 1 ? "device" : "devices"}. This device stays signed in.
+          </p>
+        </div>
+
+        <div className="flex gap-2">
+          <button onClick={onClose}
+            className="flex-1 h-9 rounded-xl text-xs font-medium bg-muted hover:bg-muted/80 text-muted-foreground transition-colors">
+            Cancel
+          </button>
+          <button onClick={onConfirm} disabled={isPending} data-testid="security-sessions-revoke-others-confirm"
+            className="flex-1 flex items-center justify-center gap-2 h-9 rounded-xl text-xs font-semibold bg-gradient-to-br from-red-600 to-red-500 shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40 hover:-translate-y-0.5 text-white disabled:opacity-60 disabled:hover:translate-y-0 transition-all">
+            {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Sign out
+          </button>
+        </div>
+      </AuthCard>
+    </TransactionModalOverlay>
+  );
+}
+
 // ─── Active sessions ─────────────────────────────────────────────────────────
 // One row per signed-in device (see AuthService#listSessions on the backend for why a
 // non-revoked, non-expired refresh token maps 1:1 to an active session). "This device" is
@@ -578,7 +621,7 @@ function SessionsCard() {
     <div>
       <div className="flex items-center justify-between px-1 mb-2 gap-3">
         <SectionLabel>Active sessions</SectionLabel>
-        {otherSessionCount > 0 && !confirmRevokeOthers && (
+        {otherSessionCount > 0 && (
           <button onClick={() => setConfirmRevokeOthers(true)} data-testid="security-sessions-revoke-others-toggle"
             className="text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors">
             Sign out others
@@ -586,27 +629,6 @@ function SessionsCard() {
         )}
       </div>
       <div className="bg-card border border-border rounded-2xl overflow-hidden divide-y divide-border">
-        {confirmRevokeOthers && (
-          <div className="flex items-center justify-between gap-3 bg-amber-500/10 border-b border-amber-500/20 px-4 py-3">
-            <p className="text-xs text-amber-600 dark:text-amber-400">
-              Sign out of {otherSessionCount} other {otherSessionCount === 1 ? "device" : "devices"}?
-            </p>
-            <div className="flex gap-2 shrink-0">
-              <button
-                onClick={() => revokeOthers(undefined, { onSuccess: () => setConfirmRevokeOthers(false) })}
-                disabled={revokingOthers} data-testid="security-sessions-revoke-others-confirm"
-                className="h-7 px-2.5 rounded-lg text-xs font-medium bg-gradient-to-br from-red-600 to-red-500 shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40 hover:-translate-y-0.5 text-white disabled:opacity-60 disabled:hover:translate-y-0 transition-all"
-              >
-                Sign out
-              </button>
-              <button onClick={() => setConfirmRevokeOthers(false)}
-                className="h-7 px-2.5 rounded-lg text-xs font-medium bg-muted hover:bg-muted/80 text-muted-foreground">
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
         {isLoading ? (
           <div className="flex justify-center py-6"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>
         ) : (
@@ -641,6 +663,15 @@ function SessionsCard() {
           })
         )}
       </div>
+
+      {confirmRevokeOthers && (
+        <RevokeOtherSessionsModal
+          count={otherSessionCount}
+          isPending={revokingOthers}
+          onClose={() => setConfirmRevokeOthers(false)}
+          onConfirm={() => revokeOthers(undefined, { onSuccess: () => setConfirmRevokeOthers(false) })}
+        />
+      )}
     </div>
   );
 }
