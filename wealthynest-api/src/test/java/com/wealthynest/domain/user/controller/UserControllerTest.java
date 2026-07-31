@@ -2,6 +2,7 @@ package com.wealthynest.domain.user.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthynest.common.security.RefreshCookieService;
+import com.wealthynest.common.util.ClientIpResolver;
 import com.wealthynest.config.RateLimitConfig;
 import com.wealthynest.config.SecurityConfig;
 import com.wealthynest.domain.auth.service.AuthService;
@@ -45,6 +46,7 @@ class UserControllerTest {
     @Autowired private ObjectMapper objectMapper;
     @MockitoBean private UserService userService;
     @MockitoBean private AuthService authService;
+    @MockitoBean private ClientIpResolver clientIpResolver;
 
     private final UUID userId = UUID.randomUUID();
 

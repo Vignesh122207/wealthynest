@@ -30,7 +30,7 @@ export function SixMonthTrend({ trend, chart, isLoading }: SixMonthTrendProps) {
       <div className="flex items-center justify-between mb-1">
         <div>
           <h2 className="font-bold text-foreground text-sm">6-Month Trend</h2>
-          <p className="text-[11px] text-muted-foreground/70 mt-0.5">Income · Expenses · Savings</p>
+          <p className="text-[11px] text-muted-foreground/80 mt-0.5">Income · Expenses · Savings</p>
         </div>
       </div>
 

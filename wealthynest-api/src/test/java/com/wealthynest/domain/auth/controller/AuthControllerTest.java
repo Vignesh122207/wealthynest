@@ -3,6 +3,7 @@ package com.wealthynest.domain.auth.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.security.RefreshCookieService;
+import com.wealthynest.common.util.ClientIpResolver;
 import com.wealthynest.config.RateLimitConfig;
 import com.wealthynest.config.SecurityConfig;
 import com.wealthynest.domain.auth.dto.request.LoginRequest;
@@ -60,6 +61,7 @@ class AuthControllerTest {
     @Autowired private ObjectMapper objectMapper;
     @MockitoBean private AuthService authService;
     @MockitoBean private WebAuthnService webAuthnService;
+    @MockitoBean private ClientIpResolver clientIpResolver;
 
     @AfterEach
     void clearSecurityContext() {
@@ -162,7 +164,7 @@ class AuthControllerTest {
             LoginRequest req = new LoginRequest();
             ReflectionTestUtils.setField(req, "email", "jane@example.com");
             ReflectionTestUtils.setField(req, "password", "Passw0rd1");
-            when(authService.login(any(), any(), any())).thenThrow(new BusinessException(
+            when(authService.login(any(), any(), any(), any())).thenThrow(new BusinessException(
                     "Too many failed attempts. Please try again later.", HttpStatus.LOCKED, "ACCOUNT_LOCKED",
                     Map.of("lockedUntil", "2026-01-01T00:00:00Z")));
 
@@ -180,7 +182,7 @@ class AuthControllerTest {
             LoginRequest req = new LoginRequest();
             ReflectionTestUtils.setField(req, "email", "jane@example.com");
             ReflectionTestUtils.setField(req, "password", "wrongpassword");
-            when(authService.login(any(), any(), any())).thenThrow(new BadCredentialsException("bad creds"));
+            when(authService.login(any(), any(), any(), any())).thenThrow(new BadCredentialsException("bad creds"));
 
             mockMvc.perform(post("/api/v1/auth/login")
                             .contentType("application/json")
@@ -200,7 +202,7 @@ class AuthControllerTest {
                             .content(objectMapper.writeValueAsString(req)))
                     .andExpect(status().isUnprocessableEntity());
 
-            org.mockito.Mockito.verify(authService, org.mockito.Mockito.never()).login(any(), any(), any());
+            org.mockito.Mockito.verify(authService, org.mockito.Mockito.never()).login(any(), any(), any(), any());
         }
     }
 
@@ -222,7 +224,7 @@ class AuthControllerTest {
         LoginRequest req = new LoginRequest();
         ReflectionTestUtils.setField(req, "email", "jane@example.com");
         ReflectionTestUtils.setField(req, "password", "Passw0rd1");
-        when(authService.login(any(), any(), any())).thenReturn(sampleAuthResponse());
+        when(authService.login(any(), any(), any(), any())).thenReturn(sampleAuthResponse());
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType("application/json")
@@ -232,6 +234,39 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.data.refreshToken").doesNotExist())
                 .andExpect(cookie().value(RefreshCookieService.COOKIE_NAME, "refresh"))
                 .andExpect(cookie().httpOnly(RefreshCookieService.COOKIE_NAME, true));
+    }
+
+    @Test
+    @DisplayName("login forwards the previous refresh token when the cookie has one, so the service can revoke this device's prior session")
+    void loginForwardsPreviousRefreshToken() throws Exception {
+        LoginRequest req = new LoginRequest();
+        ReflectionTestUtils.setField(req, "email", "jane@example.com");
+        ReflectionTestUtils.setField(req, "password", "Passw0rd1");
+        when(authService.login(any(), any(), any(), eq("old-token"))).thenReturn(sampleAuthResponse());
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(req))
+                        .cookie(refreshCookie("old-token")))
+                .andExpect(status().isOk());
+
+        verify(authService).login(any(), any(), any(), eq("old-token"));
+    }
+
+    @Test
+    @DisplayName("login with no existing cookie passes a null previous refresh token")
+    void loginWithNoCookiePassesNull() throws Exception {
+        LoginRequest req = new LoginRequest();
+        ReflectionTestUtils.setField(req, "email", "jane@example.com");
+        ReflectionTestUtils.setField(req, "password", "Passw0rd1");
+        when(authService.login(any(), any(), any(), isNull())).thenReturn(sampleAuthResponse());
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk());
+
+        verify(authService).login(any(), any(), any(), isNull());
     }
 
     @Test
@@ -318,7 +353,7 @@ class AuthControllerTest {
     @Test
     @DisplayName("googleLogin delegates the request and client metadata to the service")
     void googleLoginDelegatesToService() throws Exception {
-        when(authService.googleLogin(any(), any(), any())).thenReturn(sampleAuthResponse());
+        when(authService.googleLogin(any(), any(), any(), any())).thenReturn(sampleAuthResponse());
 
         mockMvc.perform(post("/api/v1/auth/google-login")
                         .contentType("application/json")
@@ -330,7 +365,7 @@ class AuthControllerTest {
     @Test
     @DisplayName("googleLoginNative delegates the request and client metadata to the service")
     void googleLoginNativeDelegatesToService() throws Exception {
-        when(authService.googleLoginNative(any(), any(), any())).thenReturn(sampleAuthResponse());
+        when(authService.googleLoginNative(any(), any(), any(), any())).thenReturn(sampleAuthResponse());
 
         mockMvc.perform(post("/api/v1/auth/google-login-native")
                         .contentType("application/json")
@@ -342,7 +377,7 @@ class AuthControllerTest {
     @Test
     @DisplayName("googleLoginPopup delegates the request and client metadata to the service")
     void googleLoginPopupDelegatesToService() throws Exception {
-        when(authService.googleLoginPopup(any(), any(), any())).thenReturn(sampleAuthResponse());
+        when(authService.googleLoginPopup(any(), any(), any(), any())).thenReturn(sampleAuthResponse());
 
         mockMvc.perform(post("/api/v1/auth/google-login-popup")
                         .contentType("application/json")

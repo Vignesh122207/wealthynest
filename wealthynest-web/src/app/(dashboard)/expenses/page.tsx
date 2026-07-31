@@ -133,7 +133,11 @@ export default function TransactionsPage() {
   const { startDate, endDate } = useMemo(() => {
     if (dateMode === "month") return {
       startDate: `${year}-${pad(month)}-01`,
-      endDate:   new Date(year, month, 0).toISOString().split("T")[0],
+      // new Date(year, month, 0) is the last day of the month at LOCAL midnight — going through
+      // toISOString() first converts that to UTC, which rolls it back a calendar day for any
+      // timezone ahead of UTC (e.g. IST, UTC+5:30), silently excluding the month's last day from
+      // every "this month" query. getDate() reads the local day-of-month directly, no UTC hop.
+      endDate:   `${year}-${pad(month)}-${pad(new Date(year, month, 0).getDate())}`,
     };
     if (dateMode === "year") return { startDate: `${year}-01-01`, endDate: `${year}-12-31` };
     if (dateMode === "custom") {
@@ -607,7 +611,7 @@ export default function TransactionsPage() {
   // AccountPicker has nothing to pick from (the FAB blocks this path, but these buttons didn't).
   const addAccountCta = (
     <Link href="/accounts"
-      className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
+      className="flex items-center gap-2 bg-gradient-to-br from-indigo-600 to-indigo-500 shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 hover:-translate-y-0.5 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
       <Wallet className="w-4 h-4" /> Add an Account
     </Link>
   );

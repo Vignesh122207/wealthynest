@@ -93,8 +93,10 @@ export function AssetsSection({
           <EmptyState icon={Building2} title="No assets yet"
             description="Track physical assets like property, vehicles, gold, EPF balance, or business equity."
             action={
+              // emerald, not indigo — matches the "Assets" section header's own PremiumIcon tone
+              // above (and asset rows generally), which indigo was never actually consistent with.
               <button onClick={onAdd}
-                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
+                className="flex items-center gap-2 bg-gradient-to-br from-emerald-700 to-emerald-600 shadow-lg shadow-emerald-600/30 hover:shadow-xl hover:shadow-emerald-600/40 hover:-translate-y-0.5 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
                 <Plus className="w-4 h-4" /> Add First Asset
               </button>
             } />

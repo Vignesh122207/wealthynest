@@ -58,7 +58,11 @@ export function BigAmountInput({ label = "Amount", error, colorClass, inputProps
           onChange={handleChange}
           onInput={(e) => { rhfOnInput?.(e); measure(); }}
           style={{ width: `${len}ch`, paddingRight: 2 }}
-          className={cn(fontClassFor(len), "font-extrabold bg-transparent border-none outline-none text-left max-w-full placeholder:opacity-25 tabular-nums")}
+          // big-amount-input: opts this input out of globals.css's mobile-breakpoint
+          // `font-size: 16px !important` zoom-prevention floor — every size fontClassFor() picks
+          // is already >= 16px by design, so that floor only ever fought this input's own
+          // sizing on narrow viewports (including the native app, which is always narrow).
+          className={cn(fontClassFor(len), "big-amount-input font-extrabold bg-transparent border-none outline-none text-left max-w-full placeholder:opacity-25 tabular-nums")}
           {...restInputProps} />
       </div>
       {error && <p className="text-xs text-red-500 dark:text-red-400 mt-1.5">{error}</p>}

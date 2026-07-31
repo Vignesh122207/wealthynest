@@ -4,6 +4,7 @@ import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.response.ApiResponse;
 import com.wealthynest.common.security.RefreshCookieService;
 import com.wealthynest.common.security.SecurityUtils;
+import com.wealthynest.common.util.ClientIpResolver;
 import com.wealthynest.domain.auth.dto.request.ChangeEmailRequest;
 import com.wealthynest.domain.auth.dto.request.DisablePinRequest;
 import com.wealthynest.domain.auth.dto.request.EnablePinRequest;
@@ -31,6 +32,7 @@ public class UserController {
     private final UserService userService;
     private final AuthService authService;
     private final RefreshCookieService refreshCookieService;
+    private final ClientIpResolver clientIpResolver;
 
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
@@ -52,7 +54,7 @@ public class UserController {
     public ResponseEntity<ApiResponse<Void>> changePassword(
             @Valid @RequestBody ChangePasswordRequest request, HttpServletRequest httpRequest) {
         userService.changePassword(SecurityUtils.requireCurrentUserId(), request,
-                httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"));
+                clientIpResolver.resolve(httpRequest), httpRequest.getHeader("User-Agent"));
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
@@ -64,7 +66,7 @@ public class UserController {
     public ResponseEntity<ApiResponse<Void>> changeEmail(
             @Valid @RequestBody ChangeEmailRequest request, HttpServletRequest httpRequest) {
         authService.changeEmail(SecurityUtils.requireCurrentUserId(), request,
-                httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"));
+                clientIpResolver.resolve(httpRequest), httpRequest.getHeader("User-Agent"));
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
@@ -87,7 +89,7 @@ public class UserController {
     public ResponseEntity<ApiResponse<Void>> disablePin(
             @Valid @RequestBody DisablePinRequest request, HttpServletRequest httpRequest) {
         authService.disablePin(SecurityUtils.requireCurrentUserId(), request,
-                httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"));
+                clientIpResolver.resolve(httpRequest), httpRequest.getHeader("User-Agent"));
         return ResponseEntity.ok(ApiResponse.noContent());
     }
 

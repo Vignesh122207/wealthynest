@@ -312,7 +312,7 @@ export function GoalsTab() {
             Add a rule to auto-fund a goal by a fixed amount every month.
           </p>
           <button onClick={() => setModal("create")}
-            className="mt-4 flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-fuchsia-600 hover:bg-fuchsia-500 text-white transition-all">
+            className="mt-4 flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-gradient-to-br from-fuchsia-600 to-fuchsia-500 shadow-lg shadow-fuchsia-500/30 hover:shadow-xl hover:shadow-fuchsia-500/40 hover:-translate-y-0.5 text-white transition-all">
             <Plus className="w-4 h-4" /> Add First Rule
           </button>
         </div>

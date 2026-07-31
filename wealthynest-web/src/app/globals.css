@@ -106,12 +106,17 @@
      the actual mechanism behind "the UI looks zoomed in" on phones, not a viewport misconfig
      (viewport above is already correct: width=device-width, initial-scale=1). Most inputs in this
      app render at text-sm/text-xs (14px/12px). Scoped to the mobile breakpoint and to form
-     controls only, so desktop/tablet typography is untouched. */
+     controls only, so desktop/tablet typography is untouched.
+     :not(.big-amount-input) excludes BigAmountInput's own <input> — its fontClassFor() sizes
+     (text-lg through text-4xl, i.e. 18px-36px) are already well above the 16px zoom threshold by
+     design, so this floor only ever fought that sizing on mobile/the native app specifically:
+     forcing every size class down to a flat 16px there while leaving it correctly large on a wide
+     (>767px) browser window — confirmed as the live "big 0 on web, tiny 0 in the app" bug. */
   @media (max-width: 767px) {
     /* !important: Tailwind's text-sm/text-xs utility classes live in the `utilities` cascade
        layer, which beats this `base`-layer rule on layer order alone regardless of selector
        specificity — importance is the one thing that overrides layer order. */
-    input, select, textarea { font-size: 16px !important; }
+    input:not(.big-amount-input), select, textarea { font-size: 16px !important; }
   }
 
   ::-webkit-scrollbar { width: 4px; height: 4px; }

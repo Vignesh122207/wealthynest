@@ -79,8 +79,10 @@ export function AddSavingsModal({ goal, goalColor, onClose }: { goal: Goal; goal
               </button>
             )}
             <button type="submit" data-testid="goal-savings-submit" disabled={isPending}
-              className={cn("flex-1 h-9 rounded-xl text-sm font-medium text-white transition-all disabled:opacity-60",
-                mode === "add" ? "bg-emerald-700 hover:bg-emerald-600" : "bg-red-600 hover:bg-red-500")}>
+              className={cn("flex-1 h-9 rounded-xl text-sm font-medium text-white hover:-translate-y-0.5 transition-all disabled:opacity-60 disabled:hover:translate-y-0",
+                mode === "add"
+                  ? "bg-gradient-to-br from-emerald-700 to-emerald-600 shadow-lg shadow-emerald-600/30 hover:shadow-xl hover:shadow-emerald-600/40"
+                  : "bg-gradient-to-br from-red-600 to-red-500 shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40")}>
               {isPending ? "Saving…" : mode === "add" ? "Add to Savings" : "Withdraw"}
             </button>
           </div>

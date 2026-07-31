@@ -352,7 +352,7 @@ export default function CategoriesSettingsPage() {
                   Create your first custom {isExpense ? "expense" : "income"} category to organise your finances.
                 </p>
                 <button onClick={() => setFormMode("create")}
-                  className="mt-4 flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-purple-600 hover:bg-purple-500 text-white transition-all">
+                  className="mt-4 flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-gradient-to-br from-purple-600 to-purple-500 shadow-lg shadow-purple-500/30 hover:shadow-xl hover:shadow-purple-500/40 hover:-translate-y-0.5 text-white transition-all">
                   <Plus className="w-4 h-4" /> Create First Category
                 </button>
               </div>

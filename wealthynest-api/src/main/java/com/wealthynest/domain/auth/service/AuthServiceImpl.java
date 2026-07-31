@@ -146,7 +146,7 @@ public class AuthServiceImpl implements AuthService {
     // rollback-on-unchecked-exception rule would undo that save along with everything else in
     // this transaction, silently disabling the brute-force lockout.
     @Transactional(noRollbackFor = BadCredentialsException.class)
-    public AuthResponse login(LoginRequest request, String ipAddress, String userAgent) {
+    public AuthResponse login(LoginRequest request, String ipAddress, String userAgent, String previousRefreshToken) {
         String email = request.getEmail().toLowerCase();
 
         // Checked explicitly (and first) rather than left to Spring Security's own
@@ -186,6 +186,7 @@ public class AuthServiceImpl implements AuthService {
         userRepository.save(user);
         auditService.log(user.getId(), "LOGIN_SUCCESS", "USER", user.getId(), null, null, ipAddress, userAgent);
         emailService.sendNewSignInEmail(user.getEmail(), user.getFullName(), ipAddress, userAgent, Instant.now());
+        revokeIfOwnedByUser(previousRefreshToken, user.getId());
         return buildAuthResponse(user, request.isRememberMe(), ipAddress, userAgent);
     }
 
@@ -511,12 +512,13 @@ public class AuthServiceImpl implements AuthService {
         return buildAuthResponse(user, rememberMe, ipAddress, userAgent);
     }
 
-    // Best-effort device-session rotation for factors (passkey) that carry no refresh token of
-    // their own through the ceremony the way pinLogin/refresh's token input does — the caller
-    // passes along whatever refresh token this device already had, if any, so that row gets
-    // revoked here instead of quietly accumulating as a duplicate "active session" alongside the
-    // new one. Silently no-ops for a blank/unknown/foreign token — this is a cleanup nicety, not a
-    // security boundary, so it must never fail the login itself.
+    // Best-effort device-session rotation for every login path (password, Google, passkey) that
+    // doesn't already carry a refresh token of its own through the ceremony to rotate in place the
+    // way pinLogin/refresh's token input does — the caller passes along whatever refresh token
+    // this device already had, if any (its existing cookie, read before the new one overwrites
+    // it), so that row gets revoked here instead of quietly accumulating as a duplicate "active
+    // session" alongside the new one. Silently no-ops for a blank/unknown/foreign token — this is
+    // a cleanup nicety, not a security boundary, so it must never fail the login itself.
     private void revokeIfOwnedByUser(String rawToken, UUID userId) {
         if (rawToken == null || rawToken.isBlank()) return;
         refreshTokenRepository.findByTokenHash(hashToken(rawToken))
@@ -565,12 +567,12 @@ public class AuthServiceImpl implements AuthService {
      */
     @Override
     @Transactional
-    public AuthResponse googleLogin(GoogleLoginRequest request, String ipAddress, String userAgent) {
+    public AuthResponse googleLogin(GoogleLoginRequest request, String ipAddress, String userAgent, String previousRefreshToken) {
         if (googleClientId == null || googleClientId.isBlank()) {
             throw new BusinessException("Google Sign-In isn't configured yet.", HttpStatus.SERVICE_UNAVAILABLE);
         }
         GoogleIdToken.Payload payload = verifyGoogleIdToken(request.getIdToken());
-        return signInWithGooglePayload(payload, request.isRememberMe(), ipAddress, userAgent);
+        return signInWithGooglePayload(payload, request.isRememberMe(), ipAddress, userAgent, previousRefreshToken);
     }
 
     /**
@@ -583,14 +585,14 @@ public class AuthServiceImpl implements AuthService {
      */
     @Override
     @Transactional
-    public AuthResponse googleLoginNative(GoogleCodeLoginRequest request, String ipAddress, String userAgent) {
+    public AuthResponse googleLoginNative(GoogleCodeLoginRequest request, String ipAddress, String userAgent, String previousRefreshToken) {
         if (googleNativeClientId == null || googleNativeClientId.isBlank()
                 || googleNativeClientSecret == null || googleNativeClientSecret.isBlank()) {
             throw new BusinessException("Google Sign-In isn't configured yet.", HttpStatus.SERVICE_UNAVAILABLE);
         }
         String idTokenString = exchangeGoogleAuthorizationCode(request, googleNativeClientId, googleNativeClientSecret);
         GoogleIdToken.Payload payload = verifyGoogleIdToken(idTokenString);
-        return signInWithGooglePayload(payload, request.isRememberMe(), ipAddress, userAgent);
+        return signInWithGooglePayload(payload, request.isRememberMe(), ipAddress, userAgent, previousRefreshToken);
     }
 
     /**
@@ -602,14 +604,14 @@ public class AuthServiceImpl implements AuthService {
      */
     @Override
     @Transactional
-    public AuthResponse googleLoginPopup(GoogleCodeLoginRequest request, String ipAddress, String userAgent) {
+    public AuthResponse googleLoginPopup(GoogleCodeLoginRequest request, String ipAddress, String userAgent, String previousRefreshToken) {
         if (googleClientId == null || googleClientId.isBlank()
                 || googleClientSecret == null || googleClientSecret.isBlank()) {
             throw new BusinessException("Google Sign-In isn't configured yet.", HttpStatus.SERVICE_UNAVAILABLE);
         }
         String idTokenString = exchangeGoogleAuthorizationCode(request, googleClientId, googleClientSecret);
         GoogleIdToken.Payload payload = verifyGoogleIdToken(idTokenString);
-        return signInWithGooglePayload(payload, request.isRememberMe(), ipAddress, userAgent);
+        return signInWithGooglePayload(payload, request.isRememberMe(), ipAddress, userAgent, previousRefreshToken);
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -690,7 +692,7 @@ public class AuthServiceImpl implements AuthService {
         return idTokenString;
     }
 
-    private AuthResponse signInWithGooglePayload(GoogleIdToken.Payload payload, boolean rememberMe, String ipAddress, String userAgent) {
+    private AuthResponse signInWithGooglePayload(GoogleIdToken.Payload payload, boolean rememberMe, String ipAddress, String userAgent, String previousRefreshToken) {
         if (!Boolean.TRUE.equals(payload.getEmailVerified())) {
             throw new BusinessException("Your Google account's email isn't verified.", HttpStatus.BAD_REQUEST);
         }
@@ -719,6 +721,7 @@ public class AuthServiceImpl implements AuthService {
         // already-committed-user case, so there's no need to special-case which branch ran.
         logAfterCommit(user.getId(), "GOOGLE_LOGIN_SUCCESS", user.getId(), ipAddress, userAgent);
         emailService.sendNewSignInEmail(user.getEmail(), user.getFullName(), ipAddress, userAgent, Instant.now());
+        revokeIfOwnedByUser(previousRefreshToken, user.getId());
         return buildAuthResponse(user, rememberMe, ipAddress, userAgent);
     }
 

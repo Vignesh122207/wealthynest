@@ -111,7 +111,7 @@ export function SipSection({ investmentId }: { investmentId: string }) {
               </div>
               <div className="flex gap-1.5">
                 <button type="submit" disabled={isPending}
-                  className="flex-1 h-8 rounded-lg text-[11px] font-medium bg-emerald-700 hover:bg-emerald-600 text-white transition-all disabled:opacity-60">
+                  className="flex-1 h-8 rounded-lg text-[11px] font-medium bg-gradient-to-br from-emerald-700 to-emerald-600 shadow-lg shadow-emerald-600/30 hover:shadow-xl hover:shadow-emerald-600/40 hover:-translate-y-0.5 text-white transition-all disabled:opacity-60 disabled:hover:translate-y-0">
                   {isPending ? "Saving…" : "Add SIP"}
                 </button>
                 <button type="button" onClick={() => setShowAdd(false)}

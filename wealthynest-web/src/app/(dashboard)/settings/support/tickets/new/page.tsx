@@ -127,7 +127,7 @@ export default function NewTicketPage() {
               type="submit"
               disabled={isPending}
               data-testid="ticket-submit"
-              className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white text-sm font-semibold py-3 rounded-xl transition-colors"
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-br from-green-700 to-green-600 shadow-lg shadow-green-600/30 hover:shadow-xl hover:shadow-green-600/40 hover:-translate-y-0.5 disabled:opacity-60 disabled:hover:translate-y-0 text-white text-sm font-semibold py-3 rounded-xl transition-all"
             >
               {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
               Submit Ticket

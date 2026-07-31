@@ -7,7 +7,6 @@ import {useForm} from "react-hook-form";
 import {zodResolver} from "@hookform/resolvers/zod";
 import {z} from "zod";
 import {
-    ChevronRight,
     Eye,
     EyeOff,
     Fingerprint,
@@ -25,6 +24,8 @@ import {PremiumIcon} from "@/components/icons/PremiumIcon";
 import {InfoTooltip} from "@/components/ui/Tooltip";
 import {FormInput} from "@/components/forms/FormInput";
 import {Toggle} from "@/components/ui/Toggle";
+import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
+import {AuthCard} from "@/features/auth/components/AuthCard";
 import {
     useChangeEmail,
     useChangePassword,
@@ -200,21 +201,65 @@ function NativeBiometricRow() {
 // remove action and there's a real "add another" flow. Kept expanded by default (matches the
 // original PasskeysSection) rather than gated behind a second click, since fingerprint/face is
 // exactly the feature this redesign is meant to promote, not bury further.
-function PasskeyRow() {
-  const { data: passkeys = [], isLoading } = usePasskeys();
+// Popup — same chrome as PasswordChangeModal/EmailChangeModal/PinSetupModal.
+function PasskeyAddModal({ enabled, onClose }: { enabled: boolean; onClose: () => void }) {
   const { mutate: registerPasskey, isPending: registering } = useRegisterPasskey();
-  const { mutate: deletePasskey } = useDeletePasskey();
   const [nickname, setNickname] = useState("");
-  const [showAdd, setShowAdd] = useState(false);
-  const enabled = passkeys.length > 0;
 
   const handleAdd = () => {
-    registerPasskey(nickname.trim() || "This device", { onSuccess: () => { setNickname(""); setShowAdd(false); } });
+    registerPasskey(nickname.trim() || "This device", { onSuccess: onClose });
   };
 
   return (
-    <div className="px-4 py-4 space-y-3">
-      <div className="flex items-center gap-3.5">
+    <TransactionModalOverlay onDismiss={onClose} maxWidth="max-w-[400px]">
+      <AuthCard className="px-5 pt-5 pb-6">
+        <button onClick={onClose} aria-label="Close" data-testid="passkey-add-close"
+          className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+          <X className="w-4 h-4" />
+        </button>
+
+        <div className="mb-5 pt-2 text-center">
+          <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-3">
+            <Fingerprint className="w-5 h-5 text-emerald-500" />
+          </div>
+          <h2 className="font-serif text-lg font-semibold text-foreground mb-1">
+            {enabled ? "Add another device" : "Enable passkey unlock"}
+          </h2>
+          <p className="text-muted-foreground text-xs leading-relaxed">
+            Name this device so you can recognize it in the list later.
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <FormInput
+            value={nickname}
+            onChange={e => setNickname(e.target.value)}
+            placeholder="e.g. My phone"
+            aria-label="Device name"
+            data-testid="security-passkey-nickname-input"
+          />
+          <button onClick={handleAdd} disabled={registering} data-testid="security-passkey-submit"
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-br from-brand-600 to-brand-500 shadow-[0_10px_24px_-10px_rgb(var(--brand-500)/65%),inset_0_1px_0_rgba(255,255,255,0.18)] hover:shadow-[0_14px_28px_-10px_rgb(var(--brand-500)/75%),inset_0_1px_0_rgba(255,255,255,0.22)] hover:-translate-y-0.5 disabled:opacity-60 disabled:hover:translate-y-0 text-white text-sm font-semibold py-2.5 rounded-xl transition-all">
+            {registering && <Loader2 className="w-3.5 h-3.5 animate-spin" />} {registering ? "Follow your device's prompt…" : "Continue"}
+          </button>
+        </div>
+      </AuthCard>
+    </TransactionModalOverlay>
+  );
+}
+
+function PasskeyRow() {
+  const { data: passkeys = [], isLoading } = usePasskeys();
+  const { mutate: deletePasskey } = useDeletePasskey();
+  const [showAdd, setShowAdd] = useState(false);
+  const enabled = passkeys.length > 0;
+
+  return (
+    <div>
+      {/* px-4 py-4 min-h-[64px] on this row itself (not an outer wrapper) — same reasoning as
+          EmailRow's own matching comment: padding and min-height need to live on the same element
+          for the row to come out the same 64px PIN/Biometric rows use for their Toggle. */}
+      <div className="flex items-center gap-3.5 px-4 py-4 min-h-[64px]">
         <PremiumIcon icon={Fingerprint} tone={enabled ? "green" : "gray"} size="sm" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-foreground flex items-center gap-2 flex-wrap">
@@ -232,10 +277,14 @@ function PasskeyRow() {
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">Unlock instantly with your fingerprint, face, or screen lock — no separate biometric setup, it&apos;s all part of the passkey</p>
         </div>
+        <button onClick={() => setShowAdd(true)} data-testid="security-passkey-add-toggle"
+          className="h-9 px-3.5 rounded-xl text-xs font-medium bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 dark:text-brand-300 border border-brand-500/20 transition-colors shrink-0">
+          {enabled ? "Add another" : "Enable passkey unlock"}
+        </button>
       </div>
 
       {!isLoading && passkeys.length > 0 && (
-        <div className="space-y-2 sm:pl-[46px]">
+        <div className="space-y-2 px-4 pb-3 sm:pl-[46px]">
           {passkeys.map(p => (
             <div key={p.id} className="flex items-center justify-between gap-3 bg-muted/40 rounded-xl px-3 py-2.5">
               <div className="min-w-0">
@@ -253,35 +302,9 @@ function PasskeyRow() {
         </div>
       )}
 
-      <div className="sm:pl-[46px]">
-        {showAdd ? (
-          <div className="flex gap-2 items-start">
-            <div className="flex-1">
-              <FormInput
-                value={nickname}
-                onChange={e => setNickname(e.target.value)}
-                placeholder="e.g. My phone"
-                className="h-9"
-                aria-label="Device name"
-                data-testid="security-passkey-nickname-input"
-              />
-            </div>
-            <button onClick={handleAdd} disabled={registering} data-testid="security-passkey-submit"
-              className="h-9 px-3.5 rounded-xl text-xs font-medium bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-60 transition-colors flex items-center gap-1.5">
-              {registering && <Loader2 className="w-3.5 h-3.5 animate-spin" />} {registering ? "Follow your device's prompt…" : "Continue"}
-            </button>
-            <button onClick={() => setShowAdd(false)}
-              className="h-9 w-9 flex items-center justify-center rounded-xl bg-muted hover:bg-muted/80 text-muted-foreground shrink-0">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        ) : (
-          <button onClick={() => setShowAdd(true)} data-testid="security-passkey-add-toggle"
-            className="h-10 px-3.5 rounded-xl text-xs font-medium bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 dark:text-brand-300 border border-brand-500/20 transition-colors">
-            {enabled ? "Add another device" : "Enable passkey unlock"}
-          </button>
-        )}
-      </div>
+      {showAdd && (
+        <PasskeyAddModal enabled={enabled} onClose={() => setShowAdd(false)} />
+      )}
     </div>
   );
 }
@@ -313,11 +336,11 @@ function UnlockMethodsCard() {
 // ─── Password & email — demoted below unlock methods since it's a rare action, collapsed by
 // default instead of an always-open form taking up the top of the page ─────────────────────────
 
-function PasswordRow() {
+// Popup — same TransactionModalOverlay + AuthCard chrome as PinSetupModal/PinVerifyModal, so
+// every security form now shares one consistent surface instead of some being inline-expanding
+// rows and others popups.
+function PasswordChangeModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const { mutate: changePassword, isPending } = useChangePassword();
-  const [open, setOpen] = useState(false);
-  const [success, setSuccess] = useState(false);
-
   const form = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" },
@@ -326,35 +349,29 @@ function PasswordRow() {
   function onSubmit(values: Values) {
     changePassword(
       { currentPassword: values.currentPassword, newPassword: values.newPassword },
-      { onSuccess: () => { form.reset(); setSuccess(true); setOpen(false); setTimeout(() => setSuccess(false), 4000); } }
+      { onSuccess: () => { form.reset(); onSuccess(); } }
     );
   }
 
   return (
-    <div>
-      <button
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        data-testid="security-password-toggle"
-        aria-expanded={open}
-        className="w-full flex items-center gap-3.5 px-4 py-4 min-h-[64px] text-left hover:bg-muted/40 transition-colors"
-      >
-        <PremiumIcon icon={KeyRound} tone="blue" size="sm" />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-foreground">Password</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Use a strong password with letters, numbers, and symbols</p>
-        </div>
-        <ChevronRight className={cn("w-4 h-4 text-muted-foreground/50 shrink-0 transition-transform", open && "rotate-90")} />
-      </button>
+    <TransactionModalOverlay onDismiss={onClose} maxWidth="max-w-[400px]">
+      <AuthCard className="px-5 pt-5 pb-6">
+        <button onClick={onClose} aria-label="Close" data-testid="password-change-close"
+          className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+          <X className="w-4 h-4" />
+        </button>
 
-      {success && (
-        <div className="mx-4 mb-3 text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded-xl px-3 py-2.5 text-center font-medium">
-          Password updated successfully!
+        <div className="mb-5 pt-2 text-center">
+          <div className="w-11 h-11 rounded-2xl bg-brand-500/10 flex items-center justify-center mx-auto mb-3">
+            <KeyRound className="w-5 h-5 text-brand-500" />
+          </div>
+          <h2 className="font-serif text-lg font-semibold text-foreground mb-1">Change password</h2>
+          <p className="text-muted-foreground text-xs leading-relaxed">
+            Use a strong password with letters, numbers, and symbols.
+          </p>
         </div>
-      )}
 
-      {open && (
-        <form onSubmit={form.handleSubmit(onSubmit)} className="px-4 pb-4 space-y-3 border-t border-border pt-3.5">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
           <PasswordField
             label="Current password"
             reg={form.register("currentPassword")}
@@ -387,12 +404,49 @@ function PasswordRow() {
             type="submit"
             disabled={isPending}
             data-testid="security-password-submit"
-            className="w-full flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-60 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors"
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-br from-brand-600 to-brand-500 shadow-[0_10px_24px_-10px_rgb(var(--brand-500)/65%),inset_0_1px_0_rgba(255,255,255,0.18)] hover:shadow-[0_14px_28px_-10px_rgb(var(--brand-500)/75%),inset_0_1px_0_rgba(255,255,255,0.22)] hover:-translate-y-0.5 disabled:opacity-60 disabled:hover:translate-y-0 text-white text-sm font-semibold py-2.5 rounded-xl transition-all"
           >
             {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             Update password
           </button>
         </form>
+      </AuthCard>
+    </TransactionModalOverlay>
+  );
+}
+
+function PasswordRow() {
+  const [showModal, setShowModal] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  const handleSuccess = () => {
+    setShowModal(false);
+    setSuccess(true);
+    setTimeout(() => setSuccess(false), 4000);
+  };
+
+  return (
+    <div>
+      <div className="flex items-center gap-3.5 px-4 py-4 min-h-[64px]">
+        <PremiumIcon icon={KeyRound} tone="blue" size="sm" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-foreground">Password</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Use a strong password with letters, numbers, and symbols</p>
+        </div>
+        <button onClick={() => setShowModal(true)} data-testid="security-password-toggle"
+          className="h-9 px-3.5 rounded-xl text-xs font-medium bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 dark:text-brand-300 border border-brand-500/20 transition-colors shrink-0">
+          Change password
+        </button>
+      </div>
+
+      {success && (
+        <div className="mx-4 mb-3 text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded-xl px-3 py-2.5 text-center font-medium">
+          Password updated successfully!
+        </div>
+      )}
+
+      {showModal && (
+        <PasswordChangeModal onClose={() => setShowModal(false)} onSuccess={handleSuccess} />
       )}
     </div>
   );
@@ -404,23 +458,66 @@ const emailSchema = z.object({
 });
 type EmailValues = z.infer<typeof emailSchema>;
 
-function EmailRow() {
-  const { user } = useAuthStore();
+// Popup — same chrome as PasswordChangeModal/PinSetupModal.
+function EmailChangeModal({ pendingEmail, onClose }: { pendingEmail?: string; onClose: () => void }) {
   const { mutate: changeEmail, isPending } = useChangeEmail();
-  const [showForm, setShowForm] = useState(false);
-
   const form = useForm<EmailValues>({
     resolver: zodResolver(emailSchema),
     defaultValues: { newEmail: "", currentPassword: "" },
   });
 
   const onSubmit = (values: EmailValues) => {
-    changeEmail(values, { onSuccess: () => { form.reset(); setShowForm(false); } });
+    changeEmail(values, { onSuccess: () => { form.reset(); onClose(); } });
   };
 
   return (
-    <div className="px-4 py-4 space-y-3">
-      <div className="flex items-center gap-3.5">
+    <TransactionModalOverlay onDismiss={onClose} maxWidth="max-w-[400px]">
+      <AuthCard className="px-5 pt-5 pb-6">
+        <button onClick={onClose} aria-label="Close" data-testid="email-change-close"
+          className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+          <X className="w-4 h-4" />
+        </button>
+
+        <div className="mb-5 pt-2 text-center">
+          <div className="w-11 h-11 rounded-2xl bg-teal-500/10 flex items-center justify-center mx-auto mb-3">
+            <Mail className="w-5 h-5 text-teal-500" />
+          </div>
+          <h2 className="font-serif text-lg font-semibold text-foreground mb-1">
+            {pendingEmail ? "Change to a different email" : "Change email"}
+          </h2>
+          <p className="text-muted-foreground text-xs leading-relaxed">
+            We&apos;ll send a verification link to the new address before it takes effect.
+          </p>
+        </div>
+
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
+          <FormInput
+            {...form.register("newEmail")}
+            label="New email address"
+            type="email"
+            placeholder="you@example.com"
+            className="h-auto py-2.5"
+            error={form.formState.errors.newEmail?.message}
+          />
+          <PasswordField label="Current password" reg={form.register("currentPassword")}
+            error={form.formState.errors.currentPassword?.message} />
+          <button type="submit" disabled={isPending} data-testid="security-email-submit"
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-br from-brand-600 to-brand-500 shadow-[0_10px_24px_-10px_rgb(var(--brand-500)/65%),inset_0_1px_0_rgba(255,255,255,0.18)] hover:shadow-[0_14px_28px_-10px_rgb(var(--brand-500)/75%),inset_0_1px_0_rgba(255,255,255,0.22)] hover:-translate-y-0.5 disabled:opacity-60 disabled:hover:translate-y-0 text-white text-sm font-semibold py-2.5 rounded-xl transition-all">
+            {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Send verification link
+          </button>
+        </form>
+      </AuthCard>
+    </TransactionModalOverlay>
+  );
+}
+
+function EmailRow() {
+  const { user } = useAuthStore();
+  const [showModal, setShowModal] = useState(false);
+
+  return (
+    <div>
+      <div className="flex items-center gap-3.5 px-4 py-4 min-h-[64px]">
         <PremiumIcon icon={Mail} tone="teal" size="sm" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -428,10 +525,14 @@ function EmailRow() {
           </p>
           <p className="text-xs text-muted-foreground mt-0.5 truncate">{user?.email}</p>
         </div>
+        <button onClick={() => setShowModal(true)} data-testid="security-email-change-toggle"
+          className="h-9 px-3.5 rounded-xl text-xs font-medium bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 dark:text-brand-300 border border-brand-500/20 transition-colors shrink-0">
+          {user?.pendingEmail ? "Change again" : "Change email"}
+        </button>
       </div>
 
       {user?.pendingEmail && (
-        <div className="flex items-center gap-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2.5 sm:ml-[46px]">
+        <div className="flex items-center gap-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2.5 mx-4 mb-3 sm:ml-[46px]">
           <Loader2 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
           <p className="text-xs text-amber-700 dark:text-amber-300">
             Verification link sent to <strong>{user.pendingEmail}</strong> — check that inbox to confirm the change.
@@ -439,37 +540,9 @@ function EmailRow() {
         </div>
       )}
 
-      <div className="sm:pl-[46px]">
-        {showForm ? (
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-            <FormInput
-              {...form.register("newEmail")}
-              label="New email address"
-              type="email"
-              placeholder="you@example.com"
-              className="h-auto py-2.5"
-              error={form.formState.errors.newEmail?.message}
-            />
-            <PasswordField label="Current password" reg={form.register("currentPassword")}
-              error={form.formState.errors.currentPassword?.message} />
-            <div className="flex gap-2">
-              <button type="submit" disabled={isPending}
-                className="flex-1 flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-60 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors">
-                {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Send verification link
-              </button>
-              <button type="button" onClick={() => { setShowForm(false); form.reset(); }}
-                className="h-10 w-10 flex items-center justify-center rounded-xl bg-muted hover:bg-muted/80 text-muted-foreground shrink-0">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </form>
-        ) : (
-          <button onClick={() => setShowForm(true)}
-            className="h-9 px-3.5 rounded-xl text-xs font-medium bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 dark:text-brand-300 border border-brand-500/20 transition-colors">
-            {user?.pendingEmail ? "Change to a different email" : "Change email"}
-          </button>
-        )}
-      </div>
+      {showModal && (
+        <EmailChangeModal pendingEmail={user?.pendingEmail} onClose={() => setShowModal(false)} />
+      )}
     </div>
   );
 }
@@ -522,7 +595,7 @@ function SessionsCard() {
               <button
                 onClick={() => revokeOthers(undefined, { onSuccess: () => setConfirmRevokeOthers(false) })}
                 disabled={revokingOthers} data-testid="security-sessions-revoke-others-confirm"
-                className="h-7 px-2.5 rounded-lg text-xs font-medium bg-red-600 hover:bg-red-500 text-white disabled:opacity-60"
+                className="h-7 px-2.5 rounded-lg text-xs font-medium bg-gradient-to-br from-red-600 to-red-500 shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40 hover:-translate-y-0.5 text-white disabled:opacity-60 disabled:hover:translate-y-0 transition-all"
               >
                 Sign out
               </button>
@@ -553,7 +626,7 @@ function SessionsCard() {
                       </span>
                     )}
                   </p>
-                  <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                  <p className="text-[11px] text-muted-foreground/80 mt-0.5">
                     {s.ipAddress ? `${s.ipAddress} · ` : ""}Last active {formatDate(s.createdAt)}
                   </p>
                 </div>

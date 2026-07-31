@@ -84,6 +84,28 @@ describe("enableBiometricUnlock", () => {
     await expect(enableBiometricUnlock()).rejects.toThrow();
     expect(mockedSet).not.toHaveBeenCalled();
   });
+
+  // Regression coverage for a real bug: enabling fingerprint unlock as the first unlock method
+  // on a device auto-fired a second, unsolicited fingerprint prompt — see this function's own
+  // comment. Without marking the ceremony as in-flight here (the same way AppLockScreen's own
+  // verify call does — see AppLockScreen.test.tsx's matching regression test), useAppLockTrigger
+  // couldn't tell this prompt's own pause/resume blip apart from the user actually leaving the
+  // app, and re-locked off it immediately.
+  it("marks the ceremony as in-flight for the whole time the biometric check is pending", async () => {
+    const { isBiometricPromptActive, __resetBiometricPromptStateForTests } = await import("../store/appLock.store");
+    __resetBiometricPromptStateForTests();
+    let resolveAuthenticate!: () => void;
+    mockedAuthenticate.mockReturnValue(new Promise<void>((resolve) => { resolveAuthenticate = resolve; }) as never);
+
+    const pending = enableBiometricUnlock();
+    expect(isBiometricPromptActive()).toBe(true); // still pending
+
+    resolveAuthenticate();
+    await pending;
+    expect(isBiometricPromptActive()).toBe(true); // settled, but still within the post-ceremony tail
+
+    __resetBiometricPromptStateForTests();
+  });
 });
 
 describe("disableBiometricUnlock", () => {

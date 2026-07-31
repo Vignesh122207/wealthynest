@@ -70,7 +70,7 @@ export function ExpensesTabContent({
                 : activeFilterCount > 0
                 ? <button onClick={clearAllFilters} className="text-sm text-indigo-500 hover:text-indigo-600 font-medium transition-colors">Clear filters</button>
                 : <button onClick={onAddExpense}
-                    className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
+                    className="flex items-center gap-2 bg-gradient-to-br from-red-600 to-red-500 shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40 hover:-translate-y-0.5 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
                     <Plus className="w-4 h-4" /> Add Expense
                   </button>
             } />

@@ -11,7 +11,7 @@ export default function ErrorPage({ error, reset }: { error: Error; reset: () =>
       <h1 className="text-xl font-semibold mb-2">Something went wrong</h1>
       <p className="text-sm text-muted-foreground mb-6 max-w-sm">{error.message || "An unexpected error occurred."}</p>
       <button onClick={reset}
-        className="bg-[#a85f30] hover:bg-[#c2703d] text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-all">
+        className="bg-gradient-to-br from-brand-600 to-brand-500 shadow-[0_10px_24px_-10px_rgb(var(--brand-500)/65%),inset_0_1px_0_rgba(255,255,255,0.18)] hover:shadow-[0_14px_28px_-10px_rgb(var(--brand-500)/75%),inset_0_1px_0_rgba(255,255,255,0.22)] hover:-translate-y-0.5 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-all">
         Try again
       </button>
     </div>

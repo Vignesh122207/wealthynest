@@ -333,7 +333,7 @@ function TicketDetail({ ticketId, onBack }: { ticketId: string; onBack: () => vo
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">{reply.length > 0 ? `${reply.length} chars` : ""}</span>
               <button type="submit" disabled={sendingReply || !reply.trim()}
-                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors">
+                className="flex items-center gap-2 bg-gradient-to-br from-indigo-600 to-indigo-500 shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all">
                 {sendingReply ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 Send Reply
               </button>

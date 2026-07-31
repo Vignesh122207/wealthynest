@@ -31,7 +31,7 @@ export function BudgetSection({ budgetSummaries, year, month, isLoading }: Budge
       <div className="flex items-center justify-between mb-5">
         <div>
           <h2 className="font-bold text-foreground">Budget Progress</h2>
-          <p className="text-[11px] text-muted-foreground/70 mt-0.5">{label}</p>
+          <p className="text-[11px] text-muted-foreground/80 mt-0.5">{label}</p>
         </div>
         <Link href="/budgets"
           className="text-xs font-semibold text-primary hover:underline transition-colors">

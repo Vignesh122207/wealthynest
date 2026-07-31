@@ -3,6 +3,7 @@ package com.wealthynest.domain.family.controller;
 import com.wealthynest.common.response.ApiResponse;
 import com.wealthynest.common.response.PagedResponse;
 import com.wealthynest.common.security.SecurityUtils;
+import com.wealthynest.common.util.ClientIpResolver;
 import com.wealthynest.domain.expense.dto.response.ExpenseResponse;
 import com.wealthynest.domain.expense.repository.ExpenseRepository;
 import com.wealthynest.domain.expense.service.ExpenseService;
@@ -44,6 +45,7 @@ public class FamilyController {
     private final IncomeRepository  incomeRepository;
     private final ExpenseRepository expenseRepository;
     private final UserRepository    userRepository;
+    private final ClientIpResolver  clientIpResolver;
 
     @PostMapping
     @PreAuthorize("isAuthenticated()")
@@ -51,7 +53,7 @@ public class FamilyController {
             @Valid @RequestBody CreateFamilyRequest request, HttpServletRequest httpRequest) {
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 ApiResponse.created(familyService.createFamily(SecurityUtils.requireCurrentUserId(), request,
-                        httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"))));
+                        clientIpResolver.resolve(httpRequest), httpRequest.getHeader("User-Agent"))));
     }
 
     @PostMapping("/join")
@@ -104,7 +106,7 @@ public class FamilyController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> deleteFamily(@PathVariable UUID familyId, HttpServletRequest httpRequest) {
         familyService.deleteFamily(familyId, SecurityUtils.requireCurrentUserId(),
-                httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"));
+                clientIpResolver.resolve(httpRequest), httpRequest.getHeader("User-Agent"));
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
@@ -115,7 +117,7 @@ public class FamilyController {
             @PathVariable UUID targetId,
             HttpServletRequest httpRequest) {
         familyService.revokeAdmin(familyId, SecurityUtils.requireCurrentUserId(), targetId,
-                httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"));
+                clientIpResolver.resolve(httpRequest), httpRequest.getHeader("User-Agent"));
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
@@ -126,7 +128,7 @@ public class FamilyController {
             @Valid @RequestBody TransferAdminRequest request,
             HttpServletRequest httpRequest) {
         familyService.transferAdmin(familyId, SecurityUtils.requireCurrentUserId(), request.getNewAdminId(),
-                httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"));
+                clientIpResolver.resolve(httpRequest), httpRequest.getHeader("User-Agent"));
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 

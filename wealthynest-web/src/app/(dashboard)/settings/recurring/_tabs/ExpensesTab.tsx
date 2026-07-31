@@ -3,6 +3,7 @@
 import {useEffect, useState} from "react";
 import {Check, Plus, Receipt, RefreshCw} from "lucide-react";
 import {cn} from "@/lib/utils";
+import {todayLocalISO} from "@/lib/date";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
 import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
@@ -59,7 +60,7 @@ function RuleFormModal({
   const [accountId,   setAccountId]   = useState(initial?.accountId  ?? cashAccounts[0]?.id ?? bankAccounts[0]?.id ?? creditAccounts[0]?.id ?? "");
   const [amount,      setAmount]      = useState(initial?.amount?.toString() ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
-  const [expenseDate, setExpenseDate] = useState(initial?.expenseDate ?? new Date().toISOString().split("T")[0]);
+  const [expenseDate, setExpenseDate] = useState(initial?.expenseDate ?? todayLocalISO());
   const [rule,        setRule]        = useState(initial?.recurrenceRule ?? "MONTHLY");
 
   const isEdit = !!initial?.id;
@@ -234,7 +235,7 @@ export function ExpensesTab() {
             Add a rule to auto-log a subscription, rent, or any bill that repeats on a schedule.
           </p>
           <button onClick={() => setModal("create")}
-            className="mt-4 flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-rose-600 hover:bg-rose-500 text-white transition-all">
+            className="mt-4 flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-gradient-to-br from-rose-600 to-rose-500 shadow-lg shadow-rose-500/30 hover:shadow-xl hover:shadow-rose-500/40 hover:-translate-y-0.5 text-white transition-all">
             <Plus className="w-4 h-4" /> Add First Rule
           </button>
         </div>

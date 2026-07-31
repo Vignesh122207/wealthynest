@@ -37,7 +37,7 @@ export function DangerZone({
         </p>
         <div className="flex gap-2">
           <button onClick={onLeave} disabled={leaving} data-testid="family-confirm-leave"
-            className="flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-all disabled:opacity-60">
+            className="flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-gradient-to-br from-red-600 to-red-500 shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40 hover:-translate-y-0.5 text-white transition-all disabled:opacity-60 disabled:hover:translate-y-0">
             {leaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}
             Yes, leave
           </button>
@@ -67,7 +67,7 @@ export function DangerZone({
         </div>
         <div className="flex gap-2">
           <button onClick={onDelete} disabled={deleting || deleteBlocked} data-testid="family-confirm-delete"
-            className="flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-all disabled:opacity-60">
+            className="flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium bg-gradient-to-br from-red-600 to-red-500 shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40 hover:-translate-y-0.5 text-white transition-all disabled:opacity-60 disabled:hover:translate-y-0">
             {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
             Yes, delete group
           </button>

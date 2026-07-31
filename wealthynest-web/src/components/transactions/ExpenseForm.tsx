@@ -16,6 +16,7 @@ import {AccountPicker, accountPickerLabel} from "./AccountPicker";
 import {BigAmountInput} from "./BigAmountInput";
 import {FormModalHeader} from "./FormModalHeader";
 import {cn} from "@/lib/utils";
+import {todayLocalISO} from "@/lib/date";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 
 // ─── Expense Form ─────────────────────────────────────────────────────────────
@@ -66,7 +67,7 @@ export function ExpenseForm({ title, defaultValues, defaultCategoryId, categoryO
     resolver: zodResolver(expenseSchema),
     // Category defaults to whatever you used last (or most often, if there's no "last") —
     // personalized beats a hardcoded guess, since everyone's top spending category differs.
-    defaultValues: { expenseDate: new Date().toISOString().split("T")[0], accountId: defaultAccountId, categoryId: defaultCategoryId, ...defaultValues },
+    defaultValues: { expenseDate: todayLocalISO(), accountId: defaultAccountId, categoryId: defaultCategoryId, ...defaultValues },
   });
 
   // Instant "insufficient balance" feedback before the round-trip to the server (which enforces

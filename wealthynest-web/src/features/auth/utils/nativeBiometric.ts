@@ -9,6 +9,7 @@
 import { Capacitor } from "@capacitor/core";
 import { BiometricAuth, BiometryError, BiometryErrorType } from "@aparajita/capacitor-biometric-auth";
 import { SecureStoragePlugin } from "capacitor-secure-storage-plugin";
+import { markBiometricPromptEnded, markBiometricPromptStarting } from "../store/appLock.store";
 
 // Re-exported so callers only ever depend on this platform-boundary module, not the raw plugin
 // package directly — keeps the plugin's own registerPlugin() side effects out of component/hook
@@ -39,9 +40,23 @@ export async function isBiometricUnlockEnabled(): Promise<boolean> {
 
 /** Confirms the device can actually pass a biometric check right now, then remembers the
  * preference. Throws (as a `BiometryError`) if the prompt fails or is cancelled — nothing gets
- * enabled in that case. */
+ * enabled in that case.
+ *
+ * markBiometricPromptStarting/Ended bracket this the same way AppLockScreen's own verify call
+ * does — see appLock.store's own comment for why: this BiometricPrompt pauses the hosting
+ * Activity just like AppLockScreen's does, and useAppLockTrigger's pause/resume bridge can't
+ * otherwise tell that pause apart from a real backgrounding. Missing this here was a real bug:
+ * enabling fingerprint unlock as the FIRST unlock method on a device (PIN not already set up)
+ * flips `armed` false→true mid-ceremony, and useAppLockTrigger's mount-time re-arm check uses
+ * zero grace — it locked immediately off the enable dialog's own pause, which then auto-fired a
+ * second, unsolicited fingerprint prompt from the freshly-mounted AppLockScreen. */
 export async function enableBiometricUnlock(): Promise<void> {
-  await BiometricAuth.authenticate({ reason: "Enable fingerprint unlock" });
+  markBiometricPromptStarting();
+  try {
+    await BiometricAuth.authenticate({ reason: "Enable fingerprint unlock" });
+  } finally {
+    markBiometricPromptEnded();
+  }
   await SecureStoragePlugin.set({ key: ENABLED_KEY, value: "true" });
 }
 

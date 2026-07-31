@@ -63,7 +63,7 @@ function VerifyEmailContent() {
           </p>
           <Link
             href="/login"
-            className="inline-block mt-2 px-6 py-3 rounded-xl bg-[#a85f30] hover:bg-[#c2703d] text-white font-semibold text-sm transition-colors"
+            className="inline-block mt-2 px-6 py-3 rounded-xl bg-gradient-to-br from-brand-600 to-brand-500 shadow-[0_10px_24px_-10px_rgb(var(--brand-500)/65%),inset_0_1px_0_rgba(255,255,255,0.18)] hover:shadow-[0_14px_28px_-10px_rgb(var(--brand-500)/75%),inset_0_1px_0_rgba(255,255,255,0.22)] hover:-translate-y-0.5 text-white font-semibold text-sm transition-all"
           >
             Sign in
           </Link>
