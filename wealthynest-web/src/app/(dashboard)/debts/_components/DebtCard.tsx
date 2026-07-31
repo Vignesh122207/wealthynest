@@ -1,7 +1,7 @@
 "use client";
 
 import {useState} from "react";
-import {AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Clock, Wallet} from "lucide-react";
+import {AlertCircle, Banknote, CheckCircle2, ChevronDown, ChevronUp, Clock, Wallet} from "lucide-react";
 import {cn} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import type {DebtRecord} from "@/features/debts/types/debt.types";
@@ -35,14 +35,11 @@ export function DebtCard({ debt, onEdit, onPayment }: {
       "bg-card border rounded-2xl overflow-hidden transition-all",
       isSettled ? "border-border/50 opacity-60" : isLent ? "border-emerald-500/20" : "border-red-500/20"
     )}>
-      {/* color strip */}
-      <div className={cn("h-0.5", isLent ? "bg-emerald-500" : "bg-red-500")} />
-
       <button type="button" onClick={onEdit}
         aria-label={`Edit debt with ${debt.contactName}`}
         className="w-full text-left p-4 hover:bg-muted/30 transition-colors">
         <div className="flex gap-2 sm:gap-3">
-          <ContactAvatar name={debt.contactName} isLent={isLent} />
+          <ContactAvatar name={debt.contactName} isLent={isLent} pct={pct} settled={isSettled} />
 
           <div className="flex-1 min-w-0">
             <div className="flex items-start gap-2 justify-between">
@@ -75,64 +72,54 @@ export function DebtCard({ debt, onEdit, onPayment }: {
             {debt.description && (
               <p className="text-xs text-muted-foreground/80 mt-1 truncate">{debt.description}</p>
             )}
-
-            {!isSettled && debt.amount > 0 && (
-              <div className="mt-3 space-y-1">
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>{isLent ? "Received" : "Paid"} {fmt(debt.amountSettled)}</span>
-                  <span>Left {fmt(debt.amountRemaining)}</span>
-                </div>
-                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div className={cn("h-full rounded-full transition-all duration-500",
-                    pct >= 70 ? "bg-emerald-500" : pct >= 30 ? "bg-amber-500" : "bg-red-500"
-                  )}
-                    style={{ width: `${pct}%` }} />
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </button>
 
-      <div className="px-4 pb-4 -mt-1 space-y-2">
+      {/* Actions — a compact pill for the primary action instead of a full-width flat button, and
+          a chip doubling as the payoff/history summary (payoff % itself now lives on the
+          avatar's ring, not a separate bar here). */}
+      <div className="px-4 pb-4 -mt-1 flex items-center gap-2">
         {!isSettled && (
           <button data-testid="debt-card-pay-button" onClick={onPayment}
             className={cn(
-              "w-full h-9 rounded-xl text-xs font-semibold transition-all",
-              isLent
-                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
-                : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/20"
+              "flex items-center gap-1.5 h-9 px-3.5 rounded-full text-xs font-semibold text-white shrink-0 transition-all hover:-translate-y-0.5",
+              isLent ? "bg-emerald-600 hover:bg-emerald-500" : "bg-red-600 hover:bg-red-500"
             )}>
-            {isLent ? "✓ Received" : "↑ Pay Back"}
+            <Banknote className="w-3.5 h-3.5" />
+            {isLent ? "Log payment" : "Pay back"}
           </button>
         )}
 
-        {debt.payments.length > 0 && (
-          <>
-            <button onClick={() => setExpanded(v => !v)}
-              className="w-full flex items-center justify-between text-xs text-muted-foreground hover:text-foreground transition-colors bg-muted/40 rounded-xl px-3 py-2">
-              <span>{debt.payments.length} payment{debt.payments.length !== 1 ? "s" : ""}</span>
-              {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-            </button>
-            {expanded && (
-              <div className="space-y-1.5 border-t border-border/50 pt-3">
-                {debt.payments.map(p => (
-                  <div key={p.id} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
-                      <span className="truncate">{p.note || "Payment"}</span>
-                      <span className="text-muted-foreground/80 shrink-0">
-                        {new Date(p.paidAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                      </span>
-                    </div>
-                    <span className="font-semibold text-foreground shrink-0 ml-2">{fmt(p.amount)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
+        {debt.payments.length > 0 ? (
+          <button onClick={() => setExpanded(v => !v)}
+            className="flex-1 min-w-0 flex items-center justify-between gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors bg-muted/40 rounded-full px-3.5 py-2">
+            <span className="truncate">
+              {debt.payments.length} payment{debt.payments.length !== 1 ? "s" : ""} · {fmt(debt.amountSettled)} so far
+            </span>
+            {expanded ? <ChevronUp className="w-3.5 h-3.5 shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 shrink-0" />}
+          </button>
+        ) : !isSettled && (
+          <span className="flex-1 text-xs text-muted-foreground/60 text-center">No payments yet</span>
         )}
       </div>
+
+      {expanded && debt.payments.length > 0 && (
+        <div className="px-4 pb-4 -mt-2 space-y-1.5 border-t border-border/50 pt-3">
+          {debt.payments.map(p => (
+            <div key={p.id} className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                <span className="truncate">{p.note || "Payment"}</span>
+                <span className="text-muted-foreground/80 shrink-0">
+                  {new Date(p.paidAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                </span>
+              </div>
+              <span className="font-semibold text-foreground shrink-0 ml-2">{fmt(p.amount)}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
