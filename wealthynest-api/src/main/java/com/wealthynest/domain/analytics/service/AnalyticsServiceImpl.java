@@ -105,12 +105,13 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                     .percentUsed(pct).overBudget(pct > 100).build();
         }).toList();
 
-        // Savings rate: (income - expenses) / income * 100
+        // Savings rate: (income - expenses) / income * 100. Left un-floored on purpose — a genuine
+        // overspend (expenses > income) needs to read as negative so the dashboard can tell it apart
+        // from an exact break-even month, which is legitimately 0.
         BigDecimal savingsRate = monthlyIncome.compareTo(BigDecimal.ZERO) > 0
                 ? monthlyIncome.subtract(monthlyExp)
                                .divide(monthlyIncome, 4, RoundingMode.HALF_UP)
                                .multiply(BigDecimal.valueOf(100))
-                               .max(BigDecimal.ZERO)
                 : BigDecimal.ZERO;
 
         // 6-month trend (going back from the requested month) — batch-fetch per distinct year touched

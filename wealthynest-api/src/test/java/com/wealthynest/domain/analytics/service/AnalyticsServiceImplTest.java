@@ -126,11 +126,23 @@ class AnalyticsServiceImplTest {
         }
 
         @Test
-        @DisplayName("savings rate floors at zero when expenses exceed income, rather than going negative")
-        void savingsRateFloorsAtZero() {
+        @DisplayName("savings rate goes negative when expenses exceed income, distinct from an exact break-even month")
+        void savingsRateGoesNegativeOnOverspend() {
             stubDashboardDefaults(2026, 6);
             when(incomeRepository.sumByUserAndPeriod(userId, 2026, 6)).thenReturn(new BigDecimal("1000"));
-            when(expenseRepository.sumByUserAndMonth(userId, 2026, 6)).thenReturn(new BigDecimal("5000"));
+            when(expenseRepository.sumByUserAndMonth(userId, 2026, 6)).thenReturn(new BigDecimal("1200"));
+
+            DashboardResponse response = service.getDashboard(userId, 2026, 6);
+
+            assertThat(response.getSavingsRate()).isEqualByComparingTo("-20.00");
+        }
+
+        @Test
+        @DisplayName("savings rate is exactly zero on a break-even month (income spent in full, not exceeded)")
+        void savingsRateZeroOnBreakEven() {
+            stubDashboardDefaults(2026, 6);
+            when(incomeRepository.sumByUserAndPeriod(userId, 2026, 6)).thenReturn(new BigDecimal("1000"));
+            when(expenseRepository.sumByUserAndMonth(userId, 2026, 6)).thenReturn(new BigDecimal("1000"));
 
             DashboardResponse response = service.getDashboard(userId, 2026, 6);
 
