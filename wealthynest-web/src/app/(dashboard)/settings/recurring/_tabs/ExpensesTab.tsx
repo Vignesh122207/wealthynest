@@ -3,6 +3,7 @@
 import {useEffect, useState} from "react";
 import {Check, Plus, Receipt, RefreshCw} from "lucide-react";
 import {cn} from "@/lib/utils";
+import {todayLocalISO} from "@/lib/date";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
 import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
@@ -59,7 +60,7 @@ function RuleFormModal({
   const [accountId,   setAccountId]   = useState(initial?.accountId  ?? cashAccounts[0]?.id ?? bankAccounts[0]?.id ?? creditAccounts[0]?.id ?? "");
   const [amount,      setAmount]      = useState(initial?.amount?.toString() ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
-  const [expenseDate, setExpenseDate] = useState(initial?.expenseDate ?? new Date().toISOString().split("T")[0]);
+  const [expenseDate, setExpenseDate] = useState(initial?.expenseDate ?? todayLocalISO());
   const [rule,        setRule]        = useState(initial?.recurrenceRule ?? "MONTHLY");
 
   const isEdit = !!initial?.id;

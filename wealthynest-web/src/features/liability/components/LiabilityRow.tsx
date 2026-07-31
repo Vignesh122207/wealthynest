@@ -5,6 +5,7 @@ import {badgeTextColor, PremiumIcon} from "@/components/icons/PremiumIcon";
 import {getLiabilityTypeMeta, typeLabel} from "@/lib/netWorthTypeMeta";
 import {LIABILITY_TYPES} from "@/lib/constants";
 import {cn, formatDate} from "@/lib/utils";
+import {todayLocalISO} from "@/lib/date";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {useIsDark} from "@/hooks/useIsDark";
 import type {Liability} from "../types/liability.types";
@@ -23,7 +24,7 @@ export function LiabilityRow({ liability, onEdit }: {
   const meta  = getLiabilityTypeMeta(liability.liabilityType);
   const pct   = paidPct(liability.outstandingAmount, liability.principalAmount);
   // Compare date strings directly to avoid timezone-midnight false-positives
-  const todayStr  = new Date().toISOString().split("T")[0];
+  const todayStr  = todayLocalISO();
   const isOverdue = !!(liability.endDate && liability.endDate < todayStr);
 
   const content = (

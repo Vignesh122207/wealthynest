@@ -24,6 +24,7 @@ import {useDebts} from "@/features/debts/hooks/useDebts";
 import {useAuthStore} from "@/features/auth/store/auth.store";
 import {useChartTheme} from "@/hooks/useChartTheme";
 import {pctChange} from "@/lib/utils";
+import {toLocalISODate} from "@/lib/date";
 import {buildUsageCounts, sortByUsage} from "@/lib/mostUsed";
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -186,9 +187,9 @@ export default function DashboardPage() {
     );
   };
 
-  const todayStr = now.toISOString().split("T")[0];
+  const todayStr = toLocalISODate(now);
   const next7    = new Date(now); next7.setDate(now.getDate() + 7);
-  const next7Str = next7.toISOString().split("T")[0];
+  const next7Str = toLocalISODate(next7);
   const { data: recurringPage } = useExpenses({ recurring: true, startDate: todayStr, endDate: next7Str, size: 10 });
   const upcomingBills = recurringPage?.data ?? [];
 

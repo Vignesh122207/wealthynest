@@ -12,6 +12,7 @@ import {FormModalHeader} from "@/components/transactions/FormModalHeader";
 import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
 import {BigAmountInput} from "@/components/transactions/BigAmountInput";
 import {cn} from "@/lib/utils";
+import {todayLocalISO} from "@/lib/date";
 import {type DebtFormValues, debtSchema} from "@/features/debts/schemas/debt.schema";
 import type {DebtRecord, DebtType} from "@/features/debts/types/debt.types";
 
@@ -26,7 +27,7 @@ export function DebtFormModal({ initial, defaultType, accounts, onSave, onDelete
   onClose:      () => void;
   saving:       boolean;
 }) {
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayLocalISO();
   const isEdit = !!initial?.id;
   const [type,      setType]      = useState<DebtType>(initial?.type ?? defaultType ?? "LENT");
   const [accountId, setAccountId] = useState(initial?.accountId ?? "");

@@ -6,6 +6,7 @@ import {Controller, useForm} from "react-hook-form";
 import {zodResolver} from "@hookform/resolvers/zod";
 import {z} from "zod";
 import {cn} from "@/lib/utils";
+import {todayLocalISO} from "@/lib/date";
 import {FormInput} from "@/components/forms/FormInput";
 import {FormDatePicker} from "@/components/forms/FormDatePicker";
 import {incomeSchema} from "@/features/income/schemas/income.schema";
@@ -77,7 +78,7 @@ export function IncomeForm({ onSubmit, onCancel, onDelete, isPending, accounts, 
     resolver: zodResolver(incomeFormSchema),
     // Defaults to whichever source you logged most recently (or most often, absent that) —
     // Salary only kicks in as a last resort, since it's the one source most people do have.
-    defaultValues: { incomeDate: new Date().toISOString().split("T")[0], source: defaultSource, ...defaultValues },
+    defaultValues: { incomeDate: todayLocalISO(), source: defaultSource, ...defaultValues },
   });
   // Deposits can't go to a credit card — split the rest by type so AccountPicker gets its icons right.
   const depositCash = accounts.filter(a => a.accountType === "CASH_WALLET");

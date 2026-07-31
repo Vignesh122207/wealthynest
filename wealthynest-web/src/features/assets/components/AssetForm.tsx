@@ -12,6 +12,7 @@ import {FormModalHeader} from "@/components/transactions/FormModalHeader";
 import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
 import {BigAmountInput} from "@/components/transactions/BigAmountInput";
 import {ASSET_TYPES} from "@/lib/constants";
+import {todayLocalISO} from "@/lib/date";
 import {type AssetFormValues, assetSchema} from "../schemas/asset.schema";
 
 export function AssetForm({ title, defaultValues, onSubmit, onCancel, onDelete, isPending }: {
@@ -24,7 +25,7 @@ export function AssetForm({ title, defaultValues, onSubmit, onCancel, onDelete, 
 }) {
   const form = useForm<AssetFormValues>({
     resolver: zodResolver(assetSchema),
-    defaultValues: { asOfDate: new Date().toISOString().split("T")[0], ...defaultValues },
+    defaultValues: { asOfDate: todayLocalISO(), ...defaultValues },
   });
 
   return (

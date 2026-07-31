@@ -7,6 +7,7 @@ import {z} from "zod";
 import {FormInput} from "@/components/forms/FormInput";
 import {FormDatePicker} from "@/components/forms/FormDatePicker";
 import type {AccountTransfer} from "@/features/accounts/types/account.types";
+import {todayLocalISO} from "@/lib/date";
 import {AccountPicker} from "./AccountPicker";
 import {BigAmountInput} from "./BigAmountInput";
 import {FormModalHeader} from "./FormModalHeader";
@@ -37,7 +38,7 @@ export function TransferFormModal({ onSubmit, onCancel, onDelete, isPending, acc
   defaultFromAccountId?: string;
   defaultToAccountId?:   string;
 }) {
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayLocalISO();
   const form = useForm<TransferFormValues>({
     resolver: zodResolver(transferFormSchema),
     defaultValues: {
