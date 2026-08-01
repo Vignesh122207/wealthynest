@@ -6,9 +6,9 @@ import {PremiumIcon} from "@/components/icons/PremiumIcon";
 
 export const metadata: Metadata = { title: "Delete Your Account" };
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ id, title, children }: { id?: string; title: string; children: React.ReactNode }) {
   return (
-    <section className="space-y-3">
+    <section id={id} className="space-y-3 scroll-mt-16">
       <h2 className="text-base font-semibold text-foreground">{title}</h2>
       <div className="text-sm text-muted-foreground leading-relaxed space-y-2">{children}</div>
     </section>
@@ -52,6 +52,20 @@ export default function DeleteAccountPage() {
               <li>Your data (expenses, budgets, investments, family associations) is retained but no longer accessible to you or visible to family members</li>
               <li>Data is not shown to, or usable by, anyone else after closure</li>
             </ul>
+          </Section>
+
+          <Section id="delete-some-data" title="Deleting some of your data without closing your account">
+            <p>
+              You don&apos;t need to close your account to delete individual pieces of data. Any
+              expense, income entry, budget, goal, debt, investment, or asset can be deleted
+              directly from the app at any time — open the item and use its own Delete option.
+              This works regardless of whether you ever close your account.
+            </p>
+            <p>
+              Unlike closing your account (which deactivates and retains your data until an
+              erasure request — see below), deleting an individual item is immediate and
+              permanent: it&apos;s removed from our database right away, not just hidden.
+            </p>
           </Section>
 
           <Section title="Requesting permanent erasure">
@@ -115,8 +129,8 @@ export default function DeleteAccountPage() {
           </section>
 
           <p className="text-xs text-muted-foreground">
-            See also our <Link href="/privacy" className="text-[#c2703d] hover:underline">Privacy Policy</Link> for
-            what data we collect and how it&apos;s used before deletion.
+            See also our <Link href="/privacy" className="text-[#c2703d] hover:underline">Privacy Policy</Link>{" "}
+            for what data we collect and how it&apos;s used before deletion.
           </p>
 
         </div>
