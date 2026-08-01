@@ -389,7 +389,7 @@ const tabCounts = useMemo(() => investments.reduce((acc, i) => {
                   {[{ label: "24K (999)", val: goldPriceInfo.price24k }, { label: "22K (916)", val: goldPriceInfo.price22k }, { label: "18K (750)", val: goldPriceInfo.price18k }].map(({ label, val }) => (
                     <div key={label} className="text-center">
                       <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{label}</p>
-                      <p className="text-sm font-bold text-amber-600 dark:text-amber-400 tabular-nums">
+                      <p className="text-xs sm:text-sm font-bold text-amber-600 dark:text-amber-400 tabular-nums break-words">
                         {val ? `${formatCurrency(Number(val))}/g` : "—"}
                       </p>
                     </div>

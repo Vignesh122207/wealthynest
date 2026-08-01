@@ -26,3 +26,18 @@ export const ROUTES = {
   vault:               "/vault",
   admin:              "/admin",
 } as const;
+
+/** Every authenticated dashboard route worth a breakpoint/horizontal-overflow check, as a plain
+ * array for the responsive suites' `for (const route of ...)` loops. Excludes login/signup/
+ * forgotPassword (pre-auth, don't share DashboardLayout's chrome — see responsive.spec.ts's own
+ * login/signup check instead) and admin (role-gated; a non-admin regressionUser gets redirected to
+ * /home before ever reaching the real admin page — see admin.spec.ts for that page's own
+ * coverage). Shared by responsive.spec.ts/tablet.spec.ts/tablet-portrait.spec.ts/
+ * narrow-desktop.spec.ts so all four breakpoints check the same full page set instead of each
+ * hand-maintaining its own partial list. */
+export const DASHBOARD_ROUTES: readonly string[] = [
+  ROUTES.home, ROUTES.accounts, ROUTES.transactions, ROUTES.budgets, ROUTES.goals, ROUTES.debts,
+  ROUTES.investments, ROUTES.netWorth, ROUTES.analytics, ROUTES.family, ROUTES.reports,
+  ROUTES.notifications, ROUTES.settings, ROUTES.settingsRecurring, ROUTES.settingsSupportContact,
+  ROUTES.settingsSupportFaq, ROUTES.settingsSupportTickets, ROUTES.supportWealthyNest, ROUTES.vault,
+];

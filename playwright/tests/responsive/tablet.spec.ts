@@ -1,6 +1,6 @@
 import {expect, test} from "../../fixtures";
 import {TEST_IDS} from "../../constants/testIds";
-import {ROUTES} from "../../constants/routes";
+import {DASHBOARD_ROUTES, ROUTES} from "../../constants/routes";
 
 // Runs only against --project=tablet (1080x810, landscape iPad-class — see playwright.config.ts's
 // own comment on why this sits *above* Tailwind's default `lg` breakpoint, unlike mobile-chrome's
@@ -28,8 +28,8 @@ test.describe("Responsive (tablet-landscape viewport)", () => {
     await expect(accountsPage.byTestId(TEST_IDS.nav.mobileMenuToggle)).toBeHidden();
   });
 
-  test("key pages have no horizontal overflow at tablet-landscape width @responsive", async ({ accountsPage }) => {
-    for (const route of [ROUTES.home, ROUTES.accounts, ROUTES.transactions, ROUTES.investments]) {
+  test("every dashboard page has no horizontal overflow at tablet-landscape width @responsive", async ({ accountsPage }) => {
+    for (const route of DASHBOARD_ROUTES) {
       await accountsPage.goto(route);
       await accountsPage.expectNoHorizontalOverflow();
     }

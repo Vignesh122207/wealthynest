@@ -25,12 +25,12 @@ export function NetWorthBanner({ summary, loadingSum, nwDelta, nwDeltaPct, debtR
       {loadingSum ? (
         <div className="h-10 w-48 bg-muted/60 rounded-xl animate-pulse mb-2" />
       ) : (
-        <div className="flex items-end gap-3 mb-1">
-          <p className={cn("text-4xl font-bold tabular-nums", nw >= 0 ? "text-foreground" : "text-red-600 dark:text-red-400")}>
+        <div className="flex flex-wrap items-end gap-x-3 gap-y-1 mb-1">
+          <p className={cn("text-3xl sm:text-4xl font-bold tabular-nums break-words", nw >= 0 ? "text-foreground" : "text-red-600 dark:text-red-400")}>
             {fmt(nw)}
           </p>
           {nwDelta != null && nwDeltaPct != null && (
-            <span className={cn("mb-1 text-sm font-semibold tabular-nums",
+            <span className={cn("mb-1 text-sm font-semibold tabular-nums break-words",
               nwDelta >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
               {nwDelta >= 0 ? "+" : ""}{fmtC(nwDelta)} ({nwDeltaPct >= 0 ? "+" : ""}{nwDeltaPct.toFixed(1)}%) vs last month
             </span>

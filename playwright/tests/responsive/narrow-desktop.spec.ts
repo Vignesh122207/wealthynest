@@ -1,6 +1,6 @@
 import {expect, test} from "../../fixtures";
 import {TEST_IDS} from "../../constants/testIds";
-import {ROUTES} from "../../constants/routes";
+import {DASHBOARD_ROUTES, ROUTES} from "../../constants/routes";
 
 // Runs only against --project=narrow-desktop (1152x720, plain desktop UA — see playwright.config.ts's
 // own comment on why this is a non-touch viewport just above `lg`, distinct from both tablet
@@ -27,8 +27,8 @@ test.describe("Responsive (narrow-desktop viewport)", () => {
     await expect(accountsPage.byTestId(TEST_IDS.nav.mobileMenuToggle)).toBeHidden();
   });
 
-  test("key pages have no horizontal overflow at narrow-desktop width @responsive", async ({ accountsPage }) => {
-    for (const route of [ROUTES.home, ROUTES.accounts, ROUTES.transactions, ROUTES.investments]) {
+  test("every dashboard page has no horizontal overflow at narrow-desktop width @responsive", async ({ accountsPage }) => {
+    for (const route of DASHBOARD_ROUTES) {
       await accountsPage.goto(route);
       await accountsPage.expectNoHorizontalOverflow();
     }
