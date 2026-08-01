@@ -91,7 +91,13 @@ write_env_file() {
     # live: an OPTIONS preflight with Origin: https://www.wealthynest.in got a flat 403 with no
     # CORS headers at all while the naked domain was allowed, breaking every real browser request.
     echo "CORS_ORIGINS=https://wealthynest.in,https://www.wealthynest.in"
-    echo "FRONTEND_URL=https://wealthynest.in"
+    # Must be the canonical www host, not the bare domain above (CORS_ORIGINS needs both since a
+    # browser's Origin header varies, but FRONTEND_URL must be singular and correct) - the bare
+    # domain here previously took down the whole app: WebAuthnConfig derives its RP ID/origin from
+    # this value and fails fast at startup if it's the bare, redirecting domain (see that class's
+    # own comment - this is the exact misconfiguration it exists to catch), so every deploy with
+    # the wrong value here crash-loops the backend instead of just breaking WebAuthn silently.
+    echo "FRONTEND_URL=https://www.wealthynest.in"
     echo "RATE_LIMIT_TRUSTED_PROXIES=$(ssm_value rate-limit-trusted-proxies)"
     # GOOGLE_CLIENT_ID / GOOGLE_NATIVE_CLIENT_ID are public (non-secret) OAuth client IDs, not
     # provisioned by CDK — from the OAuth clients already created in Google Cloud Console (see
