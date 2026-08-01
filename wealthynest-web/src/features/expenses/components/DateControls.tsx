@@ -35,7 +35,11 @@ export function DateControls({ dateMode, setDateMode, year, setYear, month, setM
           ))}
         </div>
         {dateMode === "month" && (
-          <>
+          // Grouped (not three loose flex children) so flex-wrap either keeps the whole
+          // prev/label/next unit on one line or wraps it as a block to the next line — it used to
+          // wrap *between* them on narrow phones, stranding the month label on its own row
+          // disconnected from its arrows and making it read as an unrelated stray label.
+          <div className="flex items-center gap-2 shrink-0">
             <button onClick={() => navigateMonth(-1)} aria-label="Previous month"
               className="w-7 h-7 rounded-lg bg-muted/60 border border-border hover:bg-muted flex items-center justify-center transition-all">
               <ChevronLeft className="w-3.5 h-3.5 text-muted-foreground" />
@@ -45,10 +49,10 @@ export function DateControls({ dateMode, setDateMode, year, setYear, month, setM
               className="w-7 h-7 rounded-lg bg-muted/60 border border-border hover:bg-muted flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed">
               <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
             </button>
-          </>
+          </div>
         )}
         {dateMode === "year" && (
-          <>
+          <div className="flex items-center gap-2 shrink-0">
             <button onClick={() => setYear(year - 1)} aria-label="Previous year"
               className="w-7 h-7 rounded-lg bg-muted/60 border border-border hover:bg-muted flex items-center justify-center transition-all">
               <ChevronLeft className="w-3.5 h-3.5 text-muted-foreground" />
@@ -58,7 +62,7 @@ export function DateControls({ dateMode, setDateMode, year, setYear, month, setM
               className="w-7 h-7 rounded-lg bg-muted/60 border border-border hover:bg-muted flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed">
               <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
             </button>
-          </>
+          </div>
         )}
       </div>
       {dateMode === "custom" && (

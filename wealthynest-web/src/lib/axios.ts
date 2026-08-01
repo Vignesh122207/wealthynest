@@ -90,17 +90,29 @@ apiClient.interceptors.response.use(
       original.headers.Authorization = `Bearer ${newAccessToken}`;
       return apiClient(original);
     } catch (refreshError) {
-      // Refresh failed — reject every waiting request and force logout. This path bypasses
-      // useLogout()'s mutation (no server call makes sense — the token that would authorize it is
-      // exactly what just failed to refresh), so it has to clear the app-lock "went hidden at"
-      // marker itself too, same as that hook's onSettled does — otherwise a stale marker left over
-      // from *this* session lingers in localStorage and immediately re-locks (and can auto-fire a
-      // passkey prompt) the moment the user's *next* fresh login lands on the dashboard, even
-      // though they just proved who they are.
+      // Reject every waiting request either way, but only force logout when the refresh call
+      // itself came back 401 — that's the one case that actually means the refresh token is dead
+      // (rotated/revoked/expired). Anything else (429 rate-limited, a network blip, a 5xx) is
+      // transient and says nothing about whether the token is still good: confirmed happening in
+      // practice when several page loads in quick succession (a flaky reconnect, rapid app
+      // foreground/background — each cold load's first request races the auth store's own
+      // rehydration and 401s once, triggering its own refresh call) burn through /auth/refresh's
+      // 10 req/min limit and the N+1th call gets 429'd — that used to nuke a perfectly valid
+      // session. Leaving it alone here means the next request's own 401 just retries the refresh
+      // normally instead.
       processQueue(refreshError, null);
-      useAuthStore.getState().logout();
-      clearPersistedHiddenAt();
-      if (typeof window !== "undefined") window.location.href = "/login";
+      const isRefreshTokenInvalid = (refreshError as AxiosError)?.response?.status === 401;
+      if (isRefreshTokenInvalid) {
+        // This path bypasses useLogout()'s mutation (no server call makes sense — the token that
+        // would authorize it is exactly what just failed to refresh), so it has to clear the
+        // app-lock "went hidden at" marker itself too, same as that hook's onSettled does —
+        // otherwise a stale marker left over from *this* session lingers in localStorage and
+        // immediately re-locks (and can auto-fire a passkey prompt) the moment the user's *next*
+        // fresh login lands on the dashboard, even though they just proved who they are.
+        useAuthStore.getState().logout();
+        clearPersistedHiddenAt();
+        if (typeof window !== "undefined") window.location.href = "/login";
+      }
       return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;

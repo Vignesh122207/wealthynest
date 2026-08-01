@@ -16,7 +16,8 @@ import { toast } from "sonner";
 import type { User, AuthResponse } from "../types/auth.types";
 
 const pushMock = vi.fn();
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: pushMock }) }));
+const replaceMock = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: pushMock, replace: replaceMock }) }));
 vi.mock("../api/auth.api", () => ({
   authApi: {
     login: vi.fn(), register: vi.fn(), logout: vi.fn(), verifyEmail: vi.fn(),
@@ -63,7 +64,9 @@ describe("useLogin", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(clearSpy).toHaveBeenCalled();
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
-    expect(pushMock).toHaveBeenCalledWith("/home");
+    // replace, not push — /login must not stay reachable via Android's hardware back button once
+    // authenticated. See useLogin's own comment for the real bug this prevents.
+    expect(replaceMock).toHaveBeenCalledWith("/home");
   });
 
   // A fresh, successful login must never immediately re-trigger the app-lock screen because of a
@@ -369,7 +372,7 @@ describe("usePinLogin", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
-    expect(pushMock).toHaveBeenCalledWith("/home");
+    expect(replaceMock).toHaveBeenCalledWith("/home");
   });
 
   it("clears both the stale 'went hidden at' marker and a stale isLocked flag on success", async () => {
@@ -424,6 +427,7 @@ describe("useUnlockWithPin", () => {
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
     expect(clearSpy).not.toHaveBeenCalled();
     expect(pushMock).not.toHaveBeenCalled();
+    expect(replaceMock).not.toHaveBeenCalled();
   });
 
   it("shows 'Incorrect PIN' fallback on failure", async () => {
@@ -455,6 +459,7 @@ describe("useUnlockWithPasskey", () => {
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
     expect(clearSpy).not.toHaveBeenCalled();
     expect(pushMock).not.toHaveBeenCalled();
+    expect(replaceMock).not.toHaveBeenCalled();
   });
 
   it("silently does nothing when the user cancels the browser prompt", async () => {
@@ -601,6 +606,9 @@ describe("useGoogleLogin", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
     expect(toast.success).not.toHaveBeenCalled();
+    // replace, not push — see useLogin's own comment for the Android back-button bug this
+    // prevents; useGoogleAuthOnSuccess is shared by every Google sign-in path.
+    expect(replaceMock).toHaveBeenCalledWith("/home");
   });
 
   it("clears both the stale 'went hidden at' marker and a stale isLocked flag on success", async () => {
@@ -629,6 +637,7 @@ describe("useGoogleLoginPopup", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
     expect(toast.success).not.toHaveBeenCalled();
+    expect(replaceMock).toHaveBeenCalledWith("/home");
   });
 
   it("shows the backend's error message on failure", async () => {

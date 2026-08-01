@@ -8,6 +8,7 @@ import {queryClient} from "@/lib/queryClient";
 import {registerServiceWorker} from "@/lib/serviceWorker";
 import {syncNativeStatusBar} from "@/lib/nativeStatusBar";
 import {useDeepLinkRouting} from "@/features/auth/hooks/useDeepLinkRouting";
+import {useHardwareBackButton} from "@/features/auth/hooks/useHardwareBackButton";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const { resolvedTheme } = useTheme();
@@ -15,6 +16,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
   // Root-level (not the dashboard layout) — verify-email/reset-password links land on the
   // logged-out (auth) route group, so this has to be live before any auth state is known.
   useDeepLinkRouting();
+  // Same reasoning — the hardware back button needs to work on /login just as much as inside the
+  // dashboard, so this can't be scoped to DashboardLayout either.
+  useHardwareBackButton();
 
   useEffect(() => {
     registerServiceWorker();

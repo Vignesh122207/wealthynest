@@ -51,10 +51,14 @@ export function TransfersTabContent({
         {transfersLoading ? <TableRowSkeleton rows={4} /> : transfersError ? (
           <QueryErrorState onRetry={() => onRetryTransfers?.()} description="Couldn't load your transfers. Check your connection and try again." />
         ) : searchedTransfers.length === 0 ? (
-          <EmptyState icon={ArrowLeftRight} title={!hasTwoAccounts ? "Need at least 2 accounts" : "No transfers this period"}
-            description={!hasTwoAccounts ? "Transfers move money between two of your own accounts — add another account first." : "Move money between your accounts."}
+          <EmptyState icon={ArrowLeftRight}
+            title={!hasTwoAccounts ? "Need at least 2 accounts" : chips.length > 0 ? "No transfers match your filters" : "No transfers this period"}
+            description={!hasTwoAccounts ? "Transfers move money between two of your own accounts — add another account first."
+              : chips.length > 0 ? "Try clearing the filters to see everything again." : "Move money between your accounts."}
             action={
               !hasTwoAccounts ? addAccountCta
+                : chips.length > 0
+                ? <button onClick={() => chips.forEach(c => c.clear())} className="text-sm text-indigo-500 hover:text-indigo-600 font-medium transition-colors">Clear filters</button>
                 : <button onClick={onAddTransfer}
                 className="flex items-center gap-2 bg-gradient-to-br from-indigo-600 to-indigo-500 shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 hover:-translate-y-0.5 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
                 <Plus className="w-4 h-4" /> New Transfer

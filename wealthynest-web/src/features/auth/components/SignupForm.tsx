@@ -1,9 +1,10 @@
 "use client";
 
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {useForm, useWatch} from "react-hook-form";
 import {zodResolver} from "@hookform/resolvers/zod";
 import Link from "next/link";
+import {useRouter} from "next/navigation";
 import {ArrowLeft, Check, Eye, EyeOff, IndianRupee, Loader2, Mail, ShieldCheck, Target, Wallet, X} from "lucide-react";
 import {BrandMark} from "@/components/icons/BrandMark";
 import {GoogleSignInButton, isGoogleSignInConfigured} from "./GoogleSignInButton";
@@ -11,6 +12,7 @@ import {AuthBrandPanel} from "./AuthBrandPanel";
 import {AuthCard} from "./AuthCard";
 import {type RegisterFormValues, registerSchema} from "../schemas/auth.schema";
 import {useRegister} from "../hooks/useAuth";
+import {useAuthStore} from "../store/auth.store";
 import {cn} from "@/lib/utils";
 
 const googleClientIdConfigured = isGoogleSignInConfigured();
@@ -106,7 +108,16 @@ export function SignupForm() {
   const [showEmailStep, setShowEmailStep] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm]   = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const { mutate: register, isPending } = useRegister();
+  const router = useRouter();
+
+  // Same guard as LoginForm's own — see its comment for the full why. Reached directly (a
+  // bookmarked/typed /signup URL) rather than via a logged-out entry point.
+  useEffect(() => {
+    if (useAuthStore.getState().isAuthenticated) { router.replace("/home"); return; }
+    setHydrated(true);
+  }, [router]);
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -120,6 +131,8 @@ export function SignupForm() {
     { name: "fullName", label: "Full name", placeholder: "Your full name", autoComplete: "name" },
     { name: "email",    label: "Email",     type: "email", placeholder: "you@example.com", autoComplete: "email" },
   ];
+
+  if (!hydrated) return null;
 
   return (
     // Locked to the viewport height on mobile (where AuthBrandPanel is hidden and this is the

@@ -4,6 +4,7 @@ import {useEffect, useState} from "react";
 import {useForm, type UseFormReturn} from "react-hook-form";
 import {zodResolver} from "@hookform/resolvers/zod";
 import Link from "next/link";
+import {useRouter} from "next/navigation";
 import {
     AlertTriangle,
     ArrowLeft,
@@ -256,12 +257,20 @@ export function LoginForm() {
   const [pinCandidate, setPinCandidate] = useState<{ eligible: boolean; name: string } | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const { mutate: login, isPending } = useLogin();
+  const router = useRouter();
 
+  // Reached directly (a bookmarked/typed /login URL, or a stale link) rather than via the normal
+  // logged-out entry points — the hardware-back-button fix (useHardwareBackButton) and the
+  // replace-not-push fix on every login success (see useLogin's own comment) both stop /login from
+  // being reachable through in-app navigation once authenticated, but neither covers a fresh full
+  // navigation to the URL itself. hydrated never flips true on this branch, so the render below
+  // stays gated on it exactly like DashboardLayout's own mirror-image guard the other direction.
   useEffect(() => {
-    const { user } = useAuthStore.getState();
+    const { user, isAuthenticated } = useAuthStore.getState();
+    if (isAuthenticated) { router.replace("/home"); return; }
     setPinCandidate({ eligible: !!user?.pinEnabled, name: user?.fullName ?? "" });
     setHydrated(true);
-  }, []);
+  }, [router]);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -283,6 +292,8 @@ export function LoginForm() {
       },
     });
   };
+
+  if (!hydrated) return null;
 
   return (
     // Locked to the viewport height on mobile (where AuthBrandPanel is hidden and this is the

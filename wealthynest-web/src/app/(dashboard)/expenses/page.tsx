@@ -549,10 +549,16 @@ export default function TransactionsPage() {
     );
   };
 
-  // Expense filter helpers
+  // Filter helpers — resets every filter across every tab (not just the active one), since
+  // FilterPanel's own "Clear all" isn't scoped to whichever tab happened to be open when it was
+  // clicked. Used to only reset the expense-side filters (payChannel/categoryId/amount/sortKey/
+  // recurringOnly) — income/transferSort and the transfers-only account selection silently
+  // survived a "Clear all", so income/transfer sort and selected accounts stuck around, exactly
+  // the "clear filter" inconsistency across tabs this now closes.
   const clearAllFilters = () => {
     setPayChannel(""); setCategoryId(""); setMinAmount(""); setMaxAmount("");
     setSortKey("date-desc"); setDateMode("month"); setRecurringOnly(false);
+    setIncomeSort("newest"); setTransferSort("newest"); setSelectedAccountIds([]);
     setYear(now.getFullYear()); setMonth(now.getMonth() + 1);
     setCustomStart(""); setCustomEnd(""); setListPage(0);
   };
@@ -575,11 +581,6 @@ export default function TransactionsPage() {
 
   useEffect(() => { setAllPage(0); },
     [txType, dateMode, year, month, customStart, customEnd, debouncedSearch, categoryId, payChannel, minAmount, maxAmount, recurringOnly]);
-
-  const activeFilterCount = [
-    payChannel !== "", categoryId !== "", minAmount !== "" || maxAmount !== "",
-    sortKey !== "date-desc", dateMode !== "month", recurringOnly,
-  ].filter(Boolean).length;
 
   const expenses      = expenseData?.data ?? [];
   const serverTotal   = expenseData?.meta?.totalElements ?? 0;
@@ -653,10 +654,31 @@ export default function TransactionsPage() {
     transferChips.push({ label: `${selectedAccountIds.length} account${selectedAccountIds.length > 1 ? "s" : ""}`, clear: () => setSelectedAccountIds([]) });
   }
 
+  // Mirrors expenseChips' own non-default-sort chip above — without these, changing Income/
+  // Transfers' own sort (FilterPanel's SortPills for those tabs) had no visible chip and no way to
+  // tell or clear it short of reopening the filter panel.
+  const sortLabels = { oldest: "Oldest first", high: "Highest first", low: "Lowest first" } as Record<string, string>;
+  const incomeSortChips: { label: string; clear: () => void }[] = [];
+  if (incomeSort !== "newest") incomeSortChips.push({ label: sortLabels[incomeSort], clear: () => setIncomeSort("newest") });
+  const transferSortChips: { label: string; clear: () => void }[] = [];
+  if (transferSort !== "newest") transferSortChips.push({ label: sortLabels[transferSort], clear: () => setTransferSort("newest") });
+
   const chips           = [...expenseChips, ...dateChips];
-  const incomeTabChips   = dateChips;
-  const transferTabChips = [...transferChips, ...dateChips];
+  const incomeTabChips   = [...incomeSortChips, ...dateChips];
+  const transferTabChips = [...transferChips, ...transferSortChips, ...dateChips];
   const allTabChips      = [...expenseChips, ...dateChips];
+
+  // Drives the Toolbar filter-icon badge and FilterPanel's own "Clear all" visibility — scoped to
+  // whichever tab is active so it matches what that tab's own chip row actually shows (used to be
+  // one global count off the expense-only filter fields, which both over-counted on Income/
+  // Transfers — a stale category/channel from a previous Expenses-tab visit still counted even
+  // though FilterPanel hides those sections there — and under-counted a non-default income/
+  // transfer sort or a transfers account selection, which never factored in at all).
+  const activeFilterCount =
+    txType === "income"    ? incomeTabChips.length
+    : txType === "transfers" ? transferTabChips.length
+    : txType === "all"       ? allTabChips.length
+    : chips.length;
 
   // Smart default for a new expense's category: whichever category you used most recently;
   // if you've never logged one, fall back to whichever you use most often overall. Only

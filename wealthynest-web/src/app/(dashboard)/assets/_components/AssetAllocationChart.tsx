@@ -31,9 +31,12 @@ export function AssetAllocationChart({ summary, pieData, chart, fmt }: {
           <p className="text-sm text-muted-foreground/80">No assets tracked yet</p>
         </div>
       ) : (
-        <div className="flex items-start gap-5">
-          {/* Donut */}
-          <div className="relative shrink-0" style={{ width: 180, height: 180 }}>
+        <div className="flex flex-col sm:flex-row sm:items-start gap-5">
+          {/* Donut — its 180px width is fixed (never shrinks), so below `sm` this stacks above
+              the legend (mx-auto centers it there) instead of squeezing the legend into whatever
+              width is left beside it, which on narrow phones pushed the legend's amount column
+              wider than its box and forced the whole page to scroll horizontally. */}
+          <div className="relative shrink-0 mx-auto sm:mx-0" style={{ width: 180, height: 180 }}>
             <ResponsiveContainer width="100%" height="100%">
               <RechartsPie>
                 <Pie data={pieData} cx="50%" cy="50%" innerRadius={52} outerRadius={82}

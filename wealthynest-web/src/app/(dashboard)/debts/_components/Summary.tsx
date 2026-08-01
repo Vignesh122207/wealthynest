@@ -14,7 +14,7 @@ export function Summary({ debts }: { debts: DebtRecord[] }) {
   const net       = lentAmt - borrowAmt;
 
   return (
-    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
       <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-3 sm:p-4">
         <div className="flex items-center gap-1.5 mb-2">
           <PremiumIcon icon={ArrowUpRight} tone="emerald" size="xs" className="rounded-md" />

@@ -10,6 +10,21 @@ test.describe("Auth — Session handling", () => {
     await expect(page).toHaveURL(new RegExp(`${ROUTES.login}$`));
   });
 
+  // Regression coverage for a real bug: /login and /signup had no guard against an already-
+  // authenticated visitor at all — the hardware-back-button fix and the replace-not-push fix on
+  // every login success (see wealthynest-web's useHardwareBackButton/useLogin) both stop /login
+  // from being reachable through in-app navigation once authenticated, but neither covers a fresh
+  // full navigation straight to the URL (a bookmark, a typed address, a stale link). Confirmed
+  // live against a running stack before this fix: an authenticated visitor to /login just saw the
+  // login form again instead of landing on /home.
+  test("visiting /login or /signup while already authenticated redirects to /home @smoke", async ({ authenticatedPage }) => {
+    await authenticatedPage.goto(ROUTES.login);
+    await expect(authenticatedPage).toHaveURL(new RegExp(`${ROUTES.home}$`));
+
+    await authenticatedPage.goto(ROUTES.signup);
+    await expect(authenticatedPage).toHaveURL(new RegExp(`${ROUTES.home}$`));
+  });
+
   test("a corrupted access token forces a redirect back to /login on the next API call", async ({ browser }) => {
     const context = await browser.newContext();
     await context.addInitScript(() => {

@@ -1,5 +1,6 @@
 import {expect, type Locator, type Page} from "@playwright/test";
 import {toastLocator} from "../helpers/wait.helper";
+import {expectNoHorizontalOverflow} from "../helpers/viewport.helper";
 import {TEST_IDS} from "../constants/testIds";
 
 /** Shared behavior every dashboard page object needs — nav, header title, toast assertions. */
@@ -73,10 +74,6 @@ export class BasePage {
   /** A page whose content overflows its viewport horizontally forces the whole app into
    * side-scroll on narrow screens — the most common "not actually responsive" symptom. */
   async expectNoHorizontalOverflow(): Promise<void> {
-    const { scrollWidth, clientWidth } = await this.page.evaluate(() => ({
-      scrollWidth: document.documentElement.scrollWidth,
-      clientWidth: document.documentElement.clientWidth,
-    }));
-    expect(scrollWidth, "page overflows horizontally at the current viewport width").toBeLessThanOrEqual(clientWidth + 1);
+    await expectNoHorizontalOverflow(this.page);
   }
 }
