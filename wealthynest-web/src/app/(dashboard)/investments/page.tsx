@@ -136,6 +136,17 @@ export default function InvestmentsPage() {
     });
   }, [investments, tab, sortKey]);
 
+  // Stocks-only search on top of the tab/sort-filtered list — split out so both the "N holdings"
+  // count and the empty-state check below reflect the actual search-narrowed result instead of the
+  // pre-search `filtered.length` (which used to leave "N holdings" showing the wrong count, and the
+  // grid silently rendering nothing at all with no explanation when a search matched zero stocks).
+  const visibleInvestments = useMemo(() => {
+    if (tab !== "stocks" || !stockSearch) return filtered;
+    const q = stockSearch.toLowerCase();
+    return filtered.filter(inv =>
+      (inv.companyName ?? "").toLowerCase().includes(q) || (inv.symbol ?? "").toLowerCase().includes(q));
+  }, [filtered, tab, stockSearch]);
+
   const buildPayload = useCallback((rawValues: AnyInvestmentFormValues, currentTab: TabId): CreateInvestmentPayload => {
     if (currentTab === "stocks") {
       const values = rawValues as StockSubmitValues;
@@ -415,21 +426,24 @@ const tabCounts = useMemo(() => investments.reduce((acc, i) => {
               </div>
             )}
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs text-muted-foreground/80">{filtered.length} holding{filtered.length !== 1 ? "s" : ""}</p>
+              <p className="text-xs text-muted-foreground/80">{visibleInvestments.length} holding{visibleInvestments.length !== 1 ? "s" : ""}</p>
               <select value={sortKey} onChange={e => setSortKey(e.target.value as SortKey)}
                 className="h-8 px-2 rounded-xl bg-muted/60 border border-border text-xs text-foreground focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/40">
                 {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
+            {visibleInvestments.length === 0 ? (
+              <EmptyState icon={Search} title="No holdings match your search"
+                description={`Nothing matches "${stockSearch}". Try a different name or symbol.`}
+                action={
+                  <button onClick={() => setStockSearch("")}
+                    className="text-sm text-indigo-500 hover:text-indigo-600 font-medium transition-colors">
+                    Clear search
+                  </button>
+                } />
+            ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-              {(tab === "stocks" && stockSearch
-                ? filtered.filter(inv => {
-                    const q = stockSearch.toLowerCase();
-                    return (inv.companyName ?? "").toLowerCase().includes(q)
-                        || (inv.symbol ?? "").toLowerCase().includes(q);
-                  })
-                : filtered
-              ).map(inv => (
+              {visibleInvestments.map(inv => (
                 <InvestmentCard key={inv.id} inv={inv}
                   onEdit={() => { setTab(switchToTab(inv)); setEditItem(inv); setShowForm(true); }}
                   bankAccounts={bankAccounts} investmentAccounts={investmentAccounts}
@@ -442,6 +456,7 @@ const tabCounts = useMemo(() => investments.reduce((acc, i) => {
                   } />
               ))}
             </div>
+            )}
           </div>
         )}
         </div>
