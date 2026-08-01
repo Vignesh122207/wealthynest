@@ -4,6 +4,7 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.view.WindowManager;
+import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
 import androidx.core.splashscreen.SplashScreen;
 import com.getcapacitor.BridgeActivity;
@@ -99,5 +100,20 @@ public class MainActivity extends BridgeActivity {
             .edit()
             .putLong(KEY_BACKGROUNDED_AT_MS, System.currentTimeMillis())
             .commit();
+
+        // Android's WebView CookieManager batches writes to its persistent store on its own
+        // internal schedule — it does NOT guarantee a cookie is on disk just because
+        // Set-Cookie was processed, and there is no lifecycle callback that flushes it
+        // automatically (this is the documented reason CookieManager.flush() exists at all).
+        // wn_refresh_token (RefreshCookieService, backend) is httpOnly — it's the ONLY thing
+        // that makes a session survive a cold start, and it lives entirely in this cookie jar,
+        // not in the JS-visible localStorage the rest of the app's auth state persists to. The
+        // reported bug this fixes ("still asking me login, but only the very first time"):
+        // sign in, close the app quickly enough that the OS kills the process before
+        // CookieManager's own internal flush timer has ever fired once, and the just-set
+        // refresh cookie never reaches disk — every login after the first has had that timer
+        // already primed at least once, which is why it reads as a one-time-only bug rather
+        // than an every-time one.
+        CookieManager.getInstance().flush();
     }
 }

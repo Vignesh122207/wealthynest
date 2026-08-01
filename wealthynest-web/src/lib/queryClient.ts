@@ -12,10 +12,14 @@ export const queryClient = new QueryClient({
     onError: (error, query) => {
       const status = (error as { response?: { status: number } })?.response?.status;
       if (status === 401) return;
-      // Stable id per query key so a query that's retrying/refetching replaces its own toast
-      // instead of stacking a new one on top each time.
+      // A real network failure (offline/DNS/timeout — axios never got a response) hits every
+      // in-flight query on the page at once; those all collapse onto one fixed id so an outage
+      // shows a single toast instead of one per query. Server-side errors (4xx/5xx) keep a
+      // per-query-key id so a query that's retrying/refetching replaces its own toast instead of
+      // stacking, while distinct resources still surface distinct errors.
+      const isNetworkError = !(error as { response?: unknown })?.response;
       toast.error(apiErrorMessage(error, "Couldn't load this — check your connection"), {
-        id: `query-error-${query.queryHash}`,
+        id: isNetworkError ? "query-error-offline" : `query-error-${query.queryHash}`,
       });
     },
   }),

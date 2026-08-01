@@ -748,6 +748,15 @@ public class AuthServiceImpl implements AuthService {
             return created;
         });
 
+        // Promotes an existing LOCAL (password) account too, not just the new-account branch above
+        // — Google already proved ownership of this email (the emailVerified check at the top of
+        // this method), which is exactly the same proof the password flow's own verification link
+        // exists to establish. Without this, someone who registered with a password, never clicked
+        // the verification email, and instead signed in with Google was left able to use the app
+        // via Google indefinitely while still carrying emailVerified=false — so the moment they
+        // tried their password on the same account, login() rejected them with EMAIL_NOT_VERIFIED
+        // despite Google sign-in having worked for them the whole time.
+        user.setEmailVerified(true);
         user.setLastLoginAt(Instant.now());
         userRepository.save(user);
         // Also goes through logAfterCommit — for the just-created branch above, `user` is that same

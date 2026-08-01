@@ -41,7 +41,12 @@ export function useLogin() {
       // instead", log back in with that password, and the session you just proved re-shows the
       // very lock screen you signed out to get past. unlock() clears both markers in one call.
       useAppLockStore.getState().unlock();
-      router.push("/home");
+      // replace, not push: this device's WebView history (which Android's hardware back button
+      // navigates through — see useHardwareBackButton) must not keep /login reachable by going
+      // back from /home right after signing in. Real bug this fixes: sign in with Google, press
+      // Android's back button once, and land right back on the login form despite being fully
+      // authenticated — a push here left /login as the previous history entry underneath /home.
+      router.replace("/home");
     },
     // ACCOUNT_LOCKED/RATE_LIMIT_EXCEEDED are rendered as a LockoutBanner with a live countdown at
     // the call site instead — see LoginForm's PasswordLoginStep — so skip the toast there to avoid
@@ -200,7 +205,7 @@ export function usePinLogin() {
       qc.clear();
       setAuth(data.user, data.accessToken);
       useAppLockStore.getState().unlock(); // see useLogin's own comment for why
-      router.push("/home");
+      router.replace("/home"); // see useLogin's own comment for why this isn't push
     },
     // PIN_LOCKED/RATE_LIMIT_EXCEEDED render as a LockoutBanner at the call site instead — see
     // deriveLockoutState's own comment on useLogin above for why the toast is skipped there.
@@ -306,7 +311,7 @@ function useGoogleAuthOnSuccess() {
     qc.clear();
     setAuth(data.user, data.accessToken);
     useAppLockStore.getState().unlock(); // see useLogin's own comment for why
-    router.push("/home");
+    router.replace("/home"); // see useLogin's own comment for why this isn't push
   };
 }
 

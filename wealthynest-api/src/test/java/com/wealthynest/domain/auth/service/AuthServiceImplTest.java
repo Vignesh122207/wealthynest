@@ -872,6 +872,27 @@ class AuthServiceImplTest {
             verify(emailService).sendNewSignInEmail(eq("alice@example.com"), any(), eq(ip), eq(ua), any());
         }
 
+        // Regression coverage for a real bug: an existing LOCAL account that registered with a
+        // password but never clicked its verification link could still sign in via Google (Google
+        // already proves email ownership independently), yet emailVerified stayed false on the row
+        // — so the same person's next password login was rejected with EMAIL_NOT_VERIFIED despite
+        // Google sign-in having worked for them the whole time. See signInWithGooglePayload's own
+        // comment for the full why.
+        @Test
+        @DisplayName("promotes an existing unverified local account's emailVerified to true")
+        void promotesExistingUnverifiedAccount() throws Exception {
+            when(googleIdTokenValidator.verify("raw-id-token")).thenReturn(payload);
+            when(payload.getEmailVerified()).thenReturn(true);
+            when(payload.getEmail()).thenReturn("alice@example.com");
+            User existing = withId(baseUser().emailVerified(false).build());
+            when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(existing));
+            stubAuthResponseBuilding();
+
+            service.googleLogin(req(), ip, ua, null);
+
+            assertThat(existing.isEmailVerified()).isTrue();
+        }
+
         // Regression coverage for a real bug: signing in again via Google from a device that still
         // held an earlier valid session left that row un-revoked, accumulating as a duplicate
         // "active session" entry every time — see login's own matching test / revokeIfOwnedByUser's
