@@ -33,14 +33,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // then overwrite that more recent update with the stale pre-mutation snapshot it originally
   // fetched — reverting familyId back to null and bouncing the UI back to onboarding right after
   // a successful create. Only apply the result if nothing else has updated the store since.
+  //
+  // Also gated on !isLocked (once lockDecisionReady, so a still-resolving passkey/biometric
+  // decision doesn't let it slip through): this call is a cold-boot 401 into axios.ts's own
+  // refresh-and-retry, same as any other request on a fresh load. Firing it while the lock screen
+  // is up raced PIN/passkey unlock for the same single-use refresh-token cookie — this resync's
+  // own refresh could rotate it moments before pinLogin()/unlockWithPasskey() presented the same
+  // now-already-superseded cookie, which the backend correctly reads as an expired session and
+  // AppLockScreen then shows as "Incorrect PIN" (real bug found via app-lock.spec.ts's own
+  // reload-while-locked test, reproduced 3/3 times before this fix). Nothing meaningful to resync
+  // yet anyway while the user hasn't proven who they are.
   useEffect(() => {
-    if (!hydrated || !isAuthenticated) return;
+    if (!hydrated || !isAuthenticated || !lockDecisionReady || isLocked) return;
     const versionAtRequest = useAuthStore.getState().userVersion;
     authApi.getMe().then((freshUser) => {
       if (useAuthStore.getState().userVersion !== versionAtRequest) return;
       setUser(freshUser);
     }).catch(() => {});
-  }, [hydrated, isAuthenticated, setUser]);
+  }, [hydrated, isAuthenticated, lockDecisionReady, isLocked, setUser]);
 
   useEffect(() => {
     if (hydrated && !isAuthenticated) router.replace("/login");

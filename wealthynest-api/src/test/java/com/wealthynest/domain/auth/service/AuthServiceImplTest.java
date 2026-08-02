@@ -289,16 +289,20 @@ class AuthServiceImplTest {
         }
 
         @Test
-        @DisplayName("reuse shortly after rotation (multi-tab race) rejects the request without revoking the session")
-        void reuseWithinGraceWindowDoesNotEscalate() {
+        @DisplayName("reuse shortly after rotation (multi-tab race) mints a fresh session instead of failing, and never escalates")
+        void reuseWithinGraceWindowMintsFreshSessionInstead() {
             RefreshToken stored = RefreshToken.builder().userId(userId).revoked(true)
-                    .revokedAt(Instant.now().minusMillis(1_000)).expiresAt(Instant.now().plusSeconds(60)).build();
+                    .revokedAt(Instant.now().minusMillis(1_000)).expiresAt(Instant.now().plusSeconds(60)).rememberMe(true).build();
             when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(stored));
+            when(userRepository.findById(userId)).thenReturn(Optional.of(withId(baseUser().build())));
+            stubAuthResponseBuilding();
 
-            assertThatThrownBy(() -> service.refresh("t", ip, ua)).isInstanceOf(BusinessException.class);
+            AuthResponse response = service.refresh("t", ip, ua);
 
+            assertThat(response.getAccessToken()).isEqualTo("access-token");
             verify(refreshTokenRepository, never()).revokeAllByUserId(any());
             verify(tokenRevocationService, never()).revokeAllTokensFor(any());
+            verifyNoInteractions(emailService);
         }
 
         @Test
@@ -729,11 +733,36 @@ class AuthServiceImplTest {
         }
 
         @Test
-        @DisplayName("throws when the backing refresh token has been revoked")
+        @DisplayName("throws when the backing refresh token has been revoked (revokedAt unset — logout/reset/explicit-revoke, not a rotation)")
         void throwsWhenRefreshTokenRevoked() {
             RefreshToken stored = RefreshToken.builder().userId(userId).revoked(true).expiresAt(Instant.now().plusSeconds(60)).build();
             when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(stored));
             assertThatThrownBy(() -> service.pinLogin(req("1234"), "t", ip, ua)).isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("throws when the backing refresh token was rotated away well outside the reuse grace window")
+        void throwsWhenRefreshTokenRotatedLongAgo() {
+            RefreshToken stored = RefreshToken.builder().userId(userId).revoked(true)
+                    .revokedAt(Instant.now().minusSeconds(30)).expiresAt(Instant.now().plusSeconds(60)).build();
+            when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(stored));
+            assertThatThrownBy(() -> service.pinLogin(req("1234"), "t", ip, ua)).isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("a refresh token reused shortly after rotation (the same background-resync race refresh() tolerates) still verifies the PIN instead of failing")
+        void reuseWithinGraceWindowStillVerifiesPin() {
+            RefreshToken stored = RefreshToken.builder().userId(userId).revoked(true)
+                    .revokedAt(Instant.now().minusMillis(1_000)).expiresAt(Instant.now().plusSeconds(60)).rememberMe(true).build();
+            when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(stored));
+            User user = withId(baseUser().pinHash("hash").build());
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(passwordEncoder.matches("1234", "hash")).thenReturn(true);
+            stubAuthResponseBuilding();
+
+            AuthResponse response = service.pinLogin(req("1234"), "t", ip, ua);
+
+            assertThat(response.getAccessToken()).isEqualTo("access-token");
         }
 
         @Test

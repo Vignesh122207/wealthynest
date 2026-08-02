@@ -230,23 +230,42 @@ public class AuthServiceImpl implements AuthService {
         RefreshToken stored = refreshTokenRepository.findByTokenHash(tokenHash)
                 .orElseThrow(() -> new BusinessException("Invalid refresh token", HttpStatus.UNAUTHORIZED, "INVALID_TOKEN"));
         if (stored.isRevoked()) {
-            // Reused after rotation already moved this session on to a newer token. Presented again
-            // within REFRESH_REUSE_GRACE_MS of that rotation, this is almost always the benign
-            // multi-tab race described on that constant — reject just this one request, same as
-            // always. Presented well after, there's no ordinary reason this exact, already-superseded
-            // token would resurface: treat it as the token having been stolen and used alongside the
-            // legitimate device, and revoke the whole session rather than just this one request.
-            // revokedAt is null for every other revocation path (logout, password reset, explicit
-            // session revoke), which this always treats as within grace — those are the user's own
-            // deliberate actions, not a rotation this check needs to police.
+            // Reused after rotation already moved this session on to a newer token. Presented well
+            // after that rotation, there's no ordinary reason this exact, already-superseded token
+            // would resurface: treat it as the token having been stolen and used alongside the
+            // legitimate device, and revoke the whole session.
             if (stored.getRevokedAt() != null
                     && stored.getRevokedAt().isBefore(Instant.now().minusMillis(REFRESH_REUSE_GRACE_MS))) {
                 refreshTokenRepository.revokeAllByUserId(stored.getUserId());
                 tokenRevocationService.revokeAllTokensFor(stored.getUserId());
                 log.warn("Refresh token reuse detected outside rotation grace window — revoking all sessions for user {}", stored.getUserId());
                 auditService.log(stored.getUserId(), "REFRESH_TOKEN_REUSE_DETECTED", "USER", stored.getUserId(), null, null, ipAddress, userAgent);
+                throw new BusinessException("Refresh token expired or revoked", HttpStatus.UNAUTHORIZED, "TOKEN_EXPIRED");
             }
-            throw new BusinessException("Refresh token expired or revoked", HttpStatus.UNAUTHORIZED, "TOKEN_EXPIRED");
+            // revokedAt is null for every other revocation path (logout, password reset, explicit
+            // session revoke) — the user's own deliberate action, which must never be quietly
+            // undone by handing back a working session just because it's presented again soon after.
+            if (stored.getRevokedAt() == null) {
+                throw new BusinessException("Refresh token expired or revoked", HttpStatus.UNAUTHORIZED, "TOKEN_EXPIRED");
+            }
+            // Reused within REFRESH_REUSE_GRACE_MS of its own rotation — this is almost always the
+            // benign multi-tab/background-resync race described on that constant (confirmed live:
+            // wealthynest-web's DashboardLayout fires its own profile resync on every mount, which
+            // 401s-and-refreshes on a cold load same as any other request — a second near-simultaneous
+            // navigation or an in-flight request racing a fresh one can each redeem this same,
+            // about-to-rotate cookie). Rejecting this one request used to force a real logout for a
+            // session that was never actually in danger — this device's *other* request already
+            // rotated it forward a moment ago. Can't hand back that exact successor token (only its
+            // hash is ever persisted — see hashToken's own comment — so the raw value genuinely
+            // doesn't exist to return), so this mints an entirely new, independent session for the
+            // same user instead. That leaves one extra valid-but-unused token sitting alongside
+            // whichever one the browser's own cookie jar ends up keeping — harmless, since each
+            // remains single-use and this device already legitimately holds the account's session
+            // either way; it simply expires unused on its own TTL, same as any refresh token nobody
+            // ever redeems.
+            User user = userRepository.findById(stored.getUserId())
+                    .orElseThrow(() -> new BusinessException("User not found", HttpStatus.NOT_FOUND));
+            return buildAuthResponse(user, stored.isRememberMe(), ipAddress, userAgent);
         }
         if (stored.getExpiresAt().isBefore(Instant.now())) {
             throw new BusinessException("Refresh token expired or revoked", HttpStatus.UNAUTHORIZED, "TOKEN_EXPIRED");
@@ -483,7 +502,27 @@ public class AuthServiceImpl implements AuthService {
         RefreshToken stored = refreshTokenRepository.findByTokenHash(tokenHash)
                 .orElseThrow(() -> new BusinessException(
                         "Session expired — please sign in with your password.", HttpStatus.UNAUTHORIZED, "INVALID_TOKEN"));
-        if (stored.isRevoked() || stored.getExpiresAt().isBefore(Instant.now())) {
+        if (stored.isRevoked()) {
+            // revokedAt null means something other than an ordinary rotation revoked this row
+            // (logout, password reset, explicit session revoke) — a deliberate action never to be
+            // quietly undone. An old revokedAt (well outside the grace window refresh() polices
+            // reuse with — see REFRESH_REUSE_GRACE_MS's own comment) means there's no ordinary
+            // reason this exact, already-superseded token would resurface this late; reject same as
+            // always rather than extend refresh()'s own revoke-everything escalation here too.
+            if (stored.getRevokedAt() == null
+                    || stored.getRevokedAt().isBefore(Instant.now().minusMillis(REFRESH_REUSE_GRACE_MS))) {
+                throw new BusinessException(
+                        "Session expired — please sign in with your password.", HttpStatus.UNAUTHORIZED, "TOKEN_EXPIRED");
+            }
+            // Reused within the grace window of its own rotation — the same benign multi-tab/
+            // background-resync race refresh() tolerates (see its own comment for the full
+            // reasoning: DashboardLayout's profile resync 401s-and-refreshes on every cold load,
+            // including one racing this exact PIN unlock for the same cookie). This device's
+            // identity is still known from the row itself even though it's already superseded —
+            // fall through and verify the PIN as normal instead of forcing "session expired" for a
+            // race the user never caused (confirmed live via app-lock.spec.ts's reload-while-locked
+            // test, which reproduced this exact failure 3/3 times before this fix).
+        } else if (stored.getExpiresAt().isBefore(Instant.now())) {
             throw new BusinessException(
                     "Session expired — please sign in with your password.", HttpStatus.UNAUTHORIZED, "TOKEN_EXPIRED");
         }

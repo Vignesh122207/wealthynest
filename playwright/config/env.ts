@@ -40,16 +40,9 @@ export const env = {
 
 export const STORAGE_STATE_PATH = path.resolve(__dirname, "../.auth/user.json");
 
-// A second, separate user for tests/regression/ — kept apart from STORAGE_STATE_PATH's user (used
-// by tests/auth/ and tests/smoke/) so that suite and this one never mutate the same account/debt/
-// budget rows concurrently. Provisioned once in global-setup, not per-worker: registering a fresh
-// user per worker multiplied auth-endpoint calls past the API's 10 req/min rate limit (see
-// RateLimitConfig) once several workers all started up within the same minute.
-export const REGRESSION_STORAGE_STATE_PATH = path.resolve(__dirname, "../.auth/regression-user.json");
-
 // "chromium", "mobile-chrome", "tablet", "tablet-portrait", and "narrow-desktop" all share the one
 // original unsuffixed storageState file — this was already true before per-project provisioning
-// existed (test:responsive's mobile-chrome project has always reused chromium's regressionUser
+// existed (test:responsive's mobile-chrome project has always reused chromium's e2eUser
 // storageState) and stays true: none of these ever run tests/regression/'s *mutating* specs
 // concurrently with each other (they only run the read-only responsive/a11y/performance/visual
 // suites), so the backend-singleton collision (Cash Wallet, Emergency Fund — see README's
@@ -60,11 +53,6 @@ const SHARED_STORAGE_PROJECTS = new Set(["chromium", "mobile-chrome", "tablet", 
 
 export function storageStatePathFor(project: string): string {
   return SHARED_STORAGE_PROJECTS.has(project) ? STORAGE_STATE_PATH : path.resolve(__dirname, `../.auth/user.${project}.json`);
-}
-export function regressionStorageStatePathFor(project: string): string {
-  return SHARED_STORAGE_PROJECTS.has(project)
-    ? REGRESSION_STORAGE_STATE_PATH
-    : path.resolve(__dirname, `../.auth/regression-user.${project}.json`);
 }
 
 // Which projects global-setup/global-teardown provision a user pair for. Defaults to chromium

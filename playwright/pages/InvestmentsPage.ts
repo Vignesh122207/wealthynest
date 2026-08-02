@@ -253,8 +253,18 @@ export class InvestmentsPage extends BasePage {
     await waitForDialogClosed(this.page);
   }
 
+  private static readonly TAB_LABELS: Record<"overview" | "stocks" | "mf" | "gold" | "fd" | "bonds", string> = {
+    overview: "Overview", stocks: "Stocks", mf: "Mutual Funds", gold: "Gold", fd: "Fixed Deposits", bonds: "Bonds",
+  };
+
+  /** Clicks the real tab pill — investments/page.tsx's TabBar onChange does a client-side
+   * router.replace, not a full reload, so this matches how a real user actually switches tabs.
+   * A hard page.goto() here used to re-mount DashboardLayout on top of whatever the *previous*
+   * goto() (gotoInvestments, importFromCas, etc.) had just triggered, occasionally close enough
+   * to race two concurrent cold-boot refresh-token redemptions — see wait.helper.ts's own comment
+   * on the single-request version of this same underlying behavior. */
   async gotoTab(tab: "overview" | "stocks" | "mf" | "gold" | "fd" | "bonds"): Promise<void> {
-    await this.goto(`${ROUTES.investments}?tab=${tab}`);
+    await this.page.getByRole("tab", { name: InvestmentsPage.TAB_LABELS[tab] }).click();
   }
 
   async expectInvestmentVisible(name: string | RegExp): Promise<void> {

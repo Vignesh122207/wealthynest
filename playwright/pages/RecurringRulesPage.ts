@@ -5,7 +5,18 @@ import {TEST_IDS} from "../constants/testIds";
 import {waitForApiResponse, waitForDialogClosed} from "../helpers/wait.helper";
 
 export class RecurringRulesPage extends BasePage {
+  /** Doubles as this page's only entry point (every caller's first navigation) and its tab
+   * switcher. The first call is a real hard navigation (there's nothing loaded yet to click), but
+   * once already on this route, clicks the real tab pill instead — settings/recurring/page.tsx's
+   * TabBar onChange does a client-side router.replace, not a reload, so a second hard page.goto()
+   * back-to-back with the first used to re-mount DashboardLayout and re-fire its cold-boot resync/
+   * refresh on top of whatever the first goto() had just triggered. See InvestmentsPage.gotoTab's
+   * identical fix, where that race was confirmed actually happening. */
   async gotoTab(tab: "income" | "expenses" | "transfers" | "goals"): Promise<void> {
+    if (this.page.url().includes(ROUTES.settingsRecurring)) {
+      await this.page.getByTestId(`recurring-type-tab-${tab}`).click();
+      return;
+    }
     await this.goto(`${ROUTES.settingsRecurring}?tab=${tab}`);
   }
 
