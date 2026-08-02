@@ -17,11 +17,11 @@ import software.amazon.awscdk.services.cloudwatch.TreatMissingData;
 import software.amazon.awscdk.services.cloudwatch.actions.Ec2Action;
 import software.amazon.awscdk.services.cloudwatch.actions.Ec2InstanceAction;
 import software.amazon.awscdk.services.cloudwatch.actions.SnsAction;
-import software.amazon.awscdk.services.ec2.Instance;
 import software.amazon.awscdk.services.elasticache.CfnReplicationGroup;
 import software.amazon.awscdk.services.rds.DatabaseInstance;
 import software.amazon.awscdk.services.sns.Topic;
 import software.amazon.awscdk.services.sns.subscriptions.EmailSubscription;
+import software.amazon.awscdk.services.ssm.StringParameter;
 import software.constructs.Construct;
 
 /**
@@ -30,13 +30,12 @@ import software.constructs.Construct;
  * though "CloudWatch Logs" reads like a Monitoring concern - {@code ComputeStack}'s own comment
  * on {@code CloudWatchAgentConfig} explains why: the instance role needs to read that parameter,
  * and granting that read here would make ComputeStack depend on MonitoringStack, which already
- * depends on ComputeStack (it takes the instance itself, for the alarms below) - a cycle for the
- * same underlying reason documented on {@code DatabaseStack} and {@code ComputeStack}'s ingress
- * rules. This stack only ever reaches *into* Compute/Database, never the other way.
- *
- * <p>TEMPORARY (phase 1 of the 2026-08-02 export-migration rollout, see ComputeStack): reverted
- * to taking Compute's Instance directly again so this deploy doesn't touch the still-imported
- * export. Switch back to the SSM parameter in phase 2, once nothing imports it.
+ * depends on ComputeStack (via the explicit deploy-order dependency added in
+ * {@code InfrastructureApp} - it reads the instance's ID through the SSM parameter
+ * {@link ComputeStack#APP_SERVER_INSTANCE_ID_PARAM} rather than a CDK Ref, for the alarms below,
+ * so it never blocks Compute from replacing that instance) - a cycle for the same underlying
+ * reason documented on {@code DatabaseStack} and {@code ComputeStack}'s ingress rules. This stack
+ * only ever reaches *into* Compute/Database, never the other way.
  */
 public class MonitoringStack extends Stack {
 
@@ -48,7 +47,6 @@ public class MonitoringStack extends Stack {
         String id,
         StackProps props,
         AppConfig config,
-        Instance appInstance,
         DatabaseInstance database,
         CfnReplicationGroup cache
     ) {
@@ -61,7 +59,8 @@ public class MonitoringStack extends Stack {
         alarmTopic.addSubscription(new EmailSubscription(config.monitoring().alarmEmail()));
 
         AlarmFactory alarms = new AlarmFactory(this, alarmTopic);
-        String instanceId = appInstance.getInstanceId();
+        String instanceId = StringParameter.valueForStringParameter(
+            this, config.namespace(ComputeStack.APP_SERVER_INSTANCE_ID_PARAM));
 
         IMetric memoryMetric = Metric.Builder.create()
             .namespace("CWAgent")
