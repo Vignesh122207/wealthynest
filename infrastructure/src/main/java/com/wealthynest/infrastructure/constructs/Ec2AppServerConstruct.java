@@ -28,12 +28,24 @@ import software.constructs.Construct;
 
 /**
  * A hardened, internet-facing EC2 app server: Ubuntu LTS resolved via Canonical's public SSM AMI
- * parameter (no stale AMI baked into a context cache), an Elastic IP, an IAM role scoped for SSM
- * Session Manager + CloudWatch Agent only (application permissions are granted separately by
- * whichever stack owns the resource being granted), and a security group that accepts inbound
- * HTTP/HTTPS from Cloudflare's published edge ranges only — never SSH, never 0.0.0.0/0.
+ * parameter, pinned to a specific dated build rather than {@code current} (see
+ * {@link #PINNED_UBUNTU_BUILD}), an Elastic IP, an IAM role scoped for SSM Session Manager +
+ * CloudWatch Agent only (application permissions are granted separately by whichever stack owns
+ * the resource being granted), and a security group that accepts inbound HTTP/HTTPS from
+ * Cloudflare's published edge ranges only — never SSH, never 0.0.0.0/0.
  */
 public final class Ec2AppServerConstruct extends Construct {
+
+    // `current` resolves fresh on every `cdk deploy`, not just when someone deliberately bumps
+    // it - Canonical republishes it every few weeks. `ImageId` is an immutable EC2 instance
+    // property, so any drift forces a replacement on the *next* deploy regardless of what that
+    // deploy's actual code change was, and that replacement isn't guaranteed to succeed (see the
+    // 2026-08-01 incident: it got blocked by CicdStack/MonitoringStack still importing the old
+    // instance's exported Ref, and rolled back). Pin to a known-good dated build here instead;
+    // bump it deliberately, in its own reviewed change, when you want to move to a newer one -
+    // check available dates with `aws ssm get-parameters-by-path --recursive --path
+    // /aws/service/canonical/ubuntu/server/26.04/stable`.
+    private static final String PINNED_UBUNTU_BUILD = "20260731";
 
     private final Instance instance;
     private final Role role;
@@ -124,8 +136,8 @@ public final class Ec2AppServerConstruct extends Construct {
             default -> throw new IllegalArgumentException(
                 "Unsupported ec2Architecture '%s' - expected 'arm64' or 'x86_64'".formatted(architecture));
         };
-        return "/aws/service/canonical/ubuntu/server/26.04/stable/current/%s/hvm/ebs-gp3/ami-id"
-            .formatted(archSegment);
+        return "/aws/service/canonical/ubuntu/server/26.04/stable/%s/%s/hvm/ebs-gp3/ami-id"
+            .formatted(PINNED_UBUNTU_BUILD, archSegment);
     }
 
     public Instance getInstance() {

@@ -64,29 +64,54 @@ ssm_value() {
 
 write_env_file() {
   log "Writing ${ENV_FILE}"
+
+  # Fetched into variables first, not inlined as `echo "KEY=$(cmd)"` - a command substitution's
+  # failure doesn't trip `set -e` when it's embedded inside a larger command like that (only
+  # echo's own exit status does), so a transient Secrets Manager/SSM failure would otherwise
+  # silently write an empty value into the env file instead of aborting the deploy. Declared and
+  # assigned on separate lines (not `local x=$(cmd)` on one line) for the same reason - `local`
+  # masks the substitution's exit status identically (shellcheck SC2155).
+  local db_url db_username db_password redis_host redis_port jwt_secret vault_encryption_key \
+    vault_hash_pepper google_native_client_secret google_client_secret mail_username mail_password \
+    fcm_service_account_json rate_limit_trusted_proxies
+  db_url=$(ssm_value db-url)
+  db_username=$(secret_field db-credentials .username)
+  db_password=$(secret_field db-credentials .password)
+  redis_host=$(ssm_value redis-host)
+  redis_port=$(ssm_value redis-port)
+  jwt_secret=$(secret_value jwt-secret)
+  vault_encryption_key=$(secret_value vault-encryption-key)
+  vault_hash_pepper=$(secret_value vault-hash-pepper)
+  google_native_client_secret=$(secret_value google-oauth-client-secret)
+  google_client_secret=$(secret_value google-oauth-web-client-secret)
+  mail_username=$(secret_field smtp-credentials .MAIL_USERNAME)
+  mail_password=$(secret_field smtp-credentials .MAIL_PASSWORD)
+  fcm_service_account_json=$(secret_value fcm-service-account)
+  rate_limit_trusted_proxies=$(ssm_value rate-limit-trusted-proxies)
+
   umask 077
   {
     echo "PORT=8080"
     echo "SPRING_PROFILES_ACTIVE=prod"
-    echo "DB_URL=$(ssm_value db-url)"
-    echo "DB_USERNAME=$(secret_field db-credentials .username)"
-    echo "DB_PASSWORD=$(secret_field db-credentials .password)"
-    echo "REDIS_HOST=$(ssm_value redis-host)"
-    echo "REDIS_PORT=$(ssm_value redis-port)"
-    echo "JWT_SECRET=$(secret_value jwt-secret)"
-    echo "VAULT_ENCRYPTION_KEY=$(secret_value vault-encryption-key)"
-    echo "VAULT_HASH_PEPPER=$(secret_value vault-hash-pepper)"
-    echo "GOOGLE_NATIVE_CLIENT_SECRET=$(secret_value google-oauth-client-secret)"
+    echo "DB_URL=${db_url}"
+    echo "DB_USERNAME=${db_username}"
+    echo "DB_PASSWORD=${db_password}"
+    echo "REDIS_HOST=${redis_host}"
+    echo "REDIS_PORT=${redis_port}"
+    echo "JWT_SECRET=${jwt_secret}"
+    echo "VAULT_ENCRYPTION_KEY=${vault_encryption_key}"
+    echo "VAULT_HASH_PEPPER=${vault_hash_pepper}"
+    echo "GOOGLE_NATIVE_CLIENT_SECRET=${google_native_client_secret}"
     # Web counterpart — only used by AuthServiceImpl.googleLoginPopup (the popup-code fallback for
     # when One Tap's silent prompt() is blocked/skipped on mobile). Separate secret from the native
     # one above because it belongs to a different Google OAuth client ("Web application", not
     # "Desktop app") with its own id/secret pair.
-    echo "GOOGLE_CLIENT_SECRET=$(secret_value google-oauth-web-client-secret)"
+    echo "GOOGLE_CLIENT_SECRET=${google_client_secret}"
     echo "MAIL_HOST=smtp-relay.brevo.com"
     echo "MAIL_PORT=587"
-    echo "MAIL_USERNAME=$(secret_field smtp-credentials .MAIL_USERNAME)"
-    echo "MAIL_PASSWORD=$(secret_field smtp-credentials .MAIL_PASSWORD)"
-    echo "FCM_SERVICE_ACCOUNT_JSON=$(secret_value fcm-service-account)"
+    echo "MAIL_USERNAME=${mail_username}"
+    echo "MAIL_PASSWORD=${mail_password}"
+    echo "FCM_SERVICE_ACCOUNT_JSON=${fcm_service_account_json}"
     # Vercel serves the site canonically from www (wealthynest.in redirects there) - confirmed
     # live: an OPTIONS preflight with Origin: https://www.wealthynest.in got a flat 403 with no
     # CORS headers at all while the naked domain was allowed, breaking every real browser request.
@@ -98,7 +123,7 @@ write_env_file() {
     # own comment - this is the exact misconfiguration it exists to catch), so every deploy with
     # the wrong value here crash-loops the backend instead of just breaking WebAuthn silently.
     echo "FRONTEND_URL=https://www.wealthynest.in"
-    echo "RATE_LIMIT_TRUSTED_PROXIES=$(ssm_value rate-limit-trusted-proxies)"
+    echo "RATE_LIMIT_TRUSTED_PROXIES=${rate_limit_trusted_proxies}"
     # GOOGLE_CLIENT_ID / GOOGLE_NATIVE_CLIENT_ID are public (non-secret) OAuth client IDs, not
     # provisioned by CDK — from the OAuth clients already created in Google Cloud Console (see
     # docs/secrets-management-guide.md).
@@ -171,6 +196,8 @@ deploy() {
 
   local previous_version=""
   if [ -L "$CURRENT_LINK" ]; then
+    # Declared above, assigned here (not `local previous_version=$(...)` on one line) - same
+    # exit-status-masking reason as write_env_file()'s variables.
     previous_version="$(basename "$(readlink -f "$CURRENT_LINK")")"
   fi
 

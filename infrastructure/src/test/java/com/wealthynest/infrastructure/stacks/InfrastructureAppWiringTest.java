@@ -135,8 +135,9 @@ class InfrastructureAppWiringTest {
             network.getSecretsManagerEndpointSecurityGroup());
 
         MonitoringStack monitoring = new MonitoringStack(app, "TestMonitoring", props, config,
-            compute.getAppServer().getInstance(), database.getDatabase().getDatabaseInstance(),
+            database.getDatabase().getDatabaseInstance(),
             database.getCache().getReplicationGroup());
+        monitoring.addDependency(compute);
 
         new OutputsStack(app, "TestOutputs", props, config,
             compute.getAppServer().getPublicIp(),
@@ -147,8 +148,8 @@ class InfrastructureAppWiringTest {
             secrets
         );
 
-        new CicdStack(app, "TestCicd", props, config,
-            compute.getAppServer().getInstance(), storage.getBackupBucket());
+        CicdStack cicd = new CicdStack(app, "TestCicd", props, config, storage.getBackupBucket());
+        cicd.addDependency(compute);
 
         return new Wired(database, compute, monitoring);
     }

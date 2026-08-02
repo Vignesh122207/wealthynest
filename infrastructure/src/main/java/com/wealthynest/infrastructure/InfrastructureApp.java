@@ -102,12 +102,17 @@ public final class InfrastructureApp {
             network.getSecretsManagerEndpointSecurityGroup()
         );
 
-        new MonitoringStack(
+        MonitoringStack monitoring = new MonitoringStack(
             app, stackPrefix + "-monitoring",
             stackProps(environment, "WealthyNest dashboards, alarms, and log groups"),
-            config, compute.getAppServer().getInstance(), database.getDatabase().getDatabaseInstance(),
+            config, database.getDatabase().getDatabaseInstance(),
             database.getCache().getReplicationGroup()
         );
+        // Monitoring no longer takes Compute's Instance as a CDK Ref (see
+        // ComputeStack#APP_SERVER_INSTANCE_ID_PARAM for why), so this deploy-order dependency has
+        // to be added explicitly - Compute must have already published that SSM parameter before
+        // Monitoring's SSM dynamic reference to it can resolve.
+        monitoring.addDependency(compute);
 
         new OutputsStack(
             app, stackPrefix + "-outputs",
@@ -121,11 +126,13 @@ public final class InfrastructureApp {
             secrets
         );
 
-        new CicdStack(
+        CicdStack cicd = new CicdStack(
             app, stackPrefix + "-cicd",
             stackProps(environment, "WealthyNest GitHub Actions OIDC deploy roles"),
-            config, compute.getAppServer().getInstance(), storage.getBackupBucket()
+            config, storage.getBackupBucket()
         );
+        // Same reasoning as monitoring.addDependency(compute) above.
+        cicd.addDependency(compute);
 
         Tags.of(app).add("Project", "WealthyNest");
         Tags.of(app).add("Environment", config.envName());

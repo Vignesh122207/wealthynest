@@ -36,6 +36,14 @@ import software.constructs.Construct;
  */
 public class ComputeStack extends Stack {
 
+    // SSM parameter suffix (under AppConfig#namespace) that CicdStack/MonitoringStack read via an
+    // SSM dynamic reference instead of taking this stack's Instance object directly. A direct CDK
+    // cross-stack Ref would put the instance behind a CloudFormation export, and CloudFormation
+    // refuses to replace a resource whose export is still imported elsewhere - turning any
+    // legitimate instance replacement (AMI bump, instance type change, ...) into a blocked,
+    // auto-rolled-back deploy. See the 2026-08-01 incident this fixed.
+    public static final String APP_SERVER_INSTANCE_ID_PARAM = "app-server-instance-id";
+
     private final Ec2AppServerConstruct appServer;
 
     public ComputeStack(
@@ -100,6 +108,14 @@ public class ComputeStack extends Stack {
             config.resourceName("app-server"),
             config.resourceName("sg-app")
         ));
+
+        StringParameter.Builder.create(this, "AppServerInstanceIdParameter")
+            .parameterName(config.namespace(APP_SERVER_INSTANCE_ID_PARAM))
+            .description("EC2 instance ID of the backend app server - read via SSM dynamic "
+                + "reference by CicdStack/MonitoringStack, deliberately not passed as a direct "
+                + "CDK Ref (see APP_SERVER_INSTANCE_ID_PARAM's own comment)")
+            .stringValue(appServer.getInstance().getInstanceId())
+            .build();
 
         // Single-sources RATE_LIMIT_TRUSTED_PROXIES (deploy-backend.sh) from the same
         // cloudflareIpv4Ranges cdk.json already drives the security group and nginx's
