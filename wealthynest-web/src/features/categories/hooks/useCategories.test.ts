@@ -43,6 +43,22 @@ describe("useCategories", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual([categories[0]]);
   });
+
+  // "Manage categories" opens in a separate browser tab, which has its own in-memory query
+  // cache — a category created there can't invalidate this query the normal way. Without
+  // this, the global default (refetchOnWindowFocus: false) plus the 10min staleTime meant
+  // switching back to the original tab never picked up the new category without a manual
+  // page refresh.
+  it("is configured to always refetch on window focus, overriding the app-wide default", async () => {
+    mockedApi.getCategories.mockResolvedValue(categories);
+    const { Wrapper, queryClient } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useCategories("EXPENSE"), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    const query = queryClient.getQueryCache().find({ queryKey: [...QUERY_KEYS.CATEGORIES, "EXPENSE"] });
+    expect(query?.options.refetchOnWindowFocus).toBe("always");
+  });
 });
 
 describe("useCreateCategory", () => {

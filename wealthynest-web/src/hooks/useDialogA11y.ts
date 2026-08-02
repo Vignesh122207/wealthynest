@@ -1,6 +1,6 @@
 "use client";
 
-import {type RefObject, useEffect} from "react";
+import {type RefObject, useEffect, useRef} from "react";
 
 const FOCUSABLE = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
 
@@ -10,6 +10,17 @@ const FOCUSABLE = 'a[href], button:not([disabled]), textarea, input, select, [ta
 // content already autoFocus'd — only moves focus onto the dialog itself if nothing inside it has
 // focus yet.
 export function useDialogA11y(containerRef: RefObject<HTMLElement | null>, onDismiss: () => void) {
+  // Callers almost always pass an inline `() => ...` for onDismiss, which is a new function
+  // identity every render. Keeping it out of the effect's deps (read via ref instead) is
+  // deliberate: any local state update in the caller while the dialog is open (e.g. typing into
+  // a field that isn't react-hook-form-registered) used to re-run this whole effect, whose cleanup
+  // re-focuses whatever had focus *before* the dialog opened — yanking focus out of the field on
+  // every keystroke.
+  const onDismissRef = useRef(onDismiss);
+  useEffect(() => {
+    onDismissRef.current = onDismiss;
+  });
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -23,7 +34,7 @@ export function useDialogA11y(containerRef: RefObject<HTMLElement | null>, onDis
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.stopPropagation();
-        onDismiss();
+        onDismissRef.current();
         return;
       }
       if (e.key !== "Tab" || !container) return;
@@ -47,5 +58,5 @@ export function useDialogA11y(containerRef: RefObject<HTMLElement | null>, onDis
       previouslyFocused?.focus?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onDismiss]);
+  }, []);
 }

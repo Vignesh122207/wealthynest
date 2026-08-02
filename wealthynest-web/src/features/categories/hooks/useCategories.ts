@@ -14,6 +14,12 @@ export function useCategories(type?: "EXPENSE" | "INCOME" | "TRANSFER") {
     queryFn:   () => categoriesApi.getCategories(),
     select:    (data: Category[]) => type ? data.filter((c) => c.type === type) : data,
     staleTime: 1000 * 60 * 10,
+    // "Manage categories" opens in a separate tab (its own in-memory query cache), so creating
+    // a category there can't invalidate this query the normal way — the two tabs never talk to
+    // each other. "always" (not the app-wide default of `refetchOnWindowFocus: false`) forces a
+    // refetch when the user tabs back here, regardless of the 10min staleTime, so a category
+    // added in the other tab actually shows up without a manual page refresh.
+    refetchOnWindowFocus: "always",
   });
 }
 

@@ -9,16 +9,20 @@ import {
     Bus,
     Camera,
     Car,
+    CarTaxiFront,
+    Church,
     Coffee,
     DollarSign,
     Dumbbell,
     Flame,
+    Fuel,
     Gift,
     Globe,
     GraduationCap,
     Handshake,
     Headphones,
     Heart,
+    HeartHandshake,
     Home,
     Laptop,
     Leaf,
@@ -27,22 +31,29 @@ import {
     MoreHorizontal,
     Music,
     Package,
+    PawPrint,
     Percent,
     Pizza,
     Plane,
     PlusCircle,
+    Scissors,
     Shield,
     ShoppingBag,
     ShoppingCart,
     Smartphone,
+    Sparkles,
     Star,
     Stethoscope,
     Tag,
     Target,
+    Tractor,
+    Train,
     TrendingUp,
     Tv,
+    Users,
     Utensils,
     Wallet,
+    Wheat,
     Wine,
     Wrench,
     Zap,
@@ -96,11 +107,14 @@ export const CATEGORY_ICON_GROUPS: CategoryIconGroup[] = [
   {
     key: "transport", title: "Transport & Travel",
     items: [
-      { key: "car",    label: "Car",      icon: Car },
-      { key: "bus",    label: "Bus",      icon: Bus },
-      { key: "bike",   label: "Bike",     icon: Bike },
-      { key: "plane",  label: "Flights",  icon: Plane },
-      { key: "globe",  label: "Travel",   icon: Globe },
+      { key: "car",    label: "Car",         icon: Car },
+      { key: "bus",    label: "Bus",         icon: Bus },
+      { key: "bike",   label: "Bike",        icon: Bike },
+      { key: "taxi",   label: "Auto & Taxi", icon: CarTaxiFront },
+      { key: "train",  label: "Train",       icon: Train },
+      { key: "fuel",   label: "Fuel",        icon: Fuel },
+      { key: "plane",  label: "Flights",     icon: Plane },
+      { key: "globe",  label: "Travel",      icon: Globe },
     ],
   },
   {
@@ -117,9 +131,10 @@ export const CATEGORY_ICON_GROUPS: CategoryIconGroup[] = [
   {
     key: "health", title: "Health & Fitness",
     items: [
-      { key: "heart",       label: "Health",      icon: Heart },
-      { key: "stethoscope", label: "Medical",     icon: Stethoscope },
-      { key: "dumbbell",    label: "Fitness",     icon: Dumbbell },
+      { key: "heart",       label: "Health",         icon: Heart },
+      { key: "stethoscope", label: "Medical",        icon: Stethoscope },
+      { key: "dumbbell",    label: "Fitness",         icon: Dumbbell },
+      { key: "scissors",    label: "Salon & Haircut", icon: Scissors },
     ],
   },
   {
@@ -128,6 +143,23 @@ export const CATEGORY_ICON_GROUPS: CategoryIconGroup[] = [
       { key: "book",       label: "Education", icon: BookOpen },
       { key: "graduation", label: "Tuition",    icon: GraduationCap },
       { key: "baby",       label: "Kids",       icon: Baby },
+      { key: "users",      label: "Relatives",  icon: Users },
+      { key: "pawprint",   label: "Pets",       icon: PawPrint },
+    ],
+  },
+  {
+    key: "culture", title: "Religion & Festivals",
+    items: [
+      { key: "church",         label: "Temple & Worship",   icon: Church },
+      { key: "sparkles",       label: "Festivals & Pooja",  icon: Sparkles },
+      { key: "heart-handshake",label: "Charity & Donations",icon: HeartHandshake },
+    ],
+  },
+  {
+    key: "agriculture", title: "Agriculture",
+    items: [
+      { key: "tractor", label: "Farming",        icon: Tractor },
+      { key: "wheat",   label: "Crops & Harvest", icon: Wheat },
     ],
   },
   {
@@ -181,7 +213,23 @@ export function getCategoryIconByKey(key?: string | null): LucideIcon | undefine
 // badges elsewhere) — the canonical swatch list for any category color picker,
 // replacing the two separate, narrower ad-hoc lists that used to live in the
 // Settings page (14 colors) and the budgets page's quick-add form (10 colors).
-export const CATEGORY_COLOR_PALETTE: string[] = Object.values(TONE_HEX);
+// A handful of extra hues not in TONE_HEX are appended below — deliberately
+// raw hex, not new IconTone entries: IconTone/TONE_HEX feeds PremiumIcon's
+// badgeTextColor contrast math everywhere in the app (nav, accounts, goals…),
+// and its 21 values were individually axe-verified for 4.5:1 contrast: growing
+// that shared type would mean re-verifying every consumer, not just this
+// picker. PremiumIcon already accepts any raw hex via its `hex` prop, so a
+// category color was never restricted to IconTone's keys in the first place.
+// These 4 were each checked against the same badgeTextColor formula (lighten
+// 30% dark-mode / darken 50% light-mode) and clear 4.5:1 in both themes.
+const EXTRA_CATEGORY_COLORS = [
+  "#6B8E23", // olive — distinct yellow-green, no existing tone sits near this hue
+  "#D946EF", // fuchsia — distinct from purple/magenta
+  "#64748B", // slate — cool blue-gray, distinct from gray/brown's warmer neutrals
+  "#3B5BDB", // navy — deeper/more saturated than blue/indigo/cobalt
+];
+
+export const CATEGORY_COLOR_PALETTE: string[] = [...Object.values(TONE_HEX), ...EXTRA_CATEGORY_COLORS];
 
 interface IconColorPair { icon?: string | null; color?: string | null; }
 
@@ -200,7 +248,7 @@ export function suggestUnusedCombo(existing: IconColorPair[]): { icon: string; c
       if (!used.has(`${icon}|${color.toLowerCase()}`)) return { icon, color };
     }
   }
-  // Registry exhausted (46 icons × 21 colors = 966 combinations) — fall back
+  // Registry exhausted (57 icons × 25 colors = 1425 combinations) — fall back
   // to the first pair rather than throwing; an exact visual duplicate at that
   // scale is no longer the interesting problem.
   return { icon: CATEGORY_ICON_LIST[0].key, color: CATEGORY_COLOR_PALETTE[0] };
