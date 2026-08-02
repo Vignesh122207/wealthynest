@@ -53,8 +53,12 @@ services:
     dns:
       - 8.8.8.8
       - 8.8.4.4
+    # Loopback-only, matching postgres/redis above — the `tunnel` container reaches this over
+    # the internal wealthynest-net bridge by service name, not through this host port mapping,
+    # so restricting it doesn't affect Cloudflare Tunnel routing. Only closes direct LAN/internet
+    # access to a bare "8080:8080" that would otherwise bypass the tunnel's TLS termination.
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     environment:
       # Overridable so the Google OAuth E2E test can opt into the `e2e-oauth-test` profile
       # (`APP_ENV=prod,e2e-oauth-test docker compose up -d --build wealthynest-api`) without
@@ -123,8 +127,10 @@ services:
     depends_on:
       wealthynest-api:
         condition: service_healthy
+    # Loopback-only — see the wealthynest-api port comment above for why this doesn't affect
+    # tunnel-routed access.
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       NEXT_PUBLIC_API_URL: ${API_URL}
     networks:
