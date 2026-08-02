@@ -93,4 +93,26 @@ class WebAuthnControllerTest {
 
         verify(webAuthnService).verifyRegistration(org.mockito.ArgumentMatchers.eq(userId), any(), org.mockito.ArgumentMatchers.eq("My Phone"));
     }
+
+    @Test
+    @DisplayName("POST /step-up/options is rejected unauthenticated, same as passkey management")
+    void stepUpOptionsUnauthenticatedIsRejected() throws Exception {
+        mockMvc.perform(post("/api/v1/users/me/webauthn/step-up/options"))
+                .andExpect(status().isUnauthorized());
+
+        org.mockito.Mockito.verifyNoInteractions(webAuthnService);
+    }
+
+    @Test
+    @DisplayName("POST /step-up/options delegates the authenticated userId and returns the challenge")
+    void stepUpOptionsDelegatesUserId() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null);
+        when(webAuthnService.getStepUpOptions(userId)).thenReturn(Map.of("challenge", "abc"));
+
+        mockMvc.perform(post("/api/v1/users/me/webauthn/step-up/options"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.challenge").value("abc"));
+
+        verify(webAuthnService).getStepUpOptions(userId);
+    }
 }

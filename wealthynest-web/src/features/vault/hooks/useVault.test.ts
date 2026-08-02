@@ -5,8 +5,11 @@ import { createQueryClientWrapper } from "@/test-utils/queryClientWrapper";
 import {
   useVaultItems, useVaultHealth, useCreateVaultItem, useUpdateVaultItem,
   useDeleteVaultItem, useToggleVaultFavorite, useRevealVaultSecret, useExportVault,
+  useVaultWebAuthnStepUp,
 } from "./useVault";
 import { vaultApi } from "../api/vault.api";
+import { authApi } from "@/features/auth/api/auth.api";
+import { getPasskeyAssertion } from "@/features/auth/utils/webauthn";
 import { toast } from "sonner";
 
 vi.mock("../api/vault.api", () => ({
@@ -15,9 +18,17 @@ vi.mock("../api/vault.api", () => ({
     deleteItem: vi.fn(), toggleFavorite: vi.fn(), revealSecret: vi.fn(), exportCsv: vi.fn(),
   },
 }));
+vi.mock("@/features/auth/api/auth.api", () => ({
+  authApi: { getVaultStepUpOptions: vi.fn() },
+}));
+vi.mock("@/features/auth/utils/webauthn", () => ({
+  getPasskeyAssertion: vi.fn(),
+}));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const mockedApi = vi.mocked(vaultApi);
+const mockedAuthApi = vi.mocked(authApi);
+const mockedGetPasskeyAssertion = vi.mocked(getPasskeyAssertion);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -131,6 +142,35 @@ describe("useExportVault", () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(mockedApi.exportCsv).toHaveBeenCalledWith({ currentPassword: "hunter2" });
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+});
+
+describe("useVaultWebAuthnStepUp", () => {
+  it("fetches step-up options then resolves the platform's passkey assertion", async () => {
+    const options = { challenge: "c" } as never;
+    const credential = { id: "cred-1" } as never;
+    mockedAuthApi.getVaultStepUpOptions.mockResolvedValue(options);
+    mockedGetPasskeyAssertion.mockResolvedValue(credential);
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useVaultWebAuthnStepUp(), { wrapper: Wrapper });
+    result.current.mutate();
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedGetPasskeyAssertion).toHaveBeenCalledWith(options);
+    expect(result.current.data).toBe(credential);
+  });
+
+  it("propagates a cancelled/failed ceremony as an error, with no toast (shown by the caller instead)", async () => {
+    mockedAuthApi.getVaultStepUpOptions.mockResolvedValue({} as never);
+    mockedGetPasskeyAssertion.mockRejectedValue(new DOMException("cancelled", "NotAllowedError"));
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useVaultWebAuthnStepUp(), { wrapper: Wrapper });
+    result.current.mutate();
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
     expect(toast.error).not.toHaveBeenCalled();
   });
 });

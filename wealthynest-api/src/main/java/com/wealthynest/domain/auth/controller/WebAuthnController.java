@@ -46,6 +46,18 @@ public class WebAuthnController {
                 webAuthnService.listPasskeys(SecurityUtils.requireCurrentUserId())));
     }
 
+    /** Challenge options for re-proving an already-authenticated session with a registered
+     * passkey — consumed by Vault reveal/export as a step-up credential (see
+     * VaultServiceImpl#requireStepUpPasskey). Verification itself isn't a separate endpoint here:
+     * the resulting assertion rides along in the reveal/export request body, alongside the
+     * password/PIN alternatives it sits next to. */
+    @PostMapping("/step-up/options")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> stepUpOptions() {
+        return ResponseEntity.ok(ApiResponse.success(
+                webAuthnService.getStepUpOptions(SecurityUtils.requireCurrentUserId())));
+    }
+
     @DeleteMapping("/passkeys/{id}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> deletePasskey(@PathVariable UUID id) {

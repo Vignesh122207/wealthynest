@@ -74,6 +74,7 @@ public class WebAuthnServiceImpl implements WebAuthnService {
 
     private static String regChallengeKey(UUID userId) { return "webauthn-reg-challenge:" + userId; }
     private static String loginChallengeKey(String email) { return "webauthn-login-challenge:" + email; }
+    private static String stepUpChallengeKey(UUID userId) { return "webauthn-stepup-challenge:" + userId; }
 
     @Override
     public Map<String, Object> getRegistrationOptions(UUID userId) {
@@ -224,14 +225,7 @@ public class WebAuthnServiceImpl implements WebAuthnService {
             throw new BusinessException("Passkey sign-in expired — please try again.", HttpStatus.UNAUTHORIZED);
         }
 
-        String credentialJson = writeJson(credential);
-        AuthenticationData parsed;
-        try {
-            parsed = webAuthnManager.parseAuthenticationResponseJSON(credentialJson);
-        } catch (Exception e) {
-            throw new BusinessException("Couldn't read that passkey response.", HttpStatus.BAD_REQUEST);
-        }
-
+        AuthenticationData parsed = parseAssertion(credential);
         WebAuthnCredential stored = credentialRepository.findByCredentialId(parsed.getCredentialId())
                 .orElseThrow(() -> new BusinessException("This passkey isn't registered.", HttpStatus.UNAUTHORIZED));
         if (!stored.getUserId().equals(userRepository.findByEmail(normalizedEmail).map(User::getId).orElse(null))) {
@@ -239,10 +233,76 @@ public class WebAuthnServiceImpl implements WebAuthnService {
         }
 
         redisTemplate.delete(loginChallengeKey(normalizedEmail));
+        verifyAndTouch(parsed, stored, Base64.getDecoder().decode(challengeB64));
 
+        return authService.issueTokensForVerifiedUser(stored.getUserId(), rememberMe, ipAddress, userAgent, previousRefreshToken);
+    }
+
+    @Override
+    public Map<String, Object> getStepUpOptions(UUID userId) {
+        List<WebAuthnCredential> credentials = credentialRepository.findByUserId(userId);
+        if (credentials.isEmpty()) {
+            throw new BusinessException("No passkey is registered for this account.", HttpStatus.BAD_REQUEST);
+        }
+
+        byte[] challengeBytes = new byte[32];
+        SECURE_RANDOM.nextBytes(challengeBytes);
+        redisTemplate.opsForValue().set(stepUpChallengeKey(userId),
+                Base64.getEncoder().encodeToString(challengeBytes), CHALLENGE_TTL);
+
+        List<PublicKeyCredentialDescriptor> allowCredentials = credentials.stream()
+                .map(c -> new PublicKeyCredentialDescriptor(PublicKeyCredentialType.PUBLIC_KEY, c.getCredentialId(), null))
+                .toList();
+
+        PublicKeyCredentialRequestOptions options = new PublicKeyCredentialRequestOptions(
+                new DefaultChallenge(challengeBytes),
+                TIMEOUT_MS,
+                webAuthnConfig.getRpId(),
+                allowCredentials,
+                UserVerificationRequirement.PREFERRED,
+                null
+        );
+        return toMap(options);
+    }
+
+    @Override
+    @Transactional
+    public void verifyStepUp(UUID userId, Map<String, Object> credential) {
+        String challengeB64 = redisTemplate.opsForValue().get(stepUpChallengeKey(userId));
+        if (challengeB64 == null) {
+            throw new BusinessException("Passkey confirmation expired — please try again.", HttpStatus.UNAUTHORIZED);
+        }
+
+        AuthenticationData parsed = parseAssertion(credential);
+        WebAuthnCredential stored = credentialRepository.findByCredentialId(parsed.getCredentialId())
+                .orElseThrow(() -> new BusinessException("This passkey isn't registered.", HttpStatus.UNAUTHORIZED));
+        if (!stored.getUserId().equals(userId)) {
+            throw new AccessDeniedException("Passkey does not belong to this account");
+        }
+
+        redisTemplate.delete(stepUpChallengeKey(userId));
+        verifyAndTouch(parsed, stored, Base64.getDecoder().decode(challengeB64));
+    }
+
+    // ─── helpers ──────────────────────────────────────────────────────────────
+
+    /** Parses a raw {@code credential.toJSON()} payload into webauthn4j's assertion type. Shared
+     * by login and step-up verification — both accept the exact same shape off the wire. */
+    private AuthenticationData parseAssertion(Map<String, Object> credential) {
+        try {
+            return webAuthnManager.parseAuthenticationResponseJSON(writeJson(credential));
+        } catch (Exception e) {
+            throw new BusinessException("Couldn't read that passkey response.", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    /** Verifies an already-parsed assertion against {@code stored}'s public key and the challenge
+     * issued for this ceremony, then persists the updated sign count/last-used timestamp. Shared
+     * by login (verifyAuthentication) and step-up (verifyStepUp) — identical cryptographic check,
+     * only the caller-side bookkeeping after success differs (issuing a session vs. nothing). */
+    private void verifyAndTouch(AuthenticationData parsed, WebAuthnCredential stored, byte[] challengeBytes) {
         ServerProperty serverProperty = new ServerProperty(
-                new Origin(webAuthnConfig.getOrigin()), webAuthnConfig.getRpId(),
-                new DefaultChallenge(Base64.getDecoder().decode(challengeB64)));
+                new Origin(webAuthnConfig.getOrigin()), webAuthnConfig.getRpId(), new DefaultChallenge(challengeBytes));
         CredentialRecord credentialRecord = toCredentialRecord(stored);
         AuthenticationParameters params = new AuthenticationParameters(
                 serverProperty, credentialRecord, null, false, true);
@@ -251,18 +311,14 @@ public class WebAuthnServiceImpl implements WebAuthnService {
         try {
             authenticationData = webAuthnManager.verify(parsed, params);
         } catch (Exception e) {
-            log.warn("Passkey login verification failed for {}: {}", normalizedEmail, e.getMessage());
+            log.warn("Passkey verification failed for user {}: {}", stored.getUserId(), e.getMessage());
             throw new BusinessException("Couldn't verify that passkey.", HttpStatus.UNAUTHORIZED);
         }
 
         stored.setSignCount(authenticationData.getAuthenticatorData().getSignCount());
         stored.setLastUsedAt(Instant.now());
         credentialRepository.save(stored);
-
-        return authService.issueTokensForVerifiedUser(stored.getUserId(), rememberMe, ipAddress, userAgent, previousRefreshToken);
     }
-
-    // ─── helpers ──────────────────────────────────────────────────────────────
 
     private CredentialRecord toCredentialRecord(WebAuthnCredential stored) {
         COSEKey coseKey = objectConverter.getCborConverter().readValue(stored.getPublicKeyCose(), COSEKey.class);

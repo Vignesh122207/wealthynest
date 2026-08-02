@@ -10,8 +10,10 @@ import {FormModalShell} from "@/components/ui/FormModalShell";
 import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
 import {resolveVaultIcon} from "@/lib/categoryMeta";
 import {cn} from "@/lib/utils";
+import {usePasskeys} from "@/features/auth/hooks/useAuth";
+import {useWebAuthnSupport} from "@/features/auth/hooks/useWebAuthnSupport";
 import {useAuthStore} from "@/features/auth/store/auth.store";
-import {useRevealVaultSecret} from "../hooks/useVault";
+import {useRevealVaultSecret, useVaultWebAuthnStepUp} from "../hooks/useVault";
 import {type RevealFormValues, revealSchema} from "../schemas/vault.schema";
 import {useVaultTrustStore} from "../store/vaultTrust.store";
 import type {VaultItem, VaultItemSecret} from "../types/vault.types";
@@ -37,6 +39,10 @@ export function RevealSecretModal({ item, accentColor, onClose }: { item: VaultI
   const [shakeKey, setShakeKey]         = useState(0);
   const clipboardTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { mutate: reveal, isPending, error } = useRevealVaultSecret();
+  const { mutate: assertPasskey, isPending: isAssertingPasskey } = useVaultWebAuthnStepUp();
+  const passkeySupported = useWebAuthnSupport();
+  const { data: passkeys } = usePasskeys();
+  const passkeyAvailable = passkeySupported && !!passkeys?.length;
 
   const trustToken = useVaultTrustStore((s) => s.token);
   const isTrusted  = useVaultTrustStore((s) => s.isTrusted);
@@ -77,6 +83,25 @@ export function RevealSecretModal({ item, accentColor, onClose }: { item: VaultI
     });
   };
 
+  const handleWebAuthnReveal = () => {
+    assertPasskey(undefined, {
+      onSuccess: (passkeyCredential) => {
+        reveal({ id: item.id, passkeyCredential }, {
+          onSuccess: (data) => handleRevealed(data, trustDevice),
+          onError: () => setShakeKey((k) => k + 1),
+        });
+      },
+      // Cancelling the OS passkey prompt is a normal outcome (see useRegisterPasskey/
+      // useUnlockWithPasskey's own NotAllowedError-is-silent convention). A genuine failure here
+      // is the ceremony itself (no options, hardware error) rather than a wrong credential the
+      // server rejected, so it toasts instead of shaking the (not currently shown) password field.
+      onError: (e: unknown) => {
+        if (e instanceof DOMException && e.name === "NotAllowedError") return;
+        toast.error("Couldn't confirm with passkey");
+      },
+    });
+  };
+
   const handleCopy = async () => {
     if (!revealed) return;
     await navigator.clipboard.writeText(revealed);
@@ -114,7 +139,8 @@ export function RevealSecretModal({ item, accentColor, onClose }: { item: VaultI
                 Confirm your account {method === "pin" ? "PIN" : "password"} to view this {item.itemType === "LOGIN" ? "password" : "note"}.
               </p>
               <div key={shakeKey} className={cn(shakeKey > 0 && "animate-shake")}>
-                <VaultStepUpFields form={form} pinAvailable={pinAvailable} idPrefix="vault-reveal" apiErrorMessage={errorMessage} />
+                <VaultStepUpFields form={form} pinAvailable={pinAvailable} idPrefix="vault-reveal" apiErrorMessage={errorMessage}
+                  passkeyAvailable={passkeyAvailable} passkeyPending={isAssertingPasskey} onUseWebAuthn={handleWebAuthnReveal} />
               </div>
               <label className="flex items-start gap-2.5 text-xs cursor-pointer select-none p-3 rounded-xl"
                 style={{ backgroundColor: VAULT_BRASS + "0f", border: `1px solid ${VAULT_BRASS}30` }}>
