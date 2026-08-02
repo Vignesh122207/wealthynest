@@ -23,14 +23,23 @@ export function toastLocator(page: Page, text?: string | RegExp) {
  * checked. That turned real server-side failures into a confusing UI-level timeout several steps
  * later (the app correctly leaves its modal open on error, and the *next* action then hits that
  * modal's backdrop) instead of a clear, immediate "the API rejected this." Pass
- * `{ allowError: true }` for the rare test that's deliberately asserting an error response. */
+ * `{ allowError: true }` for the rare test that's deliberately asserting an error response.
+ *
+ * A bare 401 (unless allowError) is treated as "not resolved yet," not a failure: auth.store.ts
+ * deliberately keeps the access token in memory only, so a fresh page load's first matching
+ * request is *expected* to 401 once and get transparently retried by axios.ts's response
+ * interceptor (same URL/method, fresh token) — invisible to a real user. Resolving on that
+ * transient 401 instead of the retry it's known to trigger turned an app behavior working exactly
+ * as designed into a spurious test failure. Any other status still resolves immediately, so a
+ * genuine failure is still reported without waiting out the full timeout. */
 export async function waitForApiResponse(
   page: Page, urlPattern: string | RegExp, method = "POST", opts?: { allowError?: boolean }
 ): Promise<Response> {
   const res = await page.waitForResponse(
     (res) => {
       const matchesUrl = typeof urlPattern === "string" ? res.url().includes(urlPattern) : urlPattern.test(res.url());
-      return matchesUrl && res.request().method() === method;
+      if (!matchesUrl || res.request().method() !== method) return false;
+      return opts?.allowError || res.status() !== 401;
     },
     { timeout: WAIT_TIMEOUT }
   );

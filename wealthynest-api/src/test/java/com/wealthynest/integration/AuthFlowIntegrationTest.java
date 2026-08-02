@@ -113,13 +113,28 @@ class AuthFlowIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.data.accessToken").exists())
                 .andReturn();
         String rotatedRefreshToken = refreshTokenCookie(refreshResult);
+        String rotatedAccessToken = objectMapper.readTree(refreshResult.getResponse().getContentAsString())
+                .get("data").get("accessToken").asText();
         assertThat(rotatedRefreshToken).isNotEqualTo(refreshToken);
 
-        // 8. Reusing the now-rotated-away original refresh token fails
-        mockMvc.perform(post("/api/v1/auth/refresh")
+        // 8. Reusing the now-rotated-away original refresh token shortly after its own rotation is
+        // treated as a benign race (two tabs/requests sharing one cookie, a background resync
+        // racing an explicit refresh) rather than theft — mints its own fresh, independent session
+        // instead of failing. See AuthServiceImpl.refresh()'s own comment on
+        // REFRESH_REUSE_GRACE_MS; AuthServiceImplTest's unit tests cover the "well after the grace
+        // window" case (treated as theft, revokes every session) with a mocked timestamp, not
+        // practical to exercise here without a real multi-second sleep.
+        MvcResult benignReuseResult = mockMvc.perform(post("/api/v1/auth/refresh")
                         .cookie(new Cookie(RefreshCookieService.COOKIE_NAME, refreshToken)))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("TOKEN_EXPIRED"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accessToken").exists())
+                .andReturn();
+        assertThat(refreshTokenCookie(benignReuseResult)).isNotEqualTo(rotatedRefreshToken); // its own token, not step 7's winner
+
+        // The winner's own access token from step 7 is completely unaffected by that benign
+        // replay — still authenticates normally.
+        mockMvc.perform(get("/api/v1/expenses").header("Authorization", "Bearer " + rotatedAccessToken))
+                .andExpect(status().isOk());
 
         // 9. Logout revokes the current refresh token and clears the cookie
         mockMvc.perform(post("/api/v1/auth/logout")

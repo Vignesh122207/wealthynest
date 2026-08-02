@@ -265,9 +265,15 @@ export function LoginForm() {
   // being reachable through in-app navigation once authenticated, but neither covers a fresh full
   // navigation to the URL itself. hydrated never flips true on this branch, so the render below
   // stays gated on it exactly like DashboardLayout's own mirror-image guard the other direction.
+  //
+  // Only redirects a PIN-less visitor: an already-authenticated PIN-eligible visitor is exactly
+  // who this route's PIN quick-login step exists for (a real app relaunch lands here still marked
+  // isAuthenticated but with no live in-memory access token — see this file's own PinLoginStep).
+  // Redirecting unconditionally on isAuthenticated alone bounced that visitor straight to /home
+  // before they ever saw the PIN prompt, silently skipping the PIN gate entirely.
   useEffect(() => {
     const { user, isAuthenticated } = useAuthStore.getState();
-    if (isAuthenticated) { router.replace("/home"); return; }
+    if (isAuthenticated && !user?.pinEnabled) { router.replace("/home"); return; }
     setPinCandidate({ eligible: !!user?.pinEnabled, name: user?.fullName ?? "" });
     setHydrated(true);
   }, [router]);

@@ -1,6 +1,7 @@
-import {type Page, test as base} from "@playwright/test";
-import {regressionStorageStatePathFor, storageStatePathFor} from "../config/env";
-import {type E2EUserFixtureData, readE2EUser, readRegressionUser} from "../helpers/auth.helper";
+import {type BrowserContext, type Page, test as base} from "@playwright/test";
+import {storageStatePathFor} from "../config/env";
+import {type E2EUserFixtureData, readE2EUser, readRegressionUser, storageStateFor} from "../helpers/auth.helper";
+import {api} from "../helpers/api.helper";
 import {LoginPage} from "../pages/auth/LoginPage";
 import {SignupPage} from "../pages/auth/SignupPage";
 import {HomePage} from "../pages/HomePage";
@@ -61,7 +62,13 @@ interface Fixtures {
   toast: Toast;
 }
 
-export const test = base.extend<Fixtures>({
+interface WorkerFixtures {
+  /** One browser context per worker, logged in fresh as regressionUser — see its own comment
+   * below (authedContext) for why this isn't a shared, disk-persisted storageState snapshot. */
+  authedContext: BrowserContext;
+}
+
+export const test = base.extend<Fixtures, WorkerFixtures>({
   // Project-scoped (testInfo.project.name) so a project beyond "chromium" reads its own
   // provisioned user/storageState rather than colliding with chromium's — see config/env.ts's
   // storageStatePathFor and global-setup's PROJECTS_TO_PROVISION loop. Defaults to the original
@@ -81,11 +88,30 @@ export const test = base.extend<Fixtures>({
     await use(readRegressionUser(testInfo.project.name));
   },
 
-  authedPage: async ({ browser }, use, testInfo) => {
-    const context = await browser.newContext({ storageState: regressionStorageStatePathFor(testInfo.project.name) });
-    const page = await context.newPage();
-    await use(page);
+  // Worker-scoped, and logged in fresh here rather than loaded from a shared on-disk storageState
+  // snapshot. That used to be safe because the access token also lived in localStorage (no refresh
+  // ever needed for a 2-hour token's whole life); once auth.store.ts stopped persisting it, every
+  // fresh context's first page load has to redeem the refresh-token cookie to get a working access
+  // token. With every tests/regression/ file/worker replaying the exact same baked-in cookie, only
+  // the very first redemption in a run was ever clean — every later one looked like reuse to
+  // AuthServiceImpl's rotation-reuse detection and could revoke every session for the shared
+  // regressionUser mid-run (confirmed live: "Refresh token reuse detected outside rotation grace
+  // window" firing repeatedly, cascading into ~19 unrelated regression files failing in the same
+  // run). One real login per worker means each worker's context owns a refresh-token cookie
+  // nothing else has touched, and the context's own cookie jar keeps it correctly rotated — via
+  // the app's normal 401-then-refresh flow — for that worker's whole lifetime.
+  authedContext: [async ({ browser }, use, workerInfo) => {
+    const user = readRegressionUser(workerInfo.project.name);
+    const auth = await api.login({ email: user.email, password: user.password });
+    const context = await browser.newContext({ storageState: storageStateFor(auth) });
+    await use(context);
     await context.close();
+  }, { scope: "worker" }],
+
+  authedPage: async ({ authedContext }, use) => {
+    const page = await authedContext.newPage();
+    await use(page);
+    await page.close();
   },
 
   loginPage:        async ({ page }, use) => { await use(new LoginPage(page)); },

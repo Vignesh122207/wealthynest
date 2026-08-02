@@ -136,27 +136,16 @@ export async function provisionE2EUser(overrides?: Partial<{ fullName: string; e
   return { fullName, email, password, auth };
 }
 
-/** Provisions a user + one EXPENSE category, then writes both a Playwright storageState file and
- * a plain JSON fixture file (read back via readE2EUser/readRegressionUser) — the shared plumbing
- * behind global-setup's two provisioned users. */
-export async function setUpFixtureUser(storageStatePath: string, userFilePath: string): Promise<void> {
+/** Registers a fresh user, verifies email, creates one EXPENSE category, and writes the plain JSON
+ * fixture file read back via readE2EUser/readRegressionUser — shared setup behind both provisioned
+ * fixture users. Returns the auth result so a caller that also needs a working session
+ * (setUpFixtureUser) doesn't have to log in a second time. */
+async function provisionAndWriteUserFile(userFilePath: string): Promise<E2EUser> {
   const user = await provisionE2EUser();
   const category = await api.createCategory(user.auth.accessToken, {
     name: randomCategoryName(),
     type: "EXPENSE",
   });
-
-  fs.mkdirSync(path.dirname(storageStatePath), { recursive: true });
-  fs.writeFileSync(
-    storageStatePath,
-    JSON.stringify({
-      cookies: [refreshTokenCookieEntry(user.auth.refreshTokenCookie)],
-      origins: [{
-        origin: env.baseUrl,
-        localStorage: [{ name: "wealthynest-auth", value: authStoreLocalStorageValue(user.auth) }],
-      }],
-    })
-  );
 
   fs.writeFileSync(
     userFilePath,
@@ -168,6 +157,47 @@ export async function setUpFixtureUser(storageStatePath: string, userFilePath: s
       expenseCategoryName: category.name,
     })
   );
+
+  return user;
+}
+
+/** Provisions a user + one EXPENSE category, then writes both a Playwright storageState file and
+ * a plain JSON fixture file (read back via readE2EUser/readRegressionUser) — the plumbing behind
+ * global-setup's e2eUser (tests/auth/ + tests/smoke/'s single, real-UI-login user, where one
+ * baked-in session never needs a mid-run refresh). See setUpRegressionUser's own comment for why
+ * tests/regression/'s user deliberately does NOT get this treatment. */
+export async function setUpFixtureUser(storageStatePath: string, userFilePath: string): Promise<void> {
+  const user = await provisionAndWriteUserFile(userFilePath);
+  fs.mkdirSync(path.dirname(storageStatePath), { recursive: true });
+  fs.writeFileSync(storageStatePath, JSON.stringify(storageStateFor(user.auth)));
+}
+
+/** Provisions tests/regression/'s shared user + category and writes its JSON fixture file only —
+ * deliberately no storageState snapshot. auth.store.ts stopped persisting the access token to
+ * localStorage (see its own history), so every fresh browser context's first page load now has to
+ * redeem the refresh-token cookie to get a working access token. A single baked-in cookie shared
+ * across every tests/regression/ file/worker meant only the very first redemption in a whole run
+ * was ever clean — every later one looked like reuse to AuthServiceImpl's rotation-reuse detection
+ * and could revoke every session for this shared user mid-run (confirmed live: "Refresh token
+ * reuse detected outside rotation grace window" firing repeatedly, cascading into ~19 unrelated
+ * regression files failing in the same run). See fixtures/index.ts's authedContext, which mints a
+ * fresh login per worker instead. */
+export async function setUpRegressionUser(userFilePath: string): Promise<void> {
+  await provisionAndWriteUserFile(userFilePath);
+}
+
+/** Builds a Playwright storageState object from a live login — the in-memory equivalent of what
+ * setUpFixtureUser writes to disk. Callers that need their own freshly-minted, never-shared session
+ * (e.g. fixtures/index.ts's authedContext) should pass a just-issued AuthResult here rather than
+ * loading a static file. */
+export function storageStateFor(auth: AuthResult) {
+  return {
+    cookies: [refreshTokenCookieEntry(auth.refreshTokenCookie)],
+    origins: [{
+      origin: env.baseUrl,
+      localStorage: [{ name: "wealthynest-auth", value: authStoreLocalStorageValue(auth) }],
+    }],
+  };
 }
 
 /** Shape zustand's `persist` middleware writes to localStorage — see

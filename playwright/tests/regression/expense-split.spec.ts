@@ -1,9 +1,8 @@
 import {expect, test} from "../../fixtures";
 import {faker} from "@faker-js/faker";
 import {randomBankAccount, uniqueSuffix} from "../../test-data/factory";
-import {provisionE2EUser, readRegressionUser} from "../../helpers/auth.helper";
+import {provisionE2EUser, readRegressionUser, storageStateFor} from "../../helpers/auth.helper";
 import {api} from "../../helpers/api.helper";
-import {regressionStorageStatePathFor} from "../../config/env";
 import {FamilyPage} from "../../pages/FamilyPage";
 import {TransactionsPage} from "../../pages/TransactionsPage";
 import type {BrowserContext, Page} from "@playwright/test";
@@ -60,7 +59,15 @@ test.describe("Expense Split", () => {
   let memberName: string;
 
   test.beforeAll(async ({ browser }, testInfo) => {
-    adminContext = await browser.newContext({ storageState: regressionStorageStatePathFor(testInfo.project.name) });
+    // One fresh login, reused both for the browser context below and for the direct API seeding
+    // further down — not loaded from a shared on-disk storageState snapshot. See
+    // fixtures/index.ts's authedContext for why: a baked-in refresh-token cookie shared across
+    // contexts races AuthServiceImpl's rotation-reuse detection.
+    const regressionUser = readRegressionUser(testInfo.project.name);
+    const auth = await api.login({ email: regressionUser.email, password: regressionUser.password });
+    regressionAccessToken = auth.accessToken;
+
+    adminContext = await browser.newContext({ storageState: storageStateFor(auth) });
     adminPage = await adminContext.newPage();
     adminFamilyPage = new FamilyPage(adminPage);
     adminTransactionsPage = new TransactionsPage(adminPage);
@@ -68,9 +75,6 @@ test.describe("Expense Split", () => {
     // This file may run in isolation (a fresh regressionUser with zero accounts) or as part of a
     // full pass where earlier files already seeded some — either way, the expense this spec adds
     // needs at least one to exist, so seed one directly rather than assuming.
-    const regressionUser = readRegressionUser(testInfo.project.name);
-    const auth = await api.login({ email: regressionUser.email, password: regressionUser.password });
-    regressionAccessToken = auth.accessToken;
     const bank = randomBankAccount();
     const account = await api.createAccount(regressionAccessToken, {
       accountType: "BANK_ACCOUNT", name: bank.bankName, bankName: bank.bankName, openingBalance: bank.openingBalance,

@@ -96,10 +96,31 @@ jobs:
       # playwright/config/env.ts loads ../../.env (the repo-root file generated above) via
       # dotenv, so API_URL/DB_PASSWORD/everything else here is already the right, browser-and-
       # runner-reachable value — nothing to override per-step.
-      - name: Run E2E suite
+      #
+      # Regression runs separately, pinned to one worker (npm run test:regression), same as it
+      # already was for its own dedicated script — every file in tests/regression/ shares one
+      # regressionUser and some of what they create/delete (a family, a Cash Wallet singleton) is
+      # real cross-file mutable state (see README's "Two provisioned users" and
+      # expense-split.spec.ts's own comment on family.spec.ts). Running it via the combined `npm
+      # test` (workers: 4 in CI, fullyParallel: true) let two regression files' real UI sessions
+      # race each other — confirmed concretely two ways: (1) two files creating/deleting a family
+      # for the same regressionUser concurrently, one file's leftover family showing up mid-run in
+      # another file's "starts from onboarding" test; (2) multiple files' cold page loads each
+      # redeeming the same session's refresh-token cookie close enough together to trip
+      # AuthServiceImpl's reuse-detection grace window and force a real logout. Everything else
+      # under tests/ has no such shared-mutable-state dependency (a11y/performance/visual/
+      # responsive are read-only against whatever regressionUser *this* pass's own global-setup
+      # provisions; auth/smoke/oauth use their own dedicated users), so it keeps running in
+      # parallel exactly as `npm test` already did.
+      - name: Run E2E suite — regression (single worker)
         if: ${{ github.event.inputs.update_snapshots != 'true' }}
         working-directory: playwright
-        run: npm test
+        run: npm run test:regression
+
+      - name: Run E2E suite — everything else (parallel)
+        if: ${{ github.event.inputs.update_snapshots != 'true' }}
+        working-directory: playwright
+        run: npx playwright test tests/a11y tests/auth tests/oauth tests/performance tests/responsive tests/smoke tests/visual --project=chromium
 
       # Screenshots are platform-sensitive (font rendering differs), so a baseline generated
       # locally on a dev machine's OS never matches this runner's Linux rendering — every
