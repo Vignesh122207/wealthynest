@@ -8,13 +8,13 @@ import software.amazon.awscdk.CfnOutput;
 import software.amazon.awscdk.Duration;
 import software.amazon.awscdk.Stack;
 import software.amazon.awscdk.StackProps;
-import software.amazon.awscdk.services.ec2.Instance;
 import software.amazon.awscdk.services.iam.Effect;
 import software.amazon.awscdk.services.iam.OpenIdConnectPrincipal;
 import software.amazon.awscdk.services.iam.OpenIdConnectProvider;
 import software.amazon.awscdk.services.iam.PolicyStatement;
 import software.amazon.awscdk.services.iam.Role;
 import software.amazon.awscdk.services.s3.Bucket;
+import software.amazon.awscdk.services.ssm.StringParameter;
 import software.constructs.Construct;
 
 /**
@@ -46,12 +46,11 @@ import software.constructs.Construct;
  *       what actually provision resources.</li>
  * </ul>
  *
- * <p>Created last (depends on Compute's instance and Storage's bucket) so it can reference their
- * ARNs without risking the kind of cross-stack cycle documented on {@link DatabaseStack}.
- *
- * <p>TEMPORARY (phase 1 of the 2026-08-02 export-migration rollout, see ComputeStack): reverted
- * to taking Compute's Instance directly again so this deploy doesn't touch the still-imported
- * export. Switch back to the SSM parameter in phase 2, once nothing imports it.
+ * <p>Created last (depends on Storage's bucket directly via a CDK Ref, and on Compute via an
+ * explicit deploy-order dependency added in {@code InfrastructureApp} - it reads Compute's
+ * instance ID through the SSM parameter {@link ComputeStack#APP_SERVER_INSTANCE_ID_PARAM} rather
+ * than a CDK Ref, so it never risks the kind of cross-stack cycle documented on
+ * {@link DatabaseStack}, and never blocks Compute from replacing that instance).
  */
 public class CicdStack extends Stack {
 
@@ -60,10 +59,12 @@ public class CicdStack extends Stack {
         String id,
         StackProps props,
         AppConfig config,
-        Instance appInstance,
         Bucket backupBucket
     ) {
         super(scope, id, props);
+
+        String appInstanceId = StringParameter.valueForStringParameter(
+            this, config.namespace(ComputeStack.APP_SERVER_INSTANCE_ID_PARAM));
 
         OpenIdConnectProvider githubOidcProvider = OpenIdConnectProvider.Builder.create(this, "GitHubOidcProvider")
             .url("https://token.actions.githubusercontent.com")
@@ -100,12 +101,21 @@ public class CicdStack extends Stack {
             .maxSessionDuration(Duration.hours(1))
             .build();
         backupBucket.grantReadWrite(backendDeployRole, "backend-releases/*");
+        // backend.yml itself (not just this stack's own SendCommand scoping above) needs to know
+        // which instance to target at workflow-run time - it reads this same parameter at runtime
+        // instead of a static repo variable, so a future instance replacement (AMI bump, instance
+        // type change, ...) can't leave it pointed at a terminated instance the way a hardcoded
+        // AWS_APP_INSTANCE_ID repo variable did on 2026-08-02.
+        StringParameter.fromStringParameterName(
+            this, "AppServerInstanceIdParameterForBackendDeploy",
+            config.namespace(ComputeStack.APP_SERVER_INSTANCE_ID_PARAM)
+        ).grantRead(backendDeployRole);
         backendDeployRole.addToPolicy(PolicyStatement.Builder.create()
             .effect(Effect.ALLOW)
             .actions(List.of("ssm:SendCommand"))
             .resources(List.of(
                 formatArn(ArnComponents.builder()
-                    .service("ec2").resource("instance").resourceName(appInstance.getInstanceId()).build()),
+                    .service("ec2").resource("instance").resourceName(appInstanceId).build()),
                 "arn:%s:ssm:%s::document/AWS-RunShellScript".formatted(getPartition(), getRegion())
             ))
             .build());
