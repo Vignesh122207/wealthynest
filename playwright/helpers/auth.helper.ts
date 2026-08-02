@@ -147,6 +147,7 @@ async function provisionAndWriteUserFile(userFilePath: string): Promise<E2EUser>
     type: "EXPENSE",
   });
 
+  fs.mkdirSync(path.dirname(userFilePath), { recursive: true });
   fs.writeFileSync(
     userFilePath,
     JSON.stringify({
