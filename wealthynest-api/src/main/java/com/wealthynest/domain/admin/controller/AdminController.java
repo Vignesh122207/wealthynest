@@ -87,6 +87,17 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.success(saved));
     }
 
+    // Fulfils the "permanent erasure" promise on the public /delete-account page — unlike anonymize
+    // (which keeps financial records for audit/compliance), this irreversibly removes the account
+    // and every row it owns.
+    @DeleteMapping("/users/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteUserPermanently(
+            @PathVariable UUID id, HttpServletRequest request) {
+        UUID actorId = SecurityUtils.getCurrentUserId().orElse(null);
+        adminService.deleteUserPermanently(id, actorId, clientIpResolver.resolve(request), request.getHeader("User-Agent"));
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
     // ── Audit Logs ────────────────────────────────────────────────────────────
 
     @GetMapping("/audit-logs")

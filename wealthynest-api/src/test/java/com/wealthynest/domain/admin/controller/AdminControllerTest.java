@@ -29,6 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -187,6 +188,33 @@ class AdminControllerTest {
                         .param("cron", "0 15 3 * * *"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.cronExpression").value("0 15 3 * * *"));
+    }
+
+    @Test
+    @DisplayName("deleteUserPermanently delegates to the service using the authenticated actor's id")
+    void deleteUserPermanentlyDelegatesToService() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null, UserRole.ADMIN);
+        UUID targetId = UUID.randomUUID();
+
+        mockMvc.perform(delete("/api/v1/admin/users/{id}", targetId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        org.mockito.Mockito.verify(adminService).deleteUserPermanently(eq(targetId), eq(userId), any(), any());
+    }
+
+    @Test
+    @DisplayName("deleteUserPermanently propagates a CONFLICT when the service blocks on an open support ticket")
+    void deleteUserPermanentlyOpenTicketReturns409() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null, UserRole.ADMIN);
+        UUID targetId = UUID.randomUUID();
+        doThrow(new com.wealthynest.common.exception.BusinessException(
+                "This user has an open support ticket. Resolve or close it before permanent deletion.",
+                org.springframework.http.HttpStatus.CONFLICT))
+                .when(adminService).deleteUserPermanently(eq(targetId), eq(userId), any(), any());
+
+        mockMvc.perform(delete("/api/v1/admin/users/{id}", targetId))
+                .andExpect(status().isConflict());
     }
 
     // ── Remaining admin endpoints ────────────────────────────────────────────

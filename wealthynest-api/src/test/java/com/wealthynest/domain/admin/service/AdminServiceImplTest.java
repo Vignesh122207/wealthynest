@@ -4,9 +4,17 @@ import com.wealthynest.common.audit.AuditLogRepository;
 import com.wealthynest.common.audit.AuditService;
 import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
+import com.wealthynest.domain.account.repository.AccountTransferRepository;
+import com.wealthynest.domain.asset.repository.AssetRepository;
 import com.wealthynest.domain.auth.repository.RefreshTokenRepository;
 import com.wealthynest.domain.auth.repository.WebAuthnCredentialRepository;
 import com.wealthynest.domain.auth.service.AuthService;
+import com.wealthynest.domain.expense.repository.ExpenseRepository;
+import com.wealthynest.domain.expensesplit.repository.ExpenseSplitRepository;
+import com.wealthynest.domain.investment.repository.InvestmentIncomeLogRepository;
+import com.wealthynest.domain.liability.repository.LiabilityRepository;
+import com.wealthynest.domain.support.entity.SupportTicket;
+import com.wealthynest.domain.support.repository.SupportTicketRepository;
 import com.wealthynest.domain.user.dto.response.UserResponse;
 import com.wealthynest.domain.user.entity.User;
 import com.wealthynest.domain.user.entity.UserRole;
@@ -43,6 +51,13 @@ class AdminServiceImplTest {
     @Mock private AuditService                 auditService;
     @Mock private VaultItemRepository          vaultItemRepository;
     @Mock private WebAuthnCredentialRepository webAuthnCredentialRepository;
+    @Mock private AssetRepository              assetRepository;
+    @Mock private LiabilityRepository          liabilityRepository;
+    @Mock private ExpenseRepository            expenseRepository;
+    @Mock private ExpenseSplitRepository       expenseSplitRepository;
+    @Mock private InvestmentIncomeLogRepository investmentIncomeLogRepository;
+    @Mock private AccountTransferRepository    accountTransferRepository;
+    @Mock private SupportTicketRepository      supportTicketRepository;
 
     @InjectMocks
     private AdminServiceImpl service;
@@ -184,6 +199,60 @@ class AdminServiceImplTest {
             assertThat(user.getPinEnabledAt()).isNull();
             verify(vaultItemRepository).deleteByUserId(targetId);
             verify(webAuthnCredentialRepository).deleteByUserId(targetId);
+        }
+    }
+
+    // ─── deleteUserPermanently ───────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("deleteUserPermanently")
+    class DeleteUserPermanentlyTests {
+
+        @Test
+        @DisplayName("blocks an admin from permanently deleting their own account")
+        void blocksSelfDeletion() {
+            assertThatThrownBy(() -> service.deleteUserPermanently(actorId, actorId, "ip", "ua"))
+                    .isInstanceOf(BusinessException.class);
+            verifyNoInteractions(userRepository);
+        }
+
+        @Test
+        @DisplayName("refuses to delete a user with an open or in-progress support ticket")
+        void blocksWhenOpenTicketExists() {
+            User user = withId(User.builder().email("a@x.com").build());
+            when(userRepository.findById(targetId)).thenReturn(Optional.of(user));
+            when(supportTicketRepository.existsByUserIdAndStatusIn(
+                    eq(targetId), eq(java.util.List.of(SupportTicket.Status.OPEN, SupportTicket.Status.IN_PROGRESS))))
+                    .thenReturn(true);
+
+            assertThatThrownBy(() -> service.deleteUserPermanently(targetId, actorId, "ip", "ua"))
+                    .isInstanceOf(BusinessException.class);
+            verify(userRepository, never()).delete(any());
+            verifyNoInteractions(assetRepository, expenseRepository);
+        }
+
+        @Test
+        @DisplayName("deletes owned financial data in dependency order, then the user row, and audit-logs the email")
+        void deletesOwnedDataThenUser() {
+            User user = withId(User.builder().email("alice@x.com").fullName("Alice").build());
+            when(userRepository.findById(targetId)).thenReturn(Optional.of(user));
+            when(supportTicketRepository.existsByUserIdAndStatusIn(any(), any())).thenReturn(false);
+
+            service.deleteUserPermanently(targetId, actorId, "ip", "ua");
+
+            var order = inOrder(investmentIncomeLogRepository, accountTransferRepository, assetRepository, userRepository);
+            order.verify(investmentIncomeLogRepository).deleteByUserId(targetId);
+            order.verify(accountTransferRepository).deleteByUserId(targetId);
+            order.verify(assetRepository).deleteByUserId(targetId);
+            order.verify(userRepository).delete(user);
+
+            verify(expenseSplitRepository).deleteByPayerUserIdOrParticipantUserId(targetId, targetId);
+            verify(expenseRepository).deleteByUserId(targetId);
+            verify(liabilityRepository).deleteByUserId(targetId);
+            verify(vaultItemRepository).deleteByUserId(targetId);
+            verify(webAuthnCredentialRepository).deleteByUserId(targetId);
+            verify(auditService).log(eq(actorId), eq("USER_DELETED_PERMANENTLY"), eq("USER"), eq(targetId),
+                    argThat(m -> "alice@x.com".equals(m.get("email"))), isNull(), eq("ip"), eq("ua"));
         }
     }
 

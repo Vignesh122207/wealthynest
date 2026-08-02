@@ -18,5 +18,9 @@ public interface AdminService {
     /** Triggers the forced-reset email and returns the target user's email for the confirmation message. */
     String resetPassword(UUID targetId, UUID actorId, String ipAddress, String userAgent);
     UserResponse anonymizeUser(UUID targetId, UUID actorId, String ipAddress, String userAgent);
+    /** Irreversibly erases the target's account and all their owned financial data (the "permanent
+     * erasure" promised on the public delete-account page), as opposed to anonymizeUser which keeps
+     * financial records for audit/compliance and only scrubs identity. */
+    void deleteUserPermanently(UUID targetId, UUID actorId, String ipAddress, String userAgent);
     PagedResponse<AuditLogResponse> getAuditLogs(Pageable pageable, UUID userId, String action);
 }
