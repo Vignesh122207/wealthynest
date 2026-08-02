@@ -76,6 +76,12 @@ export const authApi = {
   deletePasskey: async (id: string): Promise<void> => {
     await apiClient.delete(`/users/me/webauthn/passkeys/${id}`);
   },
+  // Challenge for re-proving an already-authenticated session with a registered passkey — used
+  // as a Vault reveal/export step-up credential (see useVaultWebAuthnStepUp). Unlike
+  // getPasskeyLoginOptions, this is authenticated and needs no email: the backend already knows
+  // which account's credentials to allow.
+  getVaultStepUpOptions: async (): Promise<PublicKeyCredentialRequestOptionsJSON> =>
+    (await apiClient.post<ApiResponse<PublicKeyCredentialRequestOptionsJSON>>("/users/me/webauthn/step-up/options")).data.data,
   getPasskeyLoginOptions: async (email: string): Promise<PublicKeyCredentialRequestOptionsJSON> =>
     (await apiClient.post<ApiResponse<PublicKeyCredentialRequestOptionsJSON>>("/auth/webauthn/login/options", { email })).data.data,
   // No previousRefreshToken param — this device's existing session (if any) is read off the

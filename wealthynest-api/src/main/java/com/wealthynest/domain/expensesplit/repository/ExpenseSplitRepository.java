@@ -19,6 +19,12 @@ public interface ExpenseSplitRepository extends JpaRepository<ExpenseSplit, UUID
     List<ExpenseSplit> findByPayerUserIdAndStatus(UUID payerUserId, SplitStatus status);
     List<ExpenseSplit> findByExpenseId(UUID expenseId);
 
+    /** Used for permanent account erasure. Splits where the target was the payer are already
+     * removed once their own expenses cascade-delete (expense_id ON DELETE CASCADE) — this also
+     * covers splits where they were only a participant on someone else's expense, which has no
+     * cascade path since payer/participant_user_id carry no FK. */
+    void deleteByPayerUserIdOrParticipantUserId(UUID payerUserId, UUID participantUserId);
+
     @Query("SELECT COALESCE(SUM(s.shareAmount), 0) FROM ExpenseSplit s WHERE s.expenseId = :expenseId")
     BigDecimal sumSharesByExpenseId(@Param("expenseId") UUID expenseId);
 

@@ -67,6 +67,12 @@ export const adminApi = {
   resetPassword: async (id: string): Promise<string> =>
     (await apiClient.post<ApiResponse<string>>(`/admin/users/${id}/reset-password`)).data.data,
 
+  // Irreversible — erases the account and every row it owns. See /delete-account's "permanent
+  // erasure" promise; distinct from a soft deactivate (toggleActive).
+  deleteUserPermanently: async (id: string): Promise<void> => {
+    await apiClient.delete<ApiResponse<void>>(`/admin/users/${id}`);
+  },
+
   // ── User Growth ───────────────────────────────────────────────────────────
 
   getUserGrowth: async (): Promise<UserGrowthPoint[]> =>

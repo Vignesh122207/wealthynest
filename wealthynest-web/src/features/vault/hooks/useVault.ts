@@ -3,6 +3,8 @@
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {toast} from "sonner";
 import {QUERY_KEYS} from "@/lib/constants";
+import {authApi} from "@/features/auth/api/auth.api";
+import {getPasskeyAssertion} from "@/features/auth/utils/webauthn";
 import {type StepUpCredential, vaultApi} from "../api/vault.api";
 import type {VaultItemPayload} from "../types/vault.types";
 
@@ -70,5 +72,21 @@ export function useRevealVaultSecret() {
 export function useExportVault() {
   return useMutation({
     mutationFn: (stepUp: StepUpCredential) => vaultApi.exportCsv(stepUp),
+  });
+}
+
+// Runs the passkey ceremony (fetch challenge, prompt the platform authenticator) and hands back
+// the raw assertion for RevealSecretModal/ExportVaultModal to submit as the request's
+// passkeyCredential — same "fetch options, then getPasskeyAssertion" shape as
+// useUnlockWithPasskey, minus that hook's own token issuance since this isn't a login. No onError
+// toast: cancelling the OS prompt is a normal outcome (see useRegisterPasskey's own
+// NotAllowedError-is-silent convention) and a genuine failure surfaces inline via the modal's
+// shared apiErrorMessage, same as a wrong password/PIN.
+export function useVaultWebAuthnStepUp() {
+  return useMutation({
+    mutationFn: async (): Promise<PublicKeyCredentialJSON> => {
+      const options = await authApi.getVaultStepUpOptions();
+      return getPasskeyAssertion(options);
+    },
   });
 }

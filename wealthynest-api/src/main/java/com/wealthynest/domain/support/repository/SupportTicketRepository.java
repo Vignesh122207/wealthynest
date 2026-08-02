@@ -19,4 +19,10 @@ public interface SupportTicketRepository extends JpaRepository<SupportTicket, UU
 
     @Query("SELECT COUNT(t) FROM SupportTicket t WHERE t.status = 'OPEN'")
     long countOpen();
+
+    /** Gate for permanent account erasure — an open/in-progress ticket may be an active dispute or
+     * fraud investigation, which the deletion promise (see delete-account page) carves out as an
+     * exception. support_tickets.user_id cascades unconditionally on user delete, so this has to be
+     * checked and blocked at the application layer before deletion, not left to the DB. */
+    boolean existsByUserIdAndStatusIn(UUID userId, java.util.Collection<SupportTicket.Status> statuses);
 }

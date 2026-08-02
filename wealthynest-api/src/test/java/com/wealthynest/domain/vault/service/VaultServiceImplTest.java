@@ -6,6 +6,7 @@ import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.common.security.VaultEncryptionService;
 import com.wealthynest.common.security.VaultSecretHasher;
+import com.wealthynest.domain.auth.service.WebAuthnService;
 import com.wealthynest.domain.user.entity.User;
 import com.wealthynest.domain.user.repository.UserRepository;
 import com.wealthynest.domain.vault.dto.request.RevealVaultItemRequest;
@@ -54,6 +55,7 @@ class VaultServiceImplTest {
     @Mock private AuditService           auditService;
     @Mock private StringRedisTemplate    redisTemplate;
     @Mock private ValueOperations<String, String> valueOperations;
+    @Mock private WebAuthnService        webAuthnService;
     private RestClient hibpClient;
 
     private VaultServiceImpl service;
@@ -68,7 +70,8 @@ class VaultServiceImplTest {
         // and VaultServiceImpl's checkBreach() is fail-open by design (catches and returns null).
         hibpClient = mock(RestClient.class, Answers.RETURNS_DEEP_STUBS);
         service = new VaultServiceImpl(vaultItemRepository, vaultItemMapper, vaultEncryptionService,
-                vaultSecretHasher, userRepository, passwordEncoder, auditService, redisTemplate, hibpClient);
+                vaultSecretHasher, userRepository, passwordEncoder, auditService, redisTemplate, hibpClient,
+                webAuthnService);
         lenient().when(vaultItemMapper.toResponse(any(VaultItem.class))).thenAnswer(inv -> {
             VaultItem item = inv.getArgument(0);
             return VaultItemResponse.builder().id(item.getId()).title(item.getTitle()).favorite(item.isFavorite()).build();
@@ -321,6 +324,12 @@ class VaultServiceImplTest {
             return req;
         }
 
+        private RevealVaultItemRequest passkeyRevealRequest(java.util.Map<String, Object> credential) {
+            RevealVaultItemRequest req = new RevealVaultItemRequest();
+            ReflectionTestUtils.setField(req, "passkeyCredential", credential);
+            return req;
+        }
+
         @Test
         @DisplayName("returns the decrypted secret and clears the failed-attempt counter on correct password")
         void returnsDecryptedSecretOnSuccess() {
@@ -487,6 +496,50 @@ class VaultServiceImplTest {
                     .isInstanceOf(BusinessException.class)
                     .hasMessageContaining("Too many incorrect password attempts");
             verifyNoInteractions(passwordEncoder, userRepository);
+        }
+
+        @Test
+        @DisplayName("returns the decrypted secret on a verified passkey assertion, without touching password or PIN at all")
+        void returnsDecryptedSecretOnVerifiedPasskey() {
+            java.util.Map<String, Object> credential = java.util.Map.of("id", "cred-1");
+            when(valueOperations.get(anyString())).thenReturn(null);
+            when(vaultEncryptionService.decrypt("ct", "iv", 1)).thenReturn("plaintext-secret");
+            when(vaultItemRepository.save(any(VaultItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            VaultItemSecretResponse response = service.revealSecret(itemId, userId, passkeyRevealRequest(credential), "1.2.3.4", "ua");
+
+            assertThat(response.getSecret()).isEqualTo("plaintext-secret");
+            verify(webAuthnService).verifyStepUp(userId, credential);
+            verifyNoInteractions(userRepository, passwordEncoder);
+            verify(redisTemplate).delete(anyString());
+        }
+
+        @Test
+        @DisplayName("throws and increments the same counter password/PIN attempts use, when the passkey assertion fails verification")
+        void throwsAndIncrementsSharedCounterOnFailedPasskey() {
+            java.util.Map<String, Object> credential = java.util.Map.of("id", "cred-1");
+            when(valueOperations.get(anyString())).thenReturn(null);
+            when(valueOperations.increment(anyString())).thenReturn(1L);
+            doThrow(new BusinessException("Couldn't verify that passkey.", org.springframework.http.HttpStatus.UNAUTHORIZED))
+                    .when(webAuthnService).verifyStepUp(userId, credential);
+
+            assertThatThrownBy(() -> service.revealSecret(itemId, userId, passkeyRevealRequest(credential), "1.2.3.4", "ua"))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("Couldn't verify that passkey");
+
+            verify(valueOperations).increment("vault-reveal-attempts:" + userId);
+            verifyNoInteractions(vaultEncryptionService);
+        }
+
+        @Test
+        @DisplayName("a lockout from prior failed attempts blocks a passkey attempt too, without calling WebAuthnService")
+        void lockoutAlsoBlocksPasskeyAttempt() {
+            when(valueOperations.get(anyString())).thenReturn("5");
+
+            assertThatThrownBy(() -> service.revealSecret(itemId, userId, passkeyRevealRequest(java.util.Map.of("id", "cred-1")), "1.2.3.4", "ua"))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("Too many incorrect attempts");
+            verifyNoInteractions(webAuthnService);
         }
     }
 

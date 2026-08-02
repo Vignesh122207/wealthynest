@@ -253,4 +253,56 @@ class WebAuthnServiceImplTest {
                     .isInstanceOf(BusinessException.class);
         }
     }
+
+    // ─── getStepUpOptions ────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("getStepUpOptions")
+    class GetStepUpOptionsTests {
+
+        @Test
+        @DisplayName("throws when the account has no registered passkey — nothing to step up with")
+        void throwsWhenNoPasskeysRegistered() {
+            when(credentialRepository.findByUserId(userId)).thenReturn(List.of());
+
+            assertThatThrownBy(() -> service.getStepUpOptions(userId)).isInstanceOf(BusinessException.class);
+            verify(valueOperations, never()).set(anyString(), anyString(), any(Duration.class));
+        }
+
+        @Test
+        @DisplayName("stores a fresh challenge in Redis under the per-user step-up key and lists the user's own credentials")
+        void storesChallengeAndListsOwnCredentials() {
+            WebAuthnCredential cred = WebAuthnCredential.builder().userId(userId).credentialId(new byte[]{1, 2, 3}).build();
+            when(credentialRepository.findByUserId(userId)).thenReturn(List.of(cred));
+
+            Map<String, Object> options = service.getStepUpOptions(userId);
+
+            verify(valueOperations).set(eq("webauthn-stepup-challenge:" + userId), anyString(), eq(Duration.ofMinutes(5)));
+            assertThat((List<?>) options.get("allowCredentials")).isNotEmpty();
+        }
+    }
+
+    // ─── verifyStepUp ────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("verifyStepUp")
+    class VerifyStepUpTests {
+
+        @Test
+        @DisplayName("throws UNAUTHORIZED when the step-up challenge has expired or was never started")
+        void throwsWhenChallengeMissing() {
+            when(valueOperations.get("webauthn-stepup-challenge:" + userId)).thenReturn(null);
+            assertThatThrownBy(() -> service.verifyStepUp(userId, Map.of())).isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("throws for a malformed/unreadable credential payload")
+        void throwsForMalformedCredential() {
+            when(valueOperations.get("webauthn-stepup-challenge:" + userId))
+                    .thenReturn(java.util.Base64.getEncoder().encodeToString(new byte[32]));
+
+            assertThatThrownBy(() -> service.verifyStepUp(userId, Map.of("garbage", "data")))
+                    .isInstanceOf(BusinessException.class);
+        }
+    }
 }

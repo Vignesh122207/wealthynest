@@ -1,10 +1,11 @@
 import {useEffect, useState} from "react";
-import {KeyRound, RefreshCw, Search, X} from "lucide-react";
+import {KeyRound, RefreshCw, Search, Trash2, X} from "lucide-react";
 import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
 import {PAGE_SIZE_OPTIONS, PaginationBar} from "./PaginationBar";
 import {useAuthStore} from "@/features/auth/store/auth.store";
 import {
     useAdminUsers,
+    useDeleteUserPermanently,
     useResetUserPassword,
     useToggleUserActive,
     useUpdateUserRole,
@@ -32,6 +33,7 @@ export function UsersTab() {
   const [search, setSearch]               = useState("");
   const [pageSize, setPageSize]           = useState(20);
   const [resetConfirmId, setResetConfirmId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget]     = useState<User | null>(null);
 
   const debouncedSearch = useDebounce(search, 350);
   useEffect(() => { setPage(0); }, [debouncedSearch, pageSize]);
@@ -40,6 +42,7 @@ export function UsersTab() {
   const { mutate: toggleActive, isPending: toggling } = useToggleUserActive();
   const { mutate: updateRole }                        = useUpdateUserRole();
   const { mutate: resetPassword } = useResetUserPassword();
+  const { mutate: deletePermanently, isPending: deleting } = useDeleteUserPermanently();
 
   const users         = usersPage?.data ?? [];
   const totalPages    = usersPage?.meta?.totalPages    ?? 1;
@@ -139,6 +142,10 @@ export function UsersTab() {
                           className="p-1.5 rounded-lg border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10 transition-colors">
                           <KeyRound className="w-3.5 h-3.5" />
                         </button>
+                        <button onClick={() => setDeleteTarget(u)} title="Permanently delete account"
+                          className="p-1.5 rounded-lg border border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     )}
                   </td>
@@ -161,6 +168,21 @@ export function UsersTab() {
           confirmLabel="Send reset email"
           onConfirm={() => { resetPassword(resetConfirmId); setResetConfirmId(null); }}
           onCancel={() => setResetConfirmId(null)} />
+      )}
+
+      {deleteTarget && (
+        <ConfirmDialog open danger
+          title="Permanently delete this account?"
+          description={<>
+            This erases <span className="font-medium text-foreground">{deleteTarget.fullName}</span>&apos;s
+            account and all their expenses, budgets, goals, investments, assets, and liabilities. This can&apos;t
+            be undone and isn&apos;t the same as deactivating — use Deactivate if the account might come back.
+          </>}
+          confirmLabel="Delete permanently"
+          typeToConfirm={deleteTarget.email}
+          loading={deleting}
+          onConfirm={() => deletePermanently(deleteTarget.id, { onSuccess: () => setDeleteTarget(null) })}
+          onCancel={() => setDeleteTarget(null)} />
       )}
     </>
   );

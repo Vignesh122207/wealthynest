@@ -41,6 +41,15 @@ export function useResetUserPassword() {
   });
 }
 
+export function useDeleteUserPermanently() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => adminApi.deleteUserPermanently(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin"] }); toast.success("Account permanently deleted"); },
+    onError:   (e: unknown) => toast.error(apiErrorMessage(e, "Failed to delete user")),
+  });
+}
+
 export function useAdminAuditLogs(page = 0, size = 20, userId?: string, action?: string) {
   return useQuery({
     queryKey: ["admin", "audit-logs", page, size, userId, action],

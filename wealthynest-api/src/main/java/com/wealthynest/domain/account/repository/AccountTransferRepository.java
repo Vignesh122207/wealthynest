@@ -18,6 +18,10 @@ public interface AccountTransferRepository extends JpaRepository<AccountTransfer
 
     Page<AccountTransfer> findByUserIdOrderByTransferDateDesc(UUID userId, Pageable pageable);
 
+    /** Used for permanent account erasure — from/to_account_id are ON DELETE RESTRICT, so this
+     * must run before the wallet_accounts it references cascade-delete with the user. */
+    void deleteByUserId(UUID userId);
+
     /** Legacy — only used for cascade-delete when an account is removed. */
     @Query("SELECT t FROM AccountTransfer t WHERE t.fromAccountId = :id OR t.toAccountId = :id ORDER BY t.transferDate DESC")
     List<AccountTransfer> findByAccountId(UUID id);

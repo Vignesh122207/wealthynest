@@ -7,6 +7,7 @@ import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.common.security.VaultEncryptionService;
 import com.wealthynest.common.security.VaultSecretHasher;
 import com.wealthynest.common.util.CsvSanitizer;
+import com.wealthynest.domain.auth.service.WebAuthnService;
 import com.wealthynest.domain.user.entity.User;
 import com.wealthynest.domain.user.repository.UserRepository;
 import com.wealthynest.domain.vault.dto.request.RevealVaultItemRequest;
@@ -45,12 +46,16 @@ import java.util.stream.Collectors;
 /**
  * Vault items are server-side encrypted (see {@link VaultEncryptionService}), so a valid JWT alone
  * is enough to list/edit metadata — but revealing the decrypted secret additionally requires
- * re-confirming the account password or PIN ("step-up" auth), so a leaked/stolen access token
- * can't be used alone to dump every stored password. Native biometric deliberately isn't accepted
- * here — see nativeBiometric.ts on the frontend — it proves nothing to the server, unlike password
- * and PIN, which are both checked against a real stored hash. Failed reveal attempts are
- * rate-limited per user via Redis, mirroring {@code TokenRevocationService}'s use of Redis for
- * auth-adjacent state.
+ * re-confirming the account password, PIN, or a registered passkey ("step-up" auth), so a
+ * leaked/stolen access token can't be used alone to dump every stored password. Bare native
+ * biometric (the phone's own fingerprint/face prompt, unbacked by any credential — see
+ * nativeBiometric.ts on the frontend) deliberately isn't accepted here: it proves nothing to the
+ * server. A passkey is different — it's a real WebAuthn assertion the server verifies
+ * cryptographically against a stored public key (see WebAuthnService#verifyStepUp), typically
+ * unlocked by that same fingerprint/face prompt, so it gets to sit alongside password/PIN as a
+ * third accepted credential rather than being excluded the way the bare biometric check is. Failed
+ * reveal attempts are rate-limited per user via Redis, mirroring {@code TokenRevocationService}'s
+ * use of Redis for auth-adjacent state.
  */
 @Slf4j
 @Service
@@ -69,6 +74,7 @@ public class VaultServiceImpl implements VaultService {
     private final AuditService          auditService;
     private final StringRedisTemplate   redisTemplate;
     private final RestClient            hibpClient;
+    private final WebAuthnService       webAuthnService;
 
     @Override
     @Transactional
@@ -373,10 +379,10 @@ public class VaultServiceImpl implements VaultService {
 
     /** Authenticates a step-up action (reveal/export): a valid, unexpired {@code stepUpToken}
      * (opt-in "trust this device", issued by a prior successful reveal) short-circuits straight
-     * through without touching the password/PIN or lockout state at all. Otherwise falls back to
-     * whichever credential the request actually carries — PIN if present, else password — both
-     * rate-limited under the same {@code scope} counter, since either one is an attempt at the
-     * same sensitive action regardless of which credential was used to make it. */
+     * through without touching the password/PIN/passkey or lockout state at all. Otherwise falls
+     * back to whichever credential the request actually carries — PIN, then passkey, then
+     * password — all three rate-limited under the same {@code scope} counter, since each is an
+     * attempt at the same sensitive action regardless of which credential was used to make it. */
     private void requireStepUp(String scope, UUID userId, RevealVaultItemRequest request,
                                 String ipAddress, String userAgent) {
         String token = request.getStepUpToken();
@@ -386,6 +392,11 @@ public class VaultServiceImpl implements VaultService {
         String pin = request.getPin();
         if (pin != null && !pin.isBlank()) {
             requireStepUpPin(scope, userId, pin, ipAddress, userAgent);
+            return;
+        }
+        Map<String, Object> passkeyCredential = request.getPasskeyCredential();
+        if (passkeyCredential != null && !passkeyCredential.isEmpty()) {
+            requireStepUpPasskey(scope, userId, passkeyCredential, ipAddress, userAgent);
             return;
         }
         String currentPassword = request.getCurrentPassword();
@@ -439,6 +450,28 @@ public class VaultServiceImpl implements VaultService {
         if (!passwordEncoder.matches(pin, user.getPinHash())) {
             registerFailedAttempt(scope, userId, ipAddress, userAgent);
             throw new BusinessException("Incorrect PIN", HttpStatus.UNAUTHORIZED);
+        }
+        clearFailedAttempts(scope, userId);
+    }
+
+    /** Passkey counterpart to {@code requireStepUpPassword}/{@code requireStepUpPin} — same
+     * {@code scope} lockout counter (an expired challenge, an unrecognized/foreign credential, or
+     * a failed cryptographic verification all count the same as a wrong password toward the shared
+     * limit; success clears it for all three). Delegates the actual WebAuthn verification to
+     * {@link WebAuthnService#verifyStepUp}, which already throws the right {@link BusinessException}/
+     * {@link AccessDeniedException} for each failure mode — this just wraps that in the same
+     * lockout bookkeeping the other two credentials get. */
+    private void requireStepUpPasskey(String scope, UUID userId, Map<String, Object> passkeyCredential,
+                                       String ipAddress, String userAgent) {
+        if (isLockedOut(scope, userId)) {
+            throw new BusinessException(
+                    "Too many incorrect attempts. Please try again in 15 minutes.", HttpStatus.LOCKED);
+        }
+        try {
+            webAuthnService.verifyStepUp(userId, passkeyCredential);
+        } catch (BusinessException | AccessDeniedException e) {
+            registerFailedAttempt(scope, userId, ipAddress, userAgent);
+            throw e;
         }
         clearFailedAttempts(scope, userId);
     }

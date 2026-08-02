@@ -140,6 +140,10 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID>, JpaSpec
 
     boolean existsByCategoryId(UUID categoryId);
 
+    /** Used for permanent account erasure — must run before assets/wallet_accounts cascade so
+     * budget_id/account_id/category_id references never dangle. */
+    void deleteByUserId(UUID userId);
+
     @Modifying
     @Query("UPDATE Expense e SET e.accountId = null WHERE e.accountId = :accountId")
     void clearAccountId(@Param("accountId") UUID accountId);

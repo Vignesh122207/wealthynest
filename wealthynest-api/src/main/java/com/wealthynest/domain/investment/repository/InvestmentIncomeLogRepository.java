@@ -40,6 +40,10 @@ public interface InvestmentIncomeLogRepository extends JpaRepository<InvestmentI
 
     List<InvestmentIncomeLog> findByInvestmentId(UUID investmentId);
 
+    /** Used for permanent account erasure — investment_id has no ON DELETE policy, so this must
+     * run before the investments (and the assets that cascade to them) it references are deleted. */
+    void deleteByUserId(UUID userId);
+
     /** income_entry_id has no ON DELETE policy — must be cleared before the income row it points to is deleted. */
     @Modifying
     @Query("UPDATE InvestmentIncomeLog l SET l.incomeEntryId = null WHERE l.incomeEntryId = :incomeEntryId")

@@ -6,10 +6,18 @@ import com.wealthynest.common.audit.AuditService;
 import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.common.response.PagedResponse;
+import com.wealthynest.domain.account.repository.AccountTransferRepository;
+import com.wealthynest.domain.asset.repository.AssetRepository;
 import com.wealthynest.domain.auth.dto.request.ForgotPasswordRequest;
 import com.wealthynest.domain.auth.repository.RefreshTokenRepository;
 import com.wealthynest.domain.auth.repository.WebAuthnCredentialRepository;
 import com.wealthynest.domain.auth.service.AuthService;
+import com.wealthynest.domain.expense.repository.ExpenseRepository;
+import com.wealthynest.domain.expensesplit.repository.ExpenseSplitRepository;
+import com.wealthynest.domain.investment.repository.InvestmentIncomeLogRepository;
+import com.wealthynest.domain.liability.repository.LiabilityRepository;
+import com.wealthynest.domain.support.entity.SupportTicket;
+import com.wealthynest.domain.support.repository.SupportTicketRepository;
 import com.wealthynest.domain.user.dto.response.UserResponse;
 import com.wealthynest.domain.user.entity.User;
 import com.wealthynest.domain.user.entity.UserRole;
@@ -45,6 +53,13 @@ public class AdminServiceImpl implements AdminService {
     private final AuditService                  auditService;
     private final VaultItemRepository           vaultItemRepository;
     private final WebAuthnCredentialRepository  webAuthnCredentialRepository;
+    private final AssetRepository               assetRepository;
+    private final LiabilityRepository           liabilityRepository;
+    private final ExpenseRepository             expenseRepository;
+    private final ExpenseSplitRepository        expenseSplitRepository;
+    private final InvestmentIncomeLogRepository investmentIncomeLogRepository;
+    private final AccountTransferRepository     accountTransferRepository;
+    private final SupportTicketRepository       supportTicketRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -171,6 +186,53 @@ public class AdminServiceImpl implements AdminService {
                 ipAddress, userAgent
         );
         return saved;
+    }
+
+    @Override
+    @Transactional
+    public void deleteUserPermanently(UUID targetId, UUID actorId, String ipAddress, String userAgent) {
+        requireNotSelf(targetId, actorId, "permanently delete");
+        User user = requireUser(targetId);
+
+        // An open/in-progress ticket may be an active dispute or fraud investigation — the erasure
+        // promise on the public delete-account page carves that out as an exception. Checked here
+        // rather than left to the DB: support_tickets.user_id cascades unconditionally on delete.
+        if (supportTicketRepository.existsByUserIdAndStatusIn(
+                targetId, List.of(SupportTicket.Status.OPEN, SupportTicket.Status.IN_PROGRESS))) {
+            throw new BusinessException(
+                    "This user has an open support ticket. Resolve or close it before permanent deletion.",
+                    HttpStatus.CONFLICT);
+        }
+
+        String email    = user.getEmail();
+        String fullName = user.getFullName();
+
+        // Explicit deletes in dependency order, ahead of the final cascading user delete below:
+        // investment_income_log and account_transfers both have FK columns with no ON DELETE
+        // policy (or RESTRICT), so leaving them in place would make the user-row cascade fail.
+        investmentIncomeLogRepository.deleteByUserId(targetId);
+        accountTransferRepository.deleteByUserId(targetId);
+        expenseSplitRepository.deleteByPayerUserIdOrParticipantUserId(targetId, targetId);
+        expenseRepository.deleteByUserId(targetId);
+        assetRepository.deleteByUserId(targetId);
+        liabilityRepository.deleteByUserId(targetId);
+        vaultItemRepository.deleteByUserId(targetId);
+        webAuthnCredentialRepository.deleteByUserId(targetId);
+
+        // Logged before the delete below: audit_logs.user_id is ON DELETE SET NULL, so this row
+        // survives the cascade, but only the email/name captured here keep it readable afterward.
+        auditService.log(
+                actorId, "USER_DELETED_PERMANENTLY", "USER", targetId,
+                Map.of("email", email, "fullName", fullName), null,
+                ipAddress, userAgent
+        );
+
+        // Cascades the rest at the DB level: wallet_accounts, categories, budgets, goals (and their
+        // recurring contributions), debt_records (and payments), recurring_income/transfer,
+        // notifications, notification_preferences, device_tokens, net_worth_snapshots,
+        // refresh_tokens, remaining (non-open) support_tickets and their replies, and
+        // email_verification_tokens.
+        userRepository.delete(user);
     }
 
     @Override

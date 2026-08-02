@@ -16,6 +16,10 @@ public interface AssetRepository extends JpaRepository<Asset, UUID> {
     List<Asset> findByUserIdAndActiveTrue(UUID userId);
     Optional<Asset> findByIdAndUserId(UUID id, UUID userId);
 
+    /** Used for permanent account erasure — cascades to investments (asset_id ON DELETE CASCADE)
+     * at the DB level, so investment_income_log must already be cleared for this user before this runs. */
+    void deleteByUserId(UUID userId);
+
     @Query("SELECT COALESCE(SUM(a.currentValue),0) FROM Asset a WHERE a.userId = :userId AND a.active = true")
     BigDecimal sumCurrentValueByUser(UUID userId);
 

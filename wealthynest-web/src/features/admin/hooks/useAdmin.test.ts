@@ -3,8 +3,8 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { createQueryClientWrapper } from "@/test-utils/queryClientWrapper";
 import {
   useAdminStats, useAdminUsers, useToggleUserActive, useUpdateUserRole, useResetUserPassword,
-  useAdminAuditLogs, useUserGrowth, useAdminJobs, useTriggerJob, useUpdateJobSchedule,
-  useSystemHealth,
+  useDeleteUserPermanently, useAdminAuditLogs, useUserGrowth, useAdminJobs, useTriggerJob,
+  useUpdateJobSchedule, useSystemHealth,
 } from "./useAdmin";
 import { adminApi } from "../api/admin.api";
 import { toast } from "sonner";
@@ -12,7 +12,7 @@ import { toast } from "sonner";
 vi.mock("../api/admin.api", () => ({
   adminApi: {
     getStats: vi.fn(), listUsers: vi.fn(), toggleActive: vi.fn(), updateRole: vi.fn(),
-    resetPassword: vi.fn(), getAuditLogs: vi.fn(), getUserGrowth: vi.fn(),
+    resetPassword: vi.fn(), deleteUserPermanently: vi.fn(), getAuditLogs: vi.fn(), getUserGrowth: vi.fn(),
     listJobs: vi.fn(), triggerJob: vi.fn(), updateSchedule: vi.fn(), getSystemHealth: vi.fn(),
   },
 }));
@@ -90,6 +90,35 @@ describe("useResetUserPassword", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(toast.success).toHaveBeenCalledWith("Password reset email sent");
+  });
+});
+
+describe("useDeleteUserPermanently", () => {
+  it("invalidates the admin key and toasts on success", async () => {
+    mockedApi.deleteUserPermanently.mockResolvedValue(undefined as never);
+    const { Wrapper, queryClient } = createQueryClientWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const { result } = renderHook(() => useDeleteUserPermanently(), { wrapper: Wrapper });
+    result.current.mutate("u1");
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedApi.deleteUserPermanently).toHaveBeenCalledWith("u1");
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["admin"] });
+    expect(toast.success).toHaveBeenCalledWith("Account permanently deleted");
+  });
+
+  it("shows the backend's real error message on failure, e.g. an open support ticket", async () => {
+    mockedApi.deleteUserPermanently.mockRejectedValue({
+      response: { data: { message: "This user has an open support ticket. Resolve or close it before permanent deletion." } },
+    });
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useDeleteUserPermanently(), { wrapper: Wrapper });
+    result.current.mutate("u1");
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(toast.error).toHaveBeenCalledWith("This user has an open support ticket. Resolve or close it before permanent deletion.");
   });
 });
 

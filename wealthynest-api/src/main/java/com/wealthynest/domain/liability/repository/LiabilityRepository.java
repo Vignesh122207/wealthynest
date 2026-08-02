@@ -15,6 +15,9 @@ public interface LiabilityRepository extends JpaRepository<Liability, UUID> {
 
     List<Liability> findByUserIdAndActiveTrueOrderByCreatedAtDesc(UUID userId);
 
+    /** Used for permanent account erasure. */
+    void deleteByUserId(UUID userId);
+
     @Query("SELECT COALESCE(SUM(l.outstandingAmount),0) FROM Liability l WHERE l.userId = :userId AND l.active = true")
     BigDecimal sumOutstandingByUser(UUID userId);
 
