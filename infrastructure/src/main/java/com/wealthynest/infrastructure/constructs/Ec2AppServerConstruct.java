@@ -1,6 +1,7 @@
 package com.wealthynest.infrastructure.constructs;
 
 import java.util.List;
+import java.util.Map;
 import software.amazon.awscdk.Tags;
 import software.amazon.awscdk.services.ec2.BlockDevice;
 import software.amazon.awscdk.services.ec2.BlockDeviceVolume;
@@ -28,24 +29,17 @@ import software.constructs.Construct;
 
 /**
  * A hardened, internet-facing EC2 app server: Ubuntu LTS resolved via Canonical's public SSM AMI
- * parameter, pinned to a specific dated build rather than {@code current} (see
- * {@link #PINNED_UBUNTU_BUILD}), an Elastic IP, an IAM role scoped for SSM Session Manager +
- * CloudWatch Agent only (application permissions are granted separately by whichever stack owns
- * the resource being granted), and a security group that accepts inbound HTTP/HTTPS from
- * Cloudflare's published edge ranges only — never SSH, never 0.0.0.0/0.
+ * parameter (no stale AMI baked into a context cache), an Elastic IP, an IAM role scoped for SSM
+ * Session Manager + CloudWatch Agent only (application permissions are granted separately by
+ * whichever stack owns the resource being granted), and a security group that accepts inbound
+ * HTTP/HTTPS from Cloudflare's published edge ranges only — never SSH, never 0.0.0.0/0.
+ *
+ * <p>TEMPORARY (phase 1 of the 2026-08-02 export-migration rollout, see ComputeStack): AMI
+ * pinning is deliberately reverted to {@code current} here so this deploy stays purely additive
+ * (no instance replacement) while CicdStack/MonitoringStack still import the instance via the old
+ * Ref. Re-pin once the export is safely dropped in phase 2.
  */
 public final class Ec2AppServerConstruct extends Construct {
-
-    // `current` resolves fresh on every `cdk deploy`, not just when someone deliberately bumps
-    // it - Canonical republishes it every few weeks. `ImageId` is an immutable EC2 instance
-    // property, so any drift forces a replacement on the *next* deploy regardless of what that
-    // deploy's actual code change was, and that replacement isn't guaranteed to succeed (see the
-    // 2026-08-01 incident: it got blocked by CicdStack/MonitoringStack still importing the old
-    // instance's exported Ref, and rolled back). Pin to a known-good dated build here instead;
-    // bump it deliberately, in its own reviewed change, when you want to move to a newer one -
-    // check available dates with `aws ssm get-parameters-by-path --recursive --path
-    // /aws/service/canonical/ubuntu/server/26.04/stable`.
-    private static final String PINNED_UBUNTU_BUILD = "20260731";
 
     private final Instance instance;
     private final Role role;
@@ -80,10 +74,14 @@ public final class Ec2AppServerConstruct extends Construct {
             .vpc(props.vpc())
             .vpcSubnets(SubnetSelection.builder().subnetType(SubnetType.PUBLIC).build())
             .instanceType(new InstanceType(props.instanceType()))
-            .machineImage(MachineImage.fromSsmParameter(
-                amiParameterPath(props.architecture()),
-                SsmParameterImageOptions.builder().os(OperatingSystemType.LINUX).build()
-            ))
+            // TEMPORARY (phase 1 of the 2026-08-02 export-migration rollout, see ComputeStack):
+            // hardcoded to the exact AMI the running instance already has (`current`'s own
+            // resolution has already drifted past it since launch - reverting to the SSM
+            // "current" pointer would still force a replacement here, recreating the very
+            // 2026-08-01 incident this migration is mid-fixing). Zero-diff on purpose so this
+            // deploy only adds the new SSM parameter below. Phase 2 restores
+            // MachineImage.fromSsmParameter(amiParameterPath(...)) pinned to a dated build.
+            .machineImage(MachineImage.genericLinux(Map.of("ap-south-1", "ami-06ac57e7974c65ca7")))
             .securityGroup(securityGroup)
             .role(role)
             .requireImdsv2(true)
@@ -136,8 +134,8 @@ public final class Ec2AppServerConstruct extends Construct {
             default -> throw new IllegalArgumentException(
                 "Unsupported ec2Architecture '%s' - expected 'arm64' or 'x86_64'".formatted(architecture));
         };
-        return "/aws/service/canonical/ubuntu/server/26.04/stable/%s/%s/hvm/ebs-gp3/ami-id"
-            .formatted(PINNED_UBUNTU_BUILD, archSegment);
+        return "/aws/service/canonical/ubuntu/server/26.04/stable/current/%s/hvm/ebs-gp3/ami-id"
+            .formatted(archSegment);
     }
 
     public Instance getInstance() {

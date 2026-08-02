@@ -36,12 +36,13 @@ import software.constructs.Construct;
  */
 public class ComputeStack extends Stack {
 
-    // SSM parameter suffix (under AppConfig#namespace) that CicdStack/MonitoringStack read via an
-    // SSM dynamic reference instead of taking this stack's Instance object directly. A direct CDK
-    // cross-stack Ref would put the instance behind a CloudFormation export, and CloudFormation
-    // refuses to replace a resource whose export is still imported elsewhere - turning any
-    // legitimate instance replacement (AMI bump, instance type change, ...) into a blocked,
-    // auto-rolled-back deploy. See the 2026-08-01 incident this fixed.
+    // SSM parameter suffix (under AppConfig#namespace), eventually read by CicdStack/MonitoringStack
+    // via an SSM dynamic reference instead of taking this stack's Instance object directly, so a
+    // direct CDK cross-stack Ref stops putting the instance behind a CloudFormation export that
+    // CloudFormation could later refuse to change while still imported elsewhere (see the
+    // 2026-08-01 incident this is meant to fix). Published starting now (phase 1) so the value
+    // exists in SSM before phase 2 switches CicdStack/MonitoringStack's reads over to it - see
+    // those classes' own TEMPORARY notes for why they still take the Instance directly for now.
     public static final String APP_SERVER_INSTANCE_ID_PARAM = "app-server-instance-id";
 
     private final Ec2AppServerConstruct appServer;
