@@ -17,7 +17,21 @@ export class RecurringRulesPage extends BasePage {
       await this.page.getByTestId(`recurring-type-tab-${tab}`).click();
       return;
     }
-    await this.goto(`${ROUTES.settingsRecurring}?tab=${tab}`);
+    // BasePage.goto's waitForDashboardReady only waits out the layout's own GET /users/me resync
+    // — the account/category/goal picker each tab's create*Rule immediately clicks into is fed by
+    // a *different* parallel GET (useAccounts()/useCategories()/useGoals()), queued behind the same
+    // 401-then-refresh cycle but not guaranteed to land at the same moment. This is the fastest,
+    // fewest-clicks path to a data-dependent picker anywhere in the regression suite (FAB → open →
+    // fill amount → picker, no toast/list/filter step in between to absorb the gap), so it's the
+    // one place that gap actually got hit: confirmed live via a real CI run's "waiting for
+    // getByTestId('recurring-income-account-picker-option-<id>') / Timeout 30000ms exceeded" even
+    // after the BasePage fix. Pairing this wait with the navigation (not calling it from inside
+    // create*Rule, after the fetch may already be in flight or done) is what actually closes it.
+    const resourcePaths = tab === "goals" ? ["/goals"] : tab === "expenses" ? ["/accounts", "/categories"] : ["/accounts"];
+    await Promise.all([
+      ...resourcePaths.map(path => waitForApiResponse(this.page, path, "GET")),
+      this.goto(`${ROUTES.settingsRecurring}?tab=${tab}`),
+    ]);
   }
 
   /** Explicitly picks the account rather than relying on RuleFormModal's default (accounts[0]) —
