@@ -352,6 +352,40 @@ class ExpenseServiceImplTest {
         }
 
         @Test
+        @DisplayName("changing the accountId re-validates ownership and moves the expense, checking the NEW account fresh")
+        void accountChangeValidatesOwnershipAndBalance() {
+            UUID newAccountId = UUID.randomUUID();
+            Expense expense = withId(baseExpense().amount(new BigDecimal("100")).build());
+            when(expenseRepository.findById(expenseId)).thenReturn(Optional.of(expense));
+            when(expenseRepository.save(any(Expense.class))).thenAnswer(inv -> inv.getArgument(0));
+            UpdateExpenseRequest req = mock(UpdateExpenseRequest.class);
+            when(req.getAccountId()).thenReturn(newAccountId);
+
+            service.updateExpense(expenseId, userId, req);
+
+            verify(accountOwnershipGuard).validateAccountOwnership(newAccountId, userId);
+            assertThat(expense.getAccountId()).isEqualTo(newAccountId);
+            // Fresh check (previousAmount=ZERO) — the new account never had this expense counted
+            // against it, unlike an in-place amount edit which offsets the account's own prior amount.
+            verify(accountBalanceGuard).validateSufficientBalance(newAccountId, userId, new BigDecimal("100"), BigDecimal.ZERO);
+        }
+
+        @Test
+        @DisplayName("re-sending the same accountId is a no-op — no ownership re-check, no balance re-validation")
+        void unchangedAccountIdSkipsValidation() {
+            Expense expense = withId(baseExpense().build());
+            when(expenseRepository.findById(expenseId)).thenReturn(Optional.of(expense));
+            when(expenseRepository.save(any(Expense.class))).thenAnswer(inv -> inv.getArgument(0));
+            UpdateExpenseRequest req = mock(UpdateExpenseRequest.class);
+            when(req.getAccountId()).thenReturn(accountId);
+
+            service.updateExpense(expenseId, userId, req);
+
+            verifyNoInteractions(accountOwnershipGuard);
+            verifyNoInteractions(accountBalanceGuard);
+        }
+
+        @Test
         @DisplayName("leaving the amount unchanged skips split-coverage and balance validation entirely")
         void unchangedAmountSkipsValidation() {
             Expense expense = withId(baseExpense().build());
