@@ -23,6 +23,17 @@ export const transferFormSchema = z.object({
 });
 export type TransferFormValues = z.infer<typeof transferFormSchema>;
 
+// Edit mode never lets the user touch fromAccountId/toAccountId — the pickers aren't even
+// rendered, replaced by a static "accounts can't be changed" bar below — so they can't be
+// required here. A one-sided transfer (Balance Adjustment, debt) genuinely has one of the two
+// as `null` on the wire (see adjustBalance() backend-side), which defaulted to "" client-side;
+// validating it as required silently blocked every edit — date, description, anything — with no
+// visible error since there's no field left in the DOM to show it against.
+export const transferEditSchema = transferFormSchema.extend({
+  fromAccountId: z.string(),
+  toAccountId:   z.string(),
+});
+
 export function TransferFormModal({ onSubmit, onCancel, onDelete, isPending, accounts, editTransferRef, isEdit, title, submitLabel, defaultFromAccountId, defaultToAccountId }: {
   onSubmit:         (v: TransferFormValues) => void;
   onCancel:         () => void;
@@ -40,7 +51,7 @@ export function TransferFormModal({ onSubmit, onCancel, onDelete, isPending, acc
 }) {
   const today = todayLocalISO();
   const form = useForm<TransferFormValues>({
-    resolver: zodResolver(transferFormSchema),
+    resolver: zodResolver(isEdit ? transferEditSchema : transferFormSchema),
     defaultValues: {
       fromAccountId: editTransferRef?.fromAccountId ?? defaultFromAccountId ?? "",
       toAccountId:   editTransferRef?.toAccountId   ?? defaultToAccountId   ?? "",
