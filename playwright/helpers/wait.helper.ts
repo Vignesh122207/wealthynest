@@ -50,6 +50,33 @@ export async function waitForApiResponse(
   return res;
 }
 
+/** Waits for (dashboard)/layout.tsx's own mount-time GET /users/me resync to settle — call right
+ * after navigating an authedPage so the rest of the test doesn't race the same 401-then-refresh
+ * cycle described on waitForApiResponse above. Two failure modes this closes, both confirmed live:
+ * (1) a page object that clicks straight into data that depends on another parallel GET (e.g. an
+ * account/category picker fed by useAccounts()) can find that request's own retry still in
+ * flight, rendering an empty picker with no option to click; (2) worse, every tests/regression/
+ * file shares one worker-scoped browser context (fixtures/index.ts's authedContext) and its one
+ * refresh-token cookie — if a test's authedPage fixture calls page.close() while this resync's
+ * refresh redemption is still in flight, the response (and the Set-Cookie that rotates the cookie
+ * forward) can be dropped, leaving the *already server-side-revoked* old cookie sitting in the
+ * shared context for the next test to present. That's tolerated once by AuthServiceImpl's 10s
+ * reuse grace window, but repeats across enough back-to-back tests and it eventually gets
+ * presented outside that window, which revokes every session for the shared regressionUser and
+ * cascades into every regression file still to run (reproduced live via the mass "401 Unauthorized"
+ * / forced /login redirects across ~19 unrelated files in the 2026-08-01/02 nightly runs).
+ * Short, bounded, and best-effort — a page that never mounts the dashboard layout (login, signup,
+ * marketing) never fires this request at all, so this must not fail the test if it doesn't show
+ * up. */
+export async function waitForDashboardReady(page: Page): Promise<void> {
+  await page
+    .waitForResponse(
+      (res) => res.url().includes("/users/me") && res.request().method() === "GET" && res.status() !== 401,
+      { timeout: 5000 }
+    )
+    .catch(() => {});
+}
+
 /** A successful mutation's API response resolves before React actually flushes the DOM removal of
  * its modal — every modal shell in the app (TransactionModalOverlay, AccountFormModal's own
  * bespoke overlay, ConfirmDialog) shares `data-testid="modal-overlay-backdrop"` on its outer

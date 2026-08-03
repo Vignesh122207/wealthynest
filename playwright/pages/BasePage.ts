@@ -1,5 +1,5 @@
 import {expect, type Locator, type Page} from "@playwright/test";
-import {toastLocator} from "../helpers/wait.helper";
+import {toastLocator, waitForDashboardReady} from "../helpers/wait.helper";
 import {expectNoHorizontalOverflow} from "../helpers/viewport.helper";
 import {TEST_IDS} from "../constants/testIds";
 
@@ -24,6 +24,9 @@ export class BasePage {
 
   async goto(path: string): Promise<void> {
     await this.page.goto(path);
+    // See waitForDashboardReady's own comment — closes both a picker-race flake and a
+    // shared-worker-context refresh-token-reuse cascade, both confirmed live.
+    await waitForDashboardReady(this.page);
   }
 
   async expectToast(text: string | RegExp): Promise<void> {
