@@ -43,6 +43,23 @@ export class RecurringRulesPage extends BasePage {
     ]);
   }
 
+  /** gotoTab already confirmed the tab's own data GET completed before this ran — but a completed
+   * *network* response is not the same moment as the picker's *rendered* option list reflecting
+   * it: getting from one to the other still crosses a query-cache-update + React re-render, and
+   * that gap stretched far enough under real CI load to blow a plain 30s actionability wait
+   * outright (confirmed live: "waiting for getByTestId('recurring-income-account-picker-option-
+   * <id>')" timing out even with the freshly-fetched account provably in that exact response's
+   * body). Plain `.click()` retries poll the *same* already-open panel's DOM over and over, which
+   * does nothing if that panel's own render is what's stuck — closing and reopening it forces a
+   * fresh render pass against whatever the query cache holds *right now* instead. Wrapped in
+   * `toPass` so the close/reopen itself gets retried across the full budget, not just one attempt. */
+  private async selectPickerOption(triggerTestId: string, optionTestId: string): Promise<void> {
+    await expect(async () => {
+      await this.page.getByTestId(triggerTestId).click();
+      await this.page.getByTestId(optionTestId).click({ timeout: 3000 });
+    }).toPass({ timeout: 30000 });
+  }
+
   /** Explicitly picks the account rather than relying on RuleFormModal's default (accounts[0]) —
    * app-side now syncs that default once useAccounts() resolves (see IncomeTab.tsx), but
    * asserting a specific account regardless of default-selection logic keeps this test robust to
@@ -51,8 +68,7 @@ export class RecurringRulesPage extends BasePage {
     await this.page.getByTestId(TEST_IDS.fab.toggle).click();
     await this.page.getByTestId(TEST_IDS.fab.addRecurringIncome).click();
     await this.page.getByTestId("recurring-income-amount-input").fill(String(input.amount));
-    await this.page.getByTestId("recurring-income-account-picker-trigger").click();
-    await this.page.getByTestId(`recurring-income-account-picker-option-${input.accountId}`).click();
+    await this.selectPickerOption("recurring-income-account-picker-trigger", `recurring-income-account-picker-option-${input.accountId}`);
     await this.page.getByTestId("recurring-income-description-input").fill(input.description);
     await Promise.all([
       waitForApiResponse(this.page, "/recurring-income", "POST"),
@@ -67,10 +83,8 @@ export class RecurringRulesPage extends BasePage {
     await this.page.getByTestId(TEST_IDS.fab.toggle).click();
     await this.page.getByTestId(TEST_IDS.fab.addRecurringExpense).click();
     await this.page.getByTestId("recurring-expense-amount-input").fill(String(input.amount));
-    await this.page.getByTestId("recurring-expense-category-picker-trigger").click();
-    await this.page.getByTestId(`recurring-expense-category-picker-option-${input.categoryId}`).click();
-    await this.page.getByTestId("recurring-expense-account-picker-trigger").click();
-    await this.page.getByTestId(`recurring-expense-account-picker-option-${input.accountId}`).click();
+    await this.selectPickerOption("recurring-expense-category-picker-trigger", `recurring-expense-category-picker-option-${input.categoryId}`);
+    await this.selectPickerOption("recurring-expense-account-picker-trigger", `recurring-expense-account-picker-option-${input.accountId}`);
     await this.page.getByLabel("Description (optional)").fill(input.description);
     await Promise.all([
       waitForApiResponse(this.page, "/expenses", "POST"),
@@ -86,10 +100,8 @@ export class RecurringRulesPage extends BasePage {
     await this.page.getByTestId(TEST_IDS.fab.toggle).click();
     await this.page.getByTestId(TEST_IDS.fab.addRecurringTransfer).click();
     await this.page.getByTestId("recurring-transfer-amount-input").fill(String(input.amount));
-    await this.page.getByTestId("recurring-transfer-from-account-picker-trigger").click();
-    await this.page.getByTestId(`recurring-transfer-from-account-picker-option-${input.fromAccountId}`).click();
-    await this.page.getByTestId("recurring-transfer-to-account-picker-trigger").click();
-    await this.page.getByTestId(`recurring-transfer-to-account-picker-option-${input.toAccountId}`).click();
+    await this.selectPickerOption("recurring-transfer-from-account-picker-trigger", `recurring-transfer-from-account-picker-option-${input.fromAccountId}`);
+    await this.selectPickerOption("recurring-transfer-to-account-picker-trigger", `recurring-transfer-to-account-picker-option-${input.toAccountId}`);
     await this.page.getByTestId("recurring-transfer-description-input").fill(input.description);
     await Promise.all([
       waitForApiResponse(this.page, "/recurring-transfer", "POST"),
@@ -105,8 +117,7 @@ export class RecurringRulesPage extends BasePage {
     await this.page.getByTestId(TEST_IDS.fab.toggle).click();
     await this.page.getByTestId(TEST_IDS.fab.addRecurringGoal).click();
     await this.page.getByTestId("recurring-goal-amount-input").fill(String(input.amount));
-    await this.page.getByTestId("recurring-goal-picker-trigger").click();
-    await this.page.getByTestId(`recurring-goal-picker-option-${input.goalId}`).click();
+    await this.selectPickerOption("recurring-goal-picker-trigger", `recurring-goal-picker-option-${input.goalId}`);
     await Promise.all([
       waitForApiResponse(this.page, "/recurring-goal-contribution", "POST"),
       this.page.getByTestId("recurring-goal-form-submit").click(),
