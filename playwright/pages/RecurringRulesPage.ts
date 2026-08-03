@@ -27,9 +27,18 @@ export class RecurringRulesPage extends BasePage {
     // getByTestId('recurring-income-account-picker-option-<id>') / Timeout 30000ms exceeded" even
     // after the BasePage fix. Pairing this wait with the navigation (not calling it from inside
     // create*Rule, after the fetch may already be in flight or done) is what actually closes it.
-    const resourcePaths = tab === "goals" ? ["/goals"] : tab === "expenses" ? ["/accounts", "/categories"] : ["/accounts"];
+    //
+    // A plain string pattern here first cost a whole extra debugging round: the sidebar's own
+    // <Link href="/accounts"> fires a Next.js RSC prefetch to http://localhost:3000/accounts?_rsc=…
+    // the instant this page mounts, and that URL *also* contains the substring "/accounts" — it
+    // resolved this wait before the real http://localhost:8080/api/v1/accounts call ever completed,
+    // so the picker still opened on stale/default data. End-of-string-anchored regexes, same
+    // convention already used by every other GET waitForApiResponse call in this suite (see
+    // GoalsPage.ts's /\/goals$/, FamilyPage.ts's /\/users\/me$/), are what actually distinguish the
+    // real API path from a same-named page route.
+    const resourcePatterns = tab === "goals" ? [/\/goals$/] : tab === "expenses" ? [/\/accounts$/, /\/categories$/] : [/\/accounts$/];
     await Promise.all([
-      ...resourcePaths.map(path => waitForApiResponse(this.page, path, "GET")),
+      ...resourcePatterns.map(pattern => waitForApiResponse(this.page, pattern, "GET")),
       this.goto(`${ROUTES.settingsRecurring}?tab=${tab}`),
     ]);
   }
