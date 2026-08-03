@@ -2,7 +2,7 @@
 
 import {useEffect, useMemo, useState} from "react";
 import dynamic from "next/dynamic";
-import {useSearchParams} from "next/navigation";
+import {usePathname, useRouter, useSearchParams} from "next/navigation";
 import Link from "next/link";
 import {ArrowLeftRight, Banknote, Receipt, Wallet,} from "lucide-react";
 import {Header} from "@/components/layout/Header";
@@ -70,6 +70,8 @@ export default function TransactionsPage() {
   const { fmt } = useAmountFormatter();
   const now = new Date();
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
 
   // Type tab
   const [txType, setTxType] = useState<TxType>("all");
@@ -163,8 +165,8 @@ export default function TransactionsPage() {
   const effectiveAccountIds = selectedAccountIds.length > 0 ? selectedAccountIds : accountIds;
 
   const expenseFilters = {
-    startDate:  recurringOnly ? undefined : startDate as string | undefined,
-    endDate:    recurringOnly ? undefined : endDate as string | undefined,
+    startDate:  startDate as string | undefined,
+    endDate:    endDate as string | undefined,
     search:     debouncedSearch || undefined,
     categoryId: categoryId || undefined,
     accountIds: effectiveAccountIds.length ? effectiveAccountIds : undefined,
@@ -229,13 +231,17 @@ export default function TransactionsPage() {
 
   // Income search — shared search box drives every tab
   const searchedIncome = useMemo(() => {
-    if (!debouncedSearch) return filteredIncome;
+    let base = filteredIncome;
+    if (selectedAccountIds.length > 0) {
+      base = base.filter(i => i.accountId && selectedAccountIds.includes(i.accountId));
+    }
+    if (!debouncedSearch) return base;
     const q = debouncedSearch.toLowerCase();
-    return filteredIncome.filter(i =>
+    return base.filter(i =>
       (i.description ?? "").toLowerCase().includes(q) ||
       (INCOME_SOURCES.find(s => s.value === i.source)?.label ?? "").toLowerCase().includes(q)
     );
-  }, [filteredIncome, debouncedSearch]);
+  }, [filteredIncome, debouncedSearch, selectedAccountIds]);
 
   // Transfer search — shared search box drives every tab
   const searchedTransfers = useMemo(() => {
@@ -302,14 +308,16 @@ export default function TransactionsPage() {
           if (!selectedAccountIds.includes(t.fromAccountId) && !selectedAccountIds.includes(t.toAccountId)) return false;
         }
       }
-      // Category / channel / amount / recurring filters only apply to the expense side —
+      // Amount range applies to all three kinds — unlike category/channel/recurring below,
+      // every row (expense, income, transfer) carries an `amount`.
+      if (minAmount !== "" && row.data.amount < Number(minAmount)) return false;
+      if (maxAmount !== "" && row.data.amount > Number(maxAmount)) return false;
+      // Category / channel / recurring only apply to the expense side —
       // income and transfers don't carry those dimensions in our data model.
       if (row.kind === "expense") {
         const e = row.data as Expense;
         if (categoryId && e.categoryId !== categoryId) return false;
         if (recurringOnly && !e.recurring) return false;
-        if (minAmount !== "" && e.amount < Number(minAmount)) return false;
-        if (maxAmount !== "" && e.amount > Number(maxAmount)) return false;
         if (payChannel) {
           const type = e.accountId ? accountTypeMap[e.accountId] : undefined;
           const matches = payChannel === "CASH" ? type === "CASH_WALLET"
@@ -343,8 +351,23 @@ export default function TransactionsPage() {
     });
   }, [mergedRows, debouncedSearch, categoryId, recurringOnly, minAmount, maxAmount, payChannel, accountTypeMap, selectedAccountIds]);
 
+  // mergedRows (and therefore filteredMergedRows) is always in newest-first order — fine for the
+  // default sort, but "Oldest first"/"Highest first"/"Lowest first" all need the actual matching
+  // rows on page 1 (the true oldest, or the true highest-amount, across the whole filtered period),
+  // not just whichever rows newest-first order happened to put there re-ordered in place — that's
+  // what makes the sort determine pagination, not just in-page display order.
+  const sortedMergedRows = useMemo(() => {
+    if (sortBy === "amount") {
+      return [...filteredMergedRows].sort((a, b) =>
+        sortDir === "desc" ? b.data.amount - a.data.amount : a.data.amount - b.data.amount);
+    }
+    if (sortDir === "desc") return filteredMergedRows;
+    return [...filteredMergedRows].sort((a, b) =>
+      a.date.localeCompare(b.date) || a.data.createdAt.localeCompare(b.data.createdAt));
+  }, [filteredMergedRows, sortBy, sortDir]);
+
   const allTotalPages = Math.max(1, Math.ceil(filteredMergedRows.length / ALL_PAGE_SIZE));
-  const pagedMergedRows = filteredMergedRows.slice(allPage * ALL_PAGE_SIZE, (allPage + 1) * ALL_PAGE_SIZE);
+  const pagedMergedRows = sortedMergedRows.slice(allPage * ALL_PAGE_SIZE, (allPage + 1) * ALL_PAGE_SIZE);
 
   // Net of whatever's currently matched (income − expenses; transfers don't move net worth,
   // they just move money between your own accounts, so they're excluded from this total).
@@ -563,7 +586,9 @@ export default function TransactionsPage() {
     setCustomStart(""); setCustomEnd(""); setListPage(0);
   };
 
-  // Read URL params on mount and apply tab + account filter
+  // Read URL params on mount and apply tab + account filter + selected period — without this,
+  // navigating to July and refreshing the page dropped straight back to the current month, since
+  // dateMode/year/month only ever lived in component state.
   useEffect(() => {
     const tab = searchParams.get("tab");
     if (tab === "transfers" || tab === "income" || tab === "all" || tab === "expenses") {
@@ -573,14 +598,54 @@ export default function TransactionsPage() {
     if (accountId) {
       setSelectedAccountIds([accountId]);
     }
+    const mode = searchParams.get("mode");
+    if (mode === "month" || mode === "year" || mode === "custom" || mode === "all") {
+      setDateMode(mode);
+    }
+    const yearParam = searchParams.get("year");
+    if (yearParam && !isNaN(Number(yearParam))) setYear(Number(yearParam));
+    const monthParam = searchParams.get("month");
+    if (monthParam && !isNaN(Number(monthParam))) setMonth(Number(monthParam));
+    const startParam = searchParams.get("start");
+    if (startParam) setCustomStart(startParam);
+    const endParam = searchParams.get("end");
+    if (endParam) setCustomEnd(endParam);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Keep the URL in sync with the selected tab + period so both survive a refresh/reload — a
+  // plain router.replace (not push) so switching tabs or paging through months doesn't spam
+  // browser history. Tab used to only ever be read from the URL, never written back, so
+  // switching to e.g. Transfers and refreshing silently dropped you back on the default "All"
+  // tab (still showing transfer rows, since All is a superset — easy to mistake for "it stayed
+  // on Transfers" until you noticed the pill itself had reset).
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", txType);
+    params.set("mode", dateMode);
+    if (dateMode === "month") {
+      params.set("year", String(year));
+      params.set("month", String(month));
+      params.delete("start"); params.delete("end");
+    } else if (dateMode === "year") {
+      params.set("year", String(year));
+      params.delete("month"); params.delete("start"); params.delete("end");
+    } else if (dateMode === "custom") {
+      if (customStart) params.set("start", customStart); else params.delete("start");
+      if (customEnd)   params.set("end", customEnd);     else params.delete("end");
+      params.delete("year"); params.delete("month");
+    } else {
+      params.delete("year"); params.delete("month"); params.delete("start"); params.delete("end");
+    }
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [txType, dateMode, year, month, customStart, customEnd]);
+
   useEffect(() => { setListPage(0); },
-    [startDate, endDate, debouncedSearch, categoryId, payChannel, minAmount, maxAmount, sortKey, recurringOnly]);
+    [startDate, endDate, debouncedSearch, categoryId, payChannel, minAmount, maxAmount, sortKey, recurringOnly, selectedAccountIds]);
 
   useEffect(() => { setAllPage(0); },
-    [txType, dateMode, year, month, customStart, customEnd, debouncedSearch, categoryId, payChannel, minAmount, maxAmount, recurringOnly]);
+    [txType, dateMode, year, month, customStart, customEnd, debouncedSearch, categoryId, payChannel, minAmount, maxAmount, recurringOnly, sortKey, selectedAccountIds]);
 
   const expenses      = expenseData?.data ?? [];
   const serverTotal   = expenseData?.meta?.totalElements ?? 0;
@@ -591,8 +656,15 @@ export default function TransactionsPage() {
     acc[e.expenseDate].push(e);
     return acc;
   }, {});
-  const sortedDates = Object.keys(grouped).sort((a, b) =>
-    sortDir === "asc" ? a.localeCompare(b) : b.localeCompare(a));
+  // `expenses` already arrives amount-sorted from the backend when sortBy === "amount" — grouping
+  // by date preserves that relative order within each day's bucket, but re-sorting the date keys
+  // themselves by date string (as the date-sort branch does) would undo it across days, e.g. a
+  // ₹50,000 expense on the 2nd would get buried under a ₹200 expense's day header for the 20th.
+  // So for an amount sort, date headers stay in Object.keys()'s natural (already amount-ranked)
+  // insertion order instead.
+  const sortedDates = sortBy === "amount"
+    ? Object.keys(grouped)
+    : Object.keys(grouped).sort((a, b) => sortDir === "asc" ? a.localeCompare(b) : b.localeCompare(a));
 
   // Expenses-tab list header total — from the full filtered period (filteredMergedRows), not
   // the paginated `expenses` slice, so it doesn't silently only reflect whichever page is on screen.
@@ -649,9 +721,12 @@ export default function TransactionsPage() {
   if (sortKey !== "date-desc")  expenseChips.push({ label: ({"date-asc":"Oldest first","amount-desc":"Highest first","amount-asc":"Lowest first"} as Record<string,string>)[sortKey], clear: () => setSortKey("date-desc") });
   if (recurringOnly)            expenseChips.push({ label: "Recurring only", clear: () => setRecurringOnly(false) });
 
-  const transferChips: { label: string; clear: () => void }[] = [];
+  // Account selection filters every tab (e.g. the "view transactions for this account" deep
+  // link from AccountCard, ?accountId=), so its chip is shared across all of them — not just
+  // Transfers — otherwise it filters the list with no visible indicator or way to clear it.
+  const accountChips: { label: string; clear: () => void }[] = [];
   if (selectedAccountIds.length > 0) {
-    transferChips.push({ label: `${selectedAccountIds.length} account${selectedAccountIds.length > 1 ? "s" : ""}`, clear: () => setSelectedAccountIds([]) });
+    accountChips.push({ label: `${selectedAccountIds.length} account${selectedAccountIds.length > 1 ? "s" : ""}`, clear: () => setSelectedAccountIds([]) });
   }
 
   // Mirrors expenseChips' own non-default-sort chip above — without these, changing Income/
@@ -663,10 +738,10 @@ export default function TransactionsPage() {
   const transferSortChips: { label: string; clear: () => void }[] = [];
   if (transferSort !== "newest") transferSortChips.push({ label: sortLabels[transferSort], clear: () => setTransferSort("newest") });
 
-  const chips           = [...expenseChips, ...dateChips];
-  const incomeTabChips   = [...incomeSortChips, ...dateChips];
-  const transferTabChips = [...transferChips, ...transferSortChips, ...dateChips];
-  const allTabChips      = [...expenseChips, ...dateChips];
+  const chips           = [...expenseChips, ...accountChips, ...dateChips];
+  const incomeTabChips   = [...incomeSortChips, ...accountChips, ...dateChips];
+  const transferTabChips = [...accountChips, ...transferSortChips, ...dateChips];
+  const allTabChips      = [...expenseChips, ...accountChips, ...dateChips];
 
   // Drives the Toolbar filter-icon badge and FilterPanel's own "Clear all" visibility — scoped to
   // whichever tab is active so it matches what that tab's own chip row actually shows (used to be
@@ -700,45 +775,46 @@ export default function TransactionsPage() {
     creditAccounts: creditAccounts.map(a => ({ id: a.id, name: a.name, bankName: a.bankName, currentBalance: a.currentBalance })),
   };
 
-  // Grouped income rows (with sort)
-  const incomeGroupedRaw = searchedIncome.reduce<Record<string, IncomeEntry[]>>((acc, i) => {
+  // Grouped income rows (with sort). For "high"/"low", the base list is amount-sorted before
+  // grouping, and the date headers keep that order (Object.keys() insertion order) instead of
+  // being re-sorted by date string — otherwise a day header would jump back into chronological
+  // position and bury an outlier income entry under a smaller day's header above it.
+  const incomeSortedBase = (incomeSort === "high" || incomeSort === "low")
+    ? [...searchedIncome].sort((a, b) => incomeSort === "high" ? b.amount - a.amount : a.amount - b.amount)
+    : searchedIncome;
+  const incomeGrouped = incomeSortedBase.reduce<Record<string, IncomeEntry[]>>((acc, i) => {
     if (!acc[i.incomeDate]) acc[i.incomeDate] = [];
     acc[i.incomeDate].push(i);
     return acc;
   }, {});
-  const incomeGrouped = (incomeSort === "high" || incomeSort === "low")
-    ? Object.fromEntries(Object.entries(incomeGroupedRaw).map(([date, items]) => [
-        date,
-        [...items].sort((a, b) => incomeSort === "high" ? b.amount - a.amount : a.amount - b.amount)
-      ]))
-    : incomeGroupedRaw;
-  const incomeSortedDates = Object.keys(incomeGrouped).sort((a, b) =>
-    incomeSort === "oldest" ? a.localeCompare(b) : b.localeCompare(a)
-  );
+  const incomeSortedDates = (incomeSort === "high" || incomeSort === "low")
+    ? Object.keys(incomeGrouped)
+    : Object.keys(incomeGrouped).sort((a, b) => incomeSort === "oldest" ? a.localeCompare(b) : b.localeCompare(a));
 
-  // Grouped transfer rows (with sort)
-  const transferGroupedRaw = searchedTransfers.reduce<Record<string, AccountTransfer[]>>((acc, t) => {
+  // Grouped transfer rows (with sort) — same amount-first-then-group approach as income above.
+  const transferSortedBase = (transferSort === "high" || transferSort === "low")
+    ? [...searchedTransfers].sort((a, b) => transferSort === "high" ? b.amount - a.amount : a.amount - b.amount)
+    : searchedTransfers;
+  const transferGrouped = transferSortedBase.reduce<Record<string, AccountTransfer[]>>((acc, t) => {
     if (!acc[t.transferDate]) acc[t.transferDate] = [];
     acc[t.transferDate].push(t);
     return acc;
   }, {});
-  const transferGrouped = (transferSort === "high" || transferSort === "low")
-    ? Object.fromEntries(Object.entries(transferGroupedRaw).map(([date, items]) => [
-        date,
-        [...items].sort((a, b) => transferSort === "high" ? b.amount - a.amount : a.amount - b.amount)
-      ]))
-    : transferGroupedRaw;
-  const transferSortedDates = Object.keys(transferGrouped).sort((a, b) =>
-    transferSort === "oldest" ? a.localeCompare(b) : b.localeCompare(a)
-  );
+  const transferSortedDates = (transferSort === "high" || transferSort === "low")
+    ? Object.keys(transferGrouped)
+    : Object.keys(transferGrouped).sort((a, b) => transferSort === "oldest" ? a.localeCompare(b) : b.localeCompare(a));
 
-  // Merged "All" grouped
+  // Merged "All" grouped — pagedMergedRows is already fully ordered by sortedMergedRows above
+  // (amount-sorted when sortBy === "amount", date-sorted otherwise), so grouping by date just
+  // needs to preserve that order rather than re-deriving it.
   const allGrouped = pagedMergedRows.reduce<Record<string, TxRow[]>>((acc, r) => {
     if (!acc[r.date]) acc[r.date] = [];
     acc[r.date].push(r);
     return acc;
   }, {});
-  const allSortedDates = Object.keys(allGrouped).sort((a, b) => b.localeCompare(a));
+  const allSortedDates = sortBy === "amount"
+    ? Object.keys(allGrouped)
+    : Object.keys(allGrouped).sort((a, b) => sortDir === "asc" ? a.localeCompare(b) : b.localeCompare(a));
 
   return (
     <div className="flex flex-col flex-1">
