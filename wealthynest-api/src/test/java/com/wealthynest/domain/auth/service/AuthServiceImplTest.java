@@ -13,6 +13,7 @@ import com.wealthynest.domain.auth.entity.RefreshToken;
 import com.wealthynest.domain.auth.repository.EmailVerificationTokenRepository;
 import com.wealthynest.domain.auth.repository.PasswordResetTokenRepository;
 import com.wealthynest.domain.auth.repository.RefreshTokenRepository;
+import com.wealthynest.domain.auth.repository.WebAuthnCredentialRepository;
 import com.wealthynest.domain.user.dto.response.UserResponse;
 import com.wealthynest.domain.user.entity.User;
 import com.wealthynest.domain.user.entity.UserRole;
@@ -61,6 +62,7 @@ class AuthServiceImplTest {
     @Mock private EmailService                      emailService;
     @Mock private AuditService                      auditService;
     @Mock private TokenRevocationService             tokenRevocationService;
+    @Mock private WebAuthnCredentialRepository       webAuthnCredentialRepository;
     @Mock private com.wealthynest.domain.auth.service.GoogleIdTokenValidator googleIdTokenValidator;
     // Chain wired by hand in GoogleLoginNativeTests, not RETURNS_DEEP_STUBS — see its own comment.
     @Mock private RestClient googleOAuthClient;
@@ -94,7 +96,7 @@ class AuthServiceImplTest {
         lenient().when(jwtTokenProvider.generateRefreshToken(any(), any(), anyLong())).thenReturn("refresh-token");
         lenient().when(jwtProperties.getRefreshTokenExpiryMs()).thenReturn(2592000000L);
         lenient().when(jwtProperties.getAccessTokenExpiryMs()).thenReturn(7200000L);
-        lenient().when(userMapper.toResponse(any(User.class))).thenReturn(UserResponse.builder().build());
+        lenient().when(userMapper.toResponse(any(User.class), anyBoolean())).thenReturn(UserResponse.builder().build());
         lenient().when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
@@ -135,7 +137,7 @@ class AuthServiceImplTest {
             when(userRepository.findByEmail("new@example.com")).thenReturn(Optional.empty());
             when(passwordEncoder.encode("Password1")).thenReturn("hashed-pw");
             when(userRepository.save(any(User.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
-            when(userMapper.toResponse(any())).thenReturn(UserResponse.builder().build());
+            when(userMapper.toResponse(any(), anyBoolean())).thenReturn(UserResponse.builder().build());
 
             AuthResponse response = service.register(req);
 

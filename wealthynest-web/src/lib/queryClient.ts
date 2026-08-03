@@ -14,12 +14,17 @@ export const queryClient = new QueryClient({
       if (status === 401) return;
       // A real network failure (offline/DNS/timeout — axios never got a response) hits every
       // in-flight query on the page at once; those all collapse onto one fixed id so an outage
-      // shows a single toast instead of one per query. Server-side errors (4xx/5xx) keep a
-      // per-query-key id so a query that's retrying/refetching replaces its own toast instead of
-      // stacking, while distinct resources still surface distinct errors.
+      // shows a single toast instead of one per query. A 429 gets the same treatment — a page with
+      // several parallel queries (e.g. a dashboard mount) that all land in the same rate-limit
+      // window all fail together too, and each carrying its own query.queryHash previously meant
+      // one "Too many requests" toast per query instead of one for the whole page. Every other
+      // server-side error (4xx/5xx) keeps a per-query-key id so a query that's retrying/refetching
+      // replaces its own toast instead of stacking, while distinct resources still surface distinct
+      // errors.
       const isNetworkError = !(error as { response?: unknown })?.response;
+      const isRateLimited = status === 429;
       toast.error(apiErrorMessage(error, "Couldn't load this — check your connection"), {
-        id: isNetworkError ? "query-error-offline" : `query-error-${query.queryHash}`,
+        id: isNetworkError ? "query-error-offline" : isRateLimited ? "query-error-rate-limited" : `query-error-${query.queryHash}`,
       });
     },
   }),

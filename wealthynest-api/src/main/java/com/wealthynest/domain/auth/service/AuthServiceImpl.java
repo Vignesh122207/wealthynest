@@ -14,6 +14,7 @@ import com.wealthynest.domain.auth.entity.RefreshToken;
 import com.wealthynest.domain.auth.repository.EmailVerificationTokenRepository;
 import com.wealthynest.domain.auth.repository.PasswordResetTokenRepository;
 import com.wealthynest.domain.auth.repository.RefreshTokenRepository;
+import com.wealthynest.domain.auth.repository.WebAuthnCredentialRepository;
 import com.wealthynest.domain.user.entity.User;
 import com.wealthynest.domain.user.mapper.UserMapper;
 import com.wealthynest.domain.user.repository.UserRepository;
@@ -68,6 +69,7 @@ public class AuthServiceImpl implements AuthService {
     private final EmailService                     emailService;
     private final AuditService                     auditService;
     private final TokenRevocationService           tokenRevocationService;
+    private final WebAuthnCredentialRepository     webAuthnCredentialRepository;
     private final GoogleIdTokenValidator            googleIdTokenValidator;
     private final RestClient                        googleOAuthClient; // @Bean("googleOAuthClient") — matched by field name, same as ExternalPriceServiceImpl's RestClient fields
 
@@ -150,7 +152,10 @@ public class AuthServiceImpl implements AuthService {
                 .refreshToken(null)
                 .expiresIn(0)
                 .tokenType("Bearer")
-                .user(userMapper.toResponse(user))
+                // hasPasskeys is always false here, not looked up - this is a User just created
+                // by userRepository.save() two lines above, provably too new to have any
+                // WebAuthnCredential rows yet.
+                .user(userMapper.toResponse(user, false))
                 .build();
     }
 
@@ -839,7 +844,7 @@ public class AuthServiceImpl implements AuthService {
                 .refreshTokenExpiresInMs(refreshTtlMs)
                 .expiresIn(jwtProperties.getAccessTokenExpiryMs() / 1000)
                 .tokenType("Bearer")
-                .user(userMapper.toResponse(user))
+                .user(userMapper.toResponse(user, webAuthnCredentialRepository.existsByUserId(user.getId())))
                 .build();
     }
 

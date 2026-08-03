@@ -76,6 +76,7 @@ public class ExpenseServiceImpl implements ExpenseService {
     public ExpenseResponse updateExpense(UUID expenseId, UUID userId, UpdateExpenseRequest request) {
         Expense expense = findAndValidateOwner(expenseId, userId);
         BigDecimal previousAmount = expense.getAmount();
+        UUID previousAccountId = expense.getAccountId();
         if (request.getCategoryId()    != null) {
             categoryOwnershipGuard.validateCategoryOwnership(request.getCategoryId(), userId, expense.getFamilyId());
             expense.setCategoryId(request.getCategoryId());
@@ -87,9 +88,20 @@ public class ExpenseServiceImpl implements ExpenseService {
         if (request.getRecurring()     != null) expense.setRecurring(request.getRecurring());
         if (request.getRecurrenceRule()!= null) expense.setRecurrenceRule(request.getRecurrenceRule());
         if (request.getPaymentMethod() != null) expense.setPaymentMethod(request.getPaymentMethod());
+        boolean accountChanged = request.getAccountId() != null && !request.getAccountId().equals(previousAccountId);
+        if (accountChanged) {
+            accountOwnershipGuard.validateAccountOwnership(request.getAccountId(), userId);
+            expense.setAccountId(request.getAccountId());
+        }
         if (request.getAmount() != null) {
             expenseSplitService.validateAmountCoversSplits(expenseId, expense.getAmount());
-            accountBalanceGuard.validateSufficientBalance(expense.getAccountId(), userId, expense.getAmount(), previousAmount);
+        }
+        if (request.getAmount() != null || accountChanged) {
+            // Switching accounts moves the full amount onto one that never had it counted against
+            // it before, so it's validated fresh (previousAmount=ZERO) rather than offset by what
+            // the OLD account already had — that offset only applies when the account is unchanged.
+            accountBalanceGuard.validateSufficientBalance(expense.getAccountId(), userId, expense.getAmount(),
+                    accountChanged ? BigDecimal.ZERO : previousAmount);
         }
         return enrich(expenseMapper.toResponse(expenseRepository.save(expense)));
     }

@@ -149,8 +149,15 @@ export default function BudgetsPage() {
   const watchedRollover   = form.watch("rollover");
 
   const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
+  const isCurrentYear  = year === now.getFullYear();
 
-  const existingCategoryIds = new Set(budgets.map(b => b.categoryId));
+  // Scoped to the form's currently-selected budgetType, not just categoryId: the backend allows
+  // one MONTHLY *and* one YEARLY budget per category (separate rows, uniqueness is on
+  // categoryId+budgetType — see BudgetServiceImpl.createOrUpdateBudget's findByCategoryIdAndBudgetType
+  // lookup). Ignoring budgetType here used to hide a category from the picker entirely — e.g. a
+  // category with an existing Monthly budget silently disappeared from the Yearly tab's picker too,
+  // even though creating a Yearly budget for it is perfectly valid.
+  const existingCategoryIds = new Set(budgets.filter(b => b.budgetType === budgetType).map(b => b.categoryId));
   const availableCategories = categories.filter(c => !existingCategoryIds.has(c.id));
 
   const handleAddCategory = () => {
@@ -184,9 +191,21 @@ export default function BudgetsPage() {
 
   const goToToday = () => { setYear(now.getFullYear()); setMonth(now.getMonth() + 1); };
 
+  // Yearly budgets have no independent stepper of their own — they used to just ride along with
+  // whichever year the month navigator happened to land on, so checking last year's yearly spend
+  // meant clicking "previous month" repeatedly across a Dec→Jan boundary. This changes only
+  // `year`; `month` is left as-is since it's irrelevant to the Yearly tab (spend is summed over
+  // the whole calendar year) and switching back to Monthly should still show a sensible month.
+  const navigateYear = (dir: -1 | 1) => {
+    if (dir === 1 && isCurrentYear) return;
+    setYear(y => y + dir);
+  };
+
+  const goToThisYear = () => setYear(now.getFullYear());
+
   const onSubmit = (v: BudgetFormValues) => {
     if (existingCategoryIds.has(v.categoryId)) {
-      toast.error("A budget for this category already exists this month.");
+      toast.error(`A ${budgetType === "MONTHLY" ? "monthly" : "yearly"} budget for this category already exists.`);
       return;
     }
     createBudget(
@@ -336,26 +355,49 @@ export default function BudgetsPage() {
 
         {/* Navigator + Actions */}
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-1.5">
-            <button onClick={() => navigate(-1)} aria-label="Previous month"
-              className="w-8 h-8 rounded-lg bg-muted/60 hover:bg-muted flex items-center justify-center transition-all">
-              <ChevronLeft className="w-4 h-4 text-muted-foreground" />
-            </button>
-            <div className="text-center min-w-40">
-              <span className="text-sm font-semibold text-foreground">{monthLabel(year, month)}</span>
-              <p className="text-xs text-muted-foreground leading-tight">Monthly budgets · Yearly shows {year}</p>
-            </div>
-            <button onClick={() => navigate(1)} disabled={isCurrentMonth} aria-label="Next month"
-              className="w-8 h-8 rounded-lg bg-muted/60 hover:bg-muted flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-            </button>
-            {!isCurrentMonth && (
-              <button onClick={goToToday}
-                className="h-7 px-2.5 rounded-lg bg-amber-600/20 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-[11px] font-medium hover:bg-amber-600/30 transition-all">
-                Today
+          {activeType === "YEARLY" ? (
+            <div className="flex items-center gap-1.5">
+              <button onClick={() => navigateYear(-1)} aria-label="Previous year"
+                className="w-8 h-8 rounded-lg bg-muted/60 hover:bg-muted flex items-center justify-center transition-all">
+                <ChevronLeft className="w-4 h-4 text-muted-foreground" />
               </button>
-            )}
-          </div>
+              <div className="text-center min-w-40">
+                <span className="text-sm font-semibold text-foreground">{year}</span>
+                <p className="text-xs text-muted-foreground leading-tight">Yearly budgets</p>
+              </div>
+              <button onClick={() => navigateYear(1)} disabled={isCurrentYear} aria-label="Next year"
+                className="w-8 h-8 rounded-lg bg-muted/60 hover:bg-muted flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </button>
+              {!isCurrentYear && (
+                <button onClick={goToThisYear}
+                  className="h-7 px-2.5 rounded-lg bg-amber-600/20 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-[11px] font-medium hover:bg-amber-600/30 transition-all">
+                  This Year
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <button onClick={() => navigate(-1)} aria-label="Previous month"
+                className="w-8 h-8 rounded-lg bg-muted/60 hover:bg-muted flex items-center justify-center transition-all">
+                <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+              </button>
+              <div className="text-center min-w-40">
+                <span className="text-sm font-semibold text-foreground">{monthLabel(year, month)}</span>
+                <p className="text-xs text-muted-foreground leading-tight">Monthly budgets</p>
+              </div>
+              <button onClick={() => navigate(1)} disabled={isCurrentMonth} aria-label="Next month"
+                className="w-8 h-8 rounded-lg bg-muted/60 hover:bg-muted flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </button>
+              {!isCurrentMonth && (
+                <button onClick={goToToday}
+                  className="h-7 px-2.5 rounded-lg bg-amber-600/20 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-[11px] font-medium hover:bg-amber-600/30 transition-all">
+                  Today
+                </button>
+              )}
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <Tooltip content={sortByUsage ? "Sorted by usage" : "Sort by usage"}>
               <button onClick={() => setSortByUsage(v => !v)}

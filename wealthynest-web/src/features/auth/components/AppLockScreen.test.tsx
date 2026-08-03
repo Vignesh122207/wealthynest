@@ -45,7 +45,7 @@ const mockedIsBiometryError = vi.mocked(isBiometryError);
 
 const user: User = {
   id: "u1", fullName: "Alice Smith", email: "a@x.com", role: "MEMBER",
-  active: true, createdAt: "2026-01-01", pinEnabled: true,
+  active: true, createdAt: "2026-01-01", pinEnabled: true, hasPasskeys: false,
 };
 
 function renderLockScreen() {

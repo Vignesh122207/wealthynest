@@ -5,7 +5,6 @@ import {App} from "@capacitor/app";
 import {Capacitor} from "@capacitor/core";
 import {useAuthStore} from "../store/auth.store";
 import {clearPersistedHiddenAt, isBiometricPromptActive, readPersistedHiddenAt, useAppLockStore, writePersistedHiddenAt} from "../store/appLock.store";
-import {usePasskeys} from "./useAuth";
 import {useNativeBiometricStatus} from "./useNativeBiometric";
 import {consumeNativeBackgroundedAt} from "@/lib/nativeBridge";
 
@@ -33,16 +32,19 @@ const ACTIVITY_EVENTS = ["mousemove", "keydown", "click", "scroll"] as const;
  * own what happens with that.
  *
  * Returns `ready`: whether we can say for sure yet whether this account should be locked.
- * `pinEnabled` comes from the persisted auth store, so a PIN-only decision is known synchronously
- * on first render — but a passkey or native-biometric decision each need their own async round
- * trip to resolve first. DashboardLayout holds off on painting real dashboard content while
- * `!ready`, instead of briefly showing it unlocked and only locking a moment later once those
- * queries resolve (a real, user-visible bug on refresh for passkey/biometric-only users — the
- * dashboard would flash before the lock screen caught up). */
+ * `pinEnabled` and `hasPasskeys` both come from the persisted auth store, so a PIN or passkey
+ * decision is known synchronously on first render — no network round trip gates it (see
+ * useRegisterPasskey/useDeletePasskey in useAuth.ts, which keep `hasPasskeys` current on their own
+ * success instead of waiting for the next getMe() resync). Native-biometric status is the one
+ * signal that still needs its own async check to resolve first (a real device/Keystore read on
+ * native; an instant no-op on web). DashboardLayout holds off on painting real dashboard content
+ * while `!ready`, instead of briefly showing it unlocked and only locking a moment later once that
+ * resolves (a real, user-visible bug on refresh for biometric-only users — the dashboard would
+ * flash before the lock screen caught up). */
 export function useAppLockTrigger(): { ready: boolean } {
   const pinEnabled = useAuthStore((s) => s.user?.pinEnabled ?? false);
+  const hasPasskeys = useAuthStore((s) => s.user?.hasPasskeys ?? false);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const { data: passkeys, isLoading: passkeysLoading } = usePasskeys();
   // Also read here (not just warmed for AppLockScreen to read later) — this used to only be
   // called for its cache-warming side effect, with `armed` below checking PIN/passkeys alone. That
   // silently left a native-biometric-only user (no PIN, no passkeys left after removing them) with
@@ -53,8 +55,8 @@ export function useAppLockTrigger(): { ready: boolean } {
   const lock = useAppLockStore((s) => s.lock);
 
   const nativeBiometricEnabled = !!nativeBiometric?.available && !!nativeBiometric?.enabled;
-  const armed = isAuthenticated && (pinEnabled || (passkeys?.length ?? 0) > 0 || nativeBiometricEnabled);
-  const ready = !isAuthenticated || pinEnabled || (!passkeysLoading && !nativeBiometricLoading);
+  const armed = isAuthenticated && (pinEnabled || hasPasskeys || nativeBiometricEnabled);
+  const ready = !isAuthenticated || pinEnabled || hasPasskeys || !nativeBiometricLoading;
 
   const lastActivityRef = useRef<number>(Date.now());
 

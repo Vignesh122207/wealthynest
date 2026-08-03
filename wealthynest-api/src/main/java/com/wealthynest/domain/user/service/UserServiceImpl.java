@@ -6,6 +6,7 @@ import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.common.security.TokenRevocationService;
 import com.wealthynest.common.security.UserPrincipal;
 import com.wealthynest.domain.auth.repository.RefreshTokenRepository;
+import com.wealthynest.domain.auth.repository.WebAuthnCredentialRepository;
 import com.wealthynest.domain.user.dto.request.ChangePasswordRequest;
 import com.wealthynest.domain.user.dto.request.UpdateProfileRequest;
 import com.wealthynest.domain.user.dto.response.UserResponse;
@@ -34,6 +35,7 @@ public class UserServiceImpl implements UserService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final AuditService           auditService;
     private final TokenRevocationService tokenRevocationService;
+    private final WebAuthnCredentialRepository webAuthnCredentialRepository;
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
@@ -59,7 +61,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public UserResponse getProfile(UUID userId) {
-        return userMapper.toResponse(findById(userId));
+        return toResponseWithPasskeys(findById(userId));
     }
 
     @Override
@@ -67,7 +69,7 @@ public class UserServiceImpl implements UserService {
     public UserResponse updateLastLogin(UUID userId) {
         User user = findById(userId);
         user.setLastLoginAt(Instant.now());
-        return userMapper.toResponse(userRepository.save(user));
+        return toResponseWithPasskeys(userRepository.save(user));
     }
 
     @Override
@@ -77,7 +79,11 @@ public class UserServiceImpl implements UserService {
         if (request.getFullName() != null && !request.getFullName().isBlank()) {
             user.setFullName(request.getFullName().trim());
         }
-        return userMapper.toResponse(userRepository.save(user));
+        return toResponseWithPasskeys(userRepository.save(user));
+    }
+
+    private UserResponse toResponseWithPasskeys(User user) {
+        return userMapper.toResponse(user, webAuthnCredentialRepository.existsByUserId(user.getId()));
     }
 
     @Override

@@ -93,9 +93,19 @@ export function DebtCard({ debt, onEdit, onPayment }: {
 
         {debt.payments.length > 0 ? (
           <button onClick={() => setExpanded(v => !v)}
-            className="flex-1 min-w-0 flex items-center justify-between gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors bg-muted/40 rounded-full px-3.5 py-2">
-            <span className="truncate">
-              {debt.payments.length} payment{debt.payments.length !== 1 ? "s" : ""} · {fmt(debt.amountSettled)} paid · {fmt(debt.amountRemaining)} left
+            className="flex-1 min-w-0 flex items-center justify-between gap-2 text-muted-foreground hover:text-foreground transition-colors bg-muted/40 rounded-2xl px-3.5 py-1.5">
+            {/* Two lines, not one truncating string: on a narrow mobile card next to the fixed-width
+                Pay back/Log payment button, cramming "N payments · paid · left" onto one line meant
+                the ellipsis could land mid-word ("1 Pay…"), losing the amounts entirely — the part
+                that actually matters. Each line now truncates independently, so the amounts survive
+                even if the screen is too narrow for the payment count to show in full. */}
+            <span className="min-w-0 text-left leading-tight">
+              <span className="block text-[11px] truncate">
+                {debt.payments.length} payment{debt.payments.length !== 1 ? "s" : ""}
+              </span>
+              <span className="block text-xs font-medium text-foreground/90 tabular-nums truncate">
+                {fmt(debt.amountSettled)} paid · {fmt(debt.amountRemaining)} left
+              </span>
             </span>
             {expanded ? <ChevronUp className="w-3.5 h-3.5 shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 shrink-0" />}
           </button>

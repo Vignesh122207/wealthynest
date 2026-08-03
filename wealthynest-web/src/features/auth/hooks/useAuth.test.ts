@@ -39,7 +39,7 @@ const mockedGetPasskeyAssertion = vi.mocked(getPasskeyAssertion);
 
 const baseUser: User = {
   id: "u1", fullName: "Alice Smith", email: "a@x.com", role: "MEMBER",
-  active: true, createdAt: "2026-01-01", pinEnabled: false,
+  active: true, createdAt: "2026-01-01", pinEnabled: false, hasPasskeys: false,
 };
 const authResponse: AuthResponse = {
   accessToken: "at", user: baseUser,
@@ -554,6 +554,23 @@ describe("useRegisterPasskey", () => {
     expect(window.localStorage.getItem("wealthynest:applock:passkeyDismissed")).toBeNull();
   });
 
+  // useAppLockTrigger reads user.hasPasskeys synchronously rather than the passkeys query
+  // directly (see its own doc comment) - this is what keeps that in sync on registration instead
+  // of leaving it stale until the next getMe() resync.
+  it("sets hasPasskeys=true on the persisted user on success", async () => {
+    useAuthStore.getState().setAuth({ ...baseUser, hasPasskeys: false }, "at");
+    mockedApi.getPasskeyRegistrationOptions.mockResolvedValue({ challenge: "c" } as never);
+    mockedCreatePasskey.mockResolvedValue({ id: "cred1" } as never);
+    mockedApi.verifyPasskeyRegistration.mockResolvedValue(undefined as never);
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useRegisterPasskey(), { wrapper: Wrapper });
+    result.current.mutate("My Laptop");
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(useAuthStore.getState().user?.hasPasskeys).toBe(true);
+  });
+
   it("leaves the dismiss flag untouched when registration fails", async () => {
     writePasskeyDismissedOnDevice();
     mockedApi.getPasskeyRegistrationOptions.mockResolvedValue({} as never);
@@ -583,6 +600,7 @@ describe("useRegisterPasskey", () => {
 describe("useDeletePasskey", () => {
   it("invalidates the passkey list and toasts on success", async () => {
     mockedApi.deletePasskey.mockResolvedValue(undefined as never);
+    mockedApi.listPasskeys.mockResolvedValue([] as never);
     const { Wrapper, queryClient } = createQueryClientWrapper();
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 
@@ -592,6 +610,35 @@ describe("useDeletePasskey", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["auth", "passkeys"] });
     expect(toast.success).toHaveBeenCalledWith("Passkey removed");
+  });
+
+  // Deleting one passkey doesn't tell the mutation whether others remain - it re-fetches the
+  // fresh list to decide, since useAppLockTrigger reads user.hasPasskeys synchronously rather
+  // than the passkeys query directly (see that hook's own doc comment).
+  it("sets hasPasskeys=false on the persisted user when that was the last passkey", async () => {
+    useAuthStore.getState().setAuth({ ...baseUser, hasPasskeys: true }, "at");
+    mockedApi.deletePasskey.mockResolvedValue(undefined as never);
+    mockedApi.listPasskeys.mockResolvedValue([] as never);
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useDeletePasskey(), { wrapper: Wrapper });
+    result.current.mutate("cred1");
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(useAuthStore.getState().user?.hasPasskeys).toBe(false);
+  });
+
+  it("leaves hasPasskeys=true on the persisted user when other passkeys still remain", async () => {
+    useAuthStore.getState().setAuth({ ...baseUser, hasPasskeys: true }, "at");
+    mockedApi.deletePasskey.mockResolvedValue(undefined as never);
+    mockedApi.listPasskeys.mockResolvedValue([{ id: "cred2", createdAt: "2026-01-01" }] as never);
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useDeletePasskey(), { wrapper: Wrapper });
+    result.current.mutate("cred1");
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(useAuthStore.getState().user?.hasPasskeys).toBe(true);
   });
 });
 

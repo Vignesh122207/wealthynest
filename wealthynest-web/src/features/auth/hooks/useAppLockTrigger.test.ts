@@ -4,16 +4,12 @@ import { createQueryClientWrapper } from "@/test-utils/queryClientWrapper";
 import { useAppLockTrigger } from "./useAppLockTrigger";
 import { useAuthStore } from "../store/auth.store";
 import { useAppLockStore, writePersistedHiddenAt, readPersistedHiddenAt, markBiometricPromptStarting, __resetBiometricPromptStateForTests } from "../store/appLock.store";
-import { authApi } from "../api/auth.api";
 import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
 import { consumeNativeBackgroundedAt } from "@/lib/nativeBridge";
 import { isBiometricHardwareAvailable, isBiometricUnlockEnabled } from "../utils/nativeBiometric";
 import type { User } from "../types/auth.types";
 
-vi.mock("../api/auth.api", () => ({
-  authApi: { listPasskeys: vi.fn() },
-}));
 vi.mock("@capacitor/core", () => ({
   Capacitor: { isNativePlatform: vi.fn(() => false) },
 }));
@@ -36,7 +32,6 @@ vi.mock("../utils/nativeBiometric", async (importOriginal) => {
   };
 });
 
-const mockedApi = vi.mocked(authApi);
 const mockedIsNativePlatform = vi.mocked(Capacitor.isNativePlatform);
 const mockedAddListener = vi.mocked(App.addListener);
 const mockedConsumeNativeBackgroundedAt = vi.mocked(consumeNativeBackgroundedAt);
@@ -45,7 +40,7 @@ const mockedIsBiometricUnlockEnabled = vi.mocked(isBiometricUnlockEnabled);
 
 const pinUser: User = {
   id: "u1", fullName: "Alice", email: "a@x.com", role: "MEMBER",
-  active: true, createdAt: "2026-01-01", pinEnabled: true,
+  active: true, createdAt: "2026-01-01", pinEnabled: true, hasPasskeys: false,
 };
 
 function setVisibility(state: "visible" | "hidden") {
@@ -58,7 +53,6 @@ beforeEach(() => {
   window.localStorage.clear();
   useAuthStore.setState({ user: null, accessToken: null, isAuthenticated: false, userVersion: 0 });
   useAppLockStore.setState({ isLocked: false });
-  mockedApi.listPasskeys.mockResolvedValue([]);
   mockedIsNativePlatform.mockReturnValue(false);
   mockedIsBiometricHardwareAvailable.mockResolvedValue(false);
   mockedIsBiometricUnlockEnabled.mockResolvedValue(false);
@@ -75,9 +69,9 @@ describe("useAppLockTrigger", () => {
   it("never locks a user with neither PIN nor a passkey configured", async () => {
     useAuthStore.setState({ user: { ...pinUser, pinEnabled: false }, isAuthenticated: true });
     const { Wrapper } = createQueryClientWrapper();
-    renderHook(() => useAppLockTrigger(), { wrapper: Wrapper });
+    const { result } = renderHook(() => useAppLockTrigger(), { wrapper: Wrapper });
 
-    await waitFor(() => expect(mockedApi.listPasskeys).toHaveBeenCalled());
+    await waitFor(() => expect(result.current.ready).toBe(true));
     setVisibility("hidden");
     setVisibility("visible");
 
@@ -138,18 +132,19 @@ describe("useAppLockTrigger", () => {
     expect(useAppLockStore.getState().isLocked).toBe(false);
   });
 
-  it("arms for a passkey-only user (no PIN) once the passkey list resolves non-empty", async () => {
-    useAuthStore.setState({ user: { ...pinUser, pinEnabled: false }, isAuthenticated: true });
-    mockedApi.listPasskeys.mockResolvedValue([{ id: "p1", createdAt: "2026-01-01" }]);
+  // hasPasskeys comes straight from the persisted auth store now (see useAppLockTrigger's own doc
+  // comment) - armed is true from the very first render, no query resolution to wait on.
+  it("arms for a passkey-only user (no PIN) via the persisted hasPasskeys flag, and locks after a long background", () => {
+    vi.useFakeTimers();
+    useAuthStore.setState({ user: { ...pinUser, pinEnabled: false, hasPasskeys: true }, isAuthenticated: true });
     const { Wrapper } = createQueryClientWrapper();
     renderHook(() => useAppLockTrigger(), { wrapper: Wrapper });
 
-    await waitFor(() => expect(mockedApi.listPasskeys).toHaveBeenCalled());
-    // Give the query a tick to resolve and the effect to re-run with armed=true.
-    await waitFor(() => {
-      setVisibility("hidden");
-      setVisibility("visible");
-    });
+    setVisibility("hidden");
+    vi.advanceTimersByTime(91_000);
+    setVisibility("visible");
+
+    expect(useAppLockStore.getState().isLocked).toBe(true);
   });
 
   // Regression coverage for a real, reported bug: `armed` used to check only PIN and passkeys —
@@ -339,12 +334,11 @@ describe("useAppLockTrigger", () => {
   // visibilitychange-only write path could silently never persist a hidden-at marker at all —
   // a cold reopen then found nothing to compare against and never locked. pagehide is the
   // documented, more reliable backup signal for exactly this teardown case.
-  it("pagehide also persists the hidden-at marker, so a fresh mount still locks even if visibilitychange never fired", async () => {
+  it("pagehide also persists the hidden-at marker, so a fresh mount still locks even if visibilitychange never fired", () => {
     vi.useFakeTimers();
     useAuthStore.setState({ user: pinUser, isAuthenticated: true });
     const { Wrapper } = createQueryClientWrapper();
     const { unmount } = renderHook(() => useAppLockTrigger(), { wrapper: Wrapper });
-    await vi.waitFor(() => expect(mockedApi.listPasskeys).toHaveBeenCalled());
 
     // No visibilitychange at all — only pagehide, simulating the Android task-kill case where
     // visibilitychange never fires before the process dies.
@@ -419,7 +413,9 @@ describe("useAppLockTrigger", () => {
     // Regression coverage for a real bug: DashboardLayout used to paint real dashboard content
     // as soon as `isAuthenticated` was true, then lock a moment later once the passkeys query
     // resolved — visibly flashing the actual dashboard on every refresh for a passkey-only user.
-    it("is true immediately for a PIN-enabled user, without waiting on the passkeys query", () => {
+    // hasPasskeys is synchronous now (see useAppLockTrigger's doc comment) so that specific flash
+    // can't happen anymore; native-biometric status is the one signal below still worth covering.
+    it("is true immediately for a PIN-enabled user, without waiting on anything async", () => {
       useAuthStore.setState({ user: pinUser, isAuthenticated: true });
       const { Wrapper } = createQueryClientWrapper();
       const { result } = renderHook(() => useAppLockTrigger(), { wrapper: Wrapper });
@@ -435,7 +431,10 @@ describe("useAppLockTrigger", () => {
       expect(result.current.ready).toBe(true);
     });
 
-    it("is false for a PIN-less user until the passkeys query resolves, then true", async () => {
+    // hasPasskeys/pinEnabled are both synchronous (persisted auth store), so with neither set, the
+    // one remaining thing `ready` can legitimately wait on is the native-biometric status query —
+    // still async even on web, where its queryFn short-circuits but is still wrapped in a Promise.
+    it("is false for a PIN-less, passkey-less user until native-biometric status resolves, then true", async () => {
       useAuthStore.setState({ user: { ...pinUser, pinEnabled: false }, isAuthenticated: true });
       const { Wrapper } = createQueryClientWrapper();
       const { result } = renderHook(() => useAppLockTrigger(), { wrapper: Wrapper });
@@ -444,8 +443,8 @@ describe("useAppLockTrigger", () => {
       await waitFor(() => expect(result.current.ready).toBe(true));
     });
 
-    // Same flash-of-unlocked-dashboard risk the passkeys case above guards against, but for the
-    // native biometric query specifically — armed now depends on it too, so ready must wait on it too.
+    // Same flash-of-unlocked-dashboard risk guarded against above, but forcing the native platform
+    // branch of the same query specifically.
     it("is false for a PIN-less, passkey-less native user until biometric status resolves, then true", async () => {
       mockedIsNativePlatform.mockReturnValue(true);
       mockedIsBiometricHardwareAvailable.mockResolvedValue(true);

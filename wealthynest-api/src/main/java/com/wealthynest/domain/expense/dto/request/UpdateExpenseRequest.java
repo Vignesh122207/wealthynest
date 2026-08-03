@@ -11,6 +11,7 @@ import java.util.UUID;
 @Getter
 public class UpdateExpenseRequest {
     private UUID categoryId;
+    private UUID accountId;
     @Positive private BigDecimal amount;
     @Size(max = 255) private String description;
     private String notes;
