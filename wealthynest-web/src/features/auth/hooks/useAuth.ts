@@ -280,6 +280,13 @@ export function useRegisterPasskey() {
       // This browser just proved it has a working credential store — any earlier "don't show the
       // fingerprint button on this device" from AppLockScreen is stale as of right now.
       clearPasskeyDismissedOnDevice();
+      // useAppLockTrigger reads user.hasPasskeys synchronously (no query wait) rather than
+      // usePasskeys() directly, precisely so app-lock readiness doesn't block on a network round
+      // trip - that means it won't pick up this change on its own the way the invalidated query
+      // above would. Update the store's copy directly instead of waiting for the next getMe()
+      // resync, or a just-registered passkey wouldn't arm the lock until some later reload.
+      const user = useAuthStore.getState().user;
+      if (user) useAuthStore.getState().setUser({ ...user, hasPasskeys: true });
       toast.success("Passkey added");
     },
     onError: (e: unknown) => {
@@ -293,8 +300,14 @@ export function useDeletePasskey() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => authApi.deletePasskey(id),
-    onSuccess: () => {
+    onSuccess: async () => {
       qc.invalidateQueries({ queryKey: ["auth", "passkeys"] });
+      // Deleting one passkey doesn't tell us whether others remain - fetch fresh (not from cache,
+      // which may not have an active observer to actually refetch) so user.hasPasskeys, read
+      // synchronously by useAppLockTrigger, doesn't stay stuck "true" after the last one is removed.
+      const remaining = await authApi.listPasskeys();
+      const user = useAuthStore.getState().user;
+      if (user) useAuthStore.getState().setUser({ ...user, hasPasskeys: remaining.length > 0 });
       toast.success("Passkey removed");
     },
     onError: () => toast.error("Failed to remove passkey"),

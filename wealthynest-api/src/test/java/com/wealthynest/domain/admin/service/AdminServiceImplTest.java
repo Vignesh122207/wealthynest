@@ -67,7 +67,7 @@ class AdminServiceImplTest {
 
     @BeforeEach
     void stubMapperPassthrough() {
-        lenient().when(userMapper.toResponse(any(User.class))).thenAnswer(inv -> {
+        lenient().when(userMapper.toResponse(any(User.class), anyBoolean())).thenAnswer(inv -> {
             User u = inv.getArgument(0);
             return UserResponse.builder().id(u.getId()).fullName(u.getFullName()).build();
         });

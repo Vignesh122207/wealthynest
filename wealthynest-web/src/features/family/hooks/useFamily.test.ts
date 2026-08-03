@@ -30,7 +30,7 @@ const ALL_SCOPED_KEYS = [
 
 const baseUser: User = {
   id: "u1", fullName: "Alice", email: "a@x.com", role: "MEMBER",
-  active: true, createdAt: "2026-01-01", pinEnabled: false,
+  active: true, createdAt: "2026-01-01", pinEnabled: false, hasPasskeys: false,
 };
 
 beforeEach(() => {

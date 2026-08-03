@@ -99,8 +99,8 @@ public class AdminServiceImpl implements AdminService {
     @Transactional(readOnly = true)
     public PagedResponse<UserResponse> listUsers(Pageable pageable, String search) {
         Page<UserResponse> result = StringUtils.hasText(search)
-                ? userRepository.search(search.trim(), pageable).map(userMapper::toResponse)
-                : userRepository.findAll(pageable).map(userMapper::toResponse);
+                ? userRepository.search(search.trim(), pageable).map(this::toResponseWithPasskeys)
+                : userRepository.findAll(pageable).map(this::toResponseWithPasskeys);
         return PagedResponse.of(result);
     }
 
@@ -112,7 +112,7 @@ public class AdminServiceImpl implements AdminService {
         boolean deactivating = user.isActive();
         String  targetEmail  = user.getEmail();
         user.setActive(!deactivating);
-        UserResponse saved = userMapper.toResponse(userRepository.save(user));
+        UserResponse saved = toResponseWithPasskeys(userRepository.save(user));
         if (deactivating) {
             refreshTokenRepository.revokeAllByUserId(targetId);
         }
@@ -134,7 +134,7 @@ public class AdminServiceImpl implements AdminService {
         String previousRole = user.getRole().name();
         String targetEmail  = user.getEmail();
         user.setRole(role);
-        UserResponse saved = userMapper.toResponse(userRepository.save(user));
+        UserResponse saved = toResponseWithPasskeys(userRepository.save(user));
         auditService.log(
                 actorId, "USER_ROLE_CHANGED", "USER", targetId,
                 Map.of("role", previousRole, "email", targetEmail),
@@ -178,7 +178,7 @@ public class AdminServiceImpl implements AdminService {
         vaultItemRepository.deleteByUserId(targetId);
         webAuthnCredentialRepository.deleteByUserId(targetId);
         refreshTokenRepository.revokeAllByUserId(targetId);
-        UserResponse saved = userMapper.toResponse(userRepository.save(user));
+        UserResponse saved = toResponseWithPasskeys(userRepository.save(user));
         auditService.log(
                 actorId, "USER_ANONYMIZED", "USER", targetId,
                 Map.of("email", previousEmail),
@@ -268,5 +268,9 @@ public class AdminServiceImpl implements AdminService {
     private User requireUser(UUID id) {
         return userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
+    }
+
+    private UserResponse toResponseWithPasskeys(User user) {
+        return userMapper.toResponse(user, webAuthnCredentialRepository.existsByUserId(user.getId()));
     }
 }

@@ -18,4 +18,5 @@ public class UserResponse {
     private Instant lastLoginAt;
     private Instant createdAt;
     private boolean pinEnabled;
+    private boolean hasPasskeys;
 }

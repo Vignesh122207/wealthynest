@@ -10,6 +10,7 @@ export interface User {
   lastLoginAt?: string;
   createdAt:    string;
   pinEnabled:   boolean;
+  hasPasskeys:  boolean;
 }
 
 // No refreshToken field — it travels only as an httpOnly cookie the browser manages

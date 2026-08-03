@@ -5,6 +5,7 @@ import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.common.security.TokenRevocationService;
 import com.wealthynest.domain.auth.repository.RefreshTokenRepository;
+import com.wealthynest.domain.auth.repository.WebAuthnCredentialRepository;
 import com.wealthynest.domain.user.dto.request.ChangePasswordRequest;
 import com.wealthynest.domain.user.dto.request.UpdateProfileRequest;
 import com.wealthynest.domain.user.dto.response.UserResponse;
@@ -30,17 +31,19 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceImplTest {
 
-    @Mock private UserRepository         userRepository;
-    @Mock private UserMapper             userMapper;
-    @Mock private PasswordEncoder        passwordEncoder;
-    @Mock private RefreshTokenRepository refreshTokenRepository;
-    @Mock private AuditService           auditService;
-    @Mock private TokenRevocationService tokenRevocationService;
+    @Mock private UserRepository               userRepository;
+    @Mock private UserMapper                   userMapper;
+    @Mock private PasswordEncoder              passwordEncoder;
+    @Mock private RefreshTokenRepository       refreshTokenRepository;
+    @Mock private AuditService                 auditService;
+    @Mock private TokenRevocationService       tokenRevocationService;
+    @Mock private WebAuthnCredentialRepository webAuthnCredentialRepository;
 
     @InjectMocks
     private UserServiceImpl service;
@@ -49,7 +52,7 @@ class UserServiceImplTest {
 
     @BeforeEach
     void stubMapperPassthrough() {
-        lenient().when(userMapper.toResponse(any(User.class))).thenAnswer(inv -> {
+        lenient().when(userMapper.toResponse(any(User.class), anyBoolean())).thenAnswer(inv -> {
             User u = inv.getArgument(0);
             return UserResponse.builder().id(u.getId()).fullName(u.getFullName()).build();
         });
