@@ -17,19 +17,22 @@ interface SixMonthTrendProps {
     cursorStyle:  object;
   };
   isLoading: boolean;
+  /** Home's Year mode passes "12-Month Trend" + the full annual-trend array — the component is
+   * already generic over `trend.length`, so nothing else here changes. */
+  title?: string;
 }
 
 const GRAD_INCOME   = "dashboard6moIncomeGrad";
 const GRAD_EXPENSES = "dashboard6moExpenseGrad";
 const GRAD_SAVED     = "dashboard6moSavedGrad";
 
-export function SixMonthTrend({ trend, chart, isLoading }: SixMonthTrendProps) {
+export function SixMonthTrend({ trend, chart, isLoading, title = "6-Month Trend" }: SixMonthTrendProps) {
   const { fmt } = useAmountFormatter();
   return (
     <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm h-full flex flex-col animate-fade-in-up card-hover">
       <div className="flex items-center justify-between mb-1">
         <div>
-          <h2 className="font-bold text-foreground text-sm">6-Month Trend</h2>
+          <h2 className="font-bold text-foreground text-sm">{title}</h2>
           <p className="text-[11px] text-muted-foreground/80 mt-0.5">Income · Expenses · Savings</p>
         </div>
       </div>

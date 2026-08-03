@@ -21,9 +21,11 @@ import type {Investment} from "@/features/investments/types/investment.types";
 import type {BudgetSummary} from "@/features/dashboard/types/dashboard.types";
 
 interface StatOverviewProps {
+  viewMode:          "month" | "year";
   netWorth:          number | undefined;
   prevNetWorth:      number | undefined;
   netWorthHistory:   NetWorthHistoryPoint[];
+  netWorthSinceJanTrend: number | undefined;
   investments:       Investment[];
   income:            number | undefined;
   expenses:          number | undefined;
@@ -31,7 +33,14 @@ interface StatOverviewProps {
   prevSavingsRate:   number | undefined;
   incomeTrend:       number | undefined;
   expenseTrend:      number | undefined;
-  budgetSummaries:   BudgetSummary[];
+  ytdIncome:            number | undefined;
+  ytdExpenses:          number | undefined;
+  ytdIncomeTrend:       number | undefined;
+  ytdExpenseTrend:      number | undefined;
+  ytdSavingsRate:       number | undefined;
+  ytdSavingsRateTrend:  number | undefined;
+  monthlyBudgets:    BudgetSummary[];
+  yearlyBudgets:     BudgetSummary[];
   alertBannerVisible: boolean;
   isLoading:         boolean;
 }
@@ -91,8 +100,8 @@ function StatTile({ icon, tone, label, value, deltaText, deltaGood, sparkColor, 
 }
 
 // ── Budget Progress — a ring instead of plain text, showing budgets on track out of total ──
-function BudgetProgressTile({ onTrack, total, alertBannerVisible, delay = "delay-375" }: {
-  onTrack: number; total: number; alertBannerVisible: boolean; delay?: string;
+function BudgetProgressTile({ onTrack, total, alertBannerVisible, secondaryCaption, delay = "delay-375" }: {
+  onTrack: number; total: number; alertBannerVisible: boolean; secondaryCaption?: string; delay?: string;
 }) {
   const overCount = total - onTrack;
   const good = total > 0 && overCount === 0;
@@ -111,7 +120,7 @@ function BudgetProgressTile({ onTrack, total, alertBannerVisible, delay = "delay
         <PremiumIcon icon={Target} tone="orange" size="sm" />
         <p className="text-xs font-semibold text-muted-foreground/80 truncate">Budget Progress</p>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3" data-testid="budget-progress-tile">
         <div className="relative w-14 h-14 shrink-0">
           {total > 0 && (
             <div
@@ -132,7 +141,7 @@ function BudgetProgressTile({ onTrack, total, alertBannerVisible, delay = "delay
           </div>
         </div>
         <div className="min-w-0">
-          <p className="text-lg font-bold text-foreground tabular-nums tracking-tight leading-none">
+          <p data-testid="budget-progress-caption" className="text-lg font-bold text-foreground tabular-nums tracking-tight leading-none">
             {total > 0 ? `${onTrack} of ${total}` : "—"}
           </p>
           {!suppressCaption && (
@@ -146,6 +155,9 @@ function BudgetProgressTile({ onTrack, total, alertBannerVisible, delay = "delay
               {total === 0 ? "No budgets yet" : good ? "All on track" : `${overCount} over limit`}
             </p>
           )}
+          {secondaryCaption && (
+            <p className="text-[10px] text-muted-foreground mt-1">{secondaryCaption}</p>
+          )}
         </div>
       </div>
     </div>
@@ -153,11 +165,14 @@ function BudgetProgressTile({ onTrack, total, alertBannerVisible, delay = "delay
 }
 
 export function StatOverview({
-  netWorth, prevNetWorth, netWorthHistory, investments,
+  viewMode, netWorth, prevNetWorth, netWorthHistory, netWorthSinceJanTrend, investments,
   income, expenses, savingsRate, prevSavingsRate,
-  incomeTrend, expenseTrend, budgetSummaries, alertBannerVisible, isLoading,
+  incomeTrend, expenseTrend,
+  ytdIncome, ytdExpenses, ytdIncomeTrend, ytdExpenseTrend, ytdSavingsRate, ytdSavingsRateTrend,
+  monthlyBudgets, yearlyBudgets, alertBannerVisible, isLoading,
 }: StatOverviewProps) {
   const { fmt } = useAmountFormatter();
+  const isYear = viewMode === "year";
   const active = useMemo(() => investments.filter(i => i.active), [investments]);
   const invested = useMemo(() => active.reduce((s, i) => s + i.investedAmount, 0), [active]);
   const current  = useMemo(() => active.reduce((s, i) => s + i.currentValue,   0), [active]);
@@ -168,9 +183,18 @@ export function StatOverview({
 
   const nwSpark = netWorthHistory.slice(-6).map(p => p.netWorth);
 
-  const budgetTotal     = budgetSummaries.length;
-  const budgetOverCount = budgetSummaries.filter(b => b.overBudget).length;
+  // Budget Progress shows whichever budget-type set matches the currently-browsed period —
+  // Month mode's monthly budgets, Year mode's yearly ones (e.g. an annual sinking fund) — rather
+  // than re-showing the same monthly ring under a relabeled title. The other set doesn't
+  // disappear in Year mode, it demotes to the small caption under the ring (secondaryCaption).
+  const activeBudgets   = isYear ? yearlyBudgets : monthlyBudgets;
+  const budgetTotal     = activeBudgets.length;
+  const budgetOverCount = activeBudgets.filter(b => b.overBudget).length;
   const budgetOnTrack   = budgetTotal - budgetOverCount;
+  const monthlyOnTrack  = monthlyBudgets.filter(b => !b.overBudget).length;
+  const secondaryCaption = isYear && monthlyBudgets.length > 0
+    ? `${monthlyOnTrack} monthly budget${monthlyOnTrack !== 1 ? "s" : ""} also on track`
+    : undefined;
 
   if (isLoading) {
     return (
@@ -186,13 +210,20 @@ export function StatOverview({
     );
   }
 
+  const displayIncome     = isYear ? ytdIncome     : income;
+  const displayExpenses   = isYear ? ytdExpenses   : expenses;
+  const displaySavingsRate = isYear ? ytdSavingsRate : savingsRate;
+  const incomeDeltaPct    = isYear ? ytdIncomeTrend  : incomeTrend;
+  const expenseDeltaPct   = isYear ? ytdExpenseTrend : expenseTrend;
+  const savingsRateDeltaPct = isYear ? ytdSavingsRateTrend : srPct;
+
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
       <StatTile
         icon={Landmark} tone="blue"
         label="Net Worth" value={netWorth != null ? fmt(netWorth) : "—"}
-        deltaText={formatTrendDelta(nwPct)}
-        deltaGood={nwPct != null ? nwPct >= 0 : undefined}
+        deltaText={isYear ? formatTrendDelta(netWorthSinceJanTrend, "since Jan 1") : formatTrendDelta(nwPct)}
+        deltaGood={(isYear ? netWorthSinceJanTrend : nwPct) != null ? (isYear ? netWorthSinceJanTrend! : nwPct!) >= 0 : undefined}
         sparkColor={CHART_COLORS.primary} sparkValues={nwSpark}
         delay="delay-0"
       />
@@ -205,26 +236,28 @@ export function StatOverview({
       />
       <StatTile
         icon={Banknote} tone="green"
-        label="Monthly Income" value={income != null ? fmt(income) : "—"}
-        deltaText={formatTrendDelta(incomeTrend)}
-        deltaGood={incomeTrend != null ? incomeTrend >= 0 : undefined}
+        label={isYear ? "YTD Income" : "Monthly Income"} value={displayIncome != null ? fmt(displayIncome) : "—"}
+        deltaText={isYear ? formatTrendDelta(incomeDeltaPct, "vs same period last year") : formatTrendDelta(incomeDeltaPct)}
+        deltaGood={incomeDeltaPct != null ? incomeDeltaPct >= 0 : undefined}
         delay="delay-150"
       />
       <StatTile
         icon={Receipt} tone="red"
-        label="Monthly Expenses" value={expenses != null ? fmt(expenses) : "—"}
-        deltaText={formatTrendDelta(expenseTrend)}
-        deltaGood={expenseTrend != null ? expenseTrend <= 0 : undefined}
+        label={isYear ? "YTD Expenses" : "Monthly Expenses"} value={displayExpenses != null ? fmt(displayExpenses) : "—"}
+        deltaText={isYear ? formatTrendDelta(expenseDeltaPct, "vs same period last year") : formatTrendDelta(expenseDeltaPct)}
+        deltaGood={expenseDeltaPct != null ? expenseDeltaPct <= 0 : undefined}
         delay="delay-225"
       />
       <StatTile
         icon={PiggyBank} tone="yellow"
-        label="Savings Rate" value={savingsRate != null && income ? `${savingsRate.toFixed(1)}%` : "—"}
-        deltaText={formatTrendDelta(srPct)}
-        deltaGood={srPct != null ? srPct >= 0 : undefined}
+        label={isYear ? "Savings Rate (YTD)" : "Savings Rate"}
+        value={displaySavingsRate != null && displayIncome ? `${displaySavingsRate.toFixed(1)}%` : "—"}
+        deltaText={isYear ? formatTrendDelta(savingsRateDeltaPct, "vs last year") : formatTrendDelta(savingsRateDeltaPct)}
+        deltaGood={savingsRateDeltaPct != null ? savingsRateDeltaPct >= 0 : undefined}
         delay="delay-300"
       />
-      <BudgetProgressTile onTrack={budgetOnTrack} total={budgetTotal} alertBannerVisible={alertBannerVisible} delay="delay-375" />
+      <BudgetProgressTile onTrack={budgetOnTrack} total={budgetTotal} alertBannerVisible={alertBannerVisible}
+        secondaryCaption={secondaryCaption} delay="delay-375" />
     </div>
   );
 }

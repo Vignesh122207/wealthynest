@@ -38,7 +38,13 @@ export function DebtPulse({ debts }: DebtPulseProps) {
   return (
     <Link
       href="/debts"
-      className="flex items-center gap-3 rounded-2xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/8 px-4 py-3 transition-colors animate-fade-in-up"
+      // h-full: this can sit side-by-side with the over-budget banner in AttentionRow, whose
+      // 2-line message makes it taller — without h-full this card was capped to its own
+      // (shorter, single-line) content height inside the stretched grid cell, leaving bare
+      // background below it instead of a matching card. bg/border intensity matched to the
+      // banner's (red-500/30 border, red-500/8 bg) so the pair reads as one visual family
+      // instead of DebtPulse looking washed out next to it.
+      className="flex items-center gap-3 h-full rounded-2xl border border-red-500/30 bg-red-500/8 hover:bg-red-500/12 px-4 py-3 transition-colors animate-fade-in-up"
     >
       <PremiumIcon icon={Handshake} tone="red" size="sm" />
       <p className="flex-1 text-sm min-w-0 truncate">
