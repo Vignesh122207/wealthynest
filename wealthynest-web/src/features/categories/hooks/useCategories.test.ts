@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
+import { focusManager } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@/lib/constants";
 import { createQueryClientWrapper } from "@/test-utils/queryClientWrapper";
 import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory } from "./useCategories";
@@ -21,6 +22,12 @@ const categories: Category[] = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+afterEach(() => {
+  // Reset the module-singleton focusManager back to auto-detect mode so a test that forces
+  // focus state doesn't leak into unrelated tests/files.
+  focusManager.setFocused(undefined);
 });
 
 describe("useCategories", () => {
@@ -48,16 +55,21 @@ describe("useCategories", () => {
   // cache — a category created there can't invalidate this query the normal way. Without
   // this, the global default (refetchOnWindowFocus: false) plus the 10min staleTime meant
   // switching back to the original tab never picked up the new category without a manual
-  // page refresh.
-  it("is configured to always refetch on window focus, overriding the app-wide default", async () => {
+  // page refresh. Verified behaviorally (via focusManager) rather than by inspecting
+  // Query.options directly — refetchOnWindowFocus is a QueryObserverOptions field, not part
+  // of the Query entity's own (narrower) QueryOptions type.
+  it("refetches on window focus even though staleTime hasn't elapsed, overriding the app-wide default", async () => {
     mockedApi.getCategories.mockResolvedValue(categories);
-    const { Wrapper, queryClient } = createQueryClientWrapper();
+    const { Wrapper } = createQueryClientWrapper();
 
     const { result } = renderHook(() => useCategories("EXPENSE"), { wrapper: Wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedApi.getCategories).toHaveBeenCalledTimes(1);
 
-    const query = queryClient.getQueryCache().find({ queryKey: [...QUERY_KEYS.CATEGORIES, "EXPENSE"] });
-    expect(query?.options.refetchOnWindowFocus).toBe("always");
+    focusManager.setFocused(false);
+    focusManager.setFocused(true);
+
+    await waitFor(() => expect(mockedApi.getCategories).toHaveBeenCalledTimes(2));
   });
 });
 
