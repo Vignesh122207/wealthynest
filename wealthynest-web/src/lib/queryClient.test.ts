@@ -47,4 +47,14 @@ describe("queryClient global error toast", () => {
     await runQuery("e", authError);
     expect(toast.error).not.toHaveBeenCalled();
   });
+
+  it("collapses simultaneous 429s onto one shared toast id, same as a real network outage", async () => {
+    const rateLimitError = { response: { status: 429, data: { message: "Too many requests" } } };
+    await runQuery("f", rateLimitError);
+    await runQuery("g", rateLimitError);
+
+    expect(toast.error).toHaveBeenCalledTimes(2);
+    expect(toast.error).toHaveBeenNthCalledWith(1, expect.any(String), { id: "query-error-rate-limited" });
+    expect(toast.error).toHaveBeenNthCalledWith(2, expect.any(String), { id: "query-error-rate-limited" });
+  });
 });
