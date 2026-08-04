@@ -14,6 +14,7 @@ import com.wealthynest.domain.auth.repository.EmailVerificationTokenRepository;
 import com.wealthynest.domain.auth.repository.PasswordResetTokenRepository;
 import com.wealthynest.domain.auth.repository.RefreshTokenRepository;
 import com.wealthynest.domain.auth.repository.WebAuthnCredentialRepository;
+import com.wealthynest.domain.admin.repository.SystemSettingRepository;
 import com.wealthynest.domain.user.dto.response.UserResponse;
 import com.wealthynest.domain.user.entity.User;
 import com.wealthynest.domain.user.entity.UserRole;
@@ -66,6 +67,10 @@ class AuthServiceImplTest {
     @Mock private com.wealthynest.domain.auth.service.GoogleIdTokenValidator googleIdTokenValidator;
     // Chain wired by hand in GoogleLoginNativeTests, not RETURNS_DEEP_STUBS — see its own comment.
     @Mock private RestClient googleOAuthClient;
+    // Unstubbed findById() returns Optional.empty() (Mockito's default for Optional-returning
+    // methods), which sendNewSignInEmailIfEnabled treats as "globally enabled" — so most tests
+    // don't need to stub this at all; only the kill-switch tests below do.
+    @Mock private SystemSettingRepository            systemSettingRepository;
 
     @InjectMocks
     private AuthServiceImpl service;
@@ -244,6 +249,35 @@ class AuthServiceImplTest {
             service.login(req(false), ip, ua, null);
 
             verify(emailService).sendNewSignInEmail(eq("alice@example.com"), eq("Alice"), eq(ip), eq(ua), any());
+        }
+
+        @Test
+        @DisplayName("skips the new-sign-in email when the user has opted out")
+        void skipsNewSignInEmailWhenUserOptedOut() {
+            when(authenticationManager.authenticate(any())).thenReturn(null);
+            User user = withId(baseUser().loginAlertEnabled(false).build());
+            when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(user));
+            stubAuthResponseBuilding();
+
+            service.login(req(false), ip, ua, null);
+
+            verify(emailService, never()).sendNewSignInEmail(any(), any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("skips the new-sign-in email when the admin kill switch is off, even for opted-in users")
+        void skipsNewSignInEmailWhenGloballyDisabled() {
+            when(authenticationManager.authenticate(any())).thenReturn(null);
+            User user = withId(baseUser().loginAlertEnabled(true).build());
+            when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(user));
+            when(systemSettingRepository.findById(com.wealthynest.domain.admin.entity.SystemSetting.SINGLETON_ID))
+                    .thenReturn(Optional.of(com.wealthynest.domain.admin.entity.SystemSetting.builder()
+                            .loginAlertEmailEnabled(false).build()));
+            stubAuthResponseBuilding();
+
+            service.login(req(false), ip, ua, null);
+
+            verify(emailService, never()).sendNewSignInEmail(any(), any(), any(), any(), any());
         }
 
         // Regression coverage for a real bug: logging in again from a device that still held an

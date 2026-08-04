@@ -7,6 +7,9 @@ import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.common.response.PagedResponse;
 import com.wealthynest.domain.account.repository.AccountTransferRepository;
+import com.wealthynest.domain.admin.dto.response.SystemSettingsResponse;
+import com.wealthynest.domain.admin.entity.SystemSetting;
+import com.wealthynest.domain.admin.repository.SystemSettingRepository;
 import com.wealthynest.domain.asset.repository.AssetRepository;
 import com.wealthynest.domain.auth.dto.request.ForgotPasswordRequest;
 import com.wealthynest.domain.auth.repository.RefreshTokenRepository;
@@ -60,6 +63,7 @@ public class AdminServiceImpl implements AdminService {
     private final InvestmentIncomeLogRepository investmentIncomeLogRepository;
     private final AccountTransferRepository     accountTransferRepository;
     private final SupportTicketRepository       supportTicketRepository;
+    private final SystemSettingRepository       systemSettingRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -257,6 +261,42 @@ public class AdminServiceImpl implements AdminService {
                 ? emailMap.getOrDefault(l.getUserId(), "unknown")
                 : "system"));
         return PagedResponse.of(result);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SystemSettingsResponse getSystemSettings() {
+        return toSettingsResponse(requireSystemSettings());
+    }
+
+    @Override
+    @Transactional
+    public SystemSettingsResponse updateSystemSettings(boolean loginAlertEmailEnabled, UUID actorId, String ipAddress, String userAgent) {
+        SystemSetting settings = requireSystemSettings();
+        boolean previous = settings.isLoginAlertEmailEnabled();
+        settings.setLoginAlertEmailEnabled(loginAlertEmailEnabled);
+        settings.setUpdatedAt(Instant.now());
+        SystemSettingsResponse saved = toSettingsResponse(systemSettingRepository.save(settings));
+        auditService.log(
+                actorId, "SYSTEM_SETTINGS_UPDATED", "SYSTEM_SETTING", null,
+                Map.of("loginAlertEmailEnabled", previous),
+                Map.of("loginAlertEmailEnabled", loginAlertEmailEnabled),
+                ipAddress, userAgent
+        );
+        return saved;
+    }
+
+    // The seed migration always inserts the singleton row, but falling back to an in-memory
+    // default (rather than throwing) keeps this resilient if that row is ever missing.
+    private SystemSetting requireSystemSettings() {
+        return systemSettingRepository.findById(SystemSetting.SINGLETON_ID)
+                .orElseGet(() -> SystemSetting.builder().build());
+    }
+
+    private SystemSettingsResponse toSettingsResponse(SystemSetting settings) {
+        return SystemSettingsResponse.builder()
+                .loginAlertEmailEnabled(settings.isLoginAlertEmailEnabled())
+                .build();
     }
 
     private void requireNotSelf(UUID targetId, UUID actorId, String action) {

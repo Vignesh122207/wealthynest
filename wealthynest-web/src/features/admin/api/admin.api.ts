@@ -49,6 +49,10 @@ export interface UserGrowthPoint {
   count: number;
 }
 
+export interface SystemSettings {
+  loginAlertEmailEnabled: boolean;
+}
+
 export const adminApi = {
   getStats: async (): Promise<Record<string, number>> =>
     (await apiClient.get<ApiResponse<Record<string, number>>>("/admin/stats")).data.data,
@@ -105,4 +109,13 @@ export const adminApi = {
 
   getSystemHealth: async (): Promise<ActuatorHealth> =>
     (await apiClient.get<ActuatorHealth>(`${ACTUATOR_ORIGIN}/actuator/health`)).data,
+
+  // ── System Settings ──────────────────────────────────────────────────────
+
+  getSystemSettings: async (): Promise<SystemSettings> =>
+    (await apiClient.get<ApiResponse<SystemSettings>>("/admin/settings")).data.data,
+
+  updateSystemSettings: async (loginAlertEmailEnabled: boolean): Promise<SystemSettings> =>
+    (await apiClient.patch<ApiResponse<SystemSettings>>(
+      `/admin/settings?loginAlertEmailEnabled=${loginAlertEmailEnabled}`)).data.data,
 };

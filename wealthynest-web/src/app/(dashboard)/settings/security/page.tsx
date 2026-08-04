@@ -7,6 +7,7 @@ import {useForm} from "react-hook-form";
 import {zodResolver} from "@hookform/resolvers/zod";
 import {z} from "zod";
 import {
+    Bell,
     Eye,
     EyeOff,
     Fingerprint,
@@ -36,6 +37,7 @@ import {
     useRevokeOtherSessions,
     useRevokeSession,
     useSessions,
+    useUpdateProfile,
 } from "@/features/auth/hooks/useAuth";
 import {
     useDisableBiometricUnlock,
@@ -573,6 +575,32 @@ function EmailRow() {
   );
 }
 
+// Controls the "new sign-in" security email (see AuthServiceImpl#login /
+// #signInWithGooglePayload) — used to fire on every login unconditionally. Off by admin
+// override still shows this toggle, it just has no effect; the API doesn't expose the global
+// kill switch's state here, so there's nothing to reflect.
+function LoginAlertRow() {
+  const { user } = useAuthStore();
+  const { mutate, isPending } = useUpdateProfile();
+  const enabled = user?.loginAlertEnabled ?? true;
+
+  return (
+    <div className="flex items-center gap-3.5 px-4 py-4 min-h-[64px]">
+      <PremiumIcon icon={Bell} tone="orange" size="sm" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-foreground">Sign-in email alerts</p>
+        <p className="text-xs text-muted-foreground mt-0.5">Get an email whenever your account signs in on any device</p>
+      </div>
+      <Toggle
+        checked={enabled}
+        disabled={isPending}
+        onChange={(next) => mutate({ loginAlertEnabled: next })}
+        testId={enabled ? "security-login-alert-disable-toggle" : "security-login-alert-enable-toggle"}
+      />
+    </div>
+  );
+}
+
 function PasswordEmailCard() {
   return (
     <div>
@@ -580,6 +608,7 @@ function PasswordEmailCard() {
       <div className="bg-card border border-border rounded-2xl overflow-hidden divide-y divide-border mt-2">
         <PasswordRow />
         <EmailRow />
+        <LoginAlertRow />
       </div>
     </div>
   );

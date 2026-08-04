@@ -79,6 +79,9 @@ public class UserServiceImpl implements UserService {
         if (request.getFullName() != null && !request.getFullName().isBlank()) {
             user.setFullName(request.getFullName().trim());
         }
+        if (request.getLoginAlertEnabled() != null) {
+            user.setLoginAlertEnabled(request.getLoginAlertEnabled());
+        }
         return toResponseWithPasskeys(userRepository.save(user));
     }
 

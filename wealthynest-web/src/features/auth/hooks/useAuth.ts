@@ -119,7 +119,7 @@ export function useResendVerification() {
 export function useUpdateProfile() {
   const { setUser } = useAuthStore();
   return useMutation({
-    mutationFn: (data: { fullName?: string }) => authApi.updateProfile(data),
+    mutationFn: (data: { fullName?: string; loginAlertEnabled?: boolean }) => authApi.updateProfile(data),
     onSuccess: (updated) => {
       setUser(updated);
       toast.success("Profile updated");
