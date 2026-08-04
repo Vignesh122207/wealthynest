@@ -1,8 +1,16 @@
+server:
+  shutdown: graceful
 spring:
   jpa:
     show-sql: false
   flyway:
     baseline-on-migrate: false
+  lifecycle:
+    # Deploys restart via `systemctl restart` (stop then start, no rolling/blue-green — see
+    # deploy-backend.sh) — graceful shutdown drains in-flight requests instead of dropping them
+    # mid-response. Must stay under the systemd unit's TimeoutStopSec (30s) or systemd SIGKILLs
+    # the JVM before this phase finishes waiting.
+    timeout-per-shutdown-phase: 20s
 logging:
   level:
     com.wealthynest: INFO
