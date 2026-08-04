@@ -1,6 +1,6 @@
 "use client";
 
-import {Bell, Lightbulb, RefreshCw} from "lucide-react";
+import {AlertTriangle, Bell, Gauge, Lightbulb, RefreshCw, TrendingDown, TrendingUp} from "lucide-react";
 import {cn} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {PremiumIcon} from "@/components/icons/PremiumIcon";
@@ -8,8 +8,10 @@ import type {Expense} from "@/features/expenses/types/expense.types";
 
 // Category-delta insights work for any browsed month; the other two (forecast/anomaly) are
 // only ever built by the caller for the current month — see page.tsx's isCurrentMonth gate.
+// `projected` on "delta" is true when it's a pace-projected full-month estimate for the
+// in-progress month rather than a completed-month actual — see getCategoryDeltaInsights.
 export type SmartInsight =
-  | { kind: "delta";    category: string; delta: number }
+  | { kind: "delta";    category: string; delta: number; projected: boolean }
   | { kind: "forecast"; amount: number; pctVsAvg: number | null }
   | { kind: "anomaly";  title: string; message: string };
 
@@ -49,46 +51,42 @@ export function SmartAlerts({ smartInsights, upcomingBills }: SmartAlertsProps) 
             {smartInsights.map((insight, i) => {
               if (insight.kind === "anomaly") {
                 return (
-                  <div key={i} className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 bg-red-500/8 border border-red-500/15">
-                    <span className="text-xs font-bold shrink-0 text-red-600 dark:text-red-400">Unusual</span>
-                    <p className="text-xs text-muted-foreground leading-snug min-w-0">{insight.message}</p>
+                  <div key={i} className="flex items-start gap-2.5 rounded-xl px-3 py-2.5 bg-red-500/8 border border-red-500/15">
+                    <PremiumIcon icon={AlertTriangle} tone="red" size="xs" />
+                    <p className="text-xs text-foreground/90 leading-snug min-w-0">{insight.message}</p>
                   </div>
                 );
               }
               if (insight.kind === "forecast") {
+                const good = insight.pctVsAvg == null || insight.pctVsAvg <= 0;
                 return (
-                  <div key={i} className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 bg-amber-500/8 border border-amber-500/15">
-                    <span className="text-xs font-bold shrink-0 tabular-nums text-amber-600 dark:text-amber-400">
-                      {fmt(insight.amount)}
-                    </span>
-                    <p className="text-xs text-muted-foreground leading-snug min-w-0 truncate">
-                      pace to save this month
+                  <div key={i} className={cn(
+                    "flex items-start gap-2.5 rounded-xl px-3 py-2.5",
+                    good ? "bg-emerald-500/8 border border-emerald-500/15" : "bg-amber-500/8 border border-amber-500/15"
+                  )}>
+                    <PremiumIcon icon={Gauge} tone={good ? "green" : "yellow"} size="xs" />
+                    <p className="text-xs text-foreground/90 leading-snug min-w-0">
+                      You&apos;re on pace to save <span className="font-semibold tabular-nums">{fmt(insight.amount)}</span> this month
                       {insight.pctVsAvg != null && (
-                        <> — <span className="font-semibold text-foreground">
+                        <> — <span className="font-semibold">
                           {Math.abs(Math.round(insight.pctVsAvg))}% {insight.pctVsAvg >= 0 ? "above" : "below"}
                         </span> your 6-month average</>
-                      )}
+                      )}.
                     </p>
                   </div>
                 );
               }
+              const up = insight.delta > 0;
+              const verb = insight.projected ? "You're on pace to spend" : "You spent";
               return (
                 <div key={i} className={cn(
-                  "flex items-center gap-2.5 rounded-xl px-3 py-2.5",
-                  insight.delta > 0
-                    ? "bg-amber-500/8 border border-amber-500/15"
-                    : "bg-emerald-500/8 border border-emerald-500/15"
+                  "flex items-start gap-2.5 rounded-xl px-3 py-2.5",
+                  up ? "bg-amber-500/8 border border-amber-500/15" : "bg-emerald-500/8 border border-emerald-500/15"
                 )}>
-                  <span className={cn(
-                    "text-xs font-bold shrink-0 tabular-nums",
-                    insight.delta > 0
-                      ? "text-amber-600 dark:text-amber-400"
-                      : "text-emerald-600 dark:text-emerald-400"
-                  )}>
-                    {insight.delta > 0 ? "+" : ""}{fmt(insight.delta)}
-                  </span>
-                  <p className="text-xs text-muted-foreground leading-snug min-w-0 truncate">
-                    in <span className="font-semibold text-foreground">{insight.category}</span> vs last month
+                  <PremiumIcon icon={up ? TrendingUp : TrendingDown} tone={up ? "yellow" : "green"} size="xs" />
+                  <p className="text-xs text-foreground/90 leading-snug min-w-0">
+                    {verb} <span className="font-semibold tabular-nums">{fmt(Math.abs(insight.delta))}</span> {up ? "more" : "less"} on{" "}
+                    <span className="font-semibold">{insight.category}</span> than last month.
                   </p>
                 </div>
               );

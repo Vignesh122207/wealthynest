@@ -1,5 +1,5 @@
 import {describe, expect, it} from "vitest";
-import {getAnomalyInsight, getNetWorthBaseline, getPaceForecast, getYtdMonths, sumTrend} from "./home.utils";
+import {getAnomalyInsight, getCategoryDeltaInsights, getNetWorthBaseline, getPaceForecast, getYtdMonths, sumTrend} from "./home.utils";
 import type {MonthlyTrend} from "@/features/dashboard/types/dashboard.types";
 import type {NetWorthHistoryPoint} from "@/features/networth/types/networth.types";
 
@@ -89,6 +89,71 @@ describe("getPaceForecast", () => {
   it("computes a negative pctVsAvg when pacing below the prior average", () => {
     const result = getPaceForecast(1000, 900, 10, 31, [1000]);
     expect(result?.pctVsAvg).toBeLessThan(0);
+  });
+});
+
+describe("getCategoryDeltaInsights", () => {
+  function cat(id: string, name: string, amount: number) {
+    return { categoryId: id, categoryName: name, amount };
+  }
+
+  it("returns [] before day 7 of the current month — too little data to mean anything yet", () => {
+    const current  = [cat("c1", "Groceries", 200)];
+    const previous = [cat("c1", "Groceries", 4200)];
+    const result = getCategoryDeltaInsights(current, previous, {
+      isCurrentMonth: true, dayOfMonth: 3, daysInMonth: 30, avgMonthlySpend: 20000,
+    });
+    expect(result).toEqual([]);
+  });
+
+  it("pace-projects the current month's month-to-date amount before comparing", () => {
+    // ₹1500 over 10 days → projected ₹4500 over a 30-day month; prior month was ₹4200 → +300
+    const current  = [cat("c1", "Groceries", 1500)];
+    const previous = [cat("c1", "Groceries", 4200)];
+    const result = getCategoryDeltaInsights(current, previous, {
+      isCurrentMonth: true, dayOfMonth: 10, daysInMonth: 30, avgMonthlySpend: 2000,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].delta).toBeCloseTo(300, 0);
+    expect(result[0].projected).toBe(true);
+  });
+
+  it("does not project a past (already-closed) month — compares the raw completed totals", () => {
+    const current  = [cat("c1", "Dining", 3000)];
+    const previous = [cat("c1", "Dining", 4200)];
+    const result = getCategoryDeltaInsights(current, previous, {
+      isCurrentMonth: false, dayOfMonth: 3, daysInMonth: 30, avgMonthlySpend: 20000,
+    });
+    expect(result).toEqual([{ category: "Dining", delta: -1200, projected: false }]);
+  });
+
+  it("drops deltas under the 5%-of-average threshold (min ₹100)", () => {
+    const current  = [cat("c1", "Coffee", 3050)];
+    const previous = [cat("c1", "Coffee", 3000)];
+    const result = getCategoryDeltaInsights(current, previous, {
+      isCurrentMonth: false, dayOfMonth: 28, daysInMonth: 30, avgMonthlySpend: 20000,
+    });
+    expect(result).toEqual([]);
+  });
+
+  it("treats a category missing from the prior period as a delta from zero", () => {
+    const current  = [cat("c1", "New Category", 2000)];
+    const previous: ReturnType<typeof cat>[] = [];
+    const result = getCategoryDeltaInsights(current, previous, {
+      isCurrentMonth: false, dayOfMonth: 28, daysInMonth: 30, avgMonthlySpend: 20000,
+    });
+    expect(result).toEqual([{ category: "New Category", delta: 2000, projected: false }]);
+  });
+
+  it("sorts by absolute delta and caps at 3 results", () => {
+    const current = [cat("a", "A", 5000), cat("b", "B", 1000), cat("c", "C", 3000), cat("d", "D", 10000)];
+    const previous = [cat("a", "A", 4000), cat("b", "B", 4000), cat("c", "C", 1000), cat("d", "D", 4000)];
+    // deltas: A +1000, B -3000, C +2000, D +6000
+    const result = getCategoryDeltaInsights(current, previous, {
+      isCurrentMonth: false, dayOfMonth: 28, daysInMonth: 30, avgMonthlySpend: 20000,
+    });
+    expect(result).toHaveLength(3);
+    expect(result.map(r => r.category)).toEqual(["D", "B", "C"]);
   });
 });
 

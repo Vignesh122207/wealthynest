@@ -40,7 +40,7 @@ import {BudgetSection} from "./_components/BudgetSection";
 import {TransactionList} from "./_components/TransactionList";
 import {GoalsSummary} from "./_components/GoalsSummary";
 import {TwoColRow} from "./_components/TwoColRow";
-import {getAnomalyInsight, getNetWorthBaseline, getPaceForecast, getYtdMonths, sumTrend} from "./_components/home.utils";
+import {getAnomalyInsight, getCategoryDeltaInsights, getNetWorthBaseline, getPaceForecast, getYtdMonths, sumTrend} from "./_components/home.utils";
 
 // Lazy-loaded: the Home dashboard's own bundle shouldn't carry all three quick-add forms just so
 // one can appear after a FAB click — each is only fetched the first time its modal actually opens.
@@ -264,36 +264,33 @@ export default function DashboardPage() {
   const ytdLastSavingsRate = ytdLastYear.income > 0 ? ((ytdLastYear.income - ytdLastYear.expenses) / ytdLastYear.income) * 100 : 0;
   const ytdSavingsRateTrend = pctChange(ytdSavingsRate, ytdLastSavingsRate);
 
-  // Budget Progress always rolls yearly + monthly budgets into one combined figure — see
-  // StatOverview's matching ring logic (overBudget OR paceOverBudget). The over-budget
-  // banner/count follows the same combined check so the two never disagree.
+  // Budget Progress and the over-budget banner/count are both period-scoped to whichever of
+  // Month/Year is currently browsed — a monthly budget's on-track status has nothing to say about
+  // the year view and vice versa, so mixing them together (as this used to) made the ring show an
+  // identical number regardless of which toggle was selected, which reads as broken rather than
+  // "combined by design." See StatOverview's matching activeBudgets logic.
   const budgetSummaries = data?.budgetSummaries ?? [];
   const monthlyBudgets  = budgetSummaries.filter(b => b.budgetType === "MONTHLY");
   const yearlyBudgets   = budgetSummaries.filter(b => b.budgetType === "YEARLY");
-  const overBudgetCount = [...monthlyBudgets, ...yearlyBudgets].filter(b => b.overBudget || b.paceOverBudget).length;
+  const overBudgetCount = (viewMode === "year" ? yearlyBudgets : monthlyBudgets)
+    .filter(b => b.overBudget || b.paceOverBudget).length;
 
-  const categoryDeltaInsights = useMemo((): SmartInsight[] => {
-    if (!data?.categoryBreakdown?.length || !prevData?.categoryBreakdown?.length) return [];
-    const prevMap = new Map(prevData.categoryBreakdown.map((c) => [c.categoryId, c.amount ?? 0]));
-    const avgMonthlySpend = data.monthlyExpenses > 0 ? data.monthlyExpenses : 5000;
-    const threshold = Math.max(100, avgMonthlySpend * 0.05);
-    const deltas: { category: string; delta: number }[] = [];
-    for (const c of data.categoryBreakdown) {
-      const prev = prevMap.get(c.categoryId) ?? 0;
-      const delta = (c.amount ?? 0) - prev;
-      if (Math.abs(delta) >= threshold) deltas.push({ category: c.categoryName, delta });
-    }
-    deltas.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
-    return deltas.slice(0, 3).map(d => ({ kind: "delta" as const, ...d }));
-  }, [data, prevData]);
+  // Forecast/anomaly/category-deltas all only make sense for the month actually in progress in
+  // their "projected" form — see getCategoryDeltaInsights' own comment for why a past (closed)
+  // month instead takes its plain, unprojected branch. Plain consts, not useMemo — cheap
+  // array/arithmetic work that doesn't need memoizing, and avoids re-deriving `now` inside a memo
+  // dependency array on every render.
+  const daysInMonth = new Date(year, month, 0).getDate();
 
-  // Forecast/anomaly only make sense for the month actually in progress — a projection or
-  // anomaly flag for a month that already closed isn't actionable, so both hide once you
-  // navigate away from the current month (the category-delta insights above still work for any
-  // month browsed). Plain consts, not useMemo — cheap array/arithmetic work that doesn't need
-  // memoizing, and avoids re-deriving `now` inside a memo dependency array on every render.
+  const categoryDeltaInsights: SmartInsight[] = (data?.categoryBreakdown?.length && prevData?.categoryBreakdown?.length)
+    ? getCategoryDeltaInsights(data.categoryBreakdown, prevData.categoryBreakdown, {
+        isCurrentMonth, dayOfMonth: now.getDate(), daysInMonth,
+        avgMonthlySpend: data.monthlyExpenses > 0 ? data.monthlyExpenses : 5000,
+      }).map(d => ({ kind: "delta" as const, ...d }))
+    : [];
+
   const paceForecast = isCurrentMonth
-    ? getPaceForecast(data?.monthlyIncome, data?.monthlyExpenses, now.getDate(), new Date(year, month, 0).getDate(), trend.slice(0, -1).map(t => t.saved))
+    ? getPaceForecast(data?.monthlyIncome, data?.monthlyExpenses, now.getDate(), daysInMonth, trend.slice(0, -1).map(t => t.saved))
     : null;
 
   const anomalyInsight = isCurrentMonth ? getAnomalyInsight(serverNotifications, year, month) : null;

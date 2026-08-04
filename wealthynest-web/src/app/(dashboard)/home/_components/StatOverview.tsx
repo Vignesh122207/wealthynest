@@ -74,18 +74,37 @@ function StatTile({ icon, tone, label, value, deltaText, deltaGood, delay = "del
   );
 }
 
+// Graded, not pass/fail — a single over-limit budget out of twenty used to flip this ring fully
+// red even though 95% of budgets were fine, which reads as "something's broken" rather than
+// "mostly healthy." Red is reserved for when more budgets have failed than not (<50% on track,
+// the "majority" line); 80% matches the threshold BudgetSection.tsx already uses per-category, so
+// the ring stays on the same scale as the rest of the page instead of inventing a second one.
+type BudgetTier = "green" | "amber" | "red";
+function budgetTier(pct: number): BudgetTier {
+  if (pct >= 80) return "green";
+  if (pct >= 50) return "amber";
+  return "red";
+}
+const TIER_HEX:    Record<BudgetTier, string> = { green: "#10b981", amber: "#f59e0b", red: "#ef4444" };
+const TIER_CAPTION: Record<BudgetTier, string> = {
+  green: "text-emerald-600 dark:text-emerald-400",
+  amber: "text-amber-600 dark:text-amber-400",
+  red:   "text-red-500 dark:text-red-400",
+};
+
 // ── Budget Progress — a ring instead of plain text, showing budgets on track out of total ──
-function BudgetProgressTile({ onTrack, total, alertBannerVisible, delay = "delay-375" }: {
-  onTrack: number; total: number; alertBannerVisible: boolean; delay?: string;
+function BudgetProgressTile({ onTrack, total, emptyLabel, alertBannerVisible, delay = "delay-375" }: {
+  onTrack: number; total: number; emptyLabel: string; alertBannerVisible: boolean; delay?: string;
 }) {
   const overCount = total - onTrack;
-  const good = total > 0 && overCount === 0;
+  const allOnTrack = total > 0 && overCount === 0;
   // The SmartAlerts banner already says "You have N budgets over limit" right above
   // this row when it's visible — don't repeat the same sentence in the same breath.
-  // The ring's red/green color still tells the story on its own either way.
-  const suppressCaption = !good && total > 0 && alertBannerVisible;
+  // The ring's color still tells the story on its own either way.
+  const suppressCaption = overCount > 0 && total > 0 && alertBannerVisible;
   const pct = total > 0 ? (onTrack / total) * 100 : 0;
-  const ringColor = total === 0 ? "hsl(var(--muted-foreground))" : good ? "#10b981" : "#ef4444";
+  const tier = budgetTier(pct);
+  const ringColor = total === 0 ? "hsl(var(--muted-foreground))" : TIER_HEX[tier];
   const r = 19, c = 2 * Math.PI * r;
   const offset = c - (pct / 100) * c;
 
@@ -112,7 +131,9 @@ function BudgetProgressTile({ onTrack, total, alertBannerVisible, delay = "delay
             )}
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-sm font-bold text-foreground tabular-nums tracking-tight">{total > 0 ? onTrack : "—"}</span>
+            <span className="text-xs font-bold text-foreground tabular-nums tracking-tight">
+              {total > 0 ? `${Math.round(pct)}%` : "—"}
+            </span>
           </div>
         </div>
         <div className="min-w-0">
@@ -122,12 +143,12 @@ function BudgetProgressTile({ onTrack, total, alertBannerVisible, delay = "delay
           {!suppressCaption && (
             <p className={cn(
               "flex items-center gap-1 text-[11px] font-semibold mt-1.5",
-              total === 0 ? "text-muted-foreground" : good ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"
+              total === 0 ? "text-muted-foreground" : TIER_CAPTION[tier]
             )}>
-              {total > 0 && (good
+              {total > 0 && (allOnTrack
                 ? <CheckCircle2 className="w-3 h-3 shrink-0" />
                 : <AlertTriangle className="w-3 h-3 shrink-0" />)}
-              {total === 0 ? "No budgets yet" : good ? "All on track" : `${overCount} over limit`}
+              {total === 0 ? emptyLabel : allOnTrack ? "All on track" : `${overCount} over limit`}
             </p>
           )}
         </div>
@@ -153,16 +174,16 @@ export function StatOverview({
   const nwPct = pctChange(netWorth, prevNetWorth);
   const srPct = pctChange(savingsRate, prevSavingsRate);
 
-  // Budget Progress always combines the browsed month's monthly budgets with the browsed
-  // year's yearly budgets into one "N of N" figure — a budget's on-track status isn't a
-  // monthly-vs-YTD figure the way income/expenses are, so unlike the tiles above it doesn't
-  // change with the Month/Year toggle. A budget counts as over if it's over its own current
-  // period (overBudget — e.g. blew this month's limit) OR over its annual pace (paceOverBudget
-  // — e.g. running over across the year even though this one month looks fine on its own).
-  // Pace alone would miss "over this month" whenever prior months had enough slack to keep the
-  // YTD total under the pro-rated cap; overBudget alone would miss a bad multi-month trend that
-  // never quite breaches any single month. See AnalyticsServiceImpl#getDashboard's comment.
-  const activeBudgets   = [...monthlyBudgets, ...yearlyBudgets];
+  // Budget Progress follows the Month/Year toggle like every other tile here — Month counts
+  // only monthly budgets, Year counts only yearly ones, so switching the toggle visibly changes
+  // the ring instead of showing an identical number regardless of which period is selected. A
+  // budget counts as over if it's over its own current period (overBudget — e.g. blew this
+  // month's limit) OR over its annual pace (paceOverBudget — e.g. running over across the year
+  // even though this one month looks fine on its own). Pace alone would miss "over this month"
+  // whenever prior months had enough slack to keep the YTD total under the pro-rated cap;
+  // overBudget alone would miss a bad multi-month trend that never quite breaches any single
+  // month. See AnalyticsServiceImpl#getDashboard's comment.
+  const activeBudgets   = isYear ? yearlyBudgets : monthlyBudgets;
   const budgetTotal     = activeBudgets.length;
   const budgetOverCount = activeBudgets.filter(b => b.overBudget || b.paceOverBudget).length;
   const budgetOnTrack   = budgetTotal - budgetOverCount;
@@ -226,8 +247,9 @@ export function StatOverview({
         deltaGood={savingsRateDeltaPct != null ? savingsRateDeltaPct >= 0 : undefined}
         delay="delay-300"
       />
-      <BudgetProgressTile onTrack={budgetOnTrack} total={budgetTotal} alertBannerVisible={alertBannerVisible}
-        delay="delay-375" />
+      <BudgetProgressTile onTrack={budgetOnTrack} total={budgetTotal}
+        emptyLabel={isYear ? "No yearly budgets set" : "No monthly budgets set"}
+        alertBannerVisible={alertBannerVisible} delay="delay-375" />
     </div>
   );
 }

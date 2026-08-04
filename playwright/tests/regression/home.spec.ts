@@ -45,6 +45,13 @@ test.describe("Home dashboard — dynamic reflow", () => {
     context = await browser.newContext({ storageState: storageStateFor(user.auth) });
     page = await context.newPage();
     home = new HomePage(page);
+
+    // Pins the browser clock to day 15 of the real current month for this whole suite.
+    // getCategoryDeltaInsights (home.utils.ts) gates category-delta insights until day 7 of an
+    // in-progress month, so the category-delta seed data above needs a stable, safely-past-the-
+    // gate day rather than whatever day this suite happens to actually run on — same rationale as
+    // the pace-forecast test further down, which pins the same day 15 for the same reason.
+    await page.clock.install({ time: new Date(today.getFullYear(), today.getMonth(), 15) });
   });
 
   test.afterAll(async () => {
@@ -104,11 +111,10 @@ test.describe("Home dashboard — dynamic reflow", () => {
     await expect(home.periodNavLabel).toHaveText(/^\d{4}$/); // just the year, no month
     await expect(page.getByText("YTD Income")).toBeVisible();
     await expect(page.getByText("YTD Expenses")).toBeVisible();
-    // Budget Progress is deliberately period-toggle-independent (see StatOverview's own comment
-    // on activeBudgets) — a budget's on-track status isn't a monthly-vs-YTD figure the way
-    // income/expenses are, so it still counts the one MONTHLY budget seeded above in Year mode
-    // too, unlike every other tile on this page which swaps datasets with the toggle.
-    await expect(home.budgetProgressCaption).toHaveText("0 of 1");
+    // Budget Progress follows the toggle like every other tile (see StatOverview's activeBudgets
+    // comment) — Year mode counts only YEARLY budgets, and none were seeded in this file, so it
+    // falls into the "no budgets for this period" empty state rather than repeating Month's count.
+    await expect(home.budgetProgressCaption).toHaveText("—");
     // Upcoming Bills is deliberately period-blind — same (absent) either way here.
     expect(await home.upcomingBillsCard.isVisible()).toBe(billsVisibleBefore);
 
@@ -128,13 +134,13 @@ test.describe("Home dashboard — dynamic reflow", () => {
     await page.clock.install({ time: new Date(now.getFullYear(), now.getMonth(), 15) });
 
     await home.gotoHome();
-    await expect(page.getByText("pace to save this month")).toBeVisible();
+    await expect(page.getByText(/on pace to save/)).toBeVisible();
 
     await page.getByLabel("Previous month").click();
-    await expect(page.getByText("pace to save this month")).not.toBeVisible();
+    await expect(page.getByText(/on pace to save/)).not.toBeVisible();
 
     await page.getByLabel("Next month").click();
-    await expect(page.getByText("pace to save this month")).toBeVisible();
+    await expect(page.getByText(/on pace to save/)).toBeVisible();
   });
 
   // Spend-anomaly is the other current-month-only insight, but seeding a real one requires
