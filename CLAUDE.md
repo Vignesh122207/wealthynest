@@ -95,3 +95,21 @@ A task is not complete until the affected app has been rebuilt and restarted via
 - After restart, confirm the container is healthy (`docker compose ps`) and check logs for startup errors (`docker compose logs -f <service> --tail 50`) before reporting the task as done.
 - No leftover debug logging, commented-out code, or TODO without an owner.
 - If you touched a shared component, hook, service, or util, check other call sites weren't broken.
+
+## Commit and push once verified
+
+Once the Docker rebuild/restart above confirms the container is healthy and the relevant tests
+(unit/controller, and Playwright where one was added or updated) pass, commit the change and push
+it to the current branch's remote — don't stop at "ready to commit" and wait for a separate
+go-ahead; this section *is* that go-ahead, standing for every change that reaches this point.
+- Commit with a descriptive message per the usual convention (see the Git Safety Protocol/commit
+  instructions already governing this session) — summarize the *why*, stage only the files the
+  task actually touched.
+- Push to the current branch's tracking remote (`git push`, no explicit remote/branch juggling
+  needed on an already-tracked branch). Never force-push, never push straight to `main`, never
+  skip hooks (`--no-verify`) or bypass signing.
+- This still doesn't cover destructive or irreversible git operations outside a normal
+  commit+push (`reset --hard`, force-push, rewriting published history, deleting branches) —
+  those still need explicit confirmation every time, same as always.
+- If the rebuild/restart didn't come back healthy, or a test that should've been added wasn't,
+  fix that first — don't commit a change that hasn't actually cleared the bar above.

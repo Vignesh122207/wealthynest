@@ -451,7 +451,8 @@ export default function DashboardPage() {
           {/* ── Phase 2: Budget Progress (left) + Recent Transactions (right) ── */}
           <TwoColRow>
             <BudgetSection
-              budgetSummaries={data?.budgetSummaries ?? []}
+              budgetSummaries={viewMode === "year" ? yearlyBudgets : monthlyBudgets}
+              viewMode={viewMode}
               year={year}
               month={month}
               isLoading={dataLoading}

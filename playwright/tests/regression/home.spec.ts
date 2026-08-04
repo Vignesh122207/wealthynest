@@ -104,6 +104,9 @@ test.describe("Home dashboard — dynamic reflow", () => {
     await expect(home.periodNavLabel).toHaveText(/^[A-Za-z]{3} \d{4}$/); // e.g. "Aug 2026"
     // Month mode: the one MONTHLY budget seeded above (over its limit) is the only budget counted.
     await expect(home.budgetProgressCaption).toHaveText("0 of 1");
+    // The detail panel below the ring must agree with it — it used to always receive every
+    // budget unfiltered regardless of the toggle, so it never actually hit this empty state.
+    await expect(home.budgetSection.getByText("No budgets set for this month")).not.toBeVisible();
     const monthLabel = await home.periodNavLabel.textContent();
     const billsVisibleBefore = await home.upcomingBillsCard.isVisible();
 
@@ -115,12 +118,17 @@ test.describe("Home dashboard — dynamic reflow", () => {
     // comment) — Year mode counts only YEARLY budgets, and none were seeded in this file, so it
     // falls into the "no budgets for this period" empty state rather than repeating Month's count.
     await expect(home.budgetProgressCaption).toHaveText("—");
+    // The detail panel must independently reach its own "no yearly budgets" empty state too —
+    // before the fix it kept showing the seeded MONTHLY budget's row here instead, contradicting
+    // the ring right above it.
+    await expect(home.budgetSection.getByText("No yearly budgets set")).toBeVisible();
     // Upcoming Bills is deliberately period-blind — same (absent) either way here.
     expect(await home.upcomingBillsCard.isVisible()).toBe(billsVisibleBefore);
 
     await home.switchToMonthMode();
     await expect(home.periodNavLabel).toHaveText(monthLabel!);
     await expect(home.budgetProgressCaption).toHaveText("0 of 1");
+    await expect(home.budgetSection.getByText("No budgets set for this month")).not.toBeVisible();
   });
 
   test("pace-to-save forecast hides on a past month and reappears on the current month @regression", async () => {

@@ -142,6 +142,7 @@ export const TEST_IDS = {
     periodNavLabel:     "period-nav-label",
     budgetProgressTile:    "budget-progress-tile",
     budgetProgressCaption: "budget-progress-caption",
+    budgetSection:         "budget-section",
   },
   reports: {
     tab: (id: "monthly" | "annual" | "export") => `reports-tab-${id}`,

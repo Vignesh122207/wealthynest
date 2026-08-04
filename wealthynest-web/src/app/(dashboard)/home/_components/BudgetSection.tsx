@@ -11,6 +11,7 @@ import type {BudgetSummary} from "@/features/dashboard/types/dashboard.types";
 
 interface BudgetSectionProps {
   budgetSummaries: BudgetSummary[];
+  viewMode:        "month" | "year";
   year:            number;
   month:           number;
   isLoading:       boolean;
@@ -19,15 +20,18 @@ interface BudgetSectionProps {
 // Matches Recent Transactions' cap exactly
 const DISPLAY_COUNT = 8;
 
-export function BudgetSection({ budgetSummaries, year, month, isLoading }: BudgetSectionProps) {
-  const label = monthLabel(year, month);
+export function BudgetSection({ budgetSummaries, viewMode, year, month, isLoading }: BudgetSectionProps) {
+  // Caller (home/page.tsx) already filters budgetSummaries to MONTHLY vs YEARLY based on
+  // viewMode, matching StatOverview's Budget Progress ring — this just needs to label whichever
+  // period that filtered set actually represents instead of always showing the month.
+  const label = viewMode === "year" ? String(year) : monthLabel(year, month);
   const { fmtC } = useAmountFormatter();
 
   // Sorted by spending percentage (most at-risk first), not raw amount spent
   const visible = [...budgetSummaries].sort((a, b) => b.percentUsed - a.percentUsed).slice(0, DISPLAY_COUNT);
 
   return (
-    <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm animate-fade-in-up delay-300 h-full flex flex-col card-hover">
+    <div data-testid="budget-section" className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm animate-fade-in-up delay-300 h-full flex flex-col card-hover">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h2 className="font-bold text-foreground">Budget Progress</h2>
@@ -95,7 +99,7 @@ export function BudgetSection({ budgetSummaries, year, month, isLoading }: Budge
       ) : (
         <EmptyState
           icon={Target}
-          title="No budgets set for this month"
+          title={viewMode === "year" ? "No yearly budgets set" : "No budgets set for this month"}
           description="Set spending limits by category to keep your budget on track."
           action={<Link href="/budgets" className="text-xs font-semibold text-primary hover:underline">Set up budgets →</Link>}
           className="flex-1"
