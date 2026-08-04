@@ -1,10 +1,9 @@
 "use client";
 
 import {useMemo, useState} from "react";
-import {Activity, BarChart3, Gem, Info, Percent, TrendingDown, TrendingUp, Wallet} from "lucide-react";
+import {BarChart3, Info} from "lucide-react";
 import {Cell, Pie, PieChart, ResponsiveContainer, Tooltip, type TooltipValueType} from "recharts";
 import {EmptyState} from "@/components/shared/EmptyState";
-import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
 import {chartValueToNumber, cn, formatDate} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {useChartTheme} from "@/hooks/useChartTheme";
@@ -68,37 +67,42 @@ export function OverviewTab({ investments, year, onYearChange, incomeHistory, po
       description="Add stocks, mutual funds, gold, FDs or bonds to see your portfolio overview." />
   );
 
+  const gainUp = totalGain >= 0;
+  const gainColorClass = gainUp ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400";
+  const xirrColorClass = !xirrKnown ? "text-muted-foreground" : xirrPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400";
+
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-        {[
-          { label: "Total Invested", icon: Wallet, tone: "gray" as IconTone,
-            value: fmt(totalInvested), color: "text-foreground",     bg: "bg-muted/40" },
-          { label: "Current Value",  icon: Gem, tone: "indigo" as IconTone,
-            value: fmt(totalCurrent),  color: "text-indigo-400",     bg: "bg-indigo-500/12 border-indigo-500/15" },
-          { label: "Total Gain", icon: totalGain >= 0 ? TrendingUp : TrendingDown, tone: (totalGain >= 0 ? "emerald" : "red") as IconTone,
-            value: `${totalGain >= 0 ? "+" : ""}${fmt(totalGain)}`,
-            color: totalGain >= 0 ? "text-emerald-400" : "text-red-400",
-            bg:    totalGain >= 0 ? "bg-emerald-500/12 border-emerald-500/15" : "bg-red-500/12 border-red-500/15" },
-          { label: "Overall Return", icon: Percent, tone: (gainPct >= 0 ? "emerald" : "red") as IconTone,
-            value: `${gainPct >= 0 ? "+" : ""}${gainPct.toFixed(2)}%`,
-            color: gainPct >= 0 ? "text-emerald-400" : "text-red-400",
-            bg:    gainPct >= 0 ? "bg-emerald-500/12 border-emerald-500/15" : "bg-red-500/12 border-red-500/15" },
-          { label: "XIRR", caption: "Annualized", icon: Activity, tone: (!xirrKnown ? "gray" : xirrPositive ? "emerald" : "red") as IconTone,
-            value: xirrLoading ? "…" : xirrKnown ? `${xirrPositive ? "+" : ""}${portfolioXirr.toFixed(2)}%` : "—",
-            color: !xirrKnown ? "text-muted-foreground" : xirrPositive ? "text-emerald-400" : "text-red-400",
-            bg:    !xirrKnown ? "bg-muted/40" : xirrPositive ? "bg-emerald-500/12 border-emerald-500/15" : "bg-red-500/12 border-red-500/15" },
-        ].map(({ label, icon, tone, value, color, bg, caption }) => (
-          <div key={label} className={cn("rounded-2xl border border-border p-4", bg)} title={caption ? "Money-weighted return across every buy/sell/redeem, not just current vs. invested" : undefined}>
-            <div className="flex items-center gap-1.5 mb-2">
-              <PremiumIcon icon={icon} tone={tone} size="xs" />
-              <p className="text-xs text-muted-foreground/80 uppercase tracking-wide">
-                {label}{caption && <span className="normal-case text-muted-foreground/80"> · {caption}</span>}
-              </p>
-            </div>
-            <p className={cn("text-lg font-bold tabular-nums", color)}>{value}</p>
+      {/* One fused hero (lead metric + divider + flanking stats) instead of five identical stat
+          chips — same shell as each instrument tab's own TabSummaryBar, but leading with the
+          whole-portfolio value since Overview spans every instrument type rather than one. */}
+      <div className="bg-card border border-border rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-0">
+        <div className="flex-1 sm:pr-6 min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">Total Portfolio Value</p>
+          <p className="text-2xl sm:text-3xl font-bold tabular-nums tracking-tight text-foreground">{fmt(totalCurrent)}</p>
+          <p className="text-xs font-semibold mt-1.5 tabular-nums">
+            <span className={gainColorClass}>
+              {gainUp ? "▲" : "▼"} {gainUp ? "+" : ""}{fmt(totalGain)} ({gainPct >= 0 ? "+" : ""}{gainPct.toFixed(2)}%) overall
+            </span>
+            {" · "}
+            <span className={xirrColorClass} title="Money-weighted return across every buy/sell/redeem, not just current vs. invested">
+              {xirrLoading ? "…" : xirrKnown ? `${xirrPositive ? "+" : ""}${portfolioXirr.toFixed(2)}% XIRR` : "XIRR —"}
+            </span>
+          </p>
+        </div>
+
+        <div className="h-px sm:h-auto sm:w-px bg-border shrink-0" />
+
+        <div className="flex flex-wrap gap-x-6 gap-y-3 pt-1 sm:pt-0 sm:pl-6">
+          <div className="min-w-[84px]">
+            <p className="text-[10.5px] font-semibold text-muted-foreground mb-0.5">Total Invested</p>
+            <p className="text-sm font-bold tabular-nums text-foreground">{fmt(totalInvested)}</p>
           </div>
-        ))}
+          <div className="min-w-[84px]">
+            <p className="text-[10.5px] font-semibold text-muted-foreground mb-0.5">Instrument Types</p>
+            <p className="text-sm font-bold tabular-nums text-foreground">{byType.length}</p>
+          </div>
+        </div>
       </div>
 
       {byType.length > 0 && (
