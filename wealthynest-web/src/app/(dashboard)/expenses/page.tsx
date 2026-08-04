@@ -171,6 +171,11 @@ export default function TransactionsPage() {
   // or the filter panel's account picker) takes priority over the payment-channel-derived list.
   const effectiveAccountIds = selectedAccountIds.length > 0 ? selectedAccountIds : accountIds;
 
+  // A payment-channel filter that matches zero accounts (e.g. "Card" with no credit-card account
+  // on file) must return no rows — not fall through to "no accountIds filter" and show everything,
+  // which is what an empty `effectiveAccountIds` array collapses to below.
+  const channelMatchesNoAccounts = payChannel !== "" && selectedAccountIds.length === 0 && accountIds.length === 0;
+
   const expenseFilters = {
     startDate:  startDate as string | undefined,
     endDate:    endDate as string | undefined,
@@ -185,7 +190,8 @@ export default function TransactionsPage() {
     size: PAGE_SIZE,
   };
 
-  const { data: expenseData, isLoading: expensesLoading, isError: expensesError, refetch: refetchExpenses } = useExpenses(expenseFilters);
+  const { data: expenseData, isLoading: expensesLoading, isError: expensesError, refetch: refetchExpenses } =
+    useExpenses(expenseFilters, !channelMatchesNoAccounts);
 
   // Previous month, used by the stat-card deltas below (dashboardSummary vs prevDashboardSummary)
   const prevMonthNum = month === 1 ? 12 : month - 1;
@@ -332,8 +338,8 @@ export default function TransactionsPage() {
             : type === "BANK_ACCOUNT";
           if (!matches) return false;
         }
-      } else if (categoryId || recurringOnly) {
-        // A category or recurring-only filter is active and this row isn't an expense — exclude it.
+      } else if (categoryId || recurringOnly || payChannel) {
+        // A category, recurring-only, or payment-channel filter is active and this row isn't an expense — exclude it.
         return false;
       }
       if (!debouncedSearch.trim()) return true;
@@ -650,9 +656,13 @@ export default function TransactionsPage() {
   useEffect(() => { setAllPage(0); },
     [txType, dateMode, year, month, customStart, customEnd, debouncedSearch, categoryId, payChannel, minAmount, maxAmount, recurringOnly, sortKey, selectedAccountIds]);
 
-  const expenses      = expenseData?.data ?? [];
-  const serverTotal   = expenseData?.meta?.totalElements ?? 0;
-  const totalPages    = expenseData?.meta?.totalPages ?? 1;
+  // Disabling the query above stops it from refetching, but its queryKey collapses to the same
+  // (accountIds: undefined) key as the unfiltered "All channels" query — react-query still happily
+  // serves that query's cached `data` for a disabled query with a matching key, so without this
+  // guard a channel with zero matching accounts would flash the previous unfiltered results.
+  const expenses      = channelMatchesNoAccounts ? [] : (expenseData?.data ?? []);
+  const serverTotal   = channelMatchesNoAccounts ? 0  : (expenseData?.meta?.totalElements ?? 0);
+  const totalPages    = channelMatchesNoAccounts ? 1  : (expenseData?.meta?.totalPages ?? 1);
 
   const grouped = expenses.reduce<Record<string, Expense[]>>((acc, e) => {
     if (!acc[e.expenseDate]) acc[e.expenseDate] = [];
