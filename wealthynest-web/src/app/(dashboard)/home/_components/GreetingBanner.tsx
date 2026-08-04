@@ -52,8 +52,8 @@ export function GreetingBanner({
   const insight = getSavingsInsight(income, expenses, savingsRate);
 
   return (
-    <div data-testid="greeting-banner" className="animate-fade-in-up flex flex-row items-start justify-between gap-3">
-      <div className="min-w-0 flex-1">
+    <div data-testid="greeting-banner" className="animate-fade-in-up flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+      <div className="min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <span className="text-xl" aria-hidden>
             {{ morning: "🌤️", afternoon: "☀️", evening: "🌙" }[getGreeting()] ?? "👋"}
@@ -62,9 +62,6 @@ export function GreetingBanner({
             Good {getGreeting()}, {firstName}
           </p>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Here&apos;s your financial overview for <span className="font-semibold text-foreground">{label}</span>
-        </p>
       </div>
 
       <div className="flex items-center gap-3 shrink-0">
