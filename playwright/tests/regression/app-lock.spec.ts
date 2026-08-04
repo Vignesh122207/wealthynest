@@ -133,4 +133,39 @@ test.describe("App Lock & PIN", () => {
     await appLock.unlockWithPin("1234");
     await appLock.expectNotVisible();
   });
+
+  // Regression coverage for a real bug: the LockoutBanner rendered correctly on a PIN lockout, but
+  // neither the PIN input nor the submit button were ever actually disabled — a user could keep
+  // retyping and re-firing pinLogin against a server that was rejecting every one of them anyway,
+  // and a lockout response could even flash "Incorrect PIN" alongside the lockout message.
+  // Deliberately last: this leaves the account genuinely PIN-locked for the real 15-minute window,
+  // which afterAll's closeAccount doesn't need to care about. Doesn't try to pin down whether
+  // PIN_LOCKED (5 wrong attempts) or the shared /auth RATE_LIMIT_EXCEEDED bucket trips first —
+  // deriveLockoutState treats both the same, and so does the fix, so either is a valid trigger.
+  test("too many wrong PIN attempts disables the PIN box instead of leaving it live to keep retrying @regression", async () => {
+    // test.slow()'s 3x multiplier (90s off this file's 30s default) isn't enough headroom on top
+    // of the 91s wait alone below — set an explicit budget instead for the wait plus up to 6
+    // sequential pin-login round trips.
+    test.setTimeout(150_000);
+    await appLock.goBackground();
+    // useAppLockTrigger's actual BACKGROUND_GRACE_MS is 90s, not the 30s this file's older tests'
+    // own comments assume (see useAppLockTrigger.test.ts's own 91_000 for the same real value) —
+    // a shorter wait here was flaky, passing or failing depending on incidental timing elsewhere
+    // in the run rather than reliably exercising the real grace window.
+    await page.waitForTimeout(91_000);
+    await appLock.goForeground();
+    await appLock.expectVisible();
+
+    for (let attempt = 0; attempt < 6; attempt++) {
+      if (await appLock.lockoutBanner.isVisible()) break;
+      await appLock.unlockWithPin("0000");
+      // Cleared on both a plain wrong-PIN error and a lockout error alike (see AppLockScreen.tsx's
+      // submitPin) — this is just "the attempt resolved," not a signal of which outcome it was.
+      await expect(appLock.pinInput).toHaveValue("", { timeout: 10_000 });
+    }
+
+    await expect(appLock.lockoutBanner).toBeVisible();
+    await expect(appLock.pinInput).toBeDisabled();
+    await expect(appLock.pinSubmit).toBeDisabled();
+  });
 });

@@ -25,7 +25,10 @@ export default function SetupPinPage() {
 
   const { step, value, mismatch, startOver, handleDigit, handleBackspace } = usePinEntryFlow({
     isPending,
-    onConfirmed: (pin, { onError }) => enablePin(pin, { onSuccess: close, onError }),
+    // No currentPassword — this native route is only ever reached from PinRow's "turn on" toggle
+    // (see that file's own comment), which is always first-time setup, never a replace. The
+    // "Forgot your PIN?" replace path goes through PinSetupModal instead, on every platform.
+    onConfirmed: (pin, { onError }) => enablePin({ pin }, { onSuccess: close, onError }),
   });
 
   // Start-over (only once there's a chosen PIN to redo) on the left, a plain close on the right —

@@ -1,11 +1,21 @@
 "use client";
 
+import {useState} from "react";
 import {AlertCircle, ArrowLeft, KeyRound, X} from "lucide-react";
+import {useForm} from "react-hook-form";
+import {zodResolver} from "@hookform/resolvers/zod";
+import {z} from "zod";
 import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
+import {FormInput} from "@/components/forms/FormInput";
 import {AuthCard} from "./AuthCard";
 import {PinCells, Keypad} from "./PinKeypad";
 import {useEnablePin} from "../hooks/useAuth";
 import {usePinEntryFlow} from "../hooks/usePinEntryFlow";
+import {useAuthStore} from "../store/auth.store";
+import {apiErrorCode} from "@/lib/utils";
+
+const passwordSchema = z.object({ currentPassword: z.string().min(1, "Enter your account password") });
+type PasswordValues = z.infer<typeof passwordSchema>;
 
 // Web's PIN setup surface — a popup on top of Security, not the full-page navigation the native
 // app still uses (see settings/security/pin/page.tsx's own comment: that route stays native's
@@ -19,12 +29,92 @@ import {usePinEntryFlow} from "../hooks/usePinEntryFlow";
 // native full-page version: a popup has to fit inside a viewport it's borrowing, not a whole
 // screen, so `compact` keeps the keypad tappable while the card comfortably fits without
 // TransactionModalOverlay ever needing to fall back to its own scroll.
-export function PinSetupModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+export function PinSetupModal({ onClose, onSuccess, currentPassword: prefilledPassword }: {
+  onClose: () => void;
+  onSuccess: () => void;
+  // Supplied only by the post-"Forgot your PIN?" sign-out/sign-in-again redirect (see useLogin's
+  // own comment on that flow) — that login already proved the account password moments ago, so
+  // this skips asking for it a second time. Every other caller (ordinary first-time setup, and
+  // Settings' own "Forgot your PIN?" link) leaves this undefined.
+  currentPassword?: string;
+}) {
+  const { user } = useAuthStore();
+  // Replacing an already-set PIN (not first-time setup) is the one case
+  // AuthServiceImpl#enablePin now requires proving the account password for — see its own
+  // comment on why "Forgot your PIN?" deliberately skipping the OLD pin made that necessary.
+  const isReplacing = !!user?.pinEnabled;
+  const [password, setPassword] = useState<string | undefined>(prefilledPassword);
+  const passwordForm = useForm<PasswordValues>({
+    resolver: zodResolver(passwordSchema),
+    defaultValues: { currentPassword: "" },
+  });
+
   const { mutate: enablePin, isPending } = useEnablePin();
   const { step, value, mismatch, startOver, handleDigit, handleBackspace } = usePinEntryFlow({
     isPending,
-    onConfirmed: (pin, { onError }) => enablePin(pin, { onSuccess, onError }),
+    onConfirmed: (pin, { onError }) =>
+      enablePin({ pin, currentPassword: password }, {
+        onSuccess,
+        onError: (e) => {
+          // A wrong PASSWORD is a different failure than a PIN mismatch — send the user back to
+          // re-enter it (with an inline error) instead of just clearing the PIN cells the way an
+          // ordinary enable failure does, which would otherwise retry with the same bad password
+          // and fail identically forever. startOver() (not just the local onError() below) is
+          // required here — usePinEntryFlow only ever clears `value` through the onError it hands
+          // to onConfirmed, and calling `onError()` is exactly what's being skipped on this branch;
+          // without startOver(), retyping the password correctly would land back on "Confirm your
+          // PIN" already showing 4 filled, un-editable cells from the attempt that just failed —
+          // only backspace would do anything, with no way to type a fresh PIN over it.
+          if (apiErrorCode(e) === "WRONG_PASSWORD") {
+            setPassword(undefined);
+            startOver();
+            passwordForm.setError("currentPassword", { message: "Incorrect password" });
+            return;
+          }
+          onError();
+        },
+      }),
   });
+
+  if (isReplacing && password === undefined) {
+    return (
+      <TransactionModalOverlay onDismiss={onClose} maxWidth="max-w-[360px]">
+        <AuthCard animation="scale-in" className="px-5 pt-5 pb-6">
+          <button onClick={onClose} aria-label="Close" data-testid="pin-setup-close"
+            className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+
+          <div className="mb-5 pt-2 text-center">
+            <div className="w-11 h-11 rounded-2xl bg-brand-500/10 flex items-center justify-center mx-auto mb-3">
+              <KeyRound className="w-5 h-5 text-brand-500" />
+            </div>
+            <h2 className="font-serif text-lg font-semibold text-foreground mb-1">Confirm your password</h2>
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              Enter your account password to set a new PIN.
+            </p>
+          </div>
+
+          <form onSubmit={passwordForm.handleSubmit((v) => setPassword(v.currentPassword))} className="space-y-3">
+            <FormInput
+              type="password"
+              placeholder="••••••••"
+              data-testid="pin-setup-password-input"
+              error={passwordForm.formState.errors.currentPassword?.message}
+              {...passwordForm.register("currentPassword")}
+            />
+            <button
+              type="submit"
+              data-testid="pin-setup-password-submit"
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-br from-brand-600 to-brand-500 shadow-[0_10px_24px_-10px_rgb(var(--brand-500)/65%),inset_0_1px_0_rgba(255,255,255,0.18)] hover:shadow-[0_14px_28px_-10px_rgb(var(--brand-500)/75%),inset_0_1px_0_rgba(255,255,255,0.22)] hover:-translate-y-0.5 text-white text-sm font-semibold py-2.5 rounded-xl transition-all"
+            >
+              Continue
+            </button>
+          </form>
+        </AuthCard>
+      </TransactionModalOverlay>
+    );
+  }
 
   return (
     <TransactionModalOverlay onDismiss={onClose} maxWidth="max-w-[360px]">

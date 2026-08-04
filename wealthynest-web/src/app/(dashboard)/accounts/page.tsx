@@ -41,6 +41,7 @@ import {useCreateRecurringIncome} from "@/features/recurringIncome/hooks/useRecu
 import {buildUsageCounts, pickSmartDefault} from "@/lib/mostUsed";
 import type {AccountType, WalletAccount} from "@/features/accounts/types/account.types";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {useTabParam} from "@/hooks/useTabParam";
 import {AccountStatStrip} from "./_components/AccountStatStrip";
 import {AccountFilterTabs} from "./_components/AccountFilterTabs";
 import {AccountsGrid} from "./_components/AccountsGrid";
@@ -67,6 +68,8 @@ const AccountTransactionModals = dynamic(
 type ModalType = "none" | "create" | "addMoney" | "addExpense" | "transfer" | "edit" | "import";
 type ConfirmState = { title: string; message: string; onConfirm: () => void } | null;
 
+const SECTION_FILTERS = ["all", "bank", "cash", "cc", "loan", "invest"] as const;
+
 // Module-scope, not a per-render literal — AccountCard's linkedDebts needs the exact same array
 // reference every time an account genuinely has none, or the memoized card re-renders anyway.
 const NO_DEBTS: DebtRecord[] = [];
@@ -77,7 +80,7 @@ export default function AccountsPage() {
   const { currency: currCode } = usePrefsStore();
   const currSymbol = CURRENCIES.find(c => c.code === currCode)?.symbol ?? "₹";
   const [modal, setModal]              = useState<ModalType>("none");
-  const [sectionFilter, setSectionFilter] = useState<"all" | "bank" | "cash" | "cc" | "loan" | "invest">("all");
+  const [sectionFilter, setSectionFilter] = useTabParam(SECTION_FILTERS, "all");
   const [bankInput, setBankInput]      = useState("");
   const [editAccount, setEditAccount]  = useState<WalletAccount | null>(null);
   const [preAccount, setPreAccount]    = useState<WalletAccount | null>(null);

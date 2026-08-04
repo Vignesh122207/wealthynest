@@ -18,6 +18,12 @@ public class RefreshToken {
     @Column(name = "token_hash", nullable = false, unique = true)
     private String tokenHash;
 
+    /** Stable across every rotation of a given login, including the grace-window race path in
+     * refresh() that mints a new row for the same session — see V55's own migration comment. Lets
+     * listSessions collapse those lookalike rows back into one "Active sessions" entry. */
+    @Column(name = "session_id", nullable = false)
+    private UUID sessionId;
+
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 

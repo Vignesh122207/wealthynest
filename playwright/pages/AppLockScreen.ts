@@ -33,6 +33,11 @@ export class AppLockScreen {
   get dismissPasskeyButton(): Locator {
     return this.page.getByTestId(TEST_IDS.appLock.dismissPasskey);
   }
+  // Shared LockoutBanner.tsx testid — same component AppLockScreen, the /login PIN form, and
+  // PinVerifyModal all render for PIN_LOCKED/RATE_LIMIT_EXCEEDED, not something applock-specific.
+  get lockoutBanner(): Locator {
+    return this.page.getByTestId("lockout-banner");
+  }
 
   async expectVisible(): Promise<void> {
     await expect(this.dialog).toBeVisible();

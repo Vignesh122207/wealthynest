@@ -258,8 +258,10 @@ class AuthServiceImplTest {
             User user = withId(baseUser().build());
             when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(user));
             stubAuthResponseBuilding();
-            RefreshToken previous = RefreshToken.builder().userId(userId).revoked(false).build();
+            UUID sessionId = UUID.randomUUID();
+            RefreshToken previous = RefreshToken.builder().userId(userId).sessionId(sessionId).revoked(false).build();
             when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(previous));
+            when(refreshTokenRepository.findByUserIdAndSessionId(userId, sessionId)).thenReturn(java.util.List.of(previous));
 
             service.login(req(false), ip, ua, "old-refresh-token");
 
@@ -291,9 +293,10 @@ class AuthServiceImplTest {
         }
 
         @Test
-        @DisplayName("reuse shortly after rotation (multi-tab race) mints a fresh session instead of failing, and never escalates")
+        @DisplayName("reuse shortly after rotation (multi-tab race) mints a duplicate row in the SAME session lineage instead of failing, and never escalates")
         void reuseWithinGraceWindowMintsFreshSessionInstead() {
-            RefreshToken stored = RefreshToken.builder().userId(userId).revoked(true)
+            UUID sessionId = UUID.randomUUID();
+            RefreshToken stored = RefreshToken.builder().userId(userId).sessionId(sessionId).revoked(true)
                     .revokedAt(Instant.now().minusMillis(1_000)).expiresAt(Instant.now().plusSeconds(60)).rememberMe(true).build();
             when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(stored));
             when(userRepository.findById(userId)).thenReturn(Optional.of(withId(baseUser().build())));
@@ -305,6 +308,11 @@ class AuthServiceImplTest {
             verify(refreshTokenRepository, never()).revokeAllByUserId(any());
             verify(tokenRevocationService, never()).revokeAllTokensFor(any());
             verifyNoInteractions(emailService);
+            ArgumentCaptor<RefreshToken> captor = ArgumentCaptor.forClass(RefreshToken.class);
+            verify(refreshTokenRepository).save(captor.capture());
+            // Same sessionId as the row that raced it — this is what keeps this race-minted
+            // duplicate from showing up as its own separate device in the Active Sessions list.
+            assertThat(captor.getValue().getSessionId()).isEqualTo(sessionId);
         }
 
         @Test
@@ -330,9 +338,10 @@ class AuthServiceImplTest {
         }
 
         @Test
-        @DisplayName("on success, revokes the used token, issues a new one, and stamps it with the caller's ip/user-agent")
+        @DisplayName("on success, revokes the used token, issues a new one carrying the same sessionId, and stamps it with the caller's ip/user-agent")
         void successRevokesOldTokenAndIssuesNew() {
-            RefreshToken stored = RefreshToken.builder().userId(userId).revoked(false)
+            UUID sessionId = UUID.randomUUID();
+            RefreshToken stored = RefreshToken.builder().userId(userId).sessionId(sessionId).revoked(false)
                     .expiresAt(Instant.now().plusSeconds(60)).rememberMe(true).build();
             when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(stored));
             when(userRepository.findById(userId)).thenReturn(Optional.of(withId(baseUser().build())));
@@ -347,6 +356,9 @@ class AuthServiceImplTest {
             RefreshToken newToken = captor.getAllValues().get(1);
             assertThat(newToken.getIpAddress()).isEqualTo(ip);
             assertThat(newToken.getUserAgent()).isEqualTo(ua);
+            // Same lineage as the rotated-out token — this is what lets listSessions collapse
+            // ordinary rotations (and the grace-window race's duplicate rows) into one device entry.
+            assertThat(newToken.getSessionId()).isEqualTo(sessionId);
         }
 
         @Test
@@ -367,15 +379,20 @@ class AuthServiceImplTest {
     // ─── logout ──────────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("logout revokes the matching token if found, no-ops silently if not")
+    @DisplayName("logout revokes every row sharing the token's session lineage, no-ops silently if the token is unknown")
     void logoutRevokesTokenIfFound() {
-        RefreshToken stored = RefreshToken.builder().userId(userId).revoked(false).build();
+        UUID sessionId = UUID.randomUUID();
+        RefreshToken stored = RefreshToken.builder().userId(userId).sessionId(sessionId).revoked(false).build();
+        RefreshToken raceSibling = RefreshToken.builder().userId(userId).sessionId(sessionId).revoked(false).build();
         when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(stored));
+        when(refreshTokenRepository.findByUserIdAndSessionId(userId, sessionId))
+                .thenReturn(java.util.List.of(stored, raceSibling));
 
         service.logout("t", ip, ua);
 
         assertThat(stored.isRevoked()).isTrue();
-        verify(refreshTokenRepository).save(stored);
+        assertThat(raceSibling.isRevoked()).isTrue();
+        verify(refreshTokenRepository).saveAll(java.util.List.of(stored, raceSibling));
     }
 
     @Test
@@ -383,7 +400,7 @@ class AuthServiceImplTest {
     void logoutUnknownTokenNoOp() {
         when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.empty());
         service.logout("bogus", ip, ua); // no exception
-        verify(refreshTokenRepository, never()).save(any());
+        verify(refreshTokenRepository, never()).saveAll(any());
     }
 
     // ─── verifyEmail ─────────────────────────────────────────────────────────────
@@ -655,6 +672,54 @@ class AuthServiceImplTest {
             assertThat(user.getPinLockedUntil()).isNull();
         }
 
+        // Regression coverage for a real gap: "Forgot your PIN?" deliberately skips proving the
+        // OLD pin (see PinVerifyModal's own comment), which meant anyone holding an
+        // already-unlocked device could silently swap in their own PIN with zero proof of
+        // anything — worse than disablePin's own step-up requirement, since the account still
+        // showed PIN unlock as "ENABLED" the whole time.
+        @Test
+        @DisplayName("enablePin requires and verifies the current password when a PIN is already set")
+        void enablePinReplacingExistingRequiresPassword() {
+            User user = withId(baseUser().pinHash("old-pin-hash").build());
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            EnablePinRequest req = mock(EnablePinRequest.class);
+            when(req.getPin()).thenReturn("5678");
+            when(req.getCurrentPassword()).thenReturn("correct-password");
+            when(passwordEncoder.matches("correct-password", "hashed")).thenReturn(true);
+            when(passwordEncoder.encode("5678")).thenReturn("new-pin-hash");
+
+            service.enablePin(userId, req);
+
+            assertThat(user.getPinHash()).isEqualTo("new-pin-hash");
+        }
+
+        @Test
+        @DisplayName("enablePin rejects replacing an existing PIN with a wrong or missing password")
+        void enablePinReplacingExistingRejectsWrongPassword() {
+            User user = withId(baseUser().pinHash("old-pin-hash").build());
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            EnablePinRequest req = mock(EnablePinRequest.class);
+            when(req.getCurrentPassword()).thenReturn("wrong-password");
+            when(passwordEncoder.matches("wrong-password", "hashed")).thenReturn(false);
+
+            assertThatThrownBy(() -> service.enablePin(userId, req))
+                    .isInstanceOf(BusinessException.class)
+                    .satisfies(e -> assertThat(((BusinessException) e).getCode()).isEqualTo("WRONG_PASSWORD"));
+            assertThat(user.getPinHash()).isEqualTo("old-pin-hash");
+        }
+
+        @Test
+        @DisplayName("enablePin gives a clear error replacing an existing PIN on a Google-only account with no password set")
+        void enablePinReplacingExistingNoPasswordOnAccount() {
+            User user = withId(baseUser().passwordHash(null).pinHash("old-pin-hash").build());
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            EnablePinRequest req = mock(EnablePinRequest.class);
+
+            assertThatThrownBy(() -> service.enablePin(userId, req)).isInstanceOf(BusinessException.class);
+            verify(passwordEncoder, never()).matches(any(), any());
+            assertThat(user.getPinHash()).isEqualTo("old-pin-hash");
+        }
+
         private DisablePinRequest disableReq(String pin) {
             DisablePinRequest r = mock(DisablePinRequest.class);
             lenient().when(r.getPin()).thenReturn(pin);
@@ -809,9 +874,10 @@ class AuthServiceImplTest {
         }
 
         @Test
-        @DisplayName("a correct PIN resets failure counters, rotates the refresh token, and issues new tokens")
+        @DisplayName("a correct PIN resets failure counters, rotates the refresh token, and issues new tokens carrying the same sessionId")
         void correctPinSucceedsAndRotatesToken() {
-            RefreshToken stored = RefreshToken.builder().userId(userId).revoked(false)
+            UUID sessionId = UUID.randomUUID();
+            RefreshToken stored = RefreshToken.builder().userId(userId).sessionId(sessionId).revoked(false)
                     .expiresAt(Instant.now().plusSeconds(60)).rememberMe(true).build();
             when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(stored));
             User user = withId(baseUser().pinHash("hash").pinFailedAttempts(2).build());
@@ -827,6 +893,9 @@ class AuthServiceImplTest {
             // PIN unlock is the same already-recognized device continuing its session, not a new
             // sign-in — no alert email, same reasoning as refresh().
             verifyNoInteractions(emailService);
+            ArgumentCaptor<RefreshToken> captor = ArgumentCaptor.forClass(RefreshToken.class);
+            verify(refreshTokenRepository, times(2)).save(captor.capture());
+            assertThat(captor.getAllValues().get(1).getSessionId()).isEqualTo(sessionId);
         }
     }
 
@@ -937,8 +1006,10 @@ class AuthServiceImplTest {
             User existing = withId(baseUser().build());
             when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(existing));
             stubAuthResponseBuilding();
-            RefreshToken previous = RefreshToken.builder().userId(userId).revoked(false).build();
+            UUID sessionId = UUID.randomUUID();
+            RefreshToken previous = RefreshToken.builder().userId(userId).sessionId(sessionId).revoked(false).build();
             when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(previous));
+            when(refreshTokenRepository.findByUserIdAndSessionId(userId, sessionId)).thenReturn(java.util.List.of(previous));
 
             service.googleLogin(req(), ip, ua, "old-refresh-token");
 
@@ -1221,8 +1292,10 @@ class AuthServiceImplTest {
         User user = withId(baseUser().build());
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         stubAuthResponseBuilding();
-        RefreshToken previous = RefreshToken.builder().userId(userId).revoked(false).build();
+        UUID sessionId = UUID.randomUUID();
+        RefreshToken previous = RefreshToken.builder().userId(userId).sessionId(sessionId).revoked(false).build();
         when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(previous));
+        when(refreshTokenRepository.findByUserIdAndSessionId(userId, sessionId)).thenReturn(java.util.List.of(previous));
 
         service.issueTokensForVerifiedUser(userId, false, ip, ua, "old-refresh-token");
 
@@ -1264,8 +1337,8 @@ class AuthServiceImplTest {
         @Test
         @DisplayName("lists active sessions and flags the one matching the caller's own refresh token as current")
         void listsSessionsAndFlagsCurrent() {
-            RefreshToken mine  = RefreshToken.builder().userId(userId).tokenHash(hash("mine")).ipAddress("1.1.1.1").userAgent("Chrome").build();
-            RefreshToken other = RefreshToken.builder().userId(userId).tokenHash(hash("other")).ipAddress("2.2.2.2").userAgent("Safari").build();
+            RefreshToken mine  = RefreshToken.builder().userId(userId).sessionId(UUID.randomUUID()).tokenHash(hash("mine")).ipAddress("1.1.1.1").userAgent("Chrome").build();
+            RefreshToken other = RefreshToken.builder().userId(userId).sessionId(UUID.randomUUID()).tokenHash(hash("other")).ipAddress("2.2.2.2").userAgent("Safari").build();
             when(refreshTokenRepository.findByUserIdAndRevokedFalseAndExpiresAtAfterOrderByCreatedAtDesc(eq(userId), any()))
                     .thenReturn(java.util.List.of(mine, other));
 
@@ -1280,7 +1353,7 @@ class AuthServiceImplTest {
         @Test
         @DisplayName("listSessions with no current token flags nothing as current")
         void listSessionsWithoutCurrentTokenFlagsNothing() {
-            RefreshToken token = RefreshToken.builder().userId(userId).tokenHash(hash("mine")).build();
+            RefreshToken token = RefreshToken.builder().userId(userId).sessionId(UUID.randomUUID()).tokenHash(hash("mine")).build();
             when(refreshTokenRepository.findByUserIdAndRevokedFalseAndExpiresAtAfterOrderByCreatedAtDesc(eq(userId), any()))
                     .thenReturn(java.util.List.of(token));
 
@@ -1290,24 +1363,49 @@ class AuthServiceImplTest {
         }
 
         @Test
+        @DisplayName("listSessions collapses rows sharing a sessionId (grace-window race duplicates) into one entry")
+        void listSessionsCollapsesSharedSessionId() {
+            UUID sessionId = UUID.randomUUID();
+            Instant older = Instant.now().minusSeconds(60);
+            Instant newer = Instant.now();
+            RefreshToken original = RefreshToken.builder().userId(userId).sessionId(sessionId)
+                    .tokenHash(hash("original")).ipAddress("1.1.1.1").userAgent("Chrome").createdAt(older).build();
+            RefreshToken raceSibling = RefreshToken.builder().userId(userId).sessionId(sessionId)
+                    .tokenHash(hash("race-sibling")).ipAddress("1.1.1.1").userAgent("Chrome").createdAt(newer).build();
+            // Repository contract orders by createdAt desc — newest first.
+            when(refreshTokenRepository.findByUserIdAndRevokedFalseAndExpiresAtAfterOrderByCreatedAtDesc(eq(userId), any()))
+                    .thenReturn(java.util.List.of(raceSibling, original));
+
+            var sessions = service.listSessions(userId, "original");
+
+            assertThat(sessions).hasSize(1);
+            assertThat(sessions.get(0).getId()).isEqualTo(sessionId);
+            assertThat(sessions.get(0).isCurrent()).isTrue();
+        }
+
+        @Test
         @DisplayName("revokeSession throws for a session that doesn't belong to this user")
         void revokeSessionThrowsForWrongUser() {
-            when(refreshTokenRepository.findByIdAndUserId(any(), eq(userId))).thenReturn(Optional.empty());
+            when(refreshTokenRepository.existsByUserIdAndSessionId(eq(userId), any())).thenReturn(false);
             assertThatThrownBy(() -> service.revokeSession(userId, UUID.randomUUID()))
                     .isInstanceOf(com.wealthynest.common.exception.ResourceNotFoundException.class);
         }
 
         @Test
-        @DisplayName("revokeSession revokes the matching row")
+        @DisplayName("revokeSession revokes every row sharing the session's lineage")
         void revokeSessionRevokes() {
             UUID sessionId = UUID.randomUUID();
-            RefreshToken token = RefreshToken.builder().userId(userId).revoked(false).build();
-            when(refreshTokenRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(token));
+            RefreshToken original = RefreshToken.builder().userId(userId).sessionId(sessionId).revoked(false).build();
+            RefreshToken raceSibling = RefreshToken.builder().userId(userId).sessionId(sessionId).revoked(false).build();
+            when(refreshTokenRepository.existsByUserIdAndSessionId(userId, sessionId)).thenReturn(true);
+            when(refreshTokenRepository.findByUserIdAndSessionId(userId, sessionId))
+                    .thenReturn(java.util.List.of(original, raceSibling));
 
             service.revokeSession(userId, sessionId);
 
-            assertThat(token.isRevoked()).isTrue();
-            verify(refreshTokenRepository).save(token);
+            assertThat(original.isRevoked()).isTrue();
+            assertThat(raceSibling.isRevoked()).isTrue();
+            verify(refreshTokenRepository).saveAll(java.util.List.of(original, raceSibling));
         }
 
         @Test

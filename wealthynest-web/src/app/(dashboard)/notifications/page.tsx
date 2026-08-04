@@ -1,6 +1,5 @@
 "use client";
 
-import {useState} from "react";
 import Link from "next/link";
 import {
     AlertCircle,
@@ -35,6 +34,7 @@ import {
     useServerNotifications
 } from "@/features/notifications/hooks/useServerNotifications";
 import {TabBar, type TabBarItem} from "@/components/ui/TabBar";
+import {useTabParam} from "@/hooks/useTabParam";
 import {cn} from "@/lib/utils";
 
 const SEVERITY_ICON: Record<NotifSeverity, LucideIcon> = {
@@ -100,6 +100,7 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: "debtDue",    label: "Debt Due"      },
   { value: "loanEmi",    label: "Loan EMI"      },
 ];
+const FILTER_VALUES = FILTERS.map((f) => f.value);
 
 // One color per alert type — reuses each type's own domain color from elsewhere in the app
 // (Budgets=amber, Income=emerald, Debts=rose, etc.) rather than the flat single-color chips this
@@ -200,7 +201,7 @@ function ListSkeleton() {
 }
 
 export default function NotificationsPage() {
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useTabParam<Filter>(FILTER_VALUES, "all");
 
   const { data: serverNotifs = [], isLoading, isError, refetch } = useServerNotifications();
   const { notifications: allNotifs, unreadCount }  = useMergedNotifications();

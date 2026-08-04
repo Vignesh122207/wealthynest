@@ -1,17 +1,23 @@
 "use client";
 
 import {ChevronLeft, ChevronRight, Zap} from "lucide-react";
-import {formatCurrency, getGreeting, monthLabel} from "@/lib/utils";
+import {cn, formatCurrency, getGreeting, monthLabel} from "@/lib/utils";
+
+export type HomeViewMode = "month" | "year";
 
 interface GreetingBannerProps {
-  firstName:      string;
-  year:           number;
-  month:          number;
-  isCurrentMonth: boolean;
-  onNavigate:     (dir: -1 | 1) => void;
-  income:         number | undefined;
-  expenses:       number | undefined;
-  savingsRate:    number | undefined;
+  firstName:        string;
+  year:             number;
+  month:            number;
+  isCurrentMonth:   boolean;
+  isCurrentYear:    boolean;
+  onNavigate:       (dir: -1 | 1) => void;
+  onNavigateYear:   (dir: -1 | 1) => void;
+  viewMode:         HomeViewMode;
+  onViewModeChange: (mode: HomeViewMode) => void;
+  income:           number | undefined;
+  expenses:         number | undefined;
+  savingsRate:      number | undefined;
 }
 
 // Exported as a pure function so it's testable without rendering the component.
@@ -38,9 +44,11 @@ export function getSavingsInsight(
 }
 
 export function GreetingBanner({
-  firstName, year, month, isCurrentMonth, onNavigate, income, expenses, savingsRate,
+  firstName, year, month, isCurrentMonth, isCurrentYear, onNavigate, onNavigateYear,
+  viewMode, onViewModeChange, income, expenses, savingsRate,
 }: GreetingBannerProps) {
-  const label = monthLabel(year, month);
+  const isYear = viewMode === "year";
+  const label  = isYear ? String(year) : monthLabel(year, month);
   const insight = getSavingsInsight(income, expenses, savingsRate);
 
   return (
@@ -67,23 +75,40 @@ export function GreetingBanner({
           </div>
         )}
 
-        {/* Month navigator */}
+        {/* Month/Year switch */}
+        <div className="flex items-center gap-0.5 bg-card border border-border/50 rounded-xl p-1 shrink-0">
+          {(["month", "year"] as const).map((mode) => (
+            <button
+              key={mode}
+              data-testid={`period-toggle-${mode}`}
+              onClick={() => onViewModeChange(mode)}
+              className={cn(
+                "px-2.5 py-1 rounded-lg text-xs font-semibold capitalize transition-colors",
+                viewMode === mode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted/60"
+              )}
+            >
+              {mode}
+            </button>
+          ))}
+        </div>
+
+        {/* Month/Year navigator */}
         <div className="flex items-center gap-1 bg-card border border-border/50 rounded-xl p-1 shrink-0">
           <button
-            onClick={() => onNavigate(-1)}
+            onClick={() => (isYear ? onNavigateYear(-1) : onNavigate(-1))}
             className="w-7 h-7 rounded-lg bg-muted hover:bg-muted/60 flex items-center justify-center transition-colors"
-            aria-label="Previous month"
+            aria-label={isYear ? "Previous year" : "Previous month"}
           >
             <ChevronLeft className="w-3.5 h-3.5 text-muted-foreground" />
           </button>
-          <span className="text-xs font-semibold text-foreground min-w-[4.5rem] text-center tabular-nums">
+          <span data-testid="period-nav-label" className="text-xs font-semibold text-foreground min-w-[4.5rem] text-center tabular-nums">
             {label}
           </span>
           <button
-            onClick={() => onNavigate(1)}
-            disabled={isCurrentMonth}
+            onClick={() => (isYear ? onNavigateYear(1) : onNavigate(1))}
+            disabled={isYear ? isCurrentYear : isCurrentMonth}
             className="w-7 h-7 rounded-lg bg-muted hover:bg-muted/60 flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            aria-label="Next month"
+            aria-label={isYear ? "Next year" : "Next month"}
           >
             <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
           </button>

@@ -25,4 +25,13 @@ describe("useAnnualTrend", () => {
     expect(mockedApi.getAnnualTrend).toHaveBeenCalledWith(2026);
     expect(result.current.data).toEqual([{ month: 1, income: 1000, expense: 500 }]);
   });
+
+  it("does not fetch when enabled is false", async () => {
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useAnnualTrend(2026, false), { wrapper: Wrapper });
+
+    expect(result.current.fetchStatus).toBe("idle");
+    expect(mockedApi.getAnnualTrend).not.toHaveBeenCalled();
+  });
 });

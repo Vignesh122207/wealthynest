@@ -88,7 +88,7 @@ describe("SetupPinPage", () => {
     await waitFor(() => expect(screen.getByText("Confirm your PIN")).toBeInTheDocument());
     tapDigits("1234");
 
-    await waitFor(() => expect(mockedApi.enablePin).toHaveBeenCalledWith("1234"));
+    await waitFor(() => expect(mockedApi.enablePin).toHaveBeenCalledWith("1234", undefined));
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/settings/security"));
   });
 

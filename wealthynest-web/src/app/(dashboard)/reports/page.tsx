@@ -1,16 +1,17 @@
 "use client";
 
-import {useState} from "react";
 import {BarChart2, CalendarDays, Database, FileText} from "lucide-react";
 import {Header} from "@/components/layout/Header";
 import {PageWrapper} from "@/components/layout/PageWrapper";
 import {PremiumIcon} from "@/components/icons/PremiumIcon";
 import {TabBar, type TabBarItem} from "@/components/ui/TabBar";
+import {useTabParam} from "@/hooks/useTabParam";
 import {MonthlyTab} from "./_components/MonthlyTab";
 import {AnnualTab} from "./_components/AnnualTab";
 import {ExportTab} from "./_components/ExportTab";
 
-type Tab = "monthly" | "annual" | "export";
+const TAB_IDS = ["monthly", "annual", "export"] as const;
+type Tab = (typeof TAB_IDS)[number];
 
 const TABS: TabBarItem<Tab>[] = [
   { key: "monthly", label: "Monthly",     icon: CalendarDays, color: "#2563eb" },
@@ -19,7 +20,7 @@ const TABS: TabBarItem<Tab>[] = [
 ];
 
 export default function ReportsPage() {
-  const [tab, setTab] = useState<Tab>("monthly");
+  const [tab, setTab] = useTabParam<Tab>(TAB_IDS, "monthly");
 
   return (
     <>

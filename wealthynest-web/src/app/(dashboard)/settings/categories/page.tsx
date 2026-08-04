@@ -9,6 +9,7 @@ import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
 import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
 import {badgeTextColor, PremiumIcon} from "@/components/icons/PremiumIcon";
 import {useIsDark} from "@/hooks/useIsDark";
+import {useTabParam} from "@/hooks/useTabParam";
 import {TabBar, type TabBarItem} from "@/components/ui/TabBar";
 import {FormModalHeader} from "@/components/transactions/FormModalHeader";
 import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
@@ -240,7 +241,7 @@ function CategoryRow({ category, onEdit }: {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CategoriesSettingsPage() {
-  const [tab,      setTab]      = useState<"EXPENSE" | "INCOME">("EXPENSE");
+  const [tab,      setTab]      = useTabParam<"EXPENSE" | "INCOME">(["EXPENSE", "INCOME"], "EXPENSE");
   const [formMode, setFormMode] = useState<"closed" | "create" | { id: string; name: string; icon?: string; color?: string }>("closed");
   const [deleteId, setDeleteId] = useState<string | null>(null);
 

@@ -1,7 +1,6 @@
 "use client";
 
-import {useCallback, useEffect, useMemo, useState} from "react";
-import {useRouter, useSearchParams} from "next/navigation";
+import {useCallback, useMemo, useState} from "react";
 import {BadgePercent, Building2, Coins, Layers, Plus, Search, TrendingUp, Upload, X,} from "lucide-react";
 import {Header} from "@/components/layout/Header";
 import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
@@ -9,6 +8,7 @@ import {EmptyState} from "@/components/shared/EmptyState";
 import {QueryErrorState} from "@/components/shared/QueryErrorState";
 import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
 import {TabBar, type TabBarItem} from "@/components/ui/TabBar";
+import {useTabParam} from "@/hooks/useTabParam";
 import {
     useCreateInvestment,
     useDeleteInvestment,
@@ -73,16 +73,10 @@ const TAB_COLOR: Record<TabId, string> = {
   bonds:    "#7c3aed",
 };
 
-export default function InvestmentsPage() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const [tab,       setTab]       = useState<TabId>("overview");
+const TAB_IDS = TABS.map((t) => t.id);
 
-  // Sync tab from URL param on every navigation (e.g. /investments?tab=stocks)
-  useEffect(() => {
-    const p = searchParams.get("tab") as TabId | null;
-    if (p && TABS.some(t => t.id === p)) setTab(p);
-  }, [searchParams]);
+export default function InvestmentsPage() {
+  const [tab,       setTab]       = useTabParam<TabId>(TAB_IDS, "overview");
   const [showForm,  setShowForm]  = useState(false);
   const [showCasImport, setShowCasImport] = useState(false);
   const [editItem,  setEditItem]  = useState<Investment | null>(null);
@@ -357,7 +351,7 @@ const tabCounts = useMemo(() => investments.reduce((acc, i) => {
             count: id === "overview" ? undefined : tabCounts[id],
           }))}
           value={tab}
-          onChange={(id) => { setTab(id); closeForm(); router.replace(`/investments?tab=${id}`); }}
+          onChange={(id) => { setTab(id); closeForm(); }}
         />
 
         {/* Content */}

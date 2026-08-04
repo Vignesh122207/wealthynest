@@ -14,11 +14,16 @@ import java.util.UUID;
 @Repository
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID> {
     Optional<RefreshToken> findByTokenHash(String tokenHash);
-    Optional<RefreshToken> findByIdAndUserId(UUID id, UUID userId);
 
-    // One row per active session — see V44's own comment for why revoked=false + not-yet-expired
-    // is exactly "devices currently signed in", with no separate session concept needed.
+    // One row per active refresh token — may be several rows per logical session (see V55's own
+    // comment on the grace-window race path); listSessions groups these by sessionId back into
+    // "devices currently signed in".
     List<RefreshToken> findByUserIdAndRevokedFalseAndExpiresAtAfterOrderByCreatedAtDesc(UUID userId, Instant now);
+
+    // A session can span several rows (see sessionId's own comment on RefreshToken), so revoking
+    // one has to revoke every row sharing its lineage, not just whichever row the caller looked up.
+    List<RefreshToken> findByUserIdAndSessionId(UUID userId, UUID sessionId);
+    boolean existsByUserIdAndSessionId(UUID userId, UUID sessionId);
 
     @Modifying
     @Query("UPDATE RefreshToken r SET r.revoked = true WHERE r.userId = :userId")

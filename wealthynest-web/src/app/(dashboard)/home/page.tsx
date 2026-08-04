@@ -1,6 +1,6 @@
 "use client";
 
-import {useMemo, useState} from "react";
+import {useEffect, useMemo, useState} from "react";
 import dynamic from "next/dynamic";
 import {ArrowLeftRight, Banknote, Receipt, Sparkles} from "lucide-react";
 import Link from "next/link";
@@ -21,6 +21,8 @@ import {useCreateIncome, useIncome} from "@/features/income/hooks/useIncome";
 import {useInvestments} from "@/features/investments/hooks/useInvestments";
 import {useNetWorthHistory} from "@/features/networth/hooks/useNetWorth";
 import {useDebts} from "@/features/debts/hooks/useDebts";
+import {useAnnualTrend} from "@/features/analytics/hooks/useAnalytics";
+import {useServerNotifications} from "@/features/notifications/hooks/useServerNotifications";
 import {useAuthStore} from "@/features/auth/store/auth.store";
 import {useChartTheme} from "@/hooks/useChartTheme";
 import {pctChange} from "@/lib/utils";
@@ -28,16 +30,17 @@ import {toLocalISODate} from "@/lib/date";
 import {buildUsageCounts, sortByUsage} from "@/lib/mostUsed";
 
 // ── Sub-components ────────────────────────────────────────────────────────────
-import {GreetingBanner} from "./_components/GreetingBanner";
+import {GreetingBanner, type HomeViewMode} from "./_components/GreetingBanner";
 import {SecuritySetupPrompt} from "./_components/SecuritySetupPrompt";
 import {StatOverview} from "./_components/StatOverview";
-import {SmartAlerts} from "./_components/SmartAlerts";
+import {SmartAlerts, type SmartInsight} from "./_components/SmartAlerts";
+import {AttentionRow} from "./_components/AttentionRow";
 import {WalletOverview} from "./_components/WalletOverview";
 import {BudgetSection} from "./_components/BudgetSection";
 import {TransactionList} from "./_components/TransactionList";
 import {GoalsSummary} from "./_components/GoalsSummary";
-import {DebtPulse} from "./_components/DebtPulse";
 import {TwoColRow} from "./_components/TwoColRow";
+import {getAnomalyInsight, getNetWorthBaseline, getPaceForecast, getYtdMonths, sumTrend} from "./_components/home.utils";
 
 // Lazy-loaded: the Home dashboard's own bundle shouldn't carry all three quick-add forms just so
 // one can appear after a FAB click — each is only fetched the first time its modal actually opens.
@@ -70,15 +73,20 @@ export default function DashboardPage() {
   const now         = new Date();
   const [year,  setYear]  = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [viewMode, setViewMode] = useState<HomeViewMode>("month");
   const [quickModal, setQuickModal] = useState<QuickModal>("none");
 
-  const initYear  = now.getFullYear();
-  const initMonth = now.getMonth() + 1;
-  const budgetDismissKey = `overBudgetDismissed_${initYear}_${initMonth}`;
-  const [overBudgetDismissed, setOverBudgetDismissed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem(budgetDismissKey) === "true";
-  });
+  // Dismissing the over-budget banner is scoped to whichever budget set is currently showing —
+  // a fresh month, a fresh year, or switching Month/Year all count as a new instance of the
+  // alert, same as the pre-existing per-month key just made reactive to navigation/mode instead
+  // of only ever read once at mount.
+  const overBudgetDismissKey = viewMode === "year"
+    ? `overBudgetDismissedYear_${year}`
+    : `overBudgetDismissed_${year}_${month}`;
+  const [overBudgetDismissed, setOverBudgetDismissed] = useState(false);
+  useEffect(() => {
+    setOverBudgetDismissed(localStorage.getItem(overBudgetDismissKey) === "true");
+  }, [overBudgetDismissKey]);
 
   const prevMonthNum = month === 1 ? 12 : month - 1;
   const prevYearNum  = month === 1 ? year - 1 : year;
@@ -100,6 +108,15 @@ export default function DashboardPage() {
   const { data: netWorthHistory = [] } = useNetWorthHistory();
   const { data: debts = [] }          = useDebts();
   const chart                         = useChartTheme();
+
+  // Year mode only — gated via `enabled` so Month mode (the common case) fetches nothing extra.
+  // Both reuse the same /analytics/annual endpoint Reports' AnnualTab already exercises.
+  const isYearMode = viewMode === "year";
+  const { data: annualTrendThisYear = [] } = useAnnualTrend(year,     isYearMode);
+  const { data: annualTrendLastYear = [] } = useAnnualTrend(year - 1, isYearMode);
+  // Already fetched globally by Header.tsx for the notification bell — reusing it here for the
+  // anomaly insight below is a cache hit, not a new request.
+  const { data: serverNotifications = [] } = useServerNotifications();
 
   // Quick-add form data/handlers — same forms as the Transactions page, so behavior
   // (validation, payment-method derivation, Paid Via/category pickers) stays identical
@@ -204,6 +221,7 @@ export default function DashboardPage() {
   }, [walletAccounts]);
 
   const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
+  const isCurrentYear  = year === now.getFullYear();
 
   const navigate = (dir: -1 | 1) => {
     if (dir === 1 && isCurrentMonth) return;
@@ -211,6 +229,11 @@ export default function DashboardPage() {
     if (m < 1)  { m = 12; y--; }
     if (m > 12) { m = 1;  y++; }
     setMonth(m); setYear(y);
+  };
+
+  const navigateYear = (dir: -1 | 1) => {
+    if (dir === 1 && isCurrentYear) return;
+    setYear(y => y + dir);
   };
 
   const trend          = data?.monthlyTrend ?? [];
@@ -227,10 +250,29 @@ export default function DashboardPage() {
   const netWorthTrend  = pctChange(latestSnapshot?.netWorth, prevSnapshot?.netWorth);
   const firstName      = user?.fullName?.split(" ")[0] ?? "there";
 
-  const budgetSummaries = data?.budgetSummaries ?? [];
-  const overBudgetCount = budgetSummaries.filter(b => b.overBudget).length;
+  // Year mode's "since Jan 1" net worth comparison — data.totalNetWorth is already always
+  // today's live figure (see comment above), so it's the right "current" side for this too.
+  const netWorthBaseline     = getNetWorthBaseline(netWorthHistory, year);
+  const netWorthSinceJanTrend = pctChange(data?.totalNetWorth, netWorthBaseline?.netWorth);
 
-  const smartInsights = useMemo(() => {
+  const ytdMonths    = getYtdMonths(year, now);
+  const ytdThisYear  = sumTrend(annualTrendThisYear, ytdMonths);
+  const ytdLastYear  = sumTrend(annualTrendLastYear, ytdMonths);
+  const ytdIncomeTrend  = pctChange(ytdThisYear.income, ytdLastYear.income);
+  const ytdExpenseTrend = pctChange(ytdThisYear.expenses, ytdLastYear.expenses);
+  const ytdSavingsRate     = ytdThisYear.income > 0 ? ((ytdThisYear.income - ytdThisYear.expenses) / ytdThisYear.income) * 100 : 0;
+  const ytdLastSavingsRate = ytdLastYear.income > 0 ? ((ytdLastYear.income - ytdLastYear.expenses) / ytdLastYear.income) * 100 : 0;
+  const ytdSavingsRateTrend = pctChange(ytdSavingsRate, ytdLastSavingsRate);
+
+  // Budget Progress always rolls yearly + monthly budgets into one combined figure — see
+  // StatOverview's matching ring logic (overBudget OR paceOverBudget). The over-budget
+  // banner/count follows the same combined check so the two never disagree.
+  const budgetSummaries = data?.budgetSummaries ?? [];
+  const monthlyBudgets  = budgetSummaries.filter(b => b.budgetType === "MONTHLY");
+  const yearlyBudgets   = budgetSummaries.filter(b => b.budgetType === "YEARLY");
+  const overBudgetCount = [...monthlyBudgets, ...yearlyBudgets].filter(b => b.overBudget || b.paceOverBudget).length;
+
+  const categoryDeltaInsights = useMemo((): SmartInsight[] => {
     if (!data?.categoryBreakdown?.length || !prevData?.categoryBreakdown?.length) return [];
     const prevMap = new Map(prevData.categoryBreakdown.map((c) => [c.categoryId, c.amount ?? 0]));
     const avgMonthlySpend = data.monthlyExpenses > 0 ? data.monthlyExpenses : 5000;
@@ -242,8 +284,23 @@ export default function DashboardPage() {
       if (Math.abs(delta) >= threshold) deltas.push({ category: c.categoryName, delta });
     }
     deltas.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
-    return deltas.slice(0, 3);
+    return deltas.slice(0, 3).map(d => ({ kind: "delta" as const, ...d }));
   }, [data, prevData]);
+
+  // Forecast/anomaly only make sense for the month actually in progress — a projection or
+  // anomaly flag for a month that already closed isn't actionable, so both hide once you
+  // navigate away from the current month (the category-delta insights above still work for any
+  // month browsed). Plain consts, not useMemo — cheap array/arithmetic work that doesn't need
+  // memoizing, and avoids re-deriving `now` inside a memo dependency array on every render.
+  const paceForecast = isCurrentMonth
+    ? getPaceForecast(data?.monthlyIncome, data?.monthlyExpenses, now.getDate(), new Date(year, month, 0).getDate(), trend.slice(0, -1).map(t => t.saved))
+    : null;
+
+  const anomalyInsight = isCurrentMonth ? getAnomalyInsight(serverNotifications, year, month) : null;
+
+  const smartInsights: SmartInsight[] = [...categoryDeltaInsights];
+  if (paceForecast)   smartInsights.push({ kind: "forecast", amount: paceForecast.amount, pctVsAvg: paceForecast.pctVsAvg });
+  if (anomalyInsight) smartInsights.push({ kind: "anomaly", title: anomalyInsight.title, message: anomalyInsight.message });
 
   return (
     <div className="flex flex-col flex-1 bg-background">
@@ -313,7 +370,11 @@ export default function DashboardPage() {
             year={year}
             month={month}
             isCurrentMonth={isCurrentMonth}
+            isCurrentYear={isCurrentYear}
             onNavigate={navigate}
+            onNavigateYear={navigateYear}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
             income={data?.monthlyIncome}
             expenses={data?.monthlyExpenses}
             savingsRate={data?.savingsRate}
@@ -333,9 +394,10 @@ export default function DashboardPage() {
 
           {/* ── Stat Overview: Net Worth, Investments, Income, Expenses, Savings Rate, Budget Progress ── */}
           <StatOverview
+            viewMode={viewMode}
             netWorth={data?.totalNetWorth}
             prevNetWorth={prevData?.totalNetWorth}
-            netWorthHistory={netWorthHistory}
+            netWorthSinceJanTrend={netWorthSinceJanTrend}
             investments={investments}
             income={data?.monthlyIncome}
             expenses={data?.monthlyExpenses}
@@ -343,25 +405,36 @@ export default function DashboardPage() {
             prevSavingsRate={prevData?.savingsRate}
             incomeTrend={incomeTrend}
             expenseTrend={expenseTrend}
-            budgetSummaries={budgetSummaries}
+            ytdIncome={ytdThisYear.income}
+            ytdExpenses={ytdThisYear.expenses}
+            ytdIncomeTrend={ytdIncomeTrend}
+            ytdExpenseTrend={ytdExpenseTrend}
+            ytdSavingsRate={ytdSavingsRate}
+            ytdSavingsRateTrend={ytdSavingsRateTrend}
+            monthlyBudgets={monthlyBudgets}
+            yearlyBudgets={yearlyBudgets}
             alertBannerVisible={!overBudgetDismissed && overBudgetCount > 0}
             isLoading={dataLoading}
           />
 
-          {/* ── Alerts: over-budget + smart insights + upcoming bills ── */}
-          <SmartAlerts
-            smartInsights={smartInsights}
-            upcomingBills={upcomingBills}
+          {/* ── Attention row: over-budget banner + debt pulse, reflowing to fill the row
+              whichever of the two is (or isn't) present ── */}
+          <AttentionRow
             overBudgetCount={overBudgetCount}
             overBudgetDismissed={overBudgetDismissed}
             onDismissOverBudget={() => {
               setOverBudgetDismissed(true);
-              localStorage.setItem(`overBudgetDismissed_${year}_${month}`, "true");
+              localStorage.setItem(overBudgetDismissKey, "true");
             }}
+            debts={debts}
+            periodLabel={viewMode}
           />
 
-          {/* ── Debts: lending/borrowing pulse — only renders when there's an active debt ── */}
-          <DebtPulse debts={debts} />
+          {/* ── Smart insights + upcoming bills ── */}
+          <SmartAlerts
+            smartInsights={smartInsights}
+            upcomingBills={upcomingBills}
+          />
 
           {/* ── Phase 1: Accounts Overview (left) + Spending chart (right) ── */}
           {walletAccounts.length > 0 && (
@@ -398,7 +471,12 @@ export default function DashboardPage() {
               chart={chart}
               isLoading={dataLoading}
             />
-            <SixMonthTrend trend={trend} chart={chart} isLoading={dataLoading} />
+            <SixMonthTrend
+              trend={isYearMode ? annualTrendThisYear : trend}
+              chart={chart}
+              isLoading={dataLoading}
+              title={isYearMode ? "12-Month Trend" : "6-Month Trend"}
+            />
           </TwoColRow>
 
           {/* ── Investment Overview (left) + Goals (right) ── */}

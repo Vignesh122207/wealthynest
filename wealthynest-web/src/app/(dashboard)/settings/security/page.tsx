@@ -1,6 +1,6 @@
 "use client";
 
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {useRouter} from "next/navigation";
 import type {UseFormRegisterReturn} from "react-hook-form";
 import {useForm} from "react-hook-form";
@@ -46,6 +46,7 @@ import {
 import {PinSetupModal} from "@/features/auth/components/PinSetupModal";
 import {PinVerifyModal} from "@/features/auth/components/PinVerifyModal";
 import {useAuthStore} from "@/features/auth/store/auth.store";
+import {useAppLockStore} from "@/features/auth/store/appLock.store";
 import {useWebAuthnSupport} from "@/features/auth/hooks/useWebAuthnSupport";
 import {cn, formatDate} from "@/lib/utils";
 import {isMobileUserAgent, parseUserAgent} from "@/lib/parseUserAgent";
@@ -128,6 +129,26 @@ function PinRow() {
   const enabled = !!user?.pinEnabled;
   const [showSetup, setShowSetup] = useState(false);
   const [showVerify, setShowVerify] = useState(false);
+  const [resetPassword, setResetPassword] = useState<string | undefined>(undefined);
+
+  // Lands here right after "Forgot your PIN?" → sign out → sign back in with password (see
+  // useLogin's own comment on this specific redirect) — auto-opens PIN setup with that
+  // just-typed password already in hand, closing the loop instead of leaving the user to
+  // rediscover "Forgot your PIN?" a second time on their own. A plain window.location read
+  // (not useSearchParams) so this one-shot check doesn't need a Suspense boundary the rest of
+  // this page has no other reason to carry.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("resetPin") !== "1") return;
+    const password = useAppLockStore.getState().consumePendingPinResetPassword();
+    router.replace("/settings/security"); // drop the query param so a refresh doesn't retrigger
+    if (password) {
+      setResetPassword(password);
+      setShowSetup(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const closeSetup = () => { setShowSetup(false); setResetPassword(undefined); };
 
   // Mirrors NativeBiometricRow/PasskeyRow's own toggle below — PIN used to be a tap-through link
   // when off and an always-on switch when on, the one unlock method here that didn't behave like
@@ -157,10 +178,14 @@ function PinRow() {
         testId={enabled ? "security-pin-disable-toggle" : "security-pin-enable-toggle"}
       />
       {showSetup && (
-        <PinSetupModal onClose={() => setShowSetup(false)} onSuccess={() => setShowSetup(false)} />
+        <PinSetupModal currentPassword={resetPassword} onClose={closeSetup} onSuccess={closeSetup} />
       )}
       {showVerify && (
-        <PinVerifyModal onClose={() => setShowVerify(false)} onVerified={() => setShowVerify(false)} />
+        <PinVerifyModal
+          onClose={() => setShowVerify(false)}
+          onVerified={() => setShowVerify(false)}
+          onForgot={() => { setShowVerify(false); setShowSetup(true); }}
+        />
       )}
     </div>
   );

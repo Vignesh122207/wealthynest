@@ -32,9 +32,12 @@ export const authApi = {
   resendVerification: async (email: string): Promise<void> => {
     await apiClient.post(`/auth/resend-verification?email=${encodeURIComponent(email)}`);
   },
-  // No password step-up — see AuthServiceImpl#enablePin's own comment for why that's deliberate.
-  enablePin: async (pin: string): Promise<void> => {
-    await apiClient.post("/users/me/pin/enable", { pin });
+  // No password step-up for first-time setup — see AuthServiceImpl#enablePin's own comment for
+  // why that's deliberate. currentPassword is required only when replacing an already-set PIN
+  // (e.g. "Forgot your PIN?") — omitted (undefined) on the first-time path, which the backend
+  // reads as "no PIN exists yet, nothing to prove."
+  enablePin: async (pin: string, currentPassword?: string): Promise<void> => {
+    await apiClient.post("/users/me/pin/enable", { pin, currentPassword });
   },
   // Requires the current PIN — see AuthServiceImpl#disablePin's own comment for why turning PIN
   // unlock OFF gets a step-up check that turning it on deliberately doesn't.
