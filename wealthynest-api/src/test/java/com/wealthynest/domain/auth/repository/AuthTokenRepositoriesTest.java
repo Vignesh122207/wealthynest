@@ -49,7 +49,7 @@ class AuthTokenRepositoriesTest extends AbstractRepositoryTest {
         @Test
         @DisplayName("findByTokenHash finds the exact stored hash")
         void findByTokenHashFindsExact() {
-            RefreshToken t = RefreshToken.builder().userId(userId).tokenHash("hash-abc")
+            RefreshToken t = RefreshToken.builder().userId(userId).sessionId(UUID.randomUUID()).tokenHash("hash-abc")
                     .expiresAt(Instant.now().plusSeconds(3600)).build();
             entityManager.persist(t);
             entityManager.flush();
@@ -61,11 +61,11 @@ class AuthTokenRepositoriesTest extends AbstractRepositoryTest {
         @Test
         @DisplayName("revokeAllByUserId revokes every token for that user, leaving other users' tokens untouched")
         void revokeAllOnlyTouchesThatUser() {
-            RefreshToken mine = RefreshToken.builder().userId(userId).tokenHash("hash-mine")
+            RefreshToken mine = RefreshToken.builder().userId(userId).sessionId(UUID.randomUUID()).tokenHash("hash-mine")
                     .expiresAt(Instant.now().plusSeconds(3600)).revoked(false).build();
             entityManager.persist(mine);
             UUID otherUserId = persistOtherUser();
-            RefreshToken theirs = RefreshToken.builder().userId(otherUserId).tokenHash("hash-theirs")
+            RefreshToken theirs = RefreshToken.builder().userId(otherUserId).sessionId(UUID.randomUUID()).tokenHash("hash-theirs")
                     .expiresAt(Instant.now().plusSeconds(3600)).revoked(false).build();
             entityManager.persist(theirs);
             entityManager.flush();

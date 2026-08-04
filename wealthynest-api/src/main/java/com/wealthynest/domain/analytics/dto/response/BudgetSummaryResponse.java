@@ -22,4 +22,9 @@ public class BudgetSummaryResponse {
     private BigDecimal spent;
     private double     percentUsed;
     private boolean    overBudget;
+    // Annual-pace status — see AnalyticsServiceImpl#getDashboard's own comment. Only consumed by
+    // the Home dashboard's combined (MONTHLY + YEARLY) Budget Progress ring; every other
+    // consumer of this response (Budgets page, BudgetSection, notifications) should keep using
+    // overBudget/spent/percentUsed, which stay scoped to this budget's own period.
+    private boolean    paceOverBudget;
 }

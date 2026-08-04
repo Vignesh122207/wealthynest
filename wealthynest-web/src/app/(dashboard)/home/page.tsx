@@ -264,13 +264,13 @@ export default function DashboardPage() {
   const ytdLastSavingsRate = ytdLastYear.income > 0 ? ((ytdLastYear.income - ytdLastYear.expenses) / ytdLastYear.income) * 100 : 0;
   const ytdSavingsRateTrend = pctChange(ytdSavingsRate, ytdLastSavingsRate);
 
-  // Budget Progress shows whichever budget-type set matches the currently-browsed period — see
-  // StatOverview's matching ring logic. The over-budget banner/count follows the same set so the
-  // two never disagree about which budgets are in trouble.
+  // Budget Progress always rolls yearly + monthly budgets into one combined figure — see
+  // StatOverview's matching ring logic (overBudget OR paceOverBudget). The over-budget
+  // banner/count follows the same combined check so the two never disagree.
   const budgetSummaries = data?.budgetSummaries ?? [];
   const monthlyBudgets  = budgetSummaries.filter(b => b.budgetType === "MONTHLY");
   const yearlyBudgets   = budgetSummaries.filter(b => b.budgetType === "YEARLY");
-  const overBudgetCount = (isYearMode ? yearlyBudgets : monthlyBudgets).filter(b => b.overBudget).length;
+  const overBudgetCount = [...monthlyBudgets, ...yearlyBudgets].filter(b => b.overBudget || b.paceOverBudget).length;
 
   const categoryDeltaInsights = useMemo((): SmartInsight[] => {
     if (!data?.categoryBreakdown?.length || !prevData?.categoryBreakdown?.length) return [];
@@ -397,7 +397,6 @@ export default function DashboardPage() {
             viewMode={viewMode}
             netWorth={data?.totalNetWorth}
             prevNetWorth={prevData?.totalNetWorth}
-            netWorthHistory={netWorthHistory}
             netWorthSinceJanTrend={netWorthSinceJanTrend}
             investments={investments}
             income={data?.monthlyIncome}

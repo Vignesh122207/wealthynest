@@ -49,14 +49,17 @@ export function TabBar<T extends string>({ items, value, onChange, testIdPrefix,
     measure();
     btn.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
 
-    // Re-measure if the active button's own box changes size after this — most commonly a
-    // webfont's async swap-in (next/font's font-display: swap) reflowing the label slightly
-    // after this first, synchronous measurement. Without this, the indicator was measured
-    // against the pre-swap fallback-font width on first load and stayed stale — landing visibly
-    // undersized ("half selected") — until the next tab click re-ran this effect against the
-    // now-settled font.
+    // Re-measure if ANY tab's box changes size after this — not just the active one. The
+    // original webfont-swap case (next/font's font-display: swap reflowing the active label
+    // slightly after this first synchronous measurement) only needed the active button watched,
+    // but a count badge (e.g. Expenses/Income) populating a moment later — once that tab's own
+    // query resolves, independently of the active tab's — shifts every later sibling's
+    // offsetLeft, including the active tab's, even though the active tab's own box never
+    // changed. Watching only the active button misses that shift entirely and leaves the
+    // indicator stuck at its old position/size — visibly misaligned from the button underneath,
+    // most noticeable right after a refresh when every tab's count is still arriving.
     const observer = new ResizeObserver(measure);
-    observer.observe(btn);
+    (Object.values(btnRefs.current) as (HTMLButtonElement | null | undefined)[]).forEach((el) => { if (el) observer.observe(el); });
     return () => observer.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, items.length]);
@@ -128,17 +131,28 @@ export function TabBar<T extends string>({ items, value, onChange, testIdPrefix,
                 "--hover-border": `color-mix(in srgb, ${item.color} 45%, hsl(var(--border)))`,
               } as React.CSSProperties}
               className={cn(
-                "relative z-[1] flex items-center gap-2 h-9 px-3.5 rounded-xl text-xs font-medium whitespace-nowrap transition-colors shrink-0 snap-start",
+                "relative z-[1] flex items-center gap-2 h-9 px-3.5 rounded-xl text-xs font-medium whitespace-nowrap transition-colors duration-150 delay-150 shrink-0 snap-start",
                 active
                   ? "text-white border border-transparent"
                   : "text-muted-foreground bg-card border border-border hover:bg-[var(--hover-tint)] hover:border-[var(--hover-border)]"
               )}
             >
-              <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: active ? "#fff" : item.color }} />
+              {/* Icon/label/badge color must NOT track the indicator's 300ms slide 1:1 — that
+                  was tried and made things worse: at e.g. t=40ms the color is only ~13% blended,
+                  so a long jump across a wide rail (5-6 tabs, Accounts/Investments) reads as
+                  washed-out grey text smeared across a partially-arrived colored pill for most of
+                  the animation. delay-150 duration-150 instead holds the ORIGINAL, fully legible
+                  color (grey-on-card, or white-on-pill for the outgoing tab) for the first half of
+                  the indicator's travel — while it's still visibly in transit and not yet under
+                  this button — then snaps to the target color over a quick 150ms in the second
+                  half, landing close to when the indicator itself arrives. Never fully synced
+                  (that needs a bigger redesign — see the indicator's own effect for why), but no
+                  window of low-contrast or invisible text either. */}
+              <Icon className="w-3.5 h-3.5 shrink-0 transition-colors duration-150 delay-150" style={{ color: active ? "#fff" : item.color }} />
               {item.label}
               {!!item.count && (
                 <span className={cn(
-                  "text-[11px] font-bold px-1.5 py-0.5 rounded-full",
+                  "text-[11px] font-bold px-1.5 py-0.5 rounded-full transition-colors duration-150 delay-150",
                   active ? "bg-white/25 text-white" : "bg-muted text-muted-foreground"
                 )}>
                   {item.count}

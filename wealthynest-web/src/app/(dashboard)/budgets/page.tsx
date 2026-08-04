@@ -47,6 +47,7 @@ import {BudgetTypeTabs} from "./_components/BudgetTypeTabs";
 import type {Budget, BudgetType} from "@/features/budgets/types/budget.types";
 import {cn} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {useTabParam} from "@/hooks/useTabParam";
 import {useAuthStore} from "@/features/auth/store/auth.store";
 import {toast} from "sonner";
 
@@ -128,7 +129,7 @@ export default function BudgetsPage() {
   const [editBudget,  setEditBudget]  = useState<Budget | null>(null);
   const [confirmId,   setConfirmId]   = useState<string | null>(null);
   const [budgetType,  setBudgetType]  = useState<BudgetType>("MONTHLY");
-  const [activeType,  setActiveType]  = useState<BudgetType>("MONTHLY");
+  const [activeType,  setActiveType]  = useTabParam<BudgetType>(["MONTHLY", "YEARLY"], "MONTHLY");
   const [showAddCat,  setShowAddCat]  = useState(false);
   const [newCatName,  setNewCatName]  = useState("");
   const [newCatColor, setNewCatColor] = useState(CATEGORY_COLOR_PALETTE[0]);

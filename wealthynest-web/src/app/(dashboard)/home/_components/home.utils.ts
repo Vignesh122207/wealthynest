@@ -38,7 +38,13 @@ export interface PaceForecast {
  * date, extrapolated across the whole month), compared against the average of prior months'
  * actual savings. `pctVsAvg` is null when there's no prior-month history to compare against
  * (too new an account) or that average is exactly zero (a % comparison against zero is
- * meaningless) — callers show the projected amount alone in that case. */
+ * meaningless) — callers show the projected amount alone in that case.
+ *
+ * Returns null outright before day 5 of the month: extrapolating from only a few days
+ * multiplies whatever happened so far by daysInMonth/dayOfMonth (day 1 → ~30x), so one
+ * lumpy transaction (a bonus, an FD maturity) produces a wildly unstable "pace" and an
+ * even wilder pctVsAvg against a normal-sized average. Waiting for a working week's worth
+ * of data keeps the extrapolation multiplier under ~6x. */
 export function getPaceForecast(
   income: number | undefined,
   expenses: number | undefined,
@@ -47,7 +53,7 @@ export function getPaceForecast(
   priorMonthsSaved: number[],
 ): PaceForecast | null {
   if (income == null && expenses == null) return null;
-  if (dayOfMonth <= 0 || daysInMonth <= 0) return null;
+  if (dayOfMonth < 5 || daysInMonth <= 0) return null;
 
   const projected = ((income ?? 0) - (expenses ?? 0)) / dayOfMonth * daysInMonth;
   const validPrior = priorMonthsSaved.filter(v => Number.isFinite(v));

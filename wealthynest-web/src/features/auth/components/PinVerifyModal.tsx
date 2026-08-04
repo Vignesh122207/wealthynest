@@ -9,6 +9,7 @@ import {LockoutBanner} from "./LockoutBanner";
 import {useDisablePin} from "../hooks/useAuth";
 import {PIN_LENGTH} from "../hooks/usePinEntryFlow";
 import {deriveLockoutState, type LockoutState} from "../utils/lockout";
+import {useCountdown} from "../hooks/useCountdown";
 
 // Gates turning PIN unlock OFF behind re-entering the current PIN — see
 // AuthServiceImpl#disablePin's own comment: disabling is the more sensitive direction (anyone
@@ -17,11 +18,22 @@ import {deriveLockoutState, type LockoutState} from "../utils/lockout";
 // (there's nothing new to pick), reusing the same compact popup chrome as PinSetupModal and the
 // same lockout/shake handling AppLockScreen's own PIN unlock uses — this IS a real unlock attempt
 // against the account's PIN, just spent on turning it off instead of clearing a session lock.
-export function PinVerifyModal({ onClose, onVerified }: { onClose: () => void; onVerified: () => void }) {
+//
+// onForgot is the recovery path for a PIN the user can no longer produce at all: rather than
+// forcing them through this verification (which needs the very PIN they've forgotten), it hands
+// control back to PinRow to swap this modal for PinSetupModal instead. That's safe to offer
+// unconditionally — AuthServiceImpl#enablePin already overwrites pinHash with no proof of the old
+// one required (see its own comment), so this isn't a new, weaker path, just surfacing the one
+// that already exists for the one case (forgotten PIN) that couldn't reach it before.
+export function PinVerifyModal({ onClose, onVerified, onForgot }: { onClose: () => void; onVerified: () => void; onForgot: () => void }) {
   const { mutate: disablePin, isPending } = useDisablePin();
   const [value, setValue] = useState("");
   const [error, setError] = useState(false);
   const [lockout, setLockout] = useState<LockoutState | null>(null);
+  // Live, not just "is a lockout error set" — see AppLockScreen's own comment on the identical
+  // pattern. Without this, once the 15-minute window actually passed, the keypad here stayed
+  // disabled until the modal was closed and reopened, since nothing else ever clears `lockout`.
+  const lockedOut = !!useCountdown(lockout?.retryAt);
 
   function submit(pin: string) {
     disablePin(pin, {
@@ -36,7 +48,7 @@ export function PinVerifyModal({ onClose, onVerified }: { onClose: () => void; o
   }
 
   function handleDigit(d: string) {
-    if (isPending || lockout || value.length >= PIN_LENGTH) return;
+    if (isPending || lockedOut || value.length >= PIN_LENGTH) return;
     const next = value + d;
     setValue(next);
     if (error) setError(false);
@@ -78,12 +90,21 @@ export function PinVerifyModal({ onClose, onVerified }: { onClose: () => void; o
         <PinCells value={value} error={error} compact />
 
         <div className="mt-5">
-          <Keypad onDigit={handleDigit} onBackspace={handleBackspace} disabled={isPending || !!lockout} compact />
+          <Keypad onDigit={handleDigit} onBackspace={handleBackspace} disabled={isPending || lockedOut} compact />
         </div>
 
         <p className="mt-4 text-center text-[11px] text-muted-foreground/70">
           {isPending ? "Verifying…" : "Continues automatically once you've entered 4 digits"}
         </p>
+
+        <button
+          type="button"
+          data-testid="pin-verify-forgot"
+          onClick={onForgot}
+          className="mt-3 w-full text-center text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Forgot your PIN? Set a new one
+        </button>
       </AuthCard>
     </TransactionModalOverlay>
   );

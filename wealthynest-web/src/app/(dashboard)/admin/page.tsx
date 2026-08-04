@@ -1,7 +1,7 @@
 "use client";
 
 import {useRouter} from "next/navigation";
-import {useEffect, useState} from "react";
+import {useEffect} from "react";
 import dynamic from "next/dynamic";
 import {Clock, History, LayoutDashboard, Loader2, Ticket, Users,} from "lucide-react";
 import {Header} from "@/components/layout/Header";
@@ -13,12 +13,14 @@ import {TicketsTab} from "@/features/admin/components/TicketsTab";
 import {AuditTab} from "@/features/admin/components/AuditTab";
 import {JobsTab} from "@/features/admin/components/JobsTab";
 import {TabBar, type TabBarItem} from "@/components/ui/TabBar";
+import {useTabParam} from "@/hooks/useTabParam";
 
 // Lazy-loaded (kept SSR'd — paints on first load, not after a click): pulls in recharts, same
 // fix as home/page.tsx's chart widgets (see that file's own comment for the measured cause/effect).
 const OverviewTab = dynamic(() => import("@/features/admin/components/OverviewTab").then(m => m.OverviewTab));
 
-type Tab = "overview" | "users" | "tickets" | "audit" | "jobs";
+const TAB_IDS = ["overview", "users", "tickets", "audit", "jobs"] as const;
+type Tab = (typeof TAB_IDS)[number];
 
 // Same per-type template as Investments/Accounts/Debts/Transactions/Categories.
 const TAB_COLOR: Record<Tab, string> = {
@@ -40,7 +42,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
 export default function AdminPage() {
   const { user }   = useAuthStore();
   const router     = useRouter();
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useTabParam<Tab>(TAB_IDS, "overview");
 
   const { data: stats }      = useAdminStats();
   const { data: openTickets } = useOpenTicketCount();

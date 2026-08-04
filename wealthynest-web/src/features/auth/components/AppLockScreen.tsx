@@ -10,6 +10,7 @@ import {useWebAuthnSupport} from "../hooks/useWebAuthnSupport";
 import {useIsNativePlatform, useNativeBiometricStatus} from "../hooks/useNativeBiometric";
 import {BiometryErrorType, isBiometryError, verifyBiometric} from "../utils/nativeBiometric";
 import {deriveLockoutState, type LockoutState} from "../utils/lockout";
+import {useCountdown} from "../hooks/useCountdown";
 import {LockoutBanner} from "./LockoutBanner";
 import {BrandMark} from "@/components/icons/BrandMark";
 import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
@@ -67,6 +68,13 @@ export function AppLockScreen() {
   const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState(false);
   const [lockout, setLockout] = useState<LockoutState | null>(null);
+  // Live, not just "is a lockout error set" — ticks back to false the instant the countdown
+  // actually ends, so the PIN box re-enables itself on its own instead of staying stuck disabled
+  // until this screen happens to remount. Backs both the input's own disabled state and the
+  // guard below on submitting while locked out — before this, the LockoutBanner showed the
+  // countdown but the PIN box stayed fully live, so a locked-out user could keep retyping and
+  // re-firing pinLogin against a server that was rejecting every one of them anyway.
+  const lockedOut = !!useCountdown(lockout?.retryAt);
   const [biometricPending, setBiometricPending] = useState(false);
   // Starts false on every render, same SSR/first-paint-safety reasoning as the hydrated flags
   // elsewhere in this feature — localStorage isn't available server-side, and a synchronous read
@@ -174,13 +182,21 @@ export function AppLockScreen() {
   }, [user, nativeBiometricAvailable]);
 
   const submitPin = () => {
-    if (pin.length !== PIN_LENGTH) return;
+    if (pin.length !== PIN_LENGTH || lockedOut) return;
     unlockWithPin(pin, {
       onSuccess: () => { unlock(); setPin(""); },
       // useUnlockWithPin's own onError already toasts the server message for anything that isn't
       // a lockout — this drives the cell row's red/shake state (local-only UI feedback the toast
       // can't express) plus the LockoutBanner for PIN_LOCKED/RATE_LIMIT_EXCEEDED specifically.
-      onError: (e) => { setPinError(true); setPin(""); setLockout(deriveLockoutState(e)); },
+      // A lockout error is never also "incorrect PIN" — that shake/message would contradict the
+      // banner sitting right above it, so it's one or the other, never both (mirrors
+      // PinVerifyModal's own onError below).
+      onError: (e) => {
+        const state = deriveLockoutState(e);
+        setPin("");
+        if (state) { setLockout(state); return; }
+        setPinError(true);
+      },
     });
   };
 
@@ -189,11 +205,14 @@ export function AppLockScreen() {
   // `!pinPending` so a slow request settling after the user has already backspaced/retried can't
   // double-fire; guarded on `user` (not just the early return below) because this runs every
   // render before that return, same reasoning as the fingerprint auto-trigger effect above.
+  // Guarded on `!lockedOut` too — the input is disabled while locked out (see the two render
+  // branches below), so this only matters as defense-in-depth against a stray 4-digit `pin` value
+  // surviving into a lockout.
   useEffect(() => {
-    if (!user || pin.length !== PIN_LENGTH || pinPending) return;
+    if (!user || pin.length !== PIN_LENGTH || pinPending || lockedOut) return;
     submitPin();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pin, user]);
+  }, [pin, user, lockedOut]);
 
   if (!user) return null;
 
@@ -254,17 +273,18 @@ export function AppLockScreen() {
                 autoFocus
                 autoComplete="off"
                 aria-label="PIN"
+                disabled={lockedOut}
                 value={pin}
                 onChange={(e) => {
                   setPin(e.target.value.replace(/[^0-9]/g, ""));
                   if (pinError) setPinError(false);
                   if (lockout) setLockout(null);
                 }}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-text"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-text disabled:cursor-not-allowed"
               />
               <PinCells pin={pin} pinError={pinError} />
             </div>
-            {pinError && (
+            {pinError && !lockedOut && (
               <p className="flex items-center justify-center gap-1.5 text-xs font-semibold text-red-600 dark:text-red-400">
                 <AlertCircle className="w-3.5 h-3.5" /> Incorrect PIN — try again
               </p>
@@ -272,7 +292,7 @@ export function AppLockScreen() {
             <button
               data-testid="applock-pin-submit"
               type="submit"
-              disabled={pinPending || pin.length !== PIN_LENGTH}
+              disabled={pinPending || pin.length !== PIN_LENGTH || lockedOut}
               className="w-full h-11 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2
                 bg-gradient-to-br from-brand-600 to-brand-500 text-white
                 shadow-[0_10px_24px_-10px_rgb(var(--brand-500)/65%),inset_0_1px_0_rgba(255,255,255,0.18)]
@@ -323,7 +343,11 @@ export function AppLockScreen() {
           confirmLabel="Sign out"
           danger
           loading={loggingOut}
-          onConfirm={() => logout()}
+          // Marked before signing out (not after) — see appLock.store's own comment on
+          // pinRecoveryPending: the very next successful login reads this to decide whether to
+          // redirect into PIN setup instead of /home, closing the loop this escape hatch would
+          // otherwise leave open (the forgotten PIN itself was never touched by signing out).
+          onConfirm={() => { useAppLockStore.getState().markPinRecoveryPending(); logout(); }}
           onCancel={() => setConfirmUsePassword(false)}
         />
       </div>
@@ -423,18 +447,19 @@ export function AppLockScreen() {
                 autoFocus={!fingerprintAvailable}
                 autoComplete="off"
                 aria-label="PIN"
+                disabled={lockedOut}
                 value={pin}
                 onChange={(e) => {
                   setPin(e.target.value.replace(/[^0-9]/g, ""));
                   if (pinError) setPinError(false);
                   if (lockout) setLockout(null);
                 }}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-text"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-text disabled:cursor-not-allowed"
               />
               <PinCells pin={pin} pinError={pinError} />
             </div>
 
-            {pinError && (
+            {pinError && !lockedOut && (
               <p className="flex items-center justify-center gap-1.5 text-xs font-semibold text-red-600 dark:text-red-400">
                 <AlertCircle className="w-3.5 h-3.5" /> Incorrect PIN — try again
               </p>
@@ -443,7 +468,7 @@ export function AppLockScreen() {
             <button
               data-testid="applock-pin-submit"
               type="submit"
-              disabled={pinPending || pin.length !== PIN_LENGTH}
+              disabled={pinPending || pin.length !== PIN_LENGTH || lockedOut}
               className={
                 fingerprintAvailable
                   ? "w-full h-11 rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-2 bg-muted hover:bg-muted/80 text-foreground disabled:opacity-60 disabled:cursor-not-allowed"
@@ -480,7 +505,11 @@ export function AppLockScreen() {
         confirmLabel="Sign out"
         danger
         loading={loggingOut}
-        onConfirm={() => logout()}
+        // Marked before signing out — see appLock.store's own comment on pinRecoveryPending: the
+        // very next successful login reads this to decide whether to redirect into PIN setup
+        // instead of /home, closing the loop this escape hatch would otherwise leave open (the
+        // forgotten PIN itself was never touched by signing out).
+        onConfirm={() => { useAppLockStore.getState().markPinRecoveryPending(); logout(); }}
         onCancel={() => setConfirmUsePassword(false)}
       />
     </div>

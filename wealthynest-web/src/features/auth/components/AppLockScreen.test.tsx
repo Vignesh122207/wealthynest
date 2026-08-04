@@ -73,6 +73,10 @@ beforeEach(() => {
   useAuthStore.setState({
     user, accessToken: "at", isAuthenticated: true, userVersion: 0,
   });
+  // Reset between tests — "signs out once the dialog is confirmed" (and this file's own new
+  // pinRecoveryPending test) both flip these via the real onConfirm handler, and Zustand module
+  // state otherwise leaks across tests in the same file.
+  useAppLockStore.setState({ isLocked: false, pinRecoveryPending: false, pendingPinResetPassword: null });
 });
 
 describe("AppLockScreen", () => {
@@ -195,6 +199,21 @@ describe("AppLockScreen", () => {
 
       await waitFor(() => expect(mockedApi.logout).toHaveBeenCalledWith());
       expect(pushMock).toHaveBeenCalledWith("/login");
+    });
+
+    // Regression coverage for a real gap: this escape hatch got the user back into the app, but
+    // never touched the actual forgotten PIN, so the very next lock re-showed the same PIN prompt
+    // they couldn't answer before. useLogin's own redirect-to-PIN-setup logic reads this flag —
+    // see appLock.store's own comment on pinRecoveryPending.
+    it("marks pinRecoveryPending before signing out, so the next login can redirect into PIN setup", async () => {
+      mockedApi.logout.mockResolvedValue(undefined);
+      expect(useAppLockStore.getState().pinRecoveryPending).toBe(false);
+      renderLockScreen();
+      fireEvent.click(screen.getByTestId("applock-use-password"));
+      fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+
+      expect(useAppLockStore.getState().pinRecoveryPending).toBe(true);
+      await waitFor(() => expect(mockedApi.logout).toHaveBeenCalledWith());
     });
   });
 

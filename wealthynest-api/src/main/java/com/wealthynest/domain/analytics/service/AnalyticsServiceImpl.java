@@ -84,6 +84,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         List<Budget> budgets = budgetRepository.findByUserId(userId);
         Map<UUID, BigDecimal> monthlySpendByCategory = toUuidMap(expenseRepository.findCategorySpendingByUser(userId, year, month));
         Map<UUID, BigDecimal> yearlySpendByCategory   = toUuidMap(expenseRepository.sumByUserAndYearGroupedByCategory(userId, year));
+        int monthsElapsed = monthsElapsedInYear(year);
 
         List<BudgetSummaryResponse> budgetSummaries = budgets.stream().map(b -> {
             boolean isYearly = com.wealthynest.domain.budget.entity.BudgetType.YEARLY.equals(b.getBudgetType());
@@ -94,6 +95,26 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                     ? spent.divide(b.getAmount(), 4, RoundingMode.HALF_UP)
                            .multiply(BigDecimal.valueOf(100)).doubleValue()
                     : 0.0;
+
+            // Annual pace — how this budget's spend-to-date compares against the whole year it
+            // belongs to. Used only by the Home dashboard's combined Budget Progress ring, which
+            // rolls MONTHLY and YEARLY budgets into one "N of N" figure regardless of the
+            // Month/Year toggle. A YEARLY budget already represents a full-year cap, so its pace
+            // status is identical to overBudget above. A MONTHLY budget represents a per-month
+            // allowance, so extrapolating it onto the year means comparing this year's actual
+            // spend-to-date against (monthly amount x months elapsed so far) rather than a flat
+            // x12 — a flat annual cap wouldn't flag an overspending budget until very late in
+            // the year (see getPaceForecast's own early-month-extrapolation reasoning, same idea
+            // applied here in the opposite direction).
+            boolean paceOverBudget;
+            if (isYearly) {
+                paceOverBudget = pct > 100;
+            } else {
+                BigDecimal ytdSpent = yearlySpendByCategory.getOrDefault(b.getCategoryId(), BigDecimal.ZERO);
+                BigDecimal paceCap  = b.getAmount().multiply(BigDecimal.valueOf(monthsElapsed));
+                paceOverBudget = monthsElapsed > 0 && ytdSpent.compareTo(paceCap) > 0;
+            }
+
             Category cat = catMap.get(b.getCategoryId());
             return BudgetSummaryResponse.builder()
                     .categoryId(b.getCategoryId())
@@ -102,7 +123,8 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                     .categoryIcon(cat != null ? cat.getIcon()  : "more-horizontal")
                     .budgetType(b.getBudgetType())
                     .budgeted(b.getAmount()).spent(spent)
-                    .percentUsed(pct).overBudget(pct > 100).build();
+                    .percentUsed(pct).overBudget(pct > 100)
+                    .paceOverBudget(paceOverBudget).build();
         }).toList();
 
         // Savings rate: (income - expenses) / income * 100. Left un-floored on purpose — a genuine
@@ -178,6 +200,15 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                     .build());
         }
         return result;
+    }
+
+    /** How many months of `year` count as "elapsed" as of today — 12 for a year already in the
+     * past, 0 for one that hasn't started yet, otherwise the current calendar month. */
+    private int monthsElapsedInYear(int year) {
+        int currentYear = java.time.LocalDate.now().getYear();
+        if (year < currentYear) return 12;
+        if (year > currentYear) return 0;
+        return java.time.LocalDate.now().getMonthValue();
     }
 
     private Map<UUID, BigDecimal> toUuidMap(List<Object[]> rows) {

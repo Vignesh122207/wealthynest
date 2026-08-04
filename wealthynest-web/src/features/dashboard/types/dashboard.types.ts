@@ -44,4 +44,8 @@ export interface BudgetSummary {
   spent:         number;
   percentUsed:   number;
   overBudget:    boolean;
+  // Annual-pace status — only meant for the Home dashboard's combined Budget Progress ring
+  // (MONTHLY + YEARLY rolled into one figure). Everywhere else, use overBudget/spent/percentUsed,
+  // which stay scoped to this budget's own period.
+  paceOverBudget: boolean;
 }

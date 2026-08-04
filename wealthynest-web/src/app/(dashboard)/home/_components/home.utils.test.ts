@@ -57,6 +57,11 @@ describe("getPaceForecast", () => {
 
   it("returns null for a nonsensical day-of-month/days-in-month input", () => {
     expect(getPaceForecast(1000, 500, 0, 31, [])).toBeNull();
+    expect(getPaceForecast(1000, 500, 10, 0, [])).toBeNull();
+  });
+
+  it("returns null before day 5 — too few days to extrapolate without amplifying a single lumpy transaction", () => {
+    expect(getPaceForecast(150000, 5000, 3, 31, [10000])).toBeNull();
   });
 
   it("projects the full-month pace from the elapsed-day rate", () => {

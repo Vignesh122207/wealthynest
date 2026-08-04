@@ -253,6 +253,88 @@ class AnalyticsServiceImplTest {
         }
 
         @Test
+        @DisplayName("paceOverBudget for a YEARLY budget mirrors overBudget")
+        void paceOverBudgetMirrorsOverBudgetForYearly() {
+            stubDashboardDefaults(2026, 6);
+            Budget yearly = Budget.builder().categoryId(categoryId).amount(new BigDecimal("1000")).budgetType(BudgetType.YEARLY).build();
+            when(budgetRepository.findByUserId(userId)).thenReturn(List.of(yearly));
+            when(expenseRepository.sumByUserAndYearGroupedByCategory(userId, 2026))
+                    .thenReturn(List.<Object[]>of(new Object[]{categoryId, new BigDecimal("1500")}));
+
+            DashboardResponse response = service.getDashboard(userId, 2026, 6);
+
+            BudgetSummaryResponse summary = response.getBudgetSummaries().get(0);
+            assertThat(summary.isOverBudget()).isTrue();
+            assertThat(summary.isPaceOverBudget()).isTrue();
+        }
+
+        @Test
+        @DisplayName("paceOverBudget for a MONTHLY budget, in a fully-elapsed past year, compares against the full x12 cap")
+        void paceOverBudgetForMonthlyUsesFullYearCapWhenYearHasFullyElapsed() {
+            // 2020 is guaranteed to be a past year, so all 12 months count as elapsed regardless
+            // of the real date this test runs on.
+            stubDashboardDefaults(2020, 6);
+            Budget monthly = Budget.builder().categoryId(categoryId).amount(new BigDecimal("1000")).budgetType(BudgetType.MONTHLY).build();
+            when(budgetRepository.findByUserId(userId)).thenReturn(List.of(monthly));
+            when(expenseRepository.sumByUserAndYearGroupedByCategory(userId, 2020))
+                    .thenReturn(List.<Object[]>of(new Object[]{categoryId, new BigDecimal("12001")})); // just above 1000 x 12
+
+            DashboardResponse response = service.getDashboard(userId, 2020, 6);
+
+            BudgetSummaryResponse summary = response.getBudgetSummaries().get(0);
+            assertThat(summary.isPaceOverBudget()).isTrue();
+        }
+
+        @Test
+        @DisplayName("paceOverBudget for a MONTHLY budget stays false when YTD spend is under the full x12 cap in a past year")
+        void paceOverBudgetForMonthlyStaysFalseUnderFullYearCap() {
+            stubDashboardDefaults(2020, 6);
+            Budget monthly = Budget.builder().categoryId(categoryId).amount(new BigDecimal("1000")).budgetType(BudgetType.MONTHLY).build();
+            when(budgetRepository.findByUserId(userId)).thenReturn(List.of(monthly));
+            when(expenseRepository.sumByUserAndYearGroupedByCategory(userId, 2020))
+                    .thenReturn(List.<Object[]>of(new Object[]{categoryId, new BigDecimal("11999")})); // just under 1000 x 12
+
+            DashboardResponse response = service.getDashboard(userId, 2020, 6);
+
+            BudgetSummaryResponse summary = response.getBudgetSummaries().get(0);
+            assertThat(summary.isPaceOverBudget()).isFalse();
+        }
+
+        @Test
+        @DisplayName("paceOverBudget for a MONTHLY budget never fires for a year that hasn't started yet")
+        void paceOverBudgetForMonthlyStaysFalseForFutureYear() {
+            int futureYear = java.time.LocalDate.now().getYear() + 5;
+            stubDashboardDefaults(futureYear, 6);
+            Budget monthly = Budget.builder().categoryId(categoryId).amount(new BigDecimal("1")).budgetType(BudgetType.MONTHLY).build();
+            when(budgetRepository.findByUserId(userId)).thenReturn(List.of(monthly));
+            when(expenseRepository.sumByUserAndYearGroupedByCategory(userId, futureYear))
+                    .thenReturn(List.<Object[]>of(new Object[]{categoryId, new BigDecimal("1000000")}));
+
+            DashboardResponse response = service.getDashboard(userId, futureYear, 6);
+
+            BudgetSummaryResponse summary = response.getBudgetSummaries().get(0);
+            assertThat(summary.isPaceOverBudget()).isFalse();
+        }
+
+        @Test
+        @DisplayName("paceOverBudget for a MONTHLY budget, in the current year, is pro-rated by the real elapsed month count")
+        void paceOverBudgetForMonthlyIsProRatedInCurrentYear() {
+            int currentYear = java.time.LocalDate.now().getYear();
+            int elapsed     = java.time.LocalDate.now().getMonthValue();
+            stubDashboardDefaults(currentYear, 6);
+            Budget monthly = Budget.builder().categoryId(categoryId).amount(new BigDecimal("1000")).budgetType(BudgetType.MONTHLY).build();
+            when(budgetRepository.findByUserId(userId)).thenReturn(List.of(monthly));
+            BigDecimal justOverPace = new BigDecimal("1000").multiply(BigDecimal.valueOf(elapsed)).add(BigDecimal.ONE);
+            when(expenseRepository.sumByUserAndYearGroupedByCategory(userId, currentYear))
+                    .thenReturn(List.<Object[]>of(new Object[]{categoryId, justOverPace}));
+
+            DashboardResponse response = service.getDashboard(userId, currentYear, 6);
+
+            BudgetSummaryResponse summary = response.getBudgetSummaries().get(0);
+            assertThat(summary.isPaceOverBudget()).isTrue();
+        }
+
+        @Test
         @DisplayName("6-month trend wraps across a year boundary and floors 'saved' at zero")
         void monthlyTrendWrapsYearBoundaryAndFloorsSaved() {
             stubDashboardDefaults(2026, 2); // Feb -> trend spans back into the previous year

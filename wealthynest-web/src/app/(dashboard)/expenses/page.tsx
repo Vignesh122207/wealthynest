@@ -73,8 +73,15 @@ export default function TransactionsPage() {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Type tab
-  const [txType, setTxType] = useState<TxType>("all");
+  // Type tab — read straight from the URL on the very first render rather than defaulting to
+  // "all" and correcting via a mount effect. That two-step "mount as All, then flip to the
+  // persisted tab" used to make TabBar's sliding indicator visibly sweep across every tab in
+  // between on each page load, since the effect-driven correction is a real, animated state
+  // change (not just a fast paint you'd never see).
+  const [txType, setTxType] = useState<TxType>(() => {
+    const tab = searchParams.get("tab");
+    return tab === "transfers" || tab === "income" || tab === "expenses" ? tab : "all";
+  });
 
   // Shared date state
   const [dateMode,    setDateMode]    = useState<DateMode>("month");
@@ -590,10 +597,6 @@ export default function TransactionsPage() {
   // navigating to July and refreshing the page dropped straight back to the current month, since
   // dateMode/year/month only ever lived in component state.
   useEffect(() => {
-    const tab = searchParams.get("tab");
-    if (tab === "transfers" || tab === "income" || tab === "all" || tab === "expenses") {
-      setTxType(tab as TxType);
-    }
     const accountId = searchParams.get("accountId");
     if (accountId) {
       setSelectedAccountIds([accountId]);

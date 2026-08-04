@@ -14,9 +14,7 @@ import {
 } from "lucide-react";
 import {cn, formatTrendDelta, pctChange} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
-import {CHART_COLORS} from "@/lib/chartColors";
 import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
-import type {NetWorthHistoryPoint} from "@/features/networth/types/networth.types";
 import type {Investment} from "@/features/investments/types/investment.types";
 import type {BudgetSummary} from "@/features/dashboard/types/dashboard.types";
 
@@ -24,7 +22,6 @@ interface StatOverviewProps {
   viewMode:          "month" | "year";
   netWorth:          number | undefined;
   prevNetWorth:      number | undefined;
-  netWorthHistory:   NetWorthHistoryPoint[];
   netWorthSinceJanTrend: number | undefined;
   investments:       Investment[];
   income:            number | undefined;
@@ -45,33 +42,14 @@ interface StatOverviewProps {
   isLoading:         boolean;
 }
 
-// ── Minimal inline sparkline — cheap, decorative, no need for a full Recharts instance ──
-function Sparkline({ values, color }: { values: number[]; color: string }) {
-  if (values.length < 2) return null;
-  const min = Math.min(...values), max = Math.max(...values);
-  const range = max - min || 1;
-  const w = 64, h = 24;
-  const points = values.map((v, i) => {
-    const x = (i / (values.length - 1)) * w;
-    const y = h - ((v - min) / range) * h;
-    return `${x},${y}`;
-  }).join(" ");
-  return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="shrink-0" aria-hidden>
-      <polyline points={points} fill="none" stroke={color} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 interface TileProps {
   icon: LucideIcon; tone: IconTone;
   label: string; value: string;
   deltaText?: string; deltaGood?: boolean;
-  sparkColor?: string; sparkValues?: number[];
   delay?: string;
 }
 
-function StatTile({ icon, tone, label, value, deltaText, deltaGood, sparkColor, sparkValues, delay = "delay-0" }: TileProps) {
+function StatTile({ icon, tone, label, value, deltaText, deltaGood, delay = "delay-0" }: TileProps) {
   return (
     <div className={cn(
       "bg-card rounded-2xl p-4 shadow-sm border border-border/50 card-hover animate-fade-in-up",
@@ -82,26 +60,23 @@ function StatTile({ icon, tone, label, value, deltaText, deltaGood, sparkColor, 
         <p className="text-xs font-semibold text-muted-foreground/80 truncate">{label}</p>
       </div>
       <p className="text-xl font-bold text-foreground tabular-nums tracking-tight leading-none mb-2">{value}</p>
-      <div className="flex items-center justify-between gap-2">
-        {deltaText ? (
-          <p className={cn(
-            "text-[11px] font-semibold tabular-nums",
-            deltaGood ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"
-          )}>
-            {deltaText}
-          </p>
-        ) : (
-          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">New</span>
-        )}
-        {sparkValues && sparkColor && <Sparkline values={sparkValues} color={sparkColor} />}
-      </div>
+      {deltaText ? (
+        <p className={cn(
+          "text-[11px] font-semibold tabular-nums",
+          deltaGood ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"
+        )}>
+          {deltaText}
+        </p>
+      ) : (
+        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">New</span>
+      )}
     </div>
   );
 }
 
 // ── Budget Progress — a ring instead of plain text, showing budgets on track out of total ──
-function BudgetProgressTile({ onTrack, total, alertBannerVisible, secondaryCaption, delay = "delay-375" }: {
-  onTrack: number; total: number; alertBannerVisible: boolean; secondaryCaption?: string; delay?: string;
+function BudgetProgressTile({ onTrack, total, alertBannerVisible, delay = "delay-375" }: {
+  onTrack: number; total: number; alertBannerVisible: boolean; delay?: string;
 }) {
   const overCount = total - onTrack;
   const good = total > 0 && overCount === 0;
@@ -155,9 +130,6 @@ function BudgetProgressTile({ onTrack, total, alertBannerVisible, secondaryCapti
               {total === 0 ? "No budgets yet" : good ? "All on track" : `${overCount} over limit`}
             </p>
           )}
-          {secondaryCaption && (
-            <p className="text-[10px] text-muted-foreground mt-1">{secondaryCaption}</p>
-          )}
         </div>
       </div>
     </div>
@@ -165,7 +137,7 @@ function BudgetProgressTile({ onTrack, total, alertBannerVisible, secondaryCapti
 }
 
 export function StatOverview({
-  viewMode, netWorth, prevNetWorth, netWorthHistory, netWorthSinceJanTrend, investments,
+  viewMode, netWorth, prevNetWorth, netWorthSinceJanTrend, investments,
   income, expenses, savingsRate, prevSavingsRate,
   incomeTrend, expenseTrend,
   ytdIncome, ytdExpenses, ytdIncomeTrend, ytdExpenseTrend, ytdSavingsRate, ytdSavingsRateTrend,
@@ -181,20 +153,19 @@ export function StatOverview({
   const nwPct = pctChange(netWorth, prevNetWorth);
   const srPct = pctChange(savingsRate, prevSavingsRate);
 
-  const nwSpark = netWorthHistory.slice(-6).map(p => p.netWorth);
-
-  // Budget Progress shows whichever budget-type set matches the currently-browsed period —
-  // Month mode's monthly budgets, Year mode's yearly ones (e.g. an annual sinking fund) — rather
-  // than re-showing the same monthly ring under a relabeled title. The other set doesn't
-  // disappear in Year mode, it demotes to the small caption under the ring (secondaryCaption).
-  const activeBudgets   = isYear ? yearlyBudgets : monthlyBudgets;
+  // Budget Progress always combines the browsed month's monthly budgets with the browsed
+  // year's yearly budgets into one "N of N" figure — a budget's on-track status isn't a
+  // monthly-vs-YTD figure the way income/expenses are, so unlike the tiles above it doesn't
+  // change with the Month/Year toggle. A budget counts as over if it's over its own current
+  // period (overBudget — e.g. blew this month's limit) OR over its annual pace (paceOverBudget
+  // — e.g. running over across the year even though this one month looks fine on its own).
+  // Pace alone would miss "over this month" whenever prior months had enough slack to keep the
+  // YTD total under the pro-rated cap; overBudget alone would miss a bad multi-month trend that
+  // never quite breaches any single month. See AnalyticsServiceImpl#getDashboard's comment.
+  const activeBudgets   = [...monthlyBudgets, ...yearlyBudgets];
   const budgetTotal     = activeBudgets.length;
-  const budgetOverCount = activeBudgets.filter(b => b.overBudget).length;
+  const budgetOverCount = activeBudgets.filter(b => b.overBudget || b.paceOverBudget).length;
   const budgetOnTrack   = budgetTotal - budgetOverCount;
-  const monthlyOnTrack  = monthlyBudgets.filter(b => !b.overBudget).length;
-  const secondaryCaption = isYear && monthlyBudgets.length > 0
-    ? `${monthlyOnTrack} monthly budget${monthlyOnTrack !== 1 ? "s" : ""} also on track`
-    : undefined;
 
   if (isLoading) {
     return (
@@ -224,7 +195,6 @@ export function StatOverview({
         label="Net Worth" value={netWorth != null ? fmt(netWorth) : "—"}
         deltaText={isYear ? formatTrendDelta(netWorthSinceJanTrend, "since Jan 1") : formatTrendDelta(nwPct)}
         deltaGood={(isYear ? netWorthSinceJanTrend : nwPct) != null ? (isYear ? netWorthSinceJanTrend! : nwPct!) >= 0 : undefined}
-        sparkColor={CHART_COLORS.primary} sparkValues={nwSpark}
         delay="delay-0"
       />
       <StatTile
@@ -257,7 +227,7 @@ export function StatOverview({
         delay="delay-300"
       />
       <BudgetProgressTile onTrack={budgetOnTrack} total={budgetTotal} alertBannerVisible={alertBannerVisible}
-        secondaryCaption={secondaryCaption} delay="delay-375" />
+        delay="delay-375" />
     </div>
   );
 }

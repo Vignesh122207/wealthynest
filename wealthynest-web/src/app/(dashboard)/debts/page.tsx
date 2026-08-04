@@ -10,6 +10,7 @@ import {QueryErrorState} from "@/components/shared/QueryErrorState";
 import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
 import {TabBar, type TabBarItem} from "@/components/ui/TabBar";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {useTabParam} from "@/hooks/useTabParam";
 import {
     useCreateDebt,
     useDebts,
@@ -26,7 +27,8 @@ import {Summary} from "./_components/Summary";
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-type Tab = "ALL" | "LENT" | "BORROWED";
+const TABS_LIST = ["ALL", "LENT", "BORROWED"] as const;
+type Tab = (typeof TABS_LIST)[number];
 
 // Matches this page's own FAB action colors ("I Lent"=emerald, "I Borrowed"=rose) — same
 // per-type template as Investments/Accounts/Transactions.
@@ -41,7 +43,7 @@ type Modal = null
 
 export default function DebtsPage() {
   const { fmt } = useAmountFormatter();
-  const [tab,       setTab]       = useState<Tab>("ALL");
+  const [tab,       setTab]       = useTabParam<Tab>(TABS_LIST, "ALL");
   const [modal,     setModal]     = useState<Modal>(null);
   const [deleteId,  setDeleteId]  = useState<string | null>(null);
   const [paymentId, setPaymentId] = useState<string | null>(null);

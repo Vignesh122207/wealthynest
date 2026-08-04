@@ -98,6 +98,40 @@ export class SettingsPage extends BasePage {
     await expect(this.page.getByText(nickname, { exact: true })).toBeVisible();
   }
 
+  // ── PIN unlock ──────────────────────────────────────────────────────────
+  /** Toggling PIN off doesn't disable it directly — it opens PinVerifyModal first (proving the
+   * current PIN), same as toggling it on opens PinSetupModal instead of flipping a boolean
+   * straight away. See PinRow.tsx's own comment. */
+  async openPinDisableVerify(): Promise<void> {
+    await this.page.getByTestId("security-pin-disable-toggle").click();
+  }
+
+  async enterPinInVerifyModal(pin: string): Promise<void> {
+    for (const digit of pin) await this.page.getByTestId(`pin-keypad-${digit}`).click();
+  }
+
+  /** The escape hatch for a PIN the user can no longer produce: skips proving the old one
+   * (PinVerifyModal's keypad) entirely and drops straight into PinSetupModal to choose a new PIN —
+   * see PinVerifyModal.tsx's own comment on why that's safe to offer unconditionally. */
+  async clickForgotPin(): Promise<void> {
+    await this.page.getByTestId("pin-verify-forgot").click();
+  }
+
+  get pinVerifyLockoutBanner() {
+    return this.page.getByTestId("lockout-banner");
+  }
+
+  /** Choose-then-confirm, same PIN both times — PinSetupModal.tsx's own two-step flow, driven via
+   * the on-screen keypad (this is the one PIN surface that never uses a native-keyboard input).
+   * Waits for the "Confirm your PIN" heading between rounds — usePinEntryFlow's own 180ms delay
+   * before advancing the step means firing both rounds back-to-back would land the second round's
+   * clicks while still on "choose" (already full, so silently dropped) instead of "confirm". */
+  async setNewPin(pin: string): Promise<void> {
+    for (const digit of pin) await this.page.getByTestId(`pin-keypad-${digit}`).click();
+    await expect(this.page.getByText("Confirm your PIN")).toBeVisible();
+    for (const digit of pin) await this.page.getByTestId(`pin-keypad-${digit}`).click();
+  }
+
   // ── Appearance ──────────────────────────────────────────────────────────
   async selectTheme(id: "light" | "dark" | "system"): Promise<void> {
     await this.page.getByTestId(`theme-option-${id}`).click();

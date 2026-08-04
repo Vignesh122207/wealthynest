@@ -10,6 +10,7 @@ import {QueryErrorState} from "@/components/shared/QueryErrorState";
 import {Card} from "@/components/ui/Card";
 import {FormInput} from "@/components/forms/FormInput";
 import {TabBar, type TabBarItem} from "@/components/ui/TabBar";
+import {useTabParam} from "@/hooks/useTabParam";
 import {GOAL_COLORS, getVaultCategoryColor} from "@/lib/categoryMeta";
 import {
   useCreateVaultItem, useDeleteVaultItem, useToggleVaultFavorite,
@@ -39,6 +40,7 @@ const TYPE_FILTERS = [
   { key: "FAVORITE" as const, label: "Favorites",  icon: Star },
 ];
 type TypeFilter = (typeof TYPE_FILTERS)[number]["key"];
+const TYPE_FILTER_KEYS = TYPE_FILTERS.map((f) => f.key);
 
 const TYPE_FILTER_COLOR: Record<TypeFilter, string> = {
   all:      "#475569",
@@ -50,7 +52,7 @@ const TYPE_FILTER_COLOR: Record<TypeFilter, string> = {
 export default function VaultPage() {
   useVaultAutoLock();
   const [search, setSearch]         = useState("");
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [typeFilter, setTypeFilter] = useTabParam<TypeFilter>(TYPE_FILTER_KEYS, "all");
   const [showCreate, setShowCreate] = useState(false);
   const [editItem, setEditItem]     = useState<VaultItem | null>(null);
   const [revealItem, setRevealItem]   = useState<VaultItem | null>(null);

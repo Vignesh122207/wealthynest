@@ -28,7 +28,7 @@ export function useLogin() {
     // No success toast — landing on /home, which greets you by name in its own GreetingBanner,
     // is already the confirmation; a toast on top of that is one more thing competing for
     // attention during a navigation that's already in flight, not new information.
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       qc.clear();
       setAuth(data.user, data.accessToken);
       // A fresh, successful login should never immediately re-show the app-lock screen — either
@@ -41,6 +41,18 @@ export function useLogin() {
       // instead", log back in with that password, and the session you just proved re-shows the
       // very lock screen you signed out to get past. unlock() clears both markers in one call.
       useAppLockStore.getState().unlock();
+      // AppLockScreen's "Sign out & use password" marks this right before signing out — a
+      // forgotten-PIN escape hatch that otherwise leaves the actual forgotten PIN untouched: the
+      // user lands back on /home just fine, but the very next lock re-shows the same PIN prompt
+      // they couldn't answer before. Route into PIN setup instead of /home so this login (which
+      // already proved the account password) closes that loop — and carry that just-typed
+      // password forward in memory so PinSetupModal doesn't have to ask for it again seconds
+      // later. Gated on pinEnabled: an account with no PIN configured has nothing to recover.
+      if (useAppLockStore.getState().consumePinRecoveryPending() && data.user.pinEnabled) {
+        useAppLockStore.getState().setPendingPinResetPassword(variables.password);
+        router.replace("/settings/security?resetPin=1");
+        return;
+      }
       // replace, not push: this device's WebView history (which Android's hardware back button
       // navigates through — see useHardwareBackButton) must not keep /login reachable by going
       // back from /home right after signing in. Real bug this fixes: sign in with Google, press
@@ -166,7 +178,10 @@ export function useResetPassword() {
 export function useEnablePin() {
   const { user, setUser } = useAuthStore();
   return useMutation({
-    mutationFn: (pin: string) => authApi.enablePin(pin),
+    // currentPassword is only ever populated when this is replacing an already-set PIN (see
+    // auth.api.ts#enablePin's own comment) — undefined on ordinary first-time setup.
+    mutationFn: ({ pin, currentPassword }: { pin: string; currentPassword?: string }) =>
+      authApi.enablePin(pin, currentPassword),
     onSuccess: () => {
       if (user) setUser({ ...user, pinEnabled: true });
       toast.success("PIN unlock enabled");

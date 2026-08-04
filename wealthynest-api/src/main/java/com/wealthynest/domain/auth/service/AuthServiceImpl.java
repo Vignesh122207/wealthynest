@@ -48,10 +48,12 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -270,7 +272,7 @@ public class AuthServiceImpl implements AuthService {
             // ever redeems.
             User user = userRepository.findById(stored.getUserId())
                     .orElseThrow(() -> new BusinessException("User not found", HttpStatus.NOT_FOUND));
-            return buildAuthResponse(user, stored.isRememberMe(), ipAddress, userAgent);
+            return buildAuthResponse(user, stored.isRememberMe(), ipAddress, userAgent, stored.getSessionId());
         }
         if (stored.getExpiresAt().isBefore(Instant.now())) {
             throw new BusinessException("Refresh token expired or revoked", HttpStatus.UNAUTHORIZED, "TOKEN_EXPIRED");
@@ -280,7 +282,7 @@ public class AuthServiceImpl implements AuthService {
         refreshTokenRepository.save(stored);
         User user = userRepository.findById(stored.getUserId())
                 .orElseThrow(() -> new BusinessException("User not found", HttpStatus.NOT_FOUND));
-        return buildAuthResponse(user, stored.isRememberMe(), ipAddress, userAgent);
+        return buildAuthResponse(user, stored.isRememberMe(), ipAddress, userAgent, stored.getSessionId());
     }
 
     @Override
@@ -288,10 +290,26 @@ public class AuthServiceImpl implements AuthService {
     public void logout(String refreshToken, String ipAddress, String userAgent) {
         String tokenHash = hashToken(refreshToken);
         refreshTokenRepository.findByTokenHash(tokenHash).ifPresent(t -> {
-            t.setRevoked(true);
-            refreshTokenRepository.save(t);
+            // Not just this one row — the grace-window race in refresh() can leave a still-valid
+            // sibling row under the same sessionId (see that path's own comment: "harmless... one
+            // extra valid-but-unused token"). Harmless while the session is still alive, but
+            // revoking only the presented row here left that sibling behind, un-revoked, so
+            // listSessions kept showing this session as active — for as long as the sibling's own
+            // TTL, up to 30 days for a remembered session — even after a real, explicit logout.
+            revokeSessionLineage(t.getUserId(), t.getSessionId());
             auditService.log(t.getUserId(), "LOGOUT", "USER", t.getUserId(), null, null, ipAddress, userAgent);
         });
+    }
+
+    // Revokes every row sharing a session's lineage — see sessionId's own comment on RefreshToken
+    // for why a session can span more than one row. Shared by every path that means to end a
+    // session outright (logout, a fresh login cleaning up this device's previous one), as opposed
+    // to an ordinary rotation (refresh/pinLogin), which revokes only the one row being rotated
+    // forward and deliberately leaves the rest of the lineage (including any such sibling) alone.
+    private void revokeSessionLineage(UUID userId, UUID sessionId) {
+        List<RefreshToken> tokens = refreshTokenRepository.findByUserIdAndSessionId(userId, sessionId);
+        tokens.forEach(t -> t.setRevoked(true));
+        refreshTokenRepository.saveAll(tokens);
     }
 
     @Override
@@ -439,16 +457,35 @@ public class AuthServiceImpl implements AuthService {
         auditService.log(user.getId(), "PASSWORD_RESET", "USER", user.getId(), null, null, ipAddress, userAgent);
     }
 
-    // Deliberately no current-password step-up check here (unlike changeEmail/changePassword,
-    // which both verify one) — a conscious product call, not an oversight: whoever already holds
-    // this authenticated session can set up PIN unlock directly. The real cost is that anyone
-    // holding an already-unlocked device for a few seconds could plant their own PIN as a
-    // persistent backdoor, which a password re-entry step would have blocked.
+    // Deliberately no current-password step-up check on FIRST-TIME setup (pinHash still null) —
+    // a conscious product call, not an oversight: whoever already holds this authenticated session
+    // can set up PIN unlock directly, since there's no existing protection yet for a backdoor PIN
+    // to bypass. Replacing an already-set PIN is the different, more sensitive case: without a
+    // password check here, "Forgot your PIN?" (which deliberately skips proving the OLD pin — see
+    // PinVerifyModal's own comment) would let anyone holding an already-unlocked device silently
+    // swap in their own PIN, same risk disablePin's own step-up guards against, and worse — the
+    // account still shows PIN unlock as "ENABLED" throughout, so the real owner has no visible sign
+    // anything changed until their own PIN stops working.
     @Override
     @Transactional
     public void enablePin(UUID userId, EnablePinRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException("User not found", HttpStatus.NOT_FOUND));
+        if (user.getPinHash() != null) {
+            if (user.getPasswordHash() == null) {
+                // Google-only account (never set a local password) with a PIN already configured
+                // — passwordEncoder.matches() requires a non-null encoded value, so this has to be
+                // its own branch rather than falling into the mismatch case below.
+                throw new BusinessException(
+                        "Resetting your PIN needs your account password — set one in Settings first.",
+                        HttpStatus.BAD_REQUEST);
+            }
+            String currentPassword = request.getCurrentPassword();
+            if (currentPassword == null || currentPassword.isBlank()
+                    || !passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+                throw new BusinessException("Current password is incorrect", HttpStatus.BAD_REQUEST, "WRONG_PASSWORD");
+            }
+        }
         user.setPinHash(passwordEncoder.encode(request.getPin()));
         user.setPinEnabledAt(Instant.now());
         user.setPinFailedAttempts(0);
@@ -559,7 +596,7 @@ public class AuthServiceImpl implements AuthService {
         refreshTokenRepository.save(stored);
 
         auditService.log(user.getId(), "PIN_LOGIN_SUCCESS", "USER", user.getId(), null, null, ipAddress, userAgent);
-        return buildAuthResponse(user, stored.isRememberMe(), ipAddress, userAgent);
+        return buildAuthResponse(user, stored.isRememberMe(), ipAddress, userAgent, stored.getSessionId());
     }
 
     // failedAction distinguishes which flow the failure came from (login vs disable-verification)
@@ -601,33 +638,44 @@ public class AuthServiceImpl implements AuthService {
         if (rawToken == null || rawToken.isBlank()) return;
         refreshTokenRepository.findByTokenHash(hashToken(rawToken))
                 .filter(t -> t.getUserId().equals(userId))
-                .ifPresent(t -> { t.setRevoked(true); refreshTokenRepository.save(t); });
+                .ifPresent(t -> revokeSessionLineage(t.getUserId(), t.getSessionId()));
     }
 
     @Override
     public List<SessionResponse> listSessions(UUID userId, String currentRefreshToken) {
         String currentHash = currentRefreshToken != null && !currentRefreshToken.isBlank()
                 ? hashToken(currentRefreshToken) : null;
-        return refreshTokenRepository.findByUserIdAndRevokedFalseAndExpiresAtAfterOrderByCreatedAtDesc(userId, Instant.now())
-                .stream()
-                .map(t -> SessionResponse.builder()
-                        .id(t.getId())
-                        .ipAddress(t.getIpAddress())
-                        .userAgent(t.getUserAgent())
-                        .createdAt(t.getCreatedAt())
-                        .expiresAt(t.getExpiresAt())
-                        .current(currentHash != null && currentHash.equals(t.getTokenHash()))
-                        .build())
+        List<RefreshToken> tokens = refreshTokenRepository
+                .findByUserIdAndRevokedFalseAndExpiresAtAfterOrderByCreatedAtDesc(userId, Instant.now());
+        // Grouped by sessionId (not row id) — the grace-window race path in refresh() can leave
+        // several rows for what's really one device/session (see sessionId's own comment on
+        // RefreshToken); collapse those back into a single "Active sessions" entry.
+        Map<UUID, List<RefreshToken>> bySession = tokens.stream()
+                .collect(Collectors.groupingBy(RefreshToken::getSessionId, LinkedHashMap::new, Collectors.toList()));
+        return bySession.values().stream()
+                .map(group -> {
+                    RefreshToken latest = group.get(0); // input is createdAt desc, so this is the newest in the group
+                    boolean current = currentHash != null
+                            && group.stream().anyMatch(t -> currentHash.equals(t.getTokenHash()));
+                    return SessionResponse.builder()
+                            .id(latest.getSessionId())
+                            .ipAddress(latest.getIpAddress())
+                            .userAgent(latest.getUserAgent())
+                            .createdAt(latest.getCreatedAt())
+                            .expiresAt(latest.getExpiresAt())
+                            .current(current)
+                            .build();
+                })
                 .toList();
     }
 
     @Override
     @Transactional
     public void revokeSession(UUID userId, UUID sessionId) {
-        RefreshToken token = refreshTokenRepository.findByIdAndUserId(sessionId, userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Session", "id", sessionId));
-        token.setRevoked(true);
-        refreshTokenRepository.save(token);
+        if (!refreshTokenRepository.existsByUserIdAndSessionId(userId, sessionId)) {
+            throw new ResourceNotFoundException("Session", "id", sessionId);
+        }
+        revokeSessionLineage(userId, sessionId);
     }
 
     @Override
@@ -826,12 +874,21 @@ public class AuthServiceImpl implements AuthService {
         emailService.sendVerificationEmail(user.getEmail(), user.getFullName(), link);
     }
 
+    // Fresh login (password/Google/passkey) — starts a brand-new session lineage.
     private AuthResponse buildAuthResponse(User user, boolean rememberMe, String ipAddress, String userAgent) {
+        return buildAuthResponse(user, rememberMe, ipAddress, userAgent, UUID.randomUUID());
+    }
+
+    // Rotation of an existing session (refresh/PIN unlock, including the grace-window race path)
+    // — carries the prior row's sessionId forward so listSessions can group them back into one
+    // device entry; see sessionId's own comment on RefreshToken.
+    private AuthResponse buildAuthResponse(User user, boolean rememberMe, String ipAddress, String userAgent, UUID sessionId) {
         String accessToken  = jwtTokenProvider.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name());
         long refreshTtlMs   = rememberMe ? jwtProperties.getRefreshTokenExpiryMs() : SHORT_REFRESH_TTL_MS;
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), user.getEmail(), refreshTtlMs);
         refreshTokenRepository.save(RefreshToken.builder()
                 .userId(user.getId())
+                .sessionId(sessionId)
                 .tokenHash(hashToken(refreshToken))
                 .expiresAt(Instant.now().plusMillis(refreshTtlMs))
                 .rememberMe(rememberMe)

@@ -48,7 +48,7 @@ const authResponse: AuthResponse = {
 beforeEach(() => {
   vi.clearAllMocks();
   useAuthStore.setState({ user: null, accessToken: null, isAuthenticated: false, userVersion: 0 });
-  useAppLockStore.setState({ isLocked: false });
+  useAppLockStore.setState({ isLocked: false, pinRecoveryPending: false, pendingPinResetPassword: null });
   localStorage.clear();
 });
 
@@ -140,6 +140,52 @@ describe("useLogin", () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  // Regression coverage for a real gap: AppLockScreen's "Sign out & use password" escape hatch
+  // got the user back into the app, but never touched the forgotten PIN itself — the very next
+  // lock re-showed the same PIN prompt they couldn't answer before. See appLock.store's own
+  // comment on pinRecoveryPending/pendingPinResetPassword for the full mechanism.
+  describe("pinRecoveryPending redirect", () => {
+    it("redirects to PIN setup instead of /home, carrying the just-typed password forward, when recovering and the account has a PIN", async () => {
+      useAppLockStore.setState({ pinRecoveryPending: true });
+      mockedApi.login.mockResolvedValue({ accessToken: "at", user: { ...baseUser, pinEnabled: true } } as AuthResponse);
+      const { Wrapper } = createQueryClientWrapper();
+
+      const { result } = renderHook(() => useLogin(), { wrapper: Wrapper });
+      result.current.mutate({ email: "a@x.com", password: "Pass1234" });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(replaceMock).toHaveBeenCalledWith("/settings/security?resetPin=1");
+      expect(replaceMock).not.toHaveBeenCalledWith("/home");
+      expect(useAppLockStore.getState().pendingPinResetPassword).toBe("Pass1234");
+      // One-shot — a later, unrelated login must not redirect again.
+      expect(useAppLockStore.getState().pinRecoveryPending).toBe(false);
+    });
+
+    it("still redirects to /home when recovering but the account has no PIN configured", async () => {
+      useAppLockStore.setState({ pinRecoveryPending: true });
+      mockedApi.login.mockResolvedValue({ accessToken: "at", user: { ...baseUser, pinEnabled: false } } as AuthResponse);
+      const { Wrapper } = createQueryClientWrapper();
+
+      const { result } = renderHook(() => useLogin(), { wrapper: Wrapper });
+      result.current.mutate({ email: "a@x.com", password: "Pass1234" });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(replaceMock).toHaveBeenCalledWith("/home");
+      expect(useAppLockStore.getState().pendingPinResetPassword).toBeNull();
+    });
+
+    it("redirects to /home as normal on an ordinary login with no recovery pending", async () => {
+      mockedApi.login.mockResolvedValue({ accessToken: "at", user: { ...baseUser, pinEnabled: true } } as AuthResponse);
+      const { Wrapper } = createQueryClientWrapper();
+
+      const { result } = renderHook(() => useLogin(), { wrapper: Wrapper });
+      result.current.mutate({ email: "a@x.com", password: "Pass1234" });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(replaceMock).toHaveBeenCalledWith("/home");
+    });
   });
 });
 
@@ -319,11 +365,23 @@ describe("useEnablePin / useDisablePin", () => {
     const { Wrapper } = createQueryClientWrapper();
 
     const { result } = renderHook(() => useEnablePin(), { wrapper: Wrapper });
-    result.current.mutate("1234");
+    result.current.mutate({ pin: "1234" });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(useAuthStore.getState().user?.pinEnabled).toBe(true);
-    expect(mockedApi.enablePin).toHaveBeenCalledWith("1234");
+    expect(mockedApi.enablePin).toHaveBeenCalledWith("1234", undefined);
+  });
+
+  it("useEnablePin passes currentPassword through when replacing an existing PIN", async () => {
+    useAuthStore.setState({ user: { ...baseUser, pinEnabled: true } });
+    mockedApi.enablePin.mockResolvedValue(undefined as never);
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useEnablePin(), { wrapper: Wrapper });
+    result.current.mutate({ pin: "5678", currentPassword: "hunter2" });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedApi.enablePin).toHaveBeenCalledWith("5678", "hunter2");
   });
 
   it("useDisablePin sets pinEnabled=false on the user, passing the confirmed PIN through", async () => {

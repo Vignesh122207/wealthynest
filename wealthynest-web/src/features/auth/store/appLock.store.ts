@@ -104,13 +104,42 @@ interface AppLockState {
   isLocked: boolean;
   lock:   () => void;
   unlock: () => void;
+  // One-shot marker set by AppLockScreen's "Sign out & use password" right before it signs out —
+  // and the password the very next successful login then carries forward, in memory only, so the
+  // PIN-setup screen it redirects to doesn't have to ask for it a second time seconds later. Both
+  // survive the in-app router.push()/replace() chain this flow is entirely made of (logout →
+  // /login → useLogin's own redirect), same as isLocked itself already does — see its own comment
+  // — but neither is ever persisted to localStorage: a real page reload mid-flow should drop back
+  // to the ordinary "forgot your PIN? enter your password" prompt, not silently resume with a
+  // stale password sitting around.
+  pinRecoveryPending: boolean;
+  markPinRecoveryPending: () => void;
+  consumePinRecoveryPending: () => boolean;
+  pendingPinResetPassword: string | null;
+  setPendingPinResetPassword: (password: string) => void;
+  consumePendingPinResetPassword: () => string | null;
 }
 
-export const useAppLockStore = create<AppLockState>((set) => ({
+export const useAppLockStore = create<AppLockState>((set, get) => ({
   isLocked: false,
   lock:   () => set({ isLocked: true }),
   // Only a real unlock clears the persisted marker — a mount that finds it still stale (e.g. a
   // refresh while the lock screen is up, before the user has actually unlocked) must keep
   // re-locking, not just once.
   unlock: () => { clearPersistedHiddenAt(); set({ isLocked: false }); },
+
+  pinRecoveryPending: false,
+  markPinRecoveryPending: () => set({ pinRecoveryPending: true }),
+  consumePinRecoveryPending: () => {
+    const value = get().pinRecoveryPending;
+    if (value) set({ pinRecoveryPending: false });
+    return value;
+  },
+  pendingPinResetPassword: null,
+  setPendingPinResetPassword: (password) => set({ pendingPinResetPassword: password }),
+  consumePendingPinResetPassword: () => {
+    const value = get().pendingPinResetPassword;
+    if (value !== null) set({ pendingPinResetPassword: null });
+    return value;
+  },
 }));
