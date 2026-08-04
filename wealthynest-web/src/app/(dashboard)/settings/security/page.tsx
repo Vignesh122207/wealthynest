@@ -281,6 +281,11 @@ function PasskeyRow() {
   const { mutate: deletePasskey } = useDeletePasskey();
   const [showAdd, setShowAdd] = useState(false);
   const enabled = passkeys.length > 0;
+  // On native, NativeBiometricRow already covers "unlock instantly" for opening the app — this
+  // row's job there is the credential Vault reveal/export actually checks (VaultStepUpFields only
+  // accepts a real passkey, never the bare local BiometricPrompt), so the copy needs to say that
+  // instead of repeating NativeBiometricRow's pitch back at the user as if it were a duplicate.
+  const isNative = useIsNativePlatform();
 
   return (
     <div>
@@ -303,7 +308,11 @@ function PasskeyRow() {
               } />
             )}
           </p>
-          <p className="text-xs text-muted-foreground mt-0.5">Unlock instantly with your fingerprint, face, or screen lock — no separate biometric setup, it&apos;s all part of the passkey</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {isNative
+              ? "Required to unlock Vault items and other sensitive actions with your fingerprint — separate from the app unlock toggle above"
+              : "Unlock instantly with your fingerprint, face, or screen lock — no separate biometric setup, it's all part of the passkey"}
+          </p>
         </div>
         <button onClick={() => setShowAdd(true)} data-testid="security-passkey-add-toggle"
           className="h-9 px-3.5 rounded-xl text-xs font-medium bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 dark:text-brand-300 border border-brand-500/20 transition-colors shrink-0">
@@ -337,14 +346,26 @@ function PasskeyRow() {
   );
 }
 
-// Chooses which biometric row applies to this platform — never both (see AppLockScreen's own
-// comment for why: native's plain BiometricPrompt and a browser passkey both claim the same
-// physical sensor, so offering both on one platform would be a confusing, redundant choice).
+// AppLockScreen deliberately offers only one biometric CTA at a time (native BiometricPrompt and
+// a passkey both claim the same physical sensor for that single "unlock the lock screen" action),
+// but that doesn't hold here: NativeBiometricRow is a local-only app-lock re-proof, while
+// PasskeyRow registers a real server-verified credential — the only fingerprint-style option
+// VaultStepUpFields accepts for reveal/export (see its own comment for why bare native biometric
+// isn't enough there). Gating PasskeyRow out entirely on native left Android with no way to ever
+// register a passkey, which made the vault's "Use passkey instead" option permanently unreachable
+// there — so both rows render on native, each gated on its own availability check.
 function BiometricRow() {
   const isNative = useIsNativePlatform();
   const supported = useWebAuthnSupport();
 
-  if (isNative) return <NativeBiometricRow />;
+  if (isNative) {
+    return (
+      <>
+        <NativeBiometricRow />
+        {supported && <PasskeyRow />}
+      </>
+    );
+  }
   if (!supported) return null;
   return <PasskeyRow />;
 }
