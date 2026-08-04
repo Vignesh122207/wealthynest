@@ -17,12 +17,14 @@ test.describe("Forgot PIN reset", () => {
   let context: BrowserContext;
   let page: Page;
   let accessToken: string;
+  let password: string;
   let settings: SettingsPage;
   let appLock: AppLockScreen;
 
   test.beforeAll(async ({ browser }) => {
     const user = await provisionE2EUser({ fullName: "Forgot Pin Test" });
     accessToken = user.auth.accessToken;
+    password = user.password;
     await api.enablePin(accessToken, user.password, "1111");
 
     context = await browser.newContext();
@@ -42,9 +44,10 @@ test.describe("Forgot PIN reset", () => {
 
   // Regression coverage for a real gap: turning PIN off (PinRow's toggle) only ever opened
   // PinVerifyModal, which requires re-entering the CURRENT pin — a dead end for anyone who
-  // actually forgot it, with no other way in the product to reset one. AuthServiceImpl#enablePin
-  // already needs no proof of the old PIN (see its own comment), so "Forgot your PIN?" here is
-  // just surfacing that existing capability, not a new, weaker path.
+  // actually forgot it, with no other way in the product to reset one. "Forgot your PIN?" skips
+  // that OLD-pin proof, but AuthServiceImpl#enablePin now requires the account PASSWORD instead
+  // when replacing an already-set PIN (see its own comment) — PinSetupModal's password step-up
+  // screen below is that check surfacing in the UI, not an extra hoop this test invented.
   test("Forgot your PIN? sets a new PIN without the old one, and the new PIN — not the old one — actually unlocks the app @regression", async () => {
     // useAppLockTrigger's actual BACKGROUND_GRACE_MS is 90s (see app-lock.spec.ts's own comment on
     // its identical wait) — test.slow()'s 3x multiplier isn't enough headroom on top of a 91s wait
@@ -64,6 +67,7 @@ test.describe("Forgot PIN reset", () => {
     }
     await settings.openPinDisableVerify();
     await settings.clickForgotPin();
+    await settings.confirmPasswordForPinReset(password);
     await settings.setNewPin("2222");
 
     // Back on Security with the modal closed, PIN still shown as enabled — this reset it in

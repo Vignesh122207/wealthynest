@@ -59,7 +59,9 @@ test.describe("App Lock & PIN", () => {
     await appLock.goForeground();
 
     await appLock.expectVisible();
-    await expect(page).toHaveURL(/\/accounts$/); // still here — not bounced to /home or /login
+    // still here — not bounced to /home or /login. useTabParam (Accounts' section-filter tabs)
+    // writes its own ?tab= param on first render, so the URL isn't bare /accounts any more.
+    await expect(page).toHaveURL(/\/accounts\?tab=all$/);
   });
 
   test("a wrong PIN shows an error and leaves the lock in place @regression", async () => {
@@ -71,7 +73,7 @@ test.describe("App Lock & PIN", () => {
   test("the correct PIN clears the lock without losing the page or its data @regression", async () => {
     await appLock.unlockWithPin("1234");
     await appLock.expectNotVisible();
-    await expect(page).toHaveURL(/\/accounts$/);
+    await expect(page).toHaveURL(/\/accounts\?tab=all$/);
     // The header title surviving (not a blank/loading page) is the tell for "no reload happened" —
     // a real navigation or full remount would show a loading state here, not instant content.
     await accounts.expectHeaderTitle(/Accounts/i);

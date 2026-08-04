@@ -104,10 +104,11 @@ test.describe("Home dashboard — dynamic reflow", () => {
     await expect(home.periodNavLabel).toHaveText(/^\d{4}$/); // just the year, no month
     await expect(page.getByText("YTD Income")).toBeVisible();
     await expect(page.getByText("YTD Expenses")).toBeVisible();
-    // No YEARLY-type budget was ever seeded in this file, so Year mode's ring — a different
-    // dataset than Month's — has nothing to show, proving it actually swapped rather than just
-    // relabeling the same monthly count.
-    await expect(home.budgetProgressCaption).toHaveText("—");
+    // Budget Progress is deliberately period-toggle-independent (see StatOverview's own comment
+    // on activeBudgets) — a budget's on-track status isn't a monthly-vs-YTD figure the way
+    // income/expenses are, so it still counts the one MONTHLY budget seeded above in Year mode
+    // too, unlike every other tile on this page which swaps datasets with the toggle.
+    await expect(home.budgetProgressCaption).toHaveText("0 of 1");
     // Upcoming Bills is deliberately period-blind — same (absent) either way here.
     expect(await home.upcomingBillsCard.isVisible()).toBe(billsVisibleBefore);
 
@@ -117,6 +118,15 @@ test.describe("Home dashboard — dynamic reflow", () => {
   });
 
   test("pace-to-save forecast hides on a past month and reappears on the current month @regression", async () => {
+    // getPaceForecast (home.utils.ts) returns null before day 5 of the month — too few days of
+    // real spend to extrapolate a stable pace (see its own comment) — so asserting the forecast
+    // is visible "on the current month" would fail every 1st-4th of the month regardless of the
+    // app behaving correctly. Pin the browser clock to day 15 of the real current month/year
+    // (same period the expenses seeded in beforeAll query against) instead of whatever day this
+    // actually runs on.
+    const now = new Date();
+    await page.clock.install({ time: new Date(now.getFullYear(), now.getMonth(), 15) });
+
     await home.gotoHome();
     await expect(page.getByText("pace to save this month")).toBeVisible();
 
