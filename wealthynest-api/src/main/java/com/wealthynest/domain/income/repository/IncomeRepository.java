@@ -13,6 +13,10 @@ import java.util.UUID;
 
 @Repository
 public interface IncomeRepository extends JpaRepository<IncomeEntry, UUID> {
+
+    /** Cheap EXISTS check — used to decide whether an account has any history before allowing delete. */
+    boolean existsByAccountId(UUID accountId);
+
     List<IncomeEntry> findByUserIdAndDebtFalseOrderByIncomeDateDesc(UUID userId);
     List<IncomeEntry> findByUserIdOrderByIncomeDateDesc(UUID userId);
     List<IncomeEntry> findByUserIdAndPeriodYearAndPeriodMonthAndDebtFalseOrderByIncomeDateDesc(UUID userId, int year, int month);
@@ -43,12 +47,4 @@ public interface IncomeRepository extends JpaRepository<IncomeEntry, UUID> {
 
     @Query("SELECT i FROM IncomeEntry i WHERE i.userId = :userId AND i.periodYear = :year AND i.debt = false ORDER BY i.incomeDate DESC")
     List<IncomeEntry> findByUserAndYear(@Param("userId") UUID userId, @Param("year") int year);
-
-    @Modifying
-    @Query("UPDATE IncomeEntry i SET i.accountId = null WHERE i.accountId = :accountId")
-    void clearAccountId(@Param("accountId") UUID accountId);
-
-    /** Used instead of clearAccountId when the user opts to delete a closed account's income
-     * entries outright rather than keep them as detached history. */
-    void deleteByAccountId(UUID accountId);
 }

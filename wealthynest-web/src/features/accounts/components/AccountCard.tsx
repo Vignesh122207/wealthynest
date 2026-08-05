@@ -24,6 +24,8 @@ import {
   Wifi,
 } from "lucide-react";
 import {ACCOUNT_TYPE_META} from "@/lib/accountTypeMeta";
+import {PURPOSE_CHIP_CLASS, resolvePurposeLabel} from "@/lib/accountPurposeMeta";
+import {getLifecycleStatusMeta} from "@/lib/lifecycleStatusMeta";
 import {BankLogo} from "@/components/icons/BankLogo";
 import {lighten} from "@/components/icons/PremiumIcon";
 import {getBankMonogram} from "@/lib/bankLogos";
@@ -102,6 +104,8 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
 }) {
   const { fmt } = useAmountFormatter();
   const isCreditCard = account.accountType === "CREDIT_CARD";
+  const statusMeta = getLifecycleStatusMeta(account.status);
+  const purpose = resolvePurposeLabel(account.purpose, account.purposeLabel);
   const [revealAcctNum, setRevealAcctNum] = useState(false);
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
@@ -226,6 +230,11 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
               </div>
             </div>
             <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+              {statusMeta && (
+                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-white/15 text-white/80">
+                  {statusMeta.label}
+                </span>
+              )}
               {daysUntilDue !== null && (
                 <span className={cn("text-[9px] font-bold px-2 py-0.5 rounded-full",
                   dueUrgent ? "bg-red-900/60 text-red-200" : "bg-white/15 text-white/80")}>
@@ -337,8 +346,18 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
         <div className="flex items-center gap-3">
           <BankLogo name={account.bankName} fallbackIcon={meta.icon} fallbackHex={meta.hex} size="md" className="w-10 h-10" />
           <div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 flex-wrap">
               <p className="text-sm font-semibold text-foreground">{account.name}</p>
+              {statusMeta && (
+                <span className={cn("shrink-0 text-[9px] font-bold uppercase tracking-wide rounded-full px-1.5 py-0.5", statusMeta.chipClass)}>
+                  {statusMeta.label}
+                </span>
+              )}
+              {purpose && (
+                <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide", PURPOSE_CHIP_CLASS)}>
+                  {purpose}
+                </span>
+              )}
               {account.accountType === "BANK_ACCOUNT" && (
                 account.primary ? (
                   <span title="Primary account"
@@ -391,15 +410,11 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
               <Upload className="w-3.5 h-3.5" />
             </button>
           )}
-          {(account.accountType === "EMERGENCY_FUND" || account.accountType === "INVESTMENT")
-            ? renderActions([
-                { key: "transfer", label: "Transfer", icon: ArrowLeftRight, color: "text-indigo-500", onClick: onTransfer },
-              ])
-            : renderActions([
-                { key: "expense", label: "Add Expense", icon: Receipt,        color: "text-red-500",     onClick: onAddExpense },
-                { key: "income",  label: "Add Income",  icon: Banknote,       color: "text-emerald-500", onClick: onAddMoney },
-                { key: "transfer", label: "Transfer",   icon: ArrowLeftRight, color: "text-indigo-500",  onClick: onTransfer },
-              ])}
+          {renderActions([
+            { key: "expense", label: "Add Expense", icon: Receipt,        color: "text-red-500",     onClick: onAddExpense },
+            { key: "income",  label: "Add Income",  icon: Banknote,       color: "text-emerald-500", onClick: onAddMoney },
+            { key: "transfer", label: "Transfer",   icon: ArrowLeftRight, color: "text-indigo-500",  onClick: onTransfer },
+          ])}
         </div>
       </div>
 

@@ -237,7 +237,7 @@ export default function DashboardPage() {
   };
 
   const trend          = data?.monthlyTrend ?? [];
-  const hasInvestments = investments.some(i => i.active);
+  const hasInvestments = investments.some(i => i.status === "ACTIVE");
   const incomeTrend    = pctChange(data?.monthlyIncome, prevData?.monthlyIncome);
   const expenseTrend   = pctChange(data?.monthlyExpenses, prevData?.monthlyExpenses);
   // Not derived from the dashboard endpoint's totalNetWorth: that field ignores

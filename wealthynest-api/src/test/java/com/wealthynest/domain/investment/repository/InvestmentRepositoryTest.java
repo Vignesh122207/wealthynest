@@ -1,9 +1,8 @@
 package com.wealthynest.domain.investment.repository;
 
+import com.wealthynest.common.entity.LifecycleStatus;
 import com.wealthynest.domain.account.entity.AccountType;
 import com.wealthynest.domain.account.entity.WalletAccount;
-import com.wealthynest.domain.asset.entity.Asset;
-import com.wealthynest.domain.asset.entity.AssetType;
 import com.wealthynest.domain.investment.entity.Investment;
 import com.wealthynest.domain.investment.entity.InvestmentType;
 import com.wealthynest.domain.investment.entity.StockPriceCache;
@@ -17,7 +16,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -46,19 +44,11 @@ class InvestmentRepositoryTest extends AbstractRepositoryTest {
         entityManager.flush();
     }
 
-    private Asset persistAsset(AssetType type) {
-        Asset asset = Asset.builder().userId(userId).name(type.name()).assetType(type)
-                .currentValue(BigDecimal.ZERO).asOfDate(LocalDate.now()).build();
-        entityManager.persist(asset);
-        return asset;
-    }
-
     private Investment persistInvestment(InvestmentType type, String symbol, BigDecimal units,
-                                          BigDecimal investedAmount, BigDecimal currentValue, boolean active) {
-        Asset asset = persistAsset(AssetType.STOCK);
-        Investment i = Investment.builder().userId(userId).assetId(asset.getId()).investmentType(type)
+                                          BigDecimal investedAmount, BigDecimal currentValue, LifecycleStatus status) {
+        Investment i = Investment.builder().userId(userId).investmentType(type)
                 .symbol(symbol).units(units).investedAmount(investedAmount).currentValue(currentValue)
-                .active(active).build();
+                .status(status).build();
         entityManager.persist(i);
         return i;
     }
@@ -73,10 +63,9 @@ class InvestmentRepositoryTest extends AbstractRepositoryTest {
         @DisplayName("sumCurrentValueByUser only counts active investments for that user")
         void sumCurrentValueOnlyActive() {
             persistInvestment(InvestmentType.STOCK, "INFY", new BigDecimal("10"),
-                    new BigDecimal("1000"), new BigDecimal("1200"), true);
+                    new BigDecimal("1000"), new BigDecimal("1200"), LifecycleStatus.ACTIVE);
             persistInvestment(InvestmentType.STOCK, "TCS", new BigDecimal("5"),
-                    new BigDecimal("500"), new BigDecimal("600"), false); // inactive — excluded
-            entityManager.flush();
+                    new BigDecimal("500"), new BigDecimal("600"), LifecycleStatus.ARCHIVED); // excluded
 
             BigDecimal sum = investmentRepository.sumCurrentValueByUser(userId);
 
@@ -101,11 +90,11 @@ class InvestmentRepositoryTest extends AbstractRepositoryTest {
             UUID user2Id = user2.getId();
 
             persistInvestment(InvestmentType.STOCK, "INFY", new BigDecimal("10"),
-                    new BigDecimal("1000"), new BigDecimal("1200"), true);
-            Asset asset2 = persistAsset(AssetType.STOCK);
-            Investment i2 = Investment.builder().userId(user2Id).assetId(asset2.getId())
+                    new BigDecimal("1000"), new BigDecimal("1200"), LifecycleStatus.ACTIVE);
+            Investment i2 = Investment.builder().userId(user2Id)
                     .investmentType(InvestmentType.STOCK).symbol("TCS").units(new BigDecimal("5"))
-                    .investedAmount(new BigDecimal("500")).currentValue(new BigDecimal("800")).active(true).build();
+                    .investedAmount(new BigDecimal("500")).currentValue(new BigDecimal("800"))
+                    .status(LifecycleStatus.ACTIVE).build();
             entityManager.persist(i2);
             entityManager.flush();
 
@@ -118,7 +107,7 @@ class InvestmentRepositoryTest extends AbstractRepositoryTest {
         @DisplayName("sumInvestedAmountByUser sums invested_amount, not current_value, for active rows")
         void sumInvestedAmountUsesInvestedAmountColumn() {
             persistInvestment(InvestmentType.STOCK, "INFY", new BigDecimal("10"),
-                    new BigDecimal("1000"), new BigDecimal("1500"), true);
+                    new BigDecimal("1000"), new BigDecimal("1500"), LifecycleStatus.ACTIVE);
 
             BigDecimal sum = investmentRepository.sumInvestedAmountByUser(userId);
 
@@ -133,40 +122,40 @@ class InvestmentRepositoryTest extends AbstractRepositoryTest {
     class TypedLoadTests {
 
         @Test
-        @DisplayName("findByInvestmentTypeAndActiveTrue filters by type and excludes inactive rows")
+        @DisplayName("findByInvestmentTypeAndStatus filters by type and excludes non-active rows")
         void findByTypeExcludesInactive() {
             persistInvestment(InvestmentType.STOCK, "INFY", new BigDecimal("10"),
-                    new BigDecimal("1000"), new BigDecimal("1200"), true);
+                    new BigDecimal("1000"), new BigDecimal("1200"), LifecycleStatus.ACTIVE);
             persistInvestment(InvestmentType.MUTUAL_FUND, "MF1", new BigDecimal("100"),
-                    new BigDecimal("1000"), new BigDecimal("1100"), true);
+                    new BigDecimal("1000"), new BigDecimal("1100"), LifecycleStatus.ACTIVE);
             persistInvestment(InvestmentType.STOCK, "TCS", new BigDecimal("5"),
-                    new BigDecimal("500"), new BigDecimal("600"), false);
+                    new BigDecimal("500"), new BigDecimal("600"), LifecycleStatus.CLOSED);
 
-            List<Investment> stocks = investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK);
+            List<Investment> stocks = investmentRepository.findByInvestmentTypeAndStatus(InvestmentType.STOCK, LifecycleStatus.ACTIVE);
 
             assertThat(stocks).extracting(Investment::getSymbol).containsExactly("INFY");
         }
 
         @Test
-        @DisplayName("findByUserIdAndSymbolAndInvestmentTypeAndActiveTrue finds the exact active holding")
+        @DisplayName("findByUserIdAndSymbolAndInvestmentTypeAndStatus finds the exact active holding")
         void findExactActiveHolding() {
             persistInvestment(InvestmentType.STOCK, "INFY", new BigDecimal("10"),
-                    new BigDecimal("1000"), new BigDecimal("1200"), true);
+                    new BigDecimal("1000"), new BigDecimal("1200"), LifecycleStatus.ACTIVE);
 
             Optional<Investment> found = investmentRepository
-                    .findByUserIdAndSymbolAndInvestmentTypeAndActiveTrue(userId, "INFY", InvestmentType.STOCK);
+                    .findByUserIdAndSymbolAndInvestmentTypeAndStatus(userId, "INFY", InvestmentType.STOCK, LifecycleStatus.ACTIVE);
 
             assertThat(found).isPresent();
         }
 
         @Test
-        @DisplayName("findByUserIdAndSymbolAndInvestmentTypeAndActiveTrue does not match an inactive holding")
+        @DisplayName("findByUserIdAndSymbolAndInvestmentTypeAndStatus does not match a closed holding")
         void doesNotMatchInactiveHolding() {
             persistInvestment(InvestmentType.STOCK, "INFY", new BigDecimal("10"),
-                    new BigDecimal("1000"), new BigDecimal("1200"), false);
+                    new BigDecimal("1000"), new BigDecimal("1200"), LifecycleStatus.CLOSED);
 
             Optional<Investment> found = investmentRepository
-                    .findByUserIdAndSymbolAndInvestmentTypeAndActiveTrue(userId, "INFY", InvestmentType.STOCK);
+                    .findByUserIdAndSymbolAndInvestmentTypeAndStatus(userId, "INFY", InvestmentType.STOCK, LifecycleStatus.ACTIVE);
 
             assertThat(found).isEmpty();
         }
@@ -174,22 +163,22 @@ class InvestmentRepositoryTest extends AbstractRepositoryTest {
         @Test
         @DisplayName("findDistinctActiveSchemeCodesForMF returns distinct codes, only for active MUTUAL_FUND rows")
         void distinctActiveSchemeCodes() {
-            Asset a1 = persistAsset(AssetType.MUTUAL_FUND);
-            Investment mf1 = Investment.builder().userId(userId).assetId(a1.getId())
+            Investment mf1 = Investment.builder().userId(userId)
                     .investmentType(InvestmentType.MUTUAL_FUND).schemeCode("SC001")
-                    .investedAmount(new BigDecimal("1000")).currentValue(new BigDecimal("1100")).active(true).build();
+                    .investedAmount(new BigDecimal("1000")).currentValue(new BigDecimal("1100"))
+                    .status(LifecycleStatus.ACTIVE).build();
             entityManager.persist(mf1);
 
-            Asset a2 = persistAsset(AssetType.MUTUAL_FUND);
-            Investment mf2 = Investment.builder().userId(userId).assetId(a2.getId())
+            Investment mf2 = Investment.builder().userId(userId)
                     .investmentType(InvestmentType.MUTUAL_FUND).schemeCode("SC001") // duplicate code
-                    .investedAmount(new BigDecimal("500")).currentValue(new BigDecimal("550")).active(true).build();
+                    .investedAmount(new BigDecimal("500")).currentValue(new BigDecimal("550"))
+                    .status(LifecycleStatus.ACTIVE).build();
             entityManager.persist(mf2);
 
-            Asset a3 = persistAsset(AssetType.MUTUAL_FUND);
-            Investment mf3 = Investment.builder().userId(userId).assetId(a3.getId())
+            Investment mf3 = Investment.builder().userId(userId)
                     .investmentType(InvestmentType.MUTUAL_FUND).schemeCode("SC002")
-                    .investedAmount(new BigDecimal("200")).currentValue(new BigDecimal("210")).active(false).build(); // inactive
+                    .investedAmount(new BigDecimal("200")).currentValue(new BigDecimal("210"))
+                    .status(LifecycleStatus.ARCHIVED).build(); // not active
             entityManager.persist(mf3);
             entityManager.flush();
 
@@ -209,13 +198,13 @@ class InvestmentRepositoryTest extends AbstractRepositoryTest {
         @DisplayName("bulkUpdatePriceBySymbol updates price and recomputes current_value only for active STOCK rows with units")
         void bulkUpdatePriceBySymbolOnlyTouchesActiveStockWithUnits() {
             Investment activeStock = persistInvestment(InvestmentType.STOCK, "INFY", new BigDecimal("10"),
-                    new BigDecimal("1000"), new BigDecimal("1200"), true);
+                    new BigDecimal("1000"), new BigDecimal("1200"), LifecycleStatus.ACTIVE);
             Investment inactiveStock = persistInvestment(InvestmentType.STOCK, "INFY", new BigDecimal("10"),
-                    new BigDecimal("1000"), new BigDecimal("1200"), false);
-            Asset mfAsset = persistAsset(AssetType.MUTUAL_FUND);
-            Investment mfSameSymbol = Investment.builder().userId(userId).assetId(mfAsset.getId())
+                    new BigDecimal("1000"), new BigDecimal("1200"), LifecycleStatus.CLOSED);
+            Investment mfSameSymbol = Investment.builder().userId(userId)
                     .investmentType(InvestmentType.MUTUAL_FUND).symbol("INFY").units(new BigDecimal("10"))
-                    .investedAmount(new BigDecimal("1000")).currentValue(new BigDecimal("1200")).active(true).build();
+                    .investedAmount(new BigDecimal("1000")).currentValue(new BigDecimal("1200"))
+                    .status(LifecycleStatus.ACTIVE).build();
             entityManager.persist(mfSameSymbol);
             entityManager.flush();
             entityManager.clear();
@@ -241,7 +230,7 @@ class InvestmentRepositoryTest extends AbstractRepositoryTest {
             String symbol = "SYM" + UUID.randomUUID().toString().substring(0, 8);
             entityManager.persist(StockPriceCache.builder().symbol(symbol).currentPrice(new BigDecimal("3500")).build());
             Investment stock = persistInvestment(InvestmentType.STOCK, symbol, new BigDecimal("2"),
-                    new BigDecimal("6000"), new BigDecimal("6500"), true);
+                    new BigDecimal("6000"), new BigDecimal("6500"), LifecycleStatus.ACTIVE);
             entityManager.flush();
             entityManager.clear();
 
@@ -257,10 +246,10 @@ class InvestmentRepositoryTest extends AbstractRepositoryTest {
         @Test
         @DisplayName("bulkUpdateNavBySchemeCode updates nav-derived current_value for all active MF rows sharing the scheme code")
         void bulkUpdateNavBySchemeCode() {
-            Asset asset = persistAsset(AssetType.MUTUAL_FUND);
-            Investment mf = Investment.builder().userId(userId).assetId(asset.getId())
+            Investment mf = Investment.builder().userId(userId)
                     .investmentType(InvestmentType.MUTUAL_FUND).schemeCode("SC001").units(new BigDecimal("100"))
-                    .investedAmount(new BigDecimal("1000")).currentValue(new BigDecimal("1050")).active(true).build();
+                    .investedAmount(new BigDecimal("1000")).currentValue(new BigDecimal("1050"))
+                    .status(LifecycleStatus.ACTIVE).build();
             entityManager.persist(mf);
             entityManager.flush();
             entityManager.clear();
@@ -276,16 +265,16 @@ class InvestmentRepositoryTest extends AbstractRepositoryTest {
         @Test
         @DisplayName("bulkUpdateGoldPrice applies the correct karat-tiered price via the CASE expression")
         void bulkUpdateGoldPriceAppliesCorrectKaratTier() {
-            Asset asset24 = persistAsset(AssetType.GOLD);
-            Investment gold24k = Investment.builder().userId(userId).assetId(asset24.getId())
+            Investment gold24k = Investment.builder().userId(userId)
                     .investmentType(InvestmentType.GOLD).quantityGrams(new BigDecimal("10")).goldKarat(24)
-                    .investedAmount(new BigDecimal("50000")).currentValue(new BigDecimal("55000")).active(true).build();
+                    .investedAmount(new BigDecimal("50000")).currentValue(new BigDecimal("55000"))
+                    .status(LifecycleStatus.ACTIVE).build();
             entityManager.persist(gold24k);
 
-            Asset asset22 = persistAsset(AssetType.GOLD);
-            Investment gold22k = Investment.builder().userId(userId).assetId(asset22.getId())
+            Investment gold22k = Investment.builder().userId(userId)
                     .investmentType(InvestmentType.GOLD).quantityGrams(new BigDecimal("10")).goldKarat(22)
-                    .investedAmount(new BigDecimal("45000")).currentValue(new BigDecimal("50000")).active(true).build();
+                    .investedAmount(new BigDecimal("45000")).currentValue(new BigDecimal("50000"))
+                    .status(LifecycleStatus.ACTIVE).build();
             entityManager.persist(gold22k);
             entityManager.flush();
             entityManager.clear();
@@ -302,62 +291,42 @@ class InvestmentRepositoryTest extends AbstractRepositoryTest {
         }
     }
 
-    // ─── link-clearing modifying queries ─────────────────────────────────────────
+    // ─── funding-link existence checks (used by the account-delete history guard) ─
 
     @Nested
-    @DisplayName("account-link clearing on account deletion")
-    class ClearLinkTests {
+    @DisplayName("funding-link existence checks")
+    class FundingLinkExistsTests {
 
         @Test
-        @DisplayName("clearLinkedAccountId nulls linked_account_id for every investment referencing it")
-        void clearLinkedAccountIdNullsReference() {
+        @DisplayName("existsByDebitAccountId detects an investment funded from this account")
+        void existsByDebitAccountIdDetectsLink() {
             WalletAccount account = WalletAccount.builder().userId(userId).accountType(AccountType.BANK_ACCOUNT)
                     .name("HDFC Savings").build();
             entityManager.persist(account);
             Investment i = persistInvestment(InvestmentType.STOCK, "INFY", new BigDecimal("10"),
-                    new BigDecimal("1000"), new BigDecimal("1200"), true);
-            i.setLinkedAccountId(account.getId());
+                    new BigDecimal("1000"), new BigDecimal("1200"), LifecycleStatus.ACTIVE);
+            i.setDebitAccountId(account.getId());
             entityManager.persist(i);
             entityManager.flush();
-            entityManager.clear();
 
-            investmentRepository.clearLinkedAccountId(account.getId());
-            entityManager.clear();
-
-            assertThat(entityManager.find(Investment.class, i.getId()).getLinkedAccountId()).isNull();
+            assertThat(investmentRepository.existsByDebitAccountId(account.getId())).isTrue();
+            assertThat(investmentRepository.existsByDebitAccountId(UUID.randomUUID())).isFalse();
         }
 
         @Test
-        @DisplayName("clearDebitAccountId nulls both debit_account_id and debit_transfer_id together")
-        void clearDebitAccountIdNullsBothFields() {
-            UUID accountId = UUID.randomUUID();
+        @DisplayName("existsByLinkedAccountId detects an investment crediting income to this account")
+        void existsByLinkedAccountIdDetectsLink() {
+            WalletAccount account = WalletAccount.builder().userId(userId).accountType(AccountType.BANK_ACCOUNT)
+                    .name("HDFC Savings").build();
+            entityManager.persist(account);
             Investment i = persistInvestment(InvestmentType.STOCK, "INFY", new BigDecimal("10"),
-                    new BigDecimal("1000"), new BigDecimal("1200"), true);
-            i.setDebitAccountId(accountId);
-            i.setDebitTransferId(UUID.randomUUID());
+                    new BigDecimal("1000"), new BigDecimal("1200"), LifecycleStatus.ACTIVE);
+            i.setLinkedAccountId(account.getId());
             entityManager.persist(i);
             entityManager.flush();
-            entityManager.clear();
 
-            investmentRepository.clearDebitAccountId(accountId);
-            entityManager.clear();
-
-            Investment reloaded = entityManager.find(Investment.class, i.getId());
-            assertThat(reloaded.getDebitAccountId()).isNull();
-            assertThat(reloaded.getDebitTransferId()).isNull();
+            assertThat(investmentRepository.existsByLinkedAccountId(account.getId())).isTrue();
+            assertThat(investmentRepository.existsByLinkedAccountId(UUID.randomUUID())).isFalse();
         }
-    }
-
-    // ─── derived query / existence checks ────────────────────────────────────────
-
-    @Test
-    @DisplayName("existsByAssetIdAndActiveTrueAndIdNot detects another active investment already linked to the asset")
-    void existsByAssetExcludesSelf() {
-        Investment i = persistInvestment(InvestmentType.STOCK, "INFY", new BigDecimal("10"),
-                new BigDecimal("1000"), new BigDecimal("1200"), true);
-        entityManager.flush();
-
-        assertThat(investmentRepository.existsByAssetIdAndActiveTrueAndIdNot(i.getAssetId(), i.getId())).isFalse();
-        assertThat(investmentRepository.existsByAssetIdAndActiveTrueAndIdNot(i.getAssetId(), UUID.randomUUID())).isTrue();
     }
 }

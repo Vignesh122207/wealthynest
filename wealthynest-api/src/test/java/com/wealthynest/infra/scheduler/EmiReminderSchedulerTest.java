@@ -1,5 +1,6 @@
 package com.wealthynest.infra.scheduler;
 
+import com.wealthynest.common.entity.LifecycleStatus;
 import com.wealthynest.domain.account.entity.AccountType;
 import com.wealthynest.domain.account.entity.WalletAccount;
 import com.wealthynest.domain.account.repository.WalletAccountRepository;
@@ -49,7 +50,7 @@ class EmiReminderSchedulerTest {
         void notifiesWhenTwoDaysAhead() {
             LocalDate target = LocalDate.now().plusDays(2);
             WalletAccount loan = loan(target.getDayOfMonth());
-            when(accountRepository.findByAccountTypeAndArchivedFalse(AccountType.LOAN)).thenReturn(List.of(loan));
+            when(accountRepository.findByAccountTypeAndStatus(AccountType.LOAN, LifecycleStatus.ACTIVE)).thenReturn(List.of(loan));
 
             scheduler.checkUpcomingEmis();
 
@@ -62,7 +63,7 @@ class EmiReminderSchedulerTest {
         void skipsWhenNotTwoDaysAhead() {
             LocalDate target = LocalDate.now().plusDays(5);
             WalletAccount loan = loan(target.getDayOfMonth());
-            when(accountRepository.findByAccountTypeAndArchivedFalse(AccountType.LOAN)).thenReturn(List.of(loan));
+            when(accountRepository.findByAccountTypeAndStatus(AccountType.LOAN, LifecycleStatus.ACTIVE)).thenReturn(List.of(loan));
 
             scheduler.checkUpcomingEmis();
 
@@ -75,7 +76,7 @@ class EmiReminderSchedulerTest {
             WalletAccount loan = WalletAccount.builder()
                     .userId(UUID.randomUUID()).accountType(AccountType.LOAN)
                     .emiAmount(new BigDecimal("1000")).emiDay(1).autopayAccountId(null).build();
-            when(accountRepository.findByAccountTypeAndArchivedFalse(AccountType.LOAN)).thenReturn(List.of(loan));
+            when(accountRepository.findByAccountTypeAndStatus(AccountType.LOAN, LifecycleStatus.ACTIVE)).thenReturn(List.of(loan));
 
             scheduler.checkUpcomingEmis();
 
@@ -91,7 +92,7 @@ class EmiReminderSchedulerTest {
             LocalDate expectedNext = today.getDayOfMonth() == 1 ? today : today.plusMonths(1).withDayOfMonth(1);
             org.junit.jupiter.api.Assumptions.assumeTrue(!expectedNext.isEqual(today.plusDays(2)));
             WalletAccount loan = loan(1);
-            when(accountRepository.findByAccountTypeAndArchivedFalse(AccountType.LOAN)).thenReturn(List.of(loan));
+            when(accountRepository.findByAccountTypeAndStatus(AccountType.LOAN, LifecycleStatus.ACTIVE)).thenReturn(List.of(loan));
 
             scheduler.checkUpcomingEmis();
 
@@ -104,7 +105,7 @@ class EmiReminderSchedulerTest {
             LocalDate target = LocalDate.now().plusDays(2);
             WalletAccount failing = loan(target.getDayOfMonth());
             WalletAccount succeeding = loan(target.getDayOfMonth());
-            when(accountRepository.findByAccountTypeAndArchivedFalse(AccountType.LOAN))
+            when(accountRepository.findByAccountTypeAndStatus(AccountType.LOAN, LifecycleStatus.ACTIVE))
                     .thenReturn(List.of(failing, succeeding));
             doThrow(new RuntimeException("boom")).when(notificationService)
                     .createEmiUpcomingNotification(eq(failing.getUserId()), any(), any(), any());

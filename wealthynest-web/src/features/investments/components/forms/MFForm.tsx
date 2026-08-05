@@ -9,6 +9,7 @@ import {FormInput} from "@/components/forms/FormInput";
 import {AccountPicker} from "@/components/transactions/AccountPicker";
 import {LiveSearch, SelectedChip} from "../LiveSearch";
 import {FormButtons} from "./FormButtons";
+import {BrokerAndPurposeFields} from "./BrokerAndPurposeFields";
 import {type MFFormValues, mfSchema} from "@/features/investments/schemas/investment.schema";
 import {investmentsApi} from "@/features/investments/api/investments.api";
 import type {Investment} from "@/features/investments/types/investment.types";
@@ -21,13 +22,12 @@ export type MFSubmitValues = MFFormValues & { schemeCode: string; name: string }
 export type MFFormDefaults = Partial<Omit<MFFormValues, "units" | "avgBuyPrice">>
   & { units?: number | string; avgBuyPrice?: number | string };
 
-export function MFForm({ defaultValues, onSubmit, onCancel, isPending, bankAccounts, investmentAccounts, editMF, isEditing }: {
+export function MFForm({ defaultValues, onSubmit, onCancel, isPending, bankAccounts, editMF, isEditing }: {
   defaultValues?: MFFormDefaults;
   onSubmit: (v: MFSubmitValues) => void;
   onCancel: () => void;
   isPending: boolean;
   bankAccounts: PickerAccountList;
-  investmentAccounts: PickerAccountList;
   editMF?: Investment | null;
   isEditing: boolean;
 }) {
@@ -84,13 +84,14 @@ export function MFForm({ defaultValues, onSubmit, onCancel, isPending, bankAccou
           <FormInput label="SIP Day of Month (1–31)" type="number" min="1" max="31" placeholder="e.g. 5"
             data-testid="mf-sip-day-input"
             {...form.register("sipDay")} error={form.formState.errors.sipDay?.message} />
-          {!isEditing && (bankAccounts.length > 0 || investmentAccounts.length > 0) && (
+          {!isEditing && bankAccounts.length > 0 && (
             <Controller control={form.control} name="debitAccountId" render={({ field }) => (
               <AccountPicker label="Debit from Account (optional)" placeholder="None (no debit)" allowClear
-                bankAccounts={bankAccounts} investmentAccounts={investmentAccounts}
+                bankAccounts={bankAccounts}
                 value={field.value ?? ""} onChange={field.onChange} />
             )} />
           )}
+          <BrokerAndPurposeFields form={form} />
         </div>
       )}
 

@@ -18,6 +18,9 @@ import java.util.UUID;
 @Repository
 public interface ExpenseRepository extends JpaRepository<Expense, UUID>, JpaSpecificationExecutor<Expense> {
 
+    /** Cheap EXISTS check — used to decide whether an account has any history before allowing delete. */
+    boolean existsByAccountId(UUID accountId);
+
     // Every year/month-scoped method below is a thin default wrapper around a date-range query.
     // expense_date is never wrapped in YEAR()/MONTH() inside a WHERE clause — doing so defeats
     // idx_expenses_user_date/idx_expenses_family_date (the planner can't range-scan a function of
@@ -143,14 +146,6 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID>, JpaSpec
     /** Used for permanent account erasure — must run before assets/wallet_accounts cascade so
      * budget_id/account_id/category_id references never dangle. */
     void deleteByUserId(UUID userId);
-
-    @Modifying
-    @Query("UPDATE Expense e SET e.accountId = null WHERE e.accountId = :accountId")
-    void clearAccountId(@Param("accountId") UUID accountId);
-
-    /** Used instead of clearAccountId when the user opts to delete a closed account's expenses
-     * outright rather than keep them as detached history. */
-    void deleteByAccountId(UUID accountId);
 
     /** budget_id has no ON DELETE policy — must be cleared before the budget it points to is deleted. */
     @Modifying

@@ -6,7 +6,7 @@ import {z} from "zod";
 export const blankToUndef = (v: unknown) => (v === "" || v === null ? undefined : v);
 
 export const createAccountSchema = z.object({
-  accountType:    z.enum(["CASH_WALLET", "BANK_ACCOUNT", "EMERGENCY_FUND", "CREDIT_CARD", "LOAN", "INVESTMENT"]),
+  accountType:    z.enum(["CASH_WALLET", "BANK_ACCOUNT", "CREDIT_CARD", "LOAN"]),
   name:           z.string().min(1, "Name is required").max(100),
   // API responses carry `null` for these when unset (not `undefined`), and z.string().optional()
   // only accepts undefined — without the same blankToUndef preprocessing the numeric optional
@@ -16,6 +16,12 @@ export const createAccountSchema = z.object({
   accountNumber:  z.preprocess(blankToUndef, z.string().max(20).optional()),
   openingBalance: z.coerce.number().min(0, "Balance must be 0 or more"),
   lowBalanceThreshold: z.preprocess(blankToUndef, z.coerce.number().min(0).optional()),
+  // Optional "what is this money for" tag — only valid when accountType === "BANK_ACCOUNT".
+  purpose:      z.preprocess(blankToUndef, z.enum([
+    "EMERGENCY_FUND", "RETIREMENT", "EDUCATION", "HOUSE_PURCHASE", "VEHICLE_PURCHASE",
+    "VACATION", "CHILD_FUTURE", "TAX_SAVINGS", "INVESTMENT", "GENERAL_SAVINGS", "CUSTOM",
+  ]).optional()),
+  purposeLabel: z.preprocess(blankToUndef, z.string().max(100).optional()),
   creditLimit:    z.preprocess(blankToUndef, z.coerce.number().positive().optional()),
   statementDay:   z.preprocess(blankToUndef, z.coerce.number().min(1).max(28).optional()),
   paymentDueDay:  z.preprocess(blankToUndef, z.coerce.number().min(1).max(28).optional()),
@@ -34,7 +40,30 @@ export const createAccountSchema = z.object({
   if (data.accountType === "LOAN" && !data.loanType) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["loanType"], message: "Loan type is required" });
   }
+  if (data.purpose && data.accountType !== "BANK_ACCOUNT") {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["purpose"], message: "Purpose can only be set on a Bank Account" });
+  }
+  if (data.purpose === "CUSTOM" && !data.purposeLabel) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["purposeLabel"], message: "A custom purpose needs a short label" });
+  }
 });
+
+export const PURPOSE_OPTIONS = [
+  { value: "EMERGENCY_FUND",   label: "Emergency Fund" },
+  { value: "RETIREMENT",       label: "Retirement" },
+  { value: "EDUCATION",        label: "Education" },
+  { value: "HOUSE_PURCHASE",   label: "House Purchase" },
+  { value: "VEHICLE_PURCHASE", label: "Vehicle Purchase" },
+  { value: "VACATION",         label: "Vacation" },
+  { value: "CHILD_FUTURE",     label: "Child Future" },
+  { value: "TAX_SAVINGS",      label: "Tax Savings" },
+  { value: "INVESTMENT",       label: "Investment" },
+  { value: "GENERAL_SAVINGS",  label: "General Savings" },
+  { value: "CUSTOM",           label: "Custom…" },
+];
+
+export const PURPOSE_LABELS: Record<string, string> =
+  Object.fromEntries(PURPOSE_OPTIONS.map(o => [o.value, o.label]));
 
 export const LOAN_TYPE_OPTIONS = [
   { value: "HOME_LOAN",      label: "Home Loan" },

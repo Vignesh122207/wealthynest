@@ -66,6 +66,12 @@ public class WalletAccountController {
                 accountService.unarchiveAccount(id, SecurityUtils.requireCurrentUserId())));
     }
 
+    @PatchMapping("/{id}/close")
+    public ResponseEntity<ApiResponse<AccountResponse>> close(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                accountService.closeAccount(id, SecurityUtils.requireCurrentUserId())));
+    }
+
     @PatchMapping("/{id}/set-primary")
     public ResponseEntity<ApiResponse<AccountResponse>> setPrimary(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -73,9 +79,8 @@ public class WalletAccountController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable UUID id,
-            @RequestParam(defaultValue = "false") boolean alsoDeleteTransactions) {
-        accountService.deleteAccount(id, SecurityUtils.requireCurrentUserId(), alsoDeleteTransactions);
+    public ResponseEntity<Void> delete(@PathVariable UUID id) {
+        accountService.deleteAccount(id, SecurityUtils.requireCurrentUserId());
         return ResponseEntity.noContent().build();
     }
 

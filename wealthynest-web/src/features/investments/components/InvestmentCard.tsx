@@ -36,10 +36,10 @@ function XirrBadge({ investmentId }: { investmentId: string }) {
   );
 }
 
-export function InvestmentCard({ inv, onEdit, dividendRecords, bankAccounts, investmentAccounts }: {
+export function InvestmentCard({ inv, onEdit, dividendRecords, bankAccounts }: {
   inv: Investment; onEdit: () => void;
   dividendRecords?: IncomeHistoryRecord[];
-  bankAccounts?: PickerAccountList; investmentAccounts?: PickerAccountList;
+  bankAccounts?: PickerAccountList;
 }) {
   const { fmt } = useAmountFormatter();
   const gain  = inv.gainLoss ?? (inv.currentValue - inv.investedAmount);
@@ -69,7 +69,7 @@ export function InvestmentCard({ inv, onEdit, dividendRecords, bankAccounts, inv
     <>
     {stockTxnModal && (
       <StockTransactionModal inv={inv} type={stockTxnModal} onClose={() => setStockTxnModal(null)}
-        bankAccounts={bankAccounts ?? []} investmentAccounts={investmentAccounts ?? []} />
+        bankAccounts={bankAccounts ?? []} />
     )}
     <div data-testid="investment-card" onClick={onEdit}
       className="relative bg-card border border-border rounded-2xl p-4 hover:border-indigo-500/40 hover:shadow-sm hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">

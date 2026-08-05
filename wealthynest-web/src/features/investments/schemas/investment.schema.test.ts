@@ -22,6 +22,42 @@ describe("stockSchema", () => {
   });
 });
 
+// broker/purpose/purposeLabel + the CUSTOM-requires-label rule are shared across all 5
+// investment-type schemas via the same purposeFields/requireCustomPurposeLabel — tested once
+// here against stockSchema (representative), plus one smoke test on a second schema below to
+// confirm the shared fields were actually spread in there too.
+describe("broker/purpose (shared across all investment-type schemas)", () => {
+  const base = { units: 10, avgBuyPrice: 2500, purchaseDate: "2026-01-01" };
+
+  it("accepts a broker and a non-CUSTOM purpose", () => {
+    const result = stockSchema.safeParse({ ...base, broker: "Zerodha", purpose: "EMERGENCY_FUND" });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects CUSTOM purpose with no label", () => {
+    const result = stockSchema.safeParse({ ...base, purpose: "CUSTOM" });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.purposeLabel).toContain("A custom purpose needs a short label");
+    }
+  });
+
+  it("accepts CUSTOM purpose once a label is provided", () => {
+    expect(stockSchema.safeParse({ ...base, purpose: "CUSTOM", purposeLabel: "Sabbatical" }).success).toBe(true);
+  });
+
+  it("treats a null purpose/broker (as returned by the API for an unset field) as absent, not invalid", () => {
+    const result = stockSchema.safeParse({ ...base, purpose: null, broker: null });
+    expect(result.success).toBe(true);
+  });
+
+  it("fdSchema also carries the shared purpose fields", () => {
+    const fdBase = { bankName: "HDFC", investedAmount: 100000, couponRate: 7, purchaseDate: "2026-01-01", maturityDate: "2027-01-01" };
+    expect(fdSchema.safeParse({ ...fdBase, purpose: "CUSTOM" }).success).toBe(false);
+    expect(fdSchema.safeParse({ ...fdBase, purpose: "CUSTOM", purposeLabel: "House Fund" }).success).toBe(true);
+  });
+});
+
 describe("mfSchema", () => {
   const base = { units: 100, avgBuyPrice: 25.5, purchaseDate: "2026-01-01" };
 

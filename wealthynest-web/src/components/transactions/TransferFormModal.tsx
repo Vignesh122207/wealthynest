@@ -106,8 +106,6 @@ export function TransferFormModal({ onSubmit, onCancel, onDelete, isPending, acc
                   cashAccounts={byType(fromChoices, "CASH_WALLET")}
                   bankAccounts={byType(fromChoices, "BANK_ACCOUNT")}
                   creditAccounts={byType(fromChoices, "CREDIT_CARD")}
-                  emergencyFundAccounts={byType(fromChoices, "EMERGENCY_FUND")}
-                  investmentAccounts={byType(fromChoices, "INVESTMENT")}
                   value={field.value ?? ""} onChange={field.onChange} error={fieldState.error?.message} testId="transfer-from-account-picker" />
               )} />
               <Controller control={form.control} name="toAccountId" render={({ field, fieldState }) => (
@@ -115,8 +113,6 @@ export function TransferFormModal({ onSubmit, onCancel, onDelete, isPending, acc
                   cashAccounts={byType(toChoices, "CASH_WALLET")}
                   bankAccounts={byType(toChoices, "BANK_ACCOUNT")}
                   creditAccounts={byType(toChoices, "CREDIT_CARD")}
-                  emergencyFundAccounts={byType(toChoices, "EMERGENCY_FUND")}
-                  investmentAccounts={byType(toChoices, "INVESTMENT")}
                   value={field.value ?? ""} onChange={field.onChange} error={fieldState.error?.message} testId="transfer-to-account-picker" />
               )} />
             </>

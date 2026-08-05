@@ -61,7 +61,24 @@ test.describe("Accounts", () => {
     await accountsPage.createBankAccount({ bankName, openingBalance: 1000 });
     await accountsPage.expectAccountVisible(bankName);
 
-    await accountsPage.deleteAccount(bankName, { alsoDeleteTransactions: true });
+    await accountsPage.deleteAccount(bankName);
     await accountsPage.expectAccountNotVisible(bankName);
+  });
+
+  test("deleting an account with history is rejected — close or archive instead @regression", async ({ accountsPage, transactionsPage }) => {
+    const fromBank = faker.company.name() + " Bank";
+    const toBank   = faker.company.name() + " Bank";
+    await accountsPage.gotoAccounts();
+    await accountsPage.createBankAccount({ bankName: fromBank, openingBalance: 5000 });
+    await accountsPage.createBankAccount({ bankName: toBank, openingBalance: 1000 });
+    await accountsPage.expectAccountVisible(fromBank);
+    await accountsPage.expectAccountVisible(toBank);
+
+    await transactionsPage.gotoTransactions();
+    await transactionsPage.transfer({ amount: 500, fromAccountName: fromBank, toAccountName: toBank });
+
+    await accountsPage.gotoAccounts();
+    await accountsPage.archiveAccount(fromBank);
+    await accountsPage.attemptDeleteAccountWithHistory(fromBank);
   });
 });

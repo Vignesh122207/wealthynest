@@ -1,8 +1,19 @@
-export type AccountType = "CASH_WALLET" | "BANK_ACCOUNT" | "EMERGENCY_FUND" | "CREDIT_CARD" | "LOAN" | "INVESTMENT";
+export type AccountType = "CASH_WALLET" | "BANK_ACCOUNT" | "CREDIT_CARD" | "LOAN";
 
 export type LoanType =
   | "HOME_LOAN" | "CAR_LOAN" | "PERSONAL_LOAN"
   | "EDUCATION_LOAN" | "GOLD_LOAN" | "BUSINESS_LOAN" | "OTHER";
+
+/** Optional "what is this money for" tag — Bank Accounts and Investments only, never Cash
+ * Wallet, Credit Card, or Loan. Purely descriptive: never affects balance/net-worth math. */
+export type AccountPurpose =
+  | "EMERGENCY_FUND" | "RETIREMENT" | "EDUCATION" | "HOUSE_PURCHASE" | "VEHICLE_PURCHASE"
+  | "VACATION" | "CHILD_FUTURE" | "TAX_SAVINGS" | "INVESTMENT" | "GENERAL_SAVINGS" | "CUSTOM";
+
+/** ACTIVE (normal use), CLOSED (a real-world terminal event — loan paid off, account closed at
+ * the bank; excluded from funding pickers but still counted in historical net worth), ARCHIVED
+ * (user-hidden, reversible). */
+export type LifecycleStatus = "ACTIVE" | "CLOSED" | "ARCHIVED";
 
 export interface AccountTransactionItem {
   id:          string;
@@ -30,7 +41,9 @@ export interface WalletAccount {
   totalMoneyOut:      number;
   recentTransactions: AccountTransactionItem[];
   createdAt:          string;
-  archived?:          boolean;
+  status?:            LifecycleStatus;
+  purpose?:           AccountPurpose | null;
+  purposeLabel?:      string | null;
   primary?:           boolean;
   // Credit card fields
   creditLimit?:       number;
@@ -58,6 +71,9 @@ export interface CreateAccountPayload {
   accountNumber?: string;
   openingBalance: number;
   lowBalanceThreshold?: number;
+  // Optional "what is this money for" tag — only valid when accountType === "BANK_ACCOUNT"
+  purpose?:       AccountPurpose;
+  purposeLabel?:  string;
   // Credit card
   creditLimit?:   number;
   statementDay?:  number;

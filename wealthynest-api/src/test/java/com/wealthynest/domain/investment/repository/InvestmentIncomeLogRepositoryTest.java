@@ -1,7 +1,5 @@
 package com.wealthynest.domain.investment.repository;
 
-import com.wealthynest.domain.asset.entity.Asset;
-import com.wealthynest.domain.asset.entity.AssetType;
 import com.wealthynest.domain.income.entity.IncomeEntry;
 import com.wealthynest.domain.income.entity.IncomeSource;
 import com.wealthynest.domain.investment.entity.Investment;
@@ -37,11 +35,7 @@ class InvestmentIncomeLogRepositoryTest extends AbstractRepositoryTest {
         entityManager.persist(user);
         userId = user.getId();
 
-        Asset asset = Asset.builder().userId(userId).name("Bond").assetType(AssetType.BOND)
-                .currentValue(BigDecimal.ZERO).asOfDate(LocalDate.now()).build();
-        entityManager.persist(asset);
-
-        Investment investment = Investment.builder().userId(userId).assetId(asset.getId())
+        Investment investment = Investment.builder().userId(userId)
                 .investmentType(InvestmentType.BOND).investedAmount(new BigDecimal("10000"))
                 .currentValue(new BigDecimal("10000")).build();
         entityManager.persist(investment);
@@ -94,10 +88,7 @@ class InvestmentIncomeLogRepositoryTest extends AbstractRepositoryTest {
     @Test
     @DisplayName("findByInvestmentIdInAndIncomeType batches multiple investments, still filters by income type")
     void findByInvestmentIdInBatchesAcrossInvestments() {
-        Asset secondAsset = Asset.builder().userId(userId).name("Second Bond").assetType(AssetType.BOND)
-                .currentValue(BigDecimal.ZERO).asOfDate(LocalDate.now()).build();
-        entityManager.persist(secondAsset);
-        Investment secondInvestment = Investment.builder().userId(userId).assetId(secondAsset.getId())
+        Investment secondInvestment = Investment.builder().userId(userId)
                 .investmentType(InvestmentType.BOND).investedAmount(new BigDecimal("5000"))
                 .currentValue(new BigDecimal("5000")).build();
         entityManager.persist(secondInvestment);

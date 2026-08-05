@@ -1,5 +1,25 @@
 import {z} from "zod";
 
+const blankToUndef = (v: unknown) => (v === "" || v === null ? undefined : v);
+
+// Shared across all 5 investment-type forms — broker/purpose are purely descriptive metadata,
+// never affecting funding math, so the same optional fields + CUSTOM-requires-label rule apply
+// identically regardless of investment type.
+const purposeFields = {
+  broker:       z.preprocess(blankToUndef, z.string().max(50).optional()),
+  purpose:      z.preprocess(blankToUndef, z.enum([
+    "EMERGENCY_FUND", "RETIREMENT", "EDUCATION", "HOUSE_PURCHASE", "VEHICLE_PURCHASE",
+    "VACATION", "CHILD_FUTURE", "TAX_SAVINGS", "INVESTMENT", "GENERAL_SAVINGS", "CUSTOM",
+  ]).optional()),
+  purposeLabel: z.preprocess(blankToUndef, z.string().max(100).optional()),
+};
+
+function requireCustomPurposeLabel(data: { purpose?: string; purposeLabel?: string }, ctx: z.RefinementCtx) {
+  if (data.purpose === "CUSTOM" && !data.purposeLabel) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["purposeLabel"], message: "A custom purpose needs a short label" });
+  }
+}
+
 export const stockSchema = z.object({
   units:           z.coerce.number().positive("Quantity must be > 0"),
   avgBuyPrice:     z.coerce.number().positive("Buy price must be > 0"),
@@ -7,7 +27,8 @@ export const stockSchema = z.object({
   brokerage:       z.coerce.number().min(0).optional(),
   linkedAccountId: z.string().optional(),
   debitAccountId:  z.string().optional(),
-});
+  ...purposeFields,
+}).superRefine(requireCustomPurposeLabel);
 export type StockFormValues = z.infer<typeof stockSchema>;
 
 export const mfSchema = z.object({
@@ -21,7 +42,8 @@ export const mfSchema = z.object({
   // preprocess "" to undefined before coercion so leaving them blank actually validates as absent.
   sipAmount:       z.preprocess(v => (v === "" ? undefined : v), z.coerce.number().positive("SIP amount must be positive").optional()),
   sipDay:          z.preprocess(v => (v === "" ? undefined : v), z.coerce.number().min(1).max(31).optional()),
-});
+  ...purposeFields,
+}).superRefine(requireCustomPurposeLabel);
 export type MFFormValues = z.infer<typeof mfSchema>;
 
 export const goldSchema = z.object({
@@ -31,7 +53,8 @@ export const goldSchema = z.object({
   avgBuyPrice:    z.coerce.number().positive("Buy price per gram required"),
   purchaseDate:   z.string().min(1, "Date required"),
   debitAccountId: z.string().optional(),
-});
+  ...purposeFields,
+}).superRefine(requireCustomPurposeLabel);
 export type GoldFormValues = z.infer<typeof goldSchema>;
 
 export const fdSchema = z.object({
@@ -43,7 +66,8 @@ export const fdSchema = z.object({
   compoundingFrequency: z.string().default("QUARTERLY"),
   linkedAccountId:      z.string().optional(),
   debitAccountId:       z.string().optional(),
-});
+  ...purposeFields,
+}).superRefine(requireCustomPurposeLabel);
 export type FDFormValues = z.infer<typeof fdSchema>;
 
 export const bondSchema = z.object({
@@ -62,7 +86,8 @@ export const bondSchema = z.object({
   maturityDate:     z.string().optional(),
   linkedAccountId:  z.string().optional(),
   debitAccountId:   z.string().optional(),
-});
+  ...purposeFields,
+}).superRefine(requireCustomPurposeLabel);
 export type BondFormValues = z.infer<typeof bondSchema>;
 
 export const sipSchema = z.object({

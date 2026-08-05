@@ -78,6 +78,20 @@ export function useUnarchiveAccount() {
   });
 }
 
+export function useCloseAccount() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => accountsApi.closeAccount(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.GOALS });
+      toast.success("Account closed");
+    },
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to close account")),
+  });
+}
+
 export function useSetPrimaryAccount() {
   const qc = useQueryClient();
   return useMutation({
@@ -94,18 +108,15 @@ export function useSetPrimaryAccount() {
 export function useDeleteAccount() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, alsoDeleteTransactions }: { id: string; alsoDeleteTransactions?: boolean }) =>
-      accountsApi.deleteAccount(id, alsoDeleteTransactions),
+    mutationFn: (id: string) => accountsApi.deleteAccount(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.GOALS });
-      // Only matters when alsoDeleteTransactions was set (rows actually removed), but cheap
-      // enough to always run rather than thread a conditional through the mutation result.
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.EXPENSES });
-      qc.invalidateQueries({ queryKey: ["income"] });
       toast.success("Account deleted");
     },
+    // The API only ever 409s here when the account has real history — surface its own message
+    // ("close or archive it instead") rather than a generic failure.
     onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to delete account")),
   });
 }

@@ -1,5 +1,6 @@
 package com.wealthynest.domain.investment.repository;
 
+import com.wealthynest.common.entity.LifecycleStatus;
 import com.wealthynest.domain.investment.entity.Investment;
 import com.wealthynest.domain.investment.entity.InvestmentType;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,37 +15,30 @@ import java.util.UUID;
 
 @Repository
 public interface InvestmentRepository extends JpaRepository<Investment, UUID> {
-    List<Investment> findByUserIdAndActiveTrue(UUID userId);
+    List<Investment> findByUserIdAndStatus(UUID userId, LifecycleStatus status);
     List<Investment> findByUserId(UUID userId);
-    boolean existsByAssetIdAndActiveTrueAndIdNot(UUID assetId, UUID excludeId);
+    boolean existsByDebitAccountId(UUID accountId);
+    boolean existsByLinkedAccountId(UUID accountId);
 
-    @Query("SELECT COALESCE(SUM(i.currentValue),0) FROM Investment i WHERE i.userId = :userId AND i.active = true")
+    @Query("SELECT COALESCE(SUM(i.currentValue),0) FROM Investment i WHERE i.userId = :userId AND i.status = 'ACTIVE'")
     BigDecimal sumCurrentValueByUser(UUID userId);
 
     /** Same as sumCurrentValueByUser but for a whole set of users in one query — used by family
      * net worth so it isn't run once per member. */
-    @Query("SELECT COALESCE(SUM(i.currentValue),0) FROM Investment i WHERE i.userId IN :userIds AND i.active = true")
+    @Query("SELECT COALESCE(SUM(i.currentValue),0) FROM Investment i WHERE i.userId IN :userIds AND i.status = 'ACTIVE'")
     BigDecimal sumCurrentValueByUserIn(@Param("userIds") List<UUID> userIds);
 
-    @Query("SELECT COALESCE(SUM(i.investedAmount),0) FROM Investment i WHERE i.userId = :userId AND i.active = true")
+    @Query("SELECT COALESCE(SUM(i.investedAmount),0) FROM Investment i WHERE i.userId = :userId AND i.status = 'ACTIVE'")
     BigDecimal sumInvestedAmountByUser(UUID userId);
 
-    @Modifying
-    @Query("UPDATE Investment i SET i.linkedAccountId = null WHERE i.linkedAccountId = :accountId")
-    void clearLinkedAccountId(@Param("accountId") UUID accountId);
-
-    @Modifying
-    @Query("UPDATE Investment i SET i.debitAccountId = null, i.debitTransferId = null WHERE i.debitAccountId = :accountId")
-    void clearDebitAccountId(@Param("accountId") UUID accountId);
-
     // Typed load queries — replaces findAll() + Java filter in all scheduler jobs
-    List<Investment> findByInvestmentTypeAndActiveTrue(InvestmentType type);
+    List<Investment> findByInvestmentTypeAndStatus(InvestmentType type, LifecycleStatus status);
 
-    Optional<Investment> findByUserIdAndSymbolAndInvestmentTypeAndActiveTrue(
-        UUID userId, String symbol, InvestmentType type);
+    Optional<Investment> findByUserIdAndSymbolAndInvestmentTypeAndStatus(
+        UUID userId, String symbol, InvestmentType type, LifecycleStatus status);
 
     @Query("SELECT DISTINCT i.schemeCode FROM Investment i " +
-           "WHERE i.active = true AND i.investmentType = 'MUTUAL_FUND' AND i.schemeCode IS NOT NULL")
+           "WHERE i.status = 'ACTIVE' AND i.investmentType = 'MUTUAL_FUND' AND i.schemeCode IS NOT NULL")
     List<String> findDistinctActiveSchemeCodesForMF();
 
     /**
@@ -57,7 +51,7 @@ public interface InvestmentRepository extends JpaRepository<Investment, UUID> {
            SET current_price = :price,
                current_value = units * :price
          WHERE symbol        = :symbol
-           AND is_active      = true
+           AND status         = 'ACTIVE'
            AND investment_type = 'STOCK'
            AND units          IS NOT NULL
         """, nativeQuery = true)
@@ -75,7 +69,7 @@ public interface InvestmentRepository extends JpaRepository<Investment, UUID> {
                current_value = i.units * spc.current_price
           FROM stock_price_cache spc
          WHERE i.symbol          = spc.symbol
-           AND i.is_active        = true
+           AND i.status           = 'ACTIVE'
            AND i.investment_type  = 'STOCK'
            AND i.units            IS NOT NULL
         """, nativeQuery = true)
@@ -91,7 +85,7 @@ public interface InvestmentRepository extends JpaRepository<Investment, UUID> {
            SET current_price = :nav,
                current_value = units * :nav
          WHERE scheme_code      = :schemeCode
-           AND is_active         = true
+           AND status            = 'ACTIVE'
            AND investment_type   = 'MUTUAL_FUND'
            AND units             IS NOT NULL
         """, nativeQuery = true)
@@ -111,7 +105,7 @@ public interface InvestmentRepository extends JpaRepository<Investment, UUID> {
                                * CASE WHEN gold_karat = 24 THEN :p24
                                       WHEN gold_karat = 18 THEN :p18
                                                            ELSE :p22 END
-         WHERE is_active        = true
+         WHERE status           = 'ACTIVE'
            AND investment_type  IN ('GOLD', 'GOLD_ETF')
            AND quantity_grams   IS NOT NULL
         """, nativeQuery = true)

@@ -1,5 +1,6 @@
 package com.wealthynest.domain.investment.dto.request;
 
+import com.wealthynest.common.entity.AccountPurpose;
 import com.wealthynest.domain.investment.entity.InvestmentType;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
@@ -9,7 +10,6 @@ import java.util.UUID;
 
 @Getter
 public class CreateInvestmentRequest {
-    private UUID assetId;
 
     @NotNull private InvestmentType investmentType;
     @Size(max = 30)  private String symbol;
@@ -52,6 +52,13 @@ public class CreateInvestmentRequest {
 
     // Brokerage paid on stock/bond purchase (added to debit amount, separate from investedAmount)
     @PositiveOrZero private BigDecimal brokerage;
+
+    // Purely descriptive — which platform holds this (Zerodha, Groww...), never affects funding.
+    @Size(max = 50) private String broker;
+
+    // Optional "what is this money for" tag — any investment type is eligible.
+    private AccountPurpose purpose;
+    @Size(max = 100) private String purposeLabel;
 
     private String notes;
 }

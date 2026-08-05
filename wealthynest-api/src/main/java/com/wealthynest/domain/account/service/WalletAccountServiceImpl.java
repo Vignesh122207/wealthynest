@@ -1,5 +1,7 @@
 package com.wealthynest.domain.account.service;
 
+import com.wealthynest.common.entity.AccountPurpose;
+import com.wealthynest.common.entity.LifecycleStatus;
 import com.wealthynest.common.exception.AccessDeniedException;
 import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
@@ -42,9 +44,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class WalletAccountServiceImpl implements WalletAccountService {
 
-    /** Only one active account of these types may exist per user. */
-    private static final Set<AccountType> SINGLETON_TYPES = Set.of(AccountType.CASH_WALLET, AccountType.EMERGENCY_FUND);
-
     private final WalletAccountRepository   accountRepository;
     private final AccountTransferRepository transferRepository;
     private final IncomeRepository          incomeRepository;
@@ -58,8 +57,10 @@ public class WalletAccountServiceImpl implements WalletAccountService {
     @Override
     @Transactional(readOnly = true)
     public List<AccountResponse> getAccounts(UUID userId) {
+        // ACTIVE + CLOSED — a closed account stays visible (with a Closed badge) and still counts
+        // toward historical net worth; only ARCHIVED (user-hidden) is excluded from this list.
         List<WalletAccount> accounts = accountRepository.findByUserIdOrderByCreatedAtAsc(userId)
-                .stream().filter(a -> !a.isArchived()).toList();
+                .stream().filter(a -> a.getStatus() != LifecycleStatus.ARCHIVED).toList();
         return enrichBatch(accounts);
     }
 
@@ -67,13 +68,13 @@ public class WalletAccountServiceImpl implements WalletAccountService {
     @Transactional(readOnly = true)
     public List<AccountResponse> getAccountsForUsers(List<UUID> userIds) {
         if (userIds.isEmpty()) return List.of();
-        return enrichBatch(accountRepository.findByUserIdInAndArchivedFalse(userIds));
+        return enrichBatch(accountRepository.findByUserIdInAndStatusNot(userIds, LifecycleStatus.ARCHIVED));
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<AccountResponse> getArchivedAccounts(UUID userId) {
-        List<WalletAccount> accounts = accountRepository.findByUserIdAndArchivedTrueOrderByCreatedAtAsc(userId);
+        List<WalletAccount> accounts = accountRepository.findByUserIdAndStatusOrderByCreatedAtAsc(userId, LifecycleStatus.ARCHIVED);
         return enrichBatch(accounts);
     }
 
@@ -82,7 +83,10 @@ public class WalletAccountServiceImpl implements WalletAccountService {
     @CacheEvict(value = "dashboard", allEntries = true)
     public AccountResponse archiveAccount(UUID id, UUID userId) {
         WalletAccount acct = findAndValidate(id, userId);
-        acct.setArchived(true);
+        if (acct.getStatus() == LifecycleStatus.CLOSED) {
+            throw new BusinessException("A closed account can't be archived.", HttpStatus.BAD_REQUEST);
+        }
+        acct.setStatus(LifecycleStatus.ARCHIVED);
         return enrich(accountRepository.save(acct));
     }
 
@@ -92,18 +96,30 @@ public class WalletAccountServiceImpl implements WalletAccountService {
     public AccountResponse unarchiveAccount(UUID id, UUID userId) {
         WalletAccount acct = findAndValidate(id, userId);
 
-        // Singleton types (CASH_WALLET, EMERGENCY_FUND) can only have one active account at a time.
-        // Block the restore if there is already an active account of the same type.
-        boolean singleton = SINGLETON_TYPES.contains(acct.getAccountType());
-        if (singleton && accountRepository.existsByUserIdAndAccountTypeAndArchivedFalse(userId, acct.getAccountType())) {
-            String typeName = acct.getAccountType().name().replace('_', ' ').toLowerCase();
+        // CASH_WALLET is the only remaining singleton type. Block the restore if there's already
+        // an active one (purpose's EMERGENCY_FUND singleton was removed — a purpose is a
+        // many-to-one tag by nature, not a unique slot).
+        if (acct.getAccountType() == AccountType.CASH_WALLET
+                && accountRepository.existsByUserIdAndAccountTypeAndStatus(userId, AccountType.CASH_WALLET, LifecycleStatus.ACTIVE)) {
             throw new BusinessException(
-                "You already have an active " + typeName + " account. Archive it first before restoring this one.",
+                "You already have an active cash wallet account. Archive it first before restoring this one.",
                 HttpStatus.CONFLICT
             );
         }
 
-        acct.setArchived(false);
+        acct.setStatus(LifecycleStatus.ACTIVE);
+        return enrich(accountRepository.save(acct));
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(value = "dashboard", allEntries = true)
+    public AccountResponse closeAccount(UUID id, UUID userId) {
+        WalletAccount acct = findAndValidate(id, userId);
+        if (acct.getStatus() != LifecycleStatus.ACTIVE) {
+            throw new BusinessException("Only an active account can be closed.", HttpStatus.BAD_REQUEST);
+        }
+        acct.setStatus(LifecycleStatus.CLOSED);
         return enrich(accountRepository.save(acct));
     }
 
@@ -111,27 +127,29 @@ public class WalletAccountServiceImpl implements WalletAccountService {
     @Transactional
     @CacheEvict(value = "dashboard", allEntries = true)
     public AccountResponse createAccount(UUID userId, CreateAccountRequest req) {
-        boolean singleton = SINGLETON_TYPES.contains(req.getAccountType());
-        if (singleton) {
-            String typeName = req.getAccountType().name().replace('_', ' ').toLowerCase();
-            // Block if an active account of this type already exists
-            if (accountRepository.existsByUserIdAndAccountTypeAndArchivedFalse(userId, req.getAccountType())) {
-                throw new BusinessException("You already have an active " + typeName + " account.", HttpStatus.CONFLICT);
+        // CASH_WALLET is the only remaining singleton account type.
+        if (req.getAccountType() == AccountType.CASH_WALLET) {
+            if (accountRepository.existsByUserIdAndAccountTypeAndStatus(userId, AccountType.CASH_WALLET, LifecycleStatus.ACTIVE)) {
+                throw new BusinessException("You already have an active cash wallet account.", HttpStatus.CONFLICT);
             }
-            // Block if an archived account of this type exists — force restore instead of creating a duplicate
-            if (accountRepository.existsByUserIdAndAccountType(userId, req.getAccountType())) {
+            // Block if an archived one exists — force restore instead of creating a duplicate.
+            // (A closed cash wallet, an unusual edge case, doesn't block — CLOSED is terminal.)
+            if (accountRepository.existsByUserIdAndAccountTypeAndStatus(userId, AccountType.CASH_WALLET, LifecycleStatus.ARCHIVED)) {
                 throw new BusinessException(
-                    "You have an archived " + typeName + " account with existing history. " +
+                    "You have an archived cash wallet account with existing history. " +
                     "Restore it to keep your records, or delete it permanently before creating a new one.",
                     HttpStatus.CONFLICT
                 );
             }
         }
+        validatePurpose(req.getAccountType(), req.getPurpose(), req.getPurposeLabel());
+
         // Credit-limit/billing-cycle fields only mean anything for a card, and apr is shared between
         // card and loan — apply each only where it's relevant, regardless of what the request carries,
         // so a stale value left over from a different type picked earlier in the same form can't ride along.
         boolean isCC = req.getAccountType() == AccountType.CREDIT_CARD;
         boolean isLoan = req.getAccountType() == AccountType.LOAN;
+        boolean isBank = req.getAccountType() == AccountType.BANK_ACCOUNT;
         WalletAccount account = WalletAccount.builder()
                 .userId(userId)
                 .accountType(req.getAccountType())
@@ -144,6 +162,8 @@ public class WalletAccountServiceImpl implements WalletAccountService {
                 .statementDay(isCC ? req.getStatementDay() : null)
                 .paymentDueDay(isCC ? req.getPaymentDueDay() : null)
                 .apr((isCC || isLoan) ? req.getApr() : null)
+                .purpose(isBank ? req.getPurpose() : null)
+                .purposeLabel(isBank && req.getPurpose() == AccountPurpose.CUSTOM ? req.getPurposeLabel() : null)
                 .build();
         if (req.getAccountType() == AccountType.LOAN) {
             applyLoanFields(account, req, userId);
@@ -152,7 +172,7 @@ public class WalletAccountServiceImpl implements WalletAccountService {
         }
         // First-ever bank account becomes primary automatically; later ones need an explicit "Set as Primary".
         if (req.getAccountType() == AccountType.BANK_ACCOUNT
-                && !accountRepository.existsByUserIdAndAccountTypeAndArchivedFalse(userId, AccountType.BANK_ACCOUNT)) {
+                && !accountRepository.existsByUserIdAndAccountTypeAndStatus(userId, AccountType.BANK_ACCOUNT, LifecycleStatus.ACTIVE)) {
             account.setPrimary(true);
         }
         return enrich(accountRepository.save(account));
@@ -175,7 +195,23 @@ public class WalletAccountServiceImpl implements WalletAccountService {
         if (isCC && req.getPaymentDueDay() != null) account.setPaymentDueDay(req.getPaymentDueDay());
         if ((isCC || isLoan) && req.getApr() != null) account.setApr(req.getApr());
         if (isLoan) applyLoanFields(account, req, userId);
+        if (account.getAccountType() == AccountType.BANK_ACCOUNT && req.getPurpose() != null) {
+            validatePurpose(account.getAccountType(), req.getPurpose(), req.getPurposeLabel());
+            account.setPurpose(req.getPurpose());
+            account.setPurposeLabel(req.getPurpose() == AccountPurpose.CUSTOM ? req.getPurposeLabel() : null);
+        }
         return enrich(accountRepository.save(account));
+    }
+
+    /** CUSTOM requires a label; purpose (any value) is only ever valid on a Bank Account. */
+    private void validatePurpose(AccountType accountType, AccountPurpose purpose, String purposeLabel) {
+        if (purpose == null) return;
+        if (accountType != AccountType.BANK_ACCOUNT) {
+            throw new BusinessException("Purpose can only be set on a Bank Account.", HttpStatus.BAD_REQUEST);
+        }
+        if (purpose == AccountPurpose.CUSTOM && (purposeLabel == null || purposeLabel.isBlank())) {
+            throw new BusinessException("A custom purpose needs a short label.", HttpStatus.BAD_REQUEST);
+        }
     }
 
     private void applyLoanFields(WalletAccount account, CreateAccountRequest req, UUID userId) {
@@ -187,7 +223,7 @@ public class WalletAccountServiceImpl implements WalletAccountService {
         if (req.getAutopayAccountId() != null) {
             WalletAccount source = accountRepository.findByIdAndUserId(req.getAutopayAccountId(), userId)
                     .orElseThrow(() -> new ResourceNotFoundException("WalletAccount", "id", req.getAutopayAccountId()));
-            if (source.getAccountType().isLiability() || source.getAccountType() == AccountType.INVESTMENT) {
+            if (source.getAccountType().isLiability()) {
                 throw new BusinessException("EMIs can only be auto-debited from a cash or bank account.", HttpStatus.BAD_REQUEST);
             }
             account.setAutopayAccountId(source.getId());
@@ -197,25 +233,23 @@ public class WalletAccountServiceImpl implements WalletAccountService {
     @Override
     @Transactional
     @CacheEvict(value = "dashboard", allEntries = true)
-    public void deleteAccount(UUID id, UUID userId, boolean alsoDeleteTransactions) {
+    public void deleteAccount(UUID id, UUID userId) {
         WalletAccount account = findAndValidate(id, userId);
-        // Default: detach so reports/charts that sum by month or category keep reflecting money
-        // that already moved. Opt-in: the user explicitly asked to purge this account's history too.
-        if (alsoDeleteTransactions) {
-            expenseRepository.deleteByAccountId(id);
-            incomeRepository.deleteByAccountId(id);
-        } else {
-            expenseRepository.clearAccountId(id);
-            incomeRepository.clearAccountId(id);
+        // Accounts/investments with real history are never physically deleted — Close or Archive
+        // instead. Only a genuinely empty account (never touched by an expense, income, transfer,
+        // investment funding/dividend link, or goal) can be hard-deleted.
+        boolean hasHistory = expenseRepository.existsByAccountId(id)
+                || incomeRepository.existsByAccountId(id)
+                || !transferRepository.findByAccountId(id).isEmpty()
+                || investmentRepository.existsByDebitAccountId(id)
+                || investmentRepository.existsByLinkedAccountId(id)
+                || goalRepository.existsByAccountId(id);
+        if (hasHistory) {
+            throw new BusinessException(
+                "This account has transaction history — close or archive it instead of deleting.",
+                HttpStatus.CONFLICT
+            );
         }
-        // Clear nullable FK references so deletion doesn't hit constraint violations
-        investmentRepository.clearLinkedAccountId(id);
-        investmentRepository.clearDebitAccountId(id);
-        goalRepository.clearAccountId(id);
-        // Transfers have ON DELETE RESTRICT — must be deleted explicitly
-        transferRepository.deleteAll(transferRepository.findByAccountId(id));
-        // debt_records.account_id has ON DELETE SET NULL — handled by DB
-        // recurring_income.account_id has ON DELETE CASCADE — handled by DB
         accountRepository.delete(account);
     }
 
@@ -411,7 +445,9 @@ public class WalletAccountServiceImpl implements WalletAccountService {
                 .totalMoneyOut(displayOut)
                 .recentTransactions(recent)
                 .createdAt(account.getCreatedAt())
-                .archived(account.isArchived())
+                .status(account.getStatus().name())
+                .purpose(account.getPurpose() != null ? account.getPurpose().name() : null)
+                .purposeLabel(account.getPurposeLabel())
                 .primary(account.isPrimary());
 
         if (isCreditCard) {

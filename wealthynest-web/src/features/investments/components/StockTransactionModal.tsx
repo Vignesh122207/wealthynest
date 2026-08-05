@@ -15,9 +15,9 @@ import type {PickerAccountList} from "@/features/investments/constants";
 import type {Investment} from "@/features/investments/types/investment.types";
 import {cn, formatCurrency} from "@/lib/utils";
 
-export function StockTransactionModal({ inv, type, onClose, bankAccounts, investmentAccounts }: {
+export function StockTransactionModal({ inv, type, onClose, bankAccounts }: {
   inv: Investment; type: "BUY" | "SELL"; onClose: () => void;
-  bankAccounts: PickerAccountList; investmentAccounts: PickerAccountList;
+  bankAccounts: PickerAccountList;
 }) {
   const isBuy = type === "BUY";
   const maxQty = isBuy ? undefined : Number(inv.units ?? 0);
@@ -115,12 +115,12 @@ export function StockTransactionModal({ inv, type, onClose, bankAccounts, invest
             </div>
           )}
 
-          {(bankAccounts.length > 0 || investmentAccounts.length > 0) && (
+          {bankAccounts.length > 0 && (
             <Controller control={form.control} name="accountId" render={({ field }) => (
               <AccountPicker
                 label={isBuy ? "Debit from Account (optional)" : "Credit proceeds to Account (optional)"}
                 placeholder={isBuy ? "None (no debit)" : "None (track only)"}
-                bankAccounts={bankAccounts} investmentAccounts={investmentAccounts}
+                bankAccounts={bankAccounts}
                 allowClear value={field.value ?? ""} onChange={field.onChange} />
             )} />
           )}

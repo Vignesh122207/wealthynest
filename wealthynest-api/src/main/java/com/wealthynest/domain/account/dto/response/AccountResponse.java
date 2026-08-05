@@ -25,7 +25,9 @@ public class AccountResponse {
     private BigDecimal totalMoneyOut;
     private List<AccountTransactionItem> recentTransactions;
     private Instant    createdAt;
-    private boolean    archived;
+    private String     status;
+    private String     purpose;
+    private String     purposeLabel;
     private boolean    primary;
 
     // Credit card fields (null for non-credit-card accounts)

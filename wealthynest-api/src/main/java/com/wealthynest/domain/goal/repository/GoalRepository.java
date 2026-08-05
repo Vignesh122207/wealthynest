@@ -11,14 +11,14 @@ import java.util.UUID;
 
 @Repository
 public interface GoalRepository extends JpaRepository<Goal, UUID> {
+
+    /** Cheap EXISTS check — used to decide whether an account has any history before allowing delete. */
+    boolean existsByAccountId(UUID accountId);
+
     List<Goal> findByUserIdOrderByCreatedAtAsc(UUID userId);
 
     // Family-scoped equivalent, for a caller currently in a family — mirrors BudgetRepository.
     List<Goal> findByFamilyIdOrderByCreatedAtAsc(UUID familyId);
-
-    @Modifying
-    @Query("UPDATE Goal g SET g.accountId = null WHERE g.accountId = :accountId")
-    void clearAccountId(@Param("accountId") UUID accountId);
 
     @Modifying
     @Query("UPDATE Goal g SET g.familyId = :familyId WHERE g.userId = :userId AND g.familyId IS NULL")

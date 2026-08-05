@@ -1,5 +1,6 @@
 package com.wealthynest.infra.scheduler;
 
+import com.wealthynest.common.entity.LifecycleStatus;
 import com.wealthynest.domain.investment.entity.Investment;
 import com.wealthynest.domain.investment.entity.InvestmentType;
 import com.wealthynest.domain.investment.repository.InvestmentRepository;
@@ -31,7 +32,7 @@ public class SipReminderScheduler {
     public void checkUpcomingSips() {
         LocalDate today = LocalDate.now();
         int notified = 0;
-        for (Investment inv : investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.MUTUAL_FUND)) {
+        for (Investment inv : investmentRepository.findByInvestmentTypeAndStatus(InvestmentType.MUTUAL_FUND, LifecycleStatus.ACTIVE)) {
             try {
                 if (inv.getSipDay() == null || inv.getSipAmount() == null) continue;
                 if (inv.getSipDay() < 1 || inv.getSipDay() > 31) continue;

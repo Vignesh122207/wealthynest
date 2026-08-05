@@ -9,19 +9,19 @@ import {FormSelect} from "@/components/forms/FormSelect";
 import {FormDatePicker} from "@/components/forms/FormDatePicker";
 import {AccountPicker} from "@/components/transactions/AccountPicker";
 import {FormButtons} from "./FormButtons";
+import {BrokerAndPurposeFields} from "./BrokerAndPurposeFields";
 import {type BondFormValues, bondSchema} from "@/features/investments/schemas/investment.schema";
 import {COUPON_FREQ, type PickerAccountList} from "@/features/investments/constants";
 import {formatCurrency} from "@/lib/utils";
 
 export type BondSubmitValues = BondFormValues & { _investedAmount: number };
 
-export function BondForm({ defaultValues, onSubmit, onCancel, isPending, bankAccounts, investmentAccounts, isEditing }: {
+export function BondForm({ defaultValues, onSubmit, onCancel, isPending, bankAccounts, isEditing }: {
   defaultValues?: Partial<BondFormValues>;
   onSubmit: (v: BondSubmitValues) => void;
   onCancel: () => void;
   isPending: boolean;
   bankAccounts: PickerAccountList;
-  investmentAccounts: PickerAccountList;
   isEditing: boolean;
 }) {
   const form = useForm<BondFormValues>({
@@ -118,13 +118,14 @@ export function BondForm({ defaultValues, onSubmit, onCancel, isPending, bankAcc
               bankAccounts={bankAccounts} value={field.value ?? ""} onChange={field.onChange} />
           )} />
         )}
-        {!isEditing && (bankAccounts.length > 0 || investmentAccounts.length > 0) && (
+        {!isEditing && bankAccounts.length > 0 && (
           <Controller control={form.control} name="debitAccountId" render={({ field }) => (
             <AccountPicker label="Debit from Account (optional)" placeholder="None (no debit)" allowClear
-              bankAccounts={bankAccounts} investmentAccounts={investmentAccounts}
+              bankAccounts={bankAccounts}
               value={field.value ?? ""} onChange={field.onChange} />
           )} />
         )}
+        <BrokerAndPurposeFields form={form} />
       </div>
       <FormButtons onCancel={onCancel} isPending={isPending} label="Save Bond" color="violet" />
     </form>

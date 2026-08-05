@@ -1,7 +1,5 @@
 package com.wealthynest.domain.investment.repository;
 
-import com.wealthynest.domain.asset.entity.Asset;
-import com.wealthynest.domain.asset.entity.AssetType;
 import com.wealthynest.domain.investment.entity.Investment;
 import com.wealthynest.domain.investment.entity.InvestmentType;
 import com.wealthynest.domain.investment.entity.SipTransaction;
@@ -33,11 +31,7 @@ class SipTransactionRepositoryTest extends AbstractRepositoryTest {
                 .passwordHash("hash").build();
         entityManager.persist(user);
 
-        Asset asset = Asset.builder().userId(user.getId()).name("MF").assetType(AssetType.MUTUAL_FUND)
-                .currentValue(BigDecimal.ZERO).asOfDate(LocalDate.now()).build();
-        entityManager.persist(asset);
-
-        Investment investment = Investment.builder().userId(user.getId()).assetId(asset.getId())
+        Investment investment = Investment.builder().userId(user.getId())
                 .investmentType(InvestmentType.MUTUAL_FUND).schemeCode("SC001")
                 .investedAmount(new BigDecimal("1000")).currentValue(new BigDecimal("1100")).build();
         entityManager.persist(investment);

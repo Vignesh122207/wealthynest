@@ -1,7 +1,5 @@
 package com.wealthynest.domain.investment.repository;
 
-import com.wealthynest.domain.asset.entity.Asset;
-import com.wealthynest.domain.asset.entity.AssetType;
 import com.wealthynest.domain.investment.entity.Investment;
 import com.wealthynest.domain.investment.entity.InvestmentType;
 import com.wealthynest.domain.investment.entity.StockTransaction;
@@ -35,11 +33,7 @@ class StockTransactionRepositoryTest extends AbstractRepositoryTest {
         entityManager.persist(user);
         userId = user.getId();
 
-        Asset asset = Asset.builder().userId(userId).name("INFY").assetType(AssetType.STOCK)
-                .currentValue(BigDecimal.ZERO).asOfDate(LocalDate.now()).build();
-        entityManager.persist(asset);
-
-        Investment investment = Investment.builder().userId(userId).assetId(asset.getId())
+        Investment investment = Investment.builder().userId(userId)
                 .investmentType(InvestmentType.STOCK).symbol("INFY")
                 .investedAmount(new BigDecimal("1000")).currentValue(new BigDecimal("1200")).build();
         entityManager.persist(investment);

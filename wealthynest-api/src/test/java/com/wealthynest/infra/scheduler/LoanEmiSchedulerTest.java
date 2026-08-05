@@ -1,5 +1,6 @@
 package com.wealthynest.infra.scheduler;
 
+import com.wealthynest.common.entity.LifecycleStatus;
 import com.wealthynest.domain.account.entity.AccountType;
 import com.wealthynest.domain.account.entity.WalletAccount;
 import com.wealthynest.domain.account.repository.WalletAccountRepository;
@@ -49,7 +50,7 @@ class LoanEmiSchedulerTest {
         void paysDueLoan() {
             LocalDate today = LocalDate.now();
             WalletAccount loan = loan(today.getDayOfMonth(), null);
-            when(accountRepository.findByAccountTypeAndArchivedFalse(AccountType.LOAN)).thenReturn(List.of(loan));
+            when(accountRepository.findByAccountTypeAndStatus(AccountType.LOAN, LifecycleStatus.ACTIVE)).thenReturn(List.of(loan));
             when(loanPaymentService.processAutopay(eq(loan), anyInt())).thenReturn(true);
 
             scheduler.processDueEmis();
@@ -64,7 +65,7 @@ class LoanEmiSchedulerTest {
                     .userId(UUID.randomUUID()).accountType(AccountType.LOAN)
                     .autopayAccountId(null).emiAmount(new BigDecimal("5000")).emiDay(LocalDate.now().getDayOfMonth())
                     .build();
-            when(accountRepository.findByAccountTypeAndArchivedFalse(AccountType.LOAN)).thenReturn(List.of(loan));
+            when(accountRepository.findByAccountTypeAndStatus(AccountType.LOAN, LifecycleStatus.ACTIVE)).thenReturn(List.of(loan));
 
             scheduler.processDueEmis();
 
@@ -77,7 +78,7 @@ class LoanEmiSchedulerTest {
             LocalDate today = LocalDate.now();
             int yyyymm = today.getYear() * 100 + today.getMonthValue();
             WalletAccount loan = loan(today.getDayOfMonth(), yyyymm);
-            when(accountRepository.findByAccountTypeAndArchivedFalse(AccountType.LOAN)).thenReturn(List.of(loan));
+            when(accountRepository.findByAccountTypeAndStatus(AccountType.LOAN, LifecycleStatus.ACTIVE)).thenReturn(List.of(loan));
 
             scheduler.processDueEmis();
 
@@ -90,7 +91,7 @@ class LoanEmiSchedulerTest {
             LocalDate today = LocalDate.now();
             int notToday = today.getDayOfMonth() == 1 ? 2 : 1;
             WalletAccount loan = loan(notToday, null);
-            when(accountRepository.findByAccountTypeAndArchivedFalse(AccountType.LOAN)).thenReturn(List.of(loan));
+            when(accountRepository.findByAccountTypeAndStatus(AccountType.LOAN, LifecycleStatus.ACTIVE)).thenReturn(List.of(loan));
 
             scheduler.processDueEmis();
 
@@ -105,7 +106,7 @@ class LoanEmiSchedulerTest {
             // Only meaningful when today IS the last day of a month shorter than 31 days.
             org.junit.jupiter.api.Assumptions.assumeTrue(lastDayOfMonth < 31 && today.getDayOfMonth() == lastDayOfMonth);
             WalletAccount loan = loan(31, null);
-            when(accountRepository.findByAccountTypeAndArchivedFalse(AccountType.LOAN)).thenReturn(List.of(loan));
+            when(accountRepository.findByAccountTypeAndStatus(AccountType.LOAN, LifecycleStatus.ACTIVE)).thenReturn(List.of(loan));
             when(loanPaymentService.processAutopay(eq(loan), anyInt())).thenReturn(true);
 
             scheduler.processDueEmis();
@@ -119,7 +120,7 @@ class LoanEmiSchedulerTest {
             LocalDate today = LocalDate.now();
             WalletAccount failing = loan(today.getDayOfMonth(), null);
             WalletAccount succeeding = loan(today.getDayOfMonth(), null);
-            when(accountRepository.findByAccountTypeAndArchivedFalse(AccountType.LOAN))
+            when(accountRepository.findByAccountTypeAndStatus(AccountType.LOAN, LifecycleStatus.ACTIVE))
                     .thenReturn(List.of(failing, succeeding));
             when(loanPaymentService.processAutopay(eq(failing), anyInt())).thenThrow(new RuntimeException("boom"));
             when(loanPaymentService.processAutopay(eq(succeeding), anyInt())).thenReturn(true);

@@ -27,11 +27,18 @@ export const accountsApi = {
   unarchiveAccount: async (id: string): Promise<WalletAccount> =>
     (await apiClient.patch<ApiResponse<WalletAccount>>(`/accounts/${id}/unarchive`)).data.data,
 
+  /** ACTIVE → CLOSED only — a real-world terminal event (loan paid off, account closed at the
+   * bank). Not reversible in this version, unlike archive. */
+  closeAccount: async (id: string): Promise<WalletAccount> =>
+    (await apiClient.patch<ApiResponse<WalletAccount>>(`/accounts/${id}/close`)).data.data,
+
   setPrimary: async (id: string): Promise<WalletAccount> =>
     (await apiClient.patch<ApiResponse<WalletAccount>>(`/accounts/${id}/set-primary`)).data.data,
 
-  deleteAccount: async (id: string, alsoDeleteTransactions = false): Promise<void> => {
-    await apiClient.delete(`/accounts/${id}`, { params: { alsoDeleteTransactions } });
+  /** Only succeeds when the account has zero history — the API rejects (409) otherwise with a
+   * message suggesting Close or Archive instead. */
+  deleteAccount: async (id: string): Promise<void> => {
+    await apiClient.delete(`/accounts/${id}`);
   },
 
   getTransfers: async (page = 0, size = 20): Promise<PagedResponse<AccountTransfer>> =>

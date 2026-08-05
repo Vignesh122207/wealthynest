@@ -16,6 +16,7 @@ import {
     useAdjustBalance,
     useArchiveAccount,
     useArchivedAccounts,
+    useCloseAccount,
     useCreateAccount,
     useDeleteAccount,
     useRecordLoanPayment,
@@ -68,7 +69,7 @@ const AccountTransactionModals = dynamic(
 type ModalType = "none" | "create" | "addMoney" | "addExpense" | "transfer" | "edit" | "import";
 type ConfirmState = { title: string; message: string; onConfirm: () => void } | null;
 
-const SECTION_FILTERS = ["all", "bank", "cash", "cc", "loan", "invest"] as const;
+const SECTION_FILTERS = ["all", "bank", "cash", "cc", "loan"] as const;
 
 // Module-scope, not a per-render literal — AccountCard's linkedDebts needs the exact same array
 // reference every time an account genuinely has none, or the memoized card re-renders anyway.
@@ -87,7 +88,6 @@ export default function AccountsPage() {
   const [showCCDetails, setShowCCDetails] = useState(false);
   const [confirm, setConfirm]          = useState<ConfirmState>(null);
   const [deleteTarget, setDeleteTarget] = useState<WalletAccount | null>(null);
-  const [alsoDeleteTx, setAlsoDeleteTx] = useState(false);
 
   const [showArchived, setShowArchived]      = useState(false);
   const { data: accounts = [], isLoading, isError, refetch }   = useAccounts();
@@ -136,6 +136,7 @@ export default function AccountsPage() {
   const { mutate: deleteAccount }                             = useDeleteAccount();
   const { mutate: archiveAccount }                            = useArchiveAccount();
   const { mutate: unarchiveAccount }                          = useUnarchiveAccount();
+  const { mutate: closeAccountMutation }                      = useCloseAccount();
   const { mutate: setPrimaryAccount, isPending: settingPrimary } = useSetPrimaryAccount();
   const { mutate: doTransfer, isPending: transferring }       = useTransfer();
   const { mutate: recordLoanPayment, isPending: payingLoan }  = useRecordLoanPayment();
@@ -152,16 +153,16 @@ export default function AccountsPage() {
     defaultValues: { accountType: "CASH_WALLET", name: "Cash Wallet", openingBalance: undefined },
   });
 
-  const cashAccounts      = accounts.filter(a => a.accountType === "CASH_WALLET");
-  const bankAccounts      = accounts.filter(a => a.accountType === "BANK_ACCOUNT");
-  const emergencyAccounts = accounts.filter(a => a.accountType === "EMERGENCY_FUND");
-  const creditCards       = accounts.filter(a => a.accountType === "CREDIT_CARD");
-  const loanAccounts      = accounts.filter(a => a.accountType === "LOAN");
-  const investAccounts    = accounts.filter(a => a.accountType === "INVESTMENT");
+  // Purpose (Emergency Fund, etc.) is just a tag on a Bank Account now, not a separate type — a
+  // purpose-tagged account already lands in bankAccounts naturally. Same for what used to be a
+  // distinct "Investment Account" type (broker cash float is a purpose-tagged bank account too).
+  const cashAccounts = accounts.filter(a => a.accountType === "CASH_WALLET");
+  const bankAccounts = accounts.filter(a => a.accountType === "BANK_ACCOUNT");
+  const creditCards  = accounts.filter(a => a.accountType === "CREDIT_CARD");
+  const loanAccounts = accounts.filter(a => a.accountType === "LOAN");
 
   const SECTION_TYPES: Record<Exclude<typeof sectionFilter, "all">, AccountType[]> = {
-    bank: ["BANK_ACCOUNT"], cash: ["CASH_WALLET", "EMERGENCY_FUND"],
-    invest: ["INVESTMENT"], cc: ["CREDIT_CARD"], loan: ["LOAN"],
+    bank: ["BANK_ACCOUNT"], cash: ["CASH_WALLET"], cc: ["CREDIT_CARD"], loan: ["LOAN"],
   };
   const filteredArchived = sectionFilter === "all"
     ? archivedAccounts
@@ -170,15 +171,13 @@ export default function AccountsPage() {
   const totalBalance   = [...cashAccounts, ...bankAccounts].reduce((s, a) => s + a.currentBalance, 0);
   const bankBalance    = bankAccounts.reduce((s, a) => s + a.currentBalance, 0);
   const cashBalance    = cashAccounts.reduce((s, a) => s + a.currentBalance, 0);
-  const emergencyBal   = emergencyAccounts.reduce((s, a) => s + a.currentBalance, 0);
-  const investBalance  = investAccounts.reduce((s, a) => s + a.currentBalance, 0);
   const creditCardDebt = creditCards.reduce((s, a) => s + Math.max(0, a.currentBalance), 0);
   const loanDebt       = loanAccounts.reduce((s, a) => s + Math.max(0, a.currentBalance), 0);
 
-  // Total balance = everything you own outright (cash, bank, emergency fund, broker cash) —
-  // matches the dashboard's own "Total Balance" widget; credit cards and loans are liabilities,
-  // already broken out in their own stat cards below, so they're not netted in here.
-  const totalAssetsAcrossAccounts = totalBalance + emergencyBal + investBalance;
+  // Total balance = everything you own outright (cash + bank, purpose-tagged or not) — matches
+  // the dashboard's own "Total Balance" widget; credit cards and loans are liabilities, already
+  // broken out in their own stat cards below, so they're not netted in here.
+  const totalAssetsAcrossAccounts = totalBalance;
 
   const categoryOptions = categories.map(c => ({ value: c.id, label: c.name, icon: c.icon, color: c.color }));
 
@@ -190,8 +189,7 @@ export default function AccountsPage() {
     setShowCCDetails(false);
     createForm.reset({
       accountType: type, openingBalance: undefined,
-      name: type === "CASH_WALLET" ? "Cash Wallet" : type === "EMERGENCY_FUND" ? "Emergency Fund"
-        : type === "INVESTMENT" ? "Investment Account" : type === "CREDIT_CARD" ? "Credit Card" : type === "LOAN" ? "Loan" : "",
+      name: type === "CASH_WALLET" ? "Cash Wallet" : type === "CREDIT_CARD" ? "Credit Card" : type === "LOAN" ? "Loan" : "",
     });
     setModal("create");
   };
@@ -241,9 +239,9 @@ export default function AccountsPage() {
 
   const close = () => { setModal("none"); setEditAccount(null); setPreAccount(null); setLockedExpenseAccount(null); setActualBalance(""); };
 
-  // Types whose form collects a bank / lender / broker name via BankNameInput
+  // Types whose form collects a bank / lender name via BankNameInput
   const usesBankInput = (t: AccountType) =>
-    t === "BANK_ACCOUNT" || t === "CREDIT_CARD" || t === "LOAN" || t === "INVESTMENT";
+    t === "BANK_ACCOUNT" || t === "CREDIT_CARD" || t === "LOAN";
 
   const onCreateSubmit = (v: CreateAccountForm) => {
     const withBank = usesBankInput(v.accountType);
@@ -265,7 +263,6 @@ export default function AccountsPage() {
     const { openingBalance: _ob, ...rest } = v;
     const derivedName = (() => {
       switch (editAccount.accountType) {
-        case "INVESTMENT":  return bankInput || editAccount.name;
         case "CREDIT_CARD": return bankInput ? `${bankInput} Card` : editAccount.name;
         case "LOAN": {
           const label = LOAN_TYPE_LABELS[v.loanType ?? ""];
@@ -331,14 +328,9 @@ export default function AccountsPage() {
       { onSuccess: close });
   };
 
-  const creditLimitField      = createForm.register("creditLimit");
-  const watchedType           = createForm.watch("accountType");
-  const activeType            = modal === "create" ? watchedType : (editAccount?.accountType ?? watchedType);
-  const isCCForm              = activeType === "CREDIT_CARD";
-  const isBankForm            = activeType === "BANK_ACCOUNT";
-  const isLoanForm            = activeType === "LOAN";
-  const isInvForm             = activeType === "INVESTMENT";
-  const isSimpleType          = activeType === "CASH_WALLET" || activeType === "EMERGENCY_FUND";
+  const activeType = modal === "create" ? createForm.watch("accountType") : (editAccount?.accountType ?? createForm.watch("accountType"));
+  const isCCForm    = activeType === "CREDIT_CARD";
+  const isLoanForm  = activeType === "LOAN";
 
   // Balance-reconciliation preview for the Edit form's "Actual balance" field.
   const editBalanceTarget     = parseFloat(actualBalance);
@@ -370,7 +362,7 @@ export default function AccountsPage() {
       onRecordPayment={() => { setPayLoan(a); setPayAmount(a.emiAmount ? String(a.emiAmount) : ""); setPayFrom(a.autopayAccountId ?? ""); }} />
   ) : (
     <AccountCard key={a.id} account={a}
-      linkedDebts={a.accountType === "INVESTMENT" ? NO_DEBTS : (debtsByAccountId.get(a.id) ?? NO_DEBTS)}
+      linkedDebts={debtsByAccountId.get(a.id) ?? NO_DEBTS}
       onAddMoney={() => openAddMoney(a)}
       onAddExpense={() => openAddExpense(a)}
       onTransfer={() => openTransfer(a, a.accountType === "CREDIT_CARD")}
@@ -381,7 +373,7 @@ export default function AccountsPage() {
       {...sharedCardProps(a)} />
   );
 
-  const allAccountsOrdered = [...bankAccounts, ...cashAccounts, ...emergencyAccounts, ...investAccounts, ...creditCards, ...loanAccounts];
+  const allAccountsOrdered = [...bankAccounts, ...cashAccounts, ...creditCards, ...loanAccounts];
 
   return (
     <div className="flex flex-col flex-1">
@@ -389,16 +381,16 @@ export default function AccountsPage() {
 
       {confirm && (
         <ConfirmDialog open title={confirm.title} description={confirm.message}
-          confirmLabel={confirm.title.startsWith("Archive") ? "Archive" : confirm.title.startsWith("Restore") ? "Restore" : "Delete"}
+          confirmLabel={confirm.title.startsWith("Archive") ? "Archive" : confirm.title.startsWith("Restore") ? "Restore" : confirm.title.startsWith("Close") ? "Close" : "Delete"}
           danger={!confirm.title.startsWith("Restore")}
           onConfirm={() => { confirm.onConfirm(); setConfirm(null); }}
           onCancel={() => setConfirm(null)} />
       )}
 
       {deleteTarget && (
-        <DeleteAccountModal deleteTarget={deleteTarget} alsoDeleteTx={alsoDeleteTx} setAlsoDeleteTx={setAlsoDeleteTx}
+        <DeleteAccountModal deleteTarget={deleteTarget}
           onClose={() => setDeleteTarget(null)}
-          onConfirm={() => { deleteAccount({ id: deleteTarget.id, alsoDeleteTransactions: alsoDeleteTx }); setDeleteTarget(null); }} />
+          onConfirm={() => { deleteAccount(deleteTarget.id); setDeleteTarget(null); }} />
       )}
 
       {payLoan && (
@@ -423,6 +415,13 @@ export default function AccountsPage() {
             const label = editAccount.accountType === "LOAN" ? "Archive Loan" : "Archive Account";
             askConfirm(label, `Archive "${editAccount.name}"? It will be hidden from all views but all history is preserved.`,
               () => archiveAccount(editAccount.id));
+            close();
+          }}
+          onCloseAccount={() => {
+            if (!editAccount) return;
+            askConfirm("Close Account",
+              `Close "${editAccount.name}"? This is permanent — a closed account stays visible with its history, but can no longer receive new transactions and can't be reopened.`,
+              () => closeAccountMutation(editAccount.id));
             close();
           }}
           onSubmit={modal === "edit" ? onEditSubmit : onCreateSubmit}
@@ -450,16 +449,13 @@ export default function AccountsPage() {
         <AccountStatStrip
           accounts={accounts} totalAssetsAcrossAccounts={totalAssetsAcrossAccounts}
           bankAccounts={bankAccounts} bankBalance={bankBalance}
-          cashAccounts={cashAccounts} emergencyAccounts={emergencyAccounts}
-          cashBalance={cashBalance} emergencyBal={emergencyBal}
-          investAccounts={investAccounts} investBalance={investBalance}
+          cashAccounts={cashAccounts} cashBalance={cashBalance}
           creditCards={creditCards} creditCardDebt={creditCardDebt}
           loanAccounts={loanAccounts} loanDebt={loanDebt} fmt={fmt}
         />
 
         <AccountFilterTabs
           accounts={accounts} bankAccounts={bankAccounts} cashAccounts={cashAccounts}
-          emergencyAccounts={emergencyAccounts} investAccounts={investAccounts}
           creditCards={creditCards} loanAccounts={loanAccounts}
           sectionFilter={sectionFilter} setSectionFilter={setSectionFilter}
         />
@@ -467,7 +463,6 @@ export default function AccountsPage() {
         <AccountsGrid
           isLoading={isLoading} isError={isError} onRetry={refetch} accounts={accounts} sectionFilter={sectionFilter}
           allAccountsOrdered={allAccountsOrdered} bankAccounts={bankAccounts} cashAccounts={cashAccounts}
-          emergencyAccounts={emergencyAccounts} investAccounts={investAccounts}
           creditCards={creditCards} loanAccounts={loanAccounts}
           renderAccountCard={renderAccountCard} onCreate={openCreate}
         />
@@ -475,7 +470,7 @@ export default function AccountsPage() {
         <ArchivedAccountsSection
           filteredArchived={filteredArchived} showArchived={showArchived} setShowArchived={setShowArchived}
           onRestore={(a) => askConfirm("Restore Account", `Restore "${a.name}"? It will appear in your active accounts again.`, () => unarchiveAccount(a.id))}
-          onDelete={(a) => { setDeleteTarget(a); setAlsoDeleteTx(false); }}
+          onDelete={(a) => setDeleteTarget(a)}
         />
 
 

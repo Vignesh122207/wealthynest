@@ -1,5 +1,6 @@
 package com.wealthynest.infra.scheduler;
 
+import com.wealthynest.common.entity.LifecycleStatus;
 import com.wealthynest.domain.investment.entity.Investment;
 import com.wealthynest.domain.investment.entity.InvestmentType;
 import com.wealthynest.domain.investment.repository.InvestmentRepository;
@@ -33,7 +34,7 @@ class SipReminderSchedulerTest {
 
     private Investment mf(int sipDay) {
         Investment inv = Investment.builder()
-                .userId(UUID.randomUUID()).assetId(UUID.randomUUID())
+                .userId(UUID.randomUUID())
                 .investmentType(InvestmentType.MUTUAL_FUND).companyName("Axis Bluechip Fund")
                 .investedAmount(BigDecimal.ZERO).currentValue(BigDecimal.ZERO)
                 .sipAmount(new BigDecimal("5000")).sipDay(sipDay).build();
@@ -50,7 +51,7 @@ class SipReminderSchedulerTest {
         void notifiesWhenTwoDaysAhead() {
             LocalDate target = LocalDate.now().plusDays(2);
             Investment inv = mf(target.getDayOfMonth());
-            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.MUTUAL_FUND)).thenReturn(List.of(inv));
+            when(investmentRepository.findByInvestmentTypeAndStatus(InvestmentType.MUTUAL_FUND, LifecycleStatus.ACTIVE)).thenReturn(List.of(inv));
 
             scheduler.checkUpcomingSips();
 
@@ -63,7 +64,7 @@ class SipReminderSchedulerTest {
         void skipsWhenNotTwoDaysAhead() {
             LocalDate target = LocalDate.now().plusDays(5);
             Investment inv = mf(target.getDayOfMonth());
-            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.MUTUAL_FUND)).thenReturn(List.of(inv));
+            when(investmentRepository.findByInvestmentTypeAndStatus(InvestmentType.MUTUAL_FUND, LifecycleStatus.ACTIVE)).thenReturn(List.of(inv));
 
             scheduler.checkUpcomingSips();
 
@@ -74,11 +75,11 @@ class SipReminderSchedulerTest {
         @DisplayName("skips a fund with no SIP day configured")
         void skipsUnconfiguredFund() {
             Investment inv = Investment.builder()
-                    .userId(UUID.randomUUID()).assetId(UUID.randomUUID())
+                    .userId(UUID.randomUUID())
                     .investmentType(InvestmentType.MUTUAL_FUND).companyName("Lump Sum Fund")
                     .investedAmount(BigDecimal.ZERO).currentValue(BigDecimal.ZERO)
                     .sipDay(null).build();
-            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.MUTUAL_FUND)).thenReturn(List.of(inv));
+            when(investmentRepository.findByInvestmentTypeAndStatus(InvestmentType.MUTUAL_FUND, LifecycleStatus.ACTIVE)).thenReturn(List.of(inv));
 
             scheduler.checkUpcomingSips();
 
@@ -89,11 +90,11 @@ class SipReminderSchedulerTest {
         @DisplayName("skips a fund with a SIP day but no SIP amount")
         void skipsFundWithNoAmount() {
             Investment inv = Investment.builder()
-                    .userId(UUID.randomUUID()).assetId(UUID.randomUUID())
+                    .userId(UUID.randomUUID())
                     .investmentType(InvestmentType.MUTUAL_FUND)
                     .investedAmount(BigDecimal.ZERO).currentValue(BigDecimal.ZERO)
                     .sipDay(LocalDate.now().plusDays(2).getDayOfMonth()).sipAmount(null).build();
-            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.MUTUAL_FUND)).thenReturn(List.of(inv));
+            when(investmentRepository.findByInvestmentTypeAndStatus(InvestmentType.MUTUAL_FUND, LifecycleStatus.ACTIVE)).thenReturn(List.of(inv));
 
             scheduler.checkUpcomingSips();
 
@@ -107,7 +108,7 @@ class SipReminderSchedulerTest {
             LocalDate expectedNext = today.getDayOfMonth() == 1 ? today : today.plusMonths(1).withDayOfMonth(1);
             org.junit.jupiter.api.Assumptions.assumeTrue(!expectedNext.isEqual(today.plusDays(2)));
             Investment inv = mf(1);
-            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.MUTUAL_FUND)).thenReturn(List.of(inv));
+            when(investmentRepository.findByInvestmentTypeAndStatus(InvestmentType.MUTUAL_FUND, LifecycleStatus.ACTIVE)).thenReturn(List.of(inv));
 
             scheduler.checkUpcomingSips();
 
@@ -120,7 +121,7 @@ class SipReminderSchedulerTest {
             LocalDate target = LocalDate.now().plusDays(2);
             Investment failing = mf(target.getDayOfMonth());
             Investment succeeding = mf(target.getDayOfMonth());
-            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.MUTUAL_FUND))
+            when(investmentRepository.findByInvestmentTypeAndStatus(InvestmentType.MUTUAL_FUND, LifecycleStatus.ACTIVE))
                     .thenReturn(List.of(failing, succeeding));
             doThrow(new RuntimeException("boom")).when(notificationService)
                     .createSipUpcomingNotification(eq(failing.getUserId()), any(), any(), any());

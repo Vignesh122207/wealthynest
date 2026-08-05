@@ -1,5 +1,6 @@
 package com.wealthynest.domain.networth.service;
 
+import com.wealthynest.common.entity.LifecycleStatus;
 import com.wealthynest.domain.account.dto.response.AccountResponse;
 import com.wealthynest.domain.account.service.WalletAccountService;
 import com.wealthynest.domain.asset.entity.Asset;
@@ -55,7 +56,7 @@ class NetWorthServiceImplTest {
         lenient().when(walletAccountService.getAccounts(userId)).thenReturn(List.of());
         lenient().when(investmentRepository.sumCurrentValueByUser(userId)).thenReturn(BigDecimal.ZERO);
         lenient().when(assetRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of());
-        lenient().when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of());
+        lenient().when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of());
         lenient().when(liabilityRepository.findByUserIdAndActiveTrueOrderByCreatedAtDesc(userId)).thenReturn(List.of());
     }
 
@@ -66,16 +67,16 @@ class NetWorthServiceImplTest {
     class AccountClassificationTests {
 
         @Test
-        @DisplayName("EMERGENCY_FUND balance counts toward both liquidBalance AND emergencyFund")
-        void emergencyFundCountsAsBothLiquidAndEarmarked() {
-            AccountResponse ef = AccountResponse.builder().accountType("EMERGENCY_FUND").currentBalance(new BigDecimal("5000")).build();
+        @DisplayName("a purpose-tagged BANK_ACCOUNT still counts fully as liquid — purpose is a display tag, not a different bucket")
+        void purposeTaggedAccountStillCountsAsLiquid() {
+            AccountResponse ef = AccountResponse.builder().accountType("BANK_ACCOUNT").purpose("EMERGENCY_FUND")
+                    .currentBalance(new BigDecimal("5000")).build();
             when(walletAccountService.getAccounts(userId)).thenReturn(List.of(ef));
 
             NetWorthSummaryResponse summary = service.getSummary(userId, null);
 
             assertThat(summary.getLiquidBalance()).isEqualByComparingTo("5000");
-            assertThat(summary.getEmergencyFund()).isEqualByComparingTo("5000");
-            assertThat(summary.getTotalAssets()).isEqualByComparingTo("5000"); // not double-counted
+            assertThat(summary.getTotalAssets()).isEqualByComparingTo("5000");
         }
 
         @Test
@@ -107,7 +108,7 @@ class NetWorthServiceImplTest {
         }
 
         @Test
-        @DisplayName("BANK_ACCOUNT / CASH_WALLET / INVESTMENT-type balances are all counted as liquid assets")
+        @DisplayName("BANK_ACCOUNT and CASH_WALLET balances are both counted as liquid assets")
         void otherAccountTypesCountAsLiquid() {
             AccountResponse bank = AccountResponse.builder().accountType("BANK_ACCOUNT").currentBalance(new BigDecimal("1000")).build();
             AccountResponse cash = AccountResponse.builder().accountType("CASH_WALLET").currentBalance(new BigDecimal("200")).build();
@@ -147,23 +148,22 @@ class NetWorthServiceImplTest {
         }
 
         @Test
-        @DisplayName("an asset linked to an active investment is excluded from manualAssetsValue (avoids double-counting)")
-        void investmentLinkedAssetExcludedFromManualValue() {
-            UUID linkedAssetId = UUID.randomUUID();
-            Asset linkedAsset = Asset.builder().assetType(AssetType.STOCK).currentValue(new BigDecimal("99999")).build();
-            ReflectionTestUtils.setField(linkedAsset, "id", linkedAssetId);
-            when(assetRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(linkedAsset));
-            Investment inv = Investment.builder().userId(userId).assetId(linkedAssetId)
+        @DisplayName("a manual Asset and an unrelated active Investment both count in full — Investment no longer links to Asset")
+        void manualAssetAndInvestmentBothCountIndependently() {
+            Asset manualAsset = Asset.builder().assetType(AssetType.STOCK).currentValue(new BigDecimal("99999")).build();
+            ReflectionTestUtils.setField(manualAsset, "id", UUID.randomUUID());
+            when(assetRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(manualAsset));
+            Investment inv = Investment.builder().userId(userId)
                     .investmentType(InvestmentType.STOCK).investedAmount(BigDecimal.ZERO)
-                    .currentValue(new BigDecimal("99999")).build();
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(inv));
-            when(investmentRepository.sumCurrentValueByUser(userId)).thenReturn(new BigDecimal("99999"));
+                    .currentValue(new BigDecimal("50000")).build();
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(inv));
+            when(investmentRepository.sumCurrentValueByUser(userId)).thenReturn(new BigDecimal("50000"));
 
             NetWorthSummaryResponse summary = service.getSummary(userId, null);
 
-            // Counted once via investmentValue (99999), NOT again via manualAssetsValue
-            assertThat(summary.getManualAssetsValue()).isEqualByComparingTo("0");
-            assertThat(summary.getTotalAssets()).isEqualByComparingTo("99999");
+            assertThat(summary.getManualAssetsValue()).isEqualByComparingTo("99999");
+            assertThat(summary.getInvestmentValue()).isEqualByComparingTo("50000");
+            assertThat(summary.getTotalAssets()).isEqualByComparingTo("149999");
         }
 
         @Test
@@ -175,6 +175,75 @@ class NetWorthServiceImplTest {
 
             assertThat(summary.getInvestmentValue()).isEqualByComparingTo("0");
             assertThat(summary.getTotalNetWorth()).isEqualByComparingTo("0");
+        }
+    }
+
+    // ─── getSummary: purposeBreakdown ────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("getSummary: purposeBreakdown")
+    class PurposeBreakdownTests {
+
+        @Test
+        @DisplayName("groups an account and an investment sharing the same purpose into one bucket")
+        void groupsAccountAndInvestmentUnderSamePurpose() {
+            AccountResponse savings = AccountResponse.builder().accountType("BANK_ACCOUNT")
+                    .purpose("EMERGENCY_FUND").name("Savings Account").currentBalance(new BigDecimal("200000")).build();
+            when(walletAccountService.getAccounts(userId)).thenReturn(List.of(savings));
+            Investment fd = Investment.builder().userId(userId).investmentType(InvestmentType.FD)
+                    .bankName("HDFC").purpose(com.wealthynest.common.entity.AccountPurpose.EMERGENCY_FUND)
+                    .investedAmount(new BigDecimal("500000")).currentValue(new BigDecimal("500000")).build();
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(fd));
+
+            NetWorthSummaryResponse summary = service.getSummary(userId, null);
+
+            assertThat(summary.getPurposeBreakdown()).hasSize(1);
+            var bucket = summary.getPurposeBreakdown().get(0);
+            assertThat(bucket.getPurpose()).isEqualTo("EMERGENCY_FUND");
+            assertThat(bucket.getLabel()).isEqualTo("Emergency Fund");
+            assertThat(bucket.getTotalValue()).isEqualByComparingTo("700000");
+            assertThat(bucket.getItems()).extracting("sourceType").containsExactlyInAnyOrder("ACCOUNT", "INVESTMENT");
+        }
+
+        @Test
+        @DisplayName("two rows both tagged CUSTOM with different labels land in two separate buckets, not merged")
+        void customPurposeGroupsByLabelNotByTheSharedCustomValue() {
+            AccountResponse sabbatical = AccountResponse.builder().accountType("BANK_ACCOUNT")
+                    .purpose("CUSTOM").purposeLabel("Sabbatical").name("HDFC Sabbatical").currentBalance(new BigDecimal("90000")).build();
+            AccountResponse wedding = AccountResponse.builder().accountType("BANK_ACCOUNT")
+                    .purpose("CUSTOM").purposeLabel("Wedding").name("ICICI Wedding").currentBalance(new BigDecimal("150000")).build();
+            when(walletAccountService.getAccounts(userId)).thenReturn(List.of(sabbatical, wedding));
+
+            NetWorthSummaryResponse summary = service.getSummary(userId, null);
+
+            assertThat(summary.getPurposeBreakdown()).hasSize(2);
+            assertThat(summary.getPurposeBreakdown()).extracting("label").containsExactlyInAnyOrder("Sabbatical", "Wedding");
+        }
+
+        @Test
+        @DisplayName("untagged accounts/investments are excluded from every purpose bucket")
+        void untaggedRowsExcludedFromBreakdown() {
+            AccountResponse untagged = AccountResponse.builder().accountType("BANK_ACCOUNT")
+                    .currentBalance(new BigDecimal("1000")).build();
+            when(walletAccountService.getAccounts(userId)).thenReturn(List.of(untagged));
+
+            NetWorthSummaryResponse summary = service.getSummary(userId, null);
+
+            assertThat(summary.getPurposeBreakdown()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("purposeBreakdown is a re-slice, not additive — it never changes totalAssets")
+        void breakdownNeverInflatesTotalAssets() {
+            AccountResponse tagged = AccountResponse.builder().accountType("BANK_ACCOUNT")
+                    .purpose("GENERAL_SAVINGS").currentBalance(new BigDecimal("42000")).build();
+            when(walletAccountService.getAccounts(userId)).thenReturn(List.of(tagged));
+
+            NetWorthSummaryResponse summary = service.getSummary(userId, null);
+
+            assertThat(summary.getPurposeBreakdown()).hasSize(1);
+            assertThat(summary.getPurposeBreakdown().get(0).getTotalValue()).isEqualByComparingTo("42000");
+            assertThat(summary.getTotalAssets()).isEqualByComparingTo("42000"); // not 84000
         }
     }
 

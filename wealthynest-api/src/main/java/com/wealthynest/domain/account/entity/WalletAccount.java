@@ -1,6 +1,8 @@
 package com.wealthynest.domain.account.entity;
 
+import com.wealthynest.common.entity.AccountPurpose;
 import com.wealthynest.common.entity.BaseEntity;
+import com.wealthynest.common.entity.LifecycleStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
@@ -31,6 +33,15 @@ public class WalletAccount extends BaseEntity {
     @Column(name = "opening_balance", nullable = false, precision = 14, scale = 2)
     @Builder.Default
     private BigDecimal openingBalance = BigDecimal.ZERO;
+
+    /** Optional "what is this money for" tag — only ever set when accountType == BANK_ACCOUNT. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 30)
+    private AccountPurpose purpose;
+
+    /** Free-text label, set only when purpose == CUSTOM — becomes its own Dashboard bucket. */
+    @Column(name = "purpose_label", length = 100)
+    private String purposeLabel;
 
     /** Optional — fires a (deduped, once/day) low-balance notification when the live balance
      * drops at/below this. Null = alert disabled. Meaningless for liability accounts. */
@@ -76,9 +87,10 @@ public class WalletAccount extends BaseEntity {
     @Column(name = "last_emi_yyyymm")
     private Integer lastEmiYyyymm;
 
-    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10)
     @Builder.Default
-    private boolean archived = false;
+    private LifecycleStatus status = LifecycleStatus.ACTIVE;
 
     /** Only meaningful for BANK_ACCOUNT; at most one primary account per user. */
     @Column(name = "is_primary", nullable = false)

@@ -1,5 +1,6 @@
 package com.wealthynest.infra.scheduler;
 
+import com.wealthynest.common.entity.LifecycleStatus;
 import com.wealthynest.domain.account.entity.AccountType;
 import com.wealthynest.domain.account.entity.WalletAccount;
 import com.wealthynest.domain.account.repository.WalletAccountRepository;
@@ -30,7 +31,7 @@ public class EmiReminderScheduler {
     public void checkUpcomingEmis() {
         LocalDate today = LocalDate.now();
         int notified = 0;
-        for (WalletAccount loan : accountRepository.findByAccountTypeAndArchivedFalse(AccountType.LOAN)) {
+        for (WalletAccount loan : accountRepository.findByAccountTypeAndStatus(AccountType.LOAN, LifecycleStatus.ACTIVE)) {
             try {
                 if (loan.getAutopayAccountId() == null || loan.getEmiAmount() == null || loan.getEmiDay() == null) continue;
                 LocalDate nextEmiDate = nextEmiDate(loan.getEmiDay(), today);

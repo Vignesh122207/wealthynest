@@ -43,12 +43,10 @@ export function GoalForm({ goal, goalColor, isCreate, onSubmit, onCancel, onClos
   const { data: accounts = [] } = useAccounts();
   const { user } = useAuthStore();
   const inFamily = !!user?.familyId;
-  // Credit cards aren't a sensible savings-goal destination; Emergency Fund
-  // accounts very much are (it's one of the goal presets) and were part of the
-  // original "any account except credit card" set, so keep those linkable too.
-  const cashAccounts          = accounts.filter(a => a.accountType === "CASH_WALLET");
-  const bankAccounts          = accounts.filter(a => a.accountType === "BANK_ACCOUNT");
-  const emergencyFundAccounts = accounts.filter(a => a.accountType === "EMERGENCY_FUND");
+  // Credit cards aren't a sensible savings-goal destination — Bank Accounts (which now includes
+  // any Emergency-Fund-purpose-tagged accounts, purpose being just a tag) and Cash Wallets are.
+  const cashAccounts = accounts.filter(a => a.accountType === "CASH_WALLET");
+  const bankAccounts = accounts.filter(a => a.accountType === "BANK_ACCOUNT");
 
   const form = useForm<GoalFormValues>({
     // Rebuilt fresh each render from the current accountId state — zodResolver reads whichever
@@ -171,12 +169,11 @@ export function GoalForm({ goal, goalColor, isCreate, onSubmit, onCancel, onClos
             <div>
               <AccountPicker label="Link to Account (optional — auto-syncs progress)"
                 cashAccounts={cashAccounts} bankAccounts={bankAccounts} creditAccounts={[]}
-                emergencyFundAccounts={emergencyFundAccounts}
                 testId="goal-account-picker"
                 value={accountId}
                 onChange={id => {
                   setAccountId(id);
-                  const acc = [...cashAccounts, ...bankAccounts, ...emergencyFundAccounts].find(a => a.id === id);
+                  const acc = [...cashAccounts, ...bankAccounts].find(a => a.id === id);
                   if (acc) form.setValue("savedAmount", acc.currentBalance, { shouldValidate: true });
                 }} />
               {accountId && accountId !== goal?.accountId && (

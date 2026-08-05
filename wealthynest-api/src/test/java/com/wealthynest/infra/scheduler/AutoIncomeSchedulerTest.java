@@ -1,5 +1,6 @@
 package com.wealthynest.infra.scheduler;
 
+import com.wealthynest.common.entity.LifecycleStatus;
 import com.wealthynest.domain.income.entity.IncomeEntry;
 import com.wealthynest.domain.income.repository.IncomeRepository;
 import com.wealthynest.domain.investment.entity.*;
@@ -114,9 +115,9 @@ class AutoIncomeSchedulerTest {
         @BeforeEach
         void stubBondFdAndFindAllToEmpty() {
             // Prevent bond/FD/price paths from calling mockSelf and interfering
-            lenient().when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.BOND))
+            lenient().when(investmentRepository.findByInvestmentTypeAndStatus(InvestmentType.BOND, LifecycleStatus.ACTIVE))
                 .thenReturn(Collections.emptyList());
-            lenient().when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.FD))
+            lenient().when(investmentRepository.findByInvestmentTypeAndStatus(InvestmentType.FD, LifecycleStatus.ACTIVE))
                 .thenReturn(Collections.emptyList());
             lenient().when(investmentRepository.findAll())
                 .thenReturn(Collections.emptyList());
@@ -125,7 +126,7 @@ class AutoIncomeSchedulerTest {
         @Test
         @DisplayName("no active STOCK investments → self never invoked")
         void noActiveStocks_noInteractionsWithSelf() {
-            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK))
+            when(investmentRepository.findByInvestmentTypeAndStatus(InvestmentType.STOCK, LifecycleStatus.ACTIVE))
                 .thenReturn(Collections.emptyList());
 
             scheduler.runAllAutoIncome();
@@ -143,7 +144,7 @@ class AutoIncomeSchedulerTest {
                 .investedAmount(BigDecimal.valueOf(1000))
                 .currentValue(BigDecimal.valueOf(1000))
                 .build();
-            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK))
+            when(investmentRepository.findByInvestmentTypeAndStatus(InvestmentType.STOCK, LifecycleStatus.ACTIVE))
                 .thenReturn(List.of(inv));
 
             scheduler.runAllAutoIncome();
@@ -161,7 +162,7 @@ class AutoIncomeSchedulerTest {
                 .investedAmount(BigDecimal.valueOf(1000))
                 .currentValue(BigDecimal.valueOf(1000))
                 .build();
-            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK))
+            when(investmentRepository.findByInvestmentTypeAndStatus(InvestmentType.STOCK, LifecycleStatus.ACTIVE))
                 .thenReturn(List.of(inv));
 
             scheduler.runAllAutoIncome();
@@ -177,7 +178,7 @@ class AutoIncomeSchedulerTest {
             // Production code sleeps 2 s between symbols — this test takes ~2 s
             Investment inv1 = buildStockInvestment("RELIANCE", LocalDate.now().minusYears(1));
             Investment inv2 = buildStockInvestment("TCS",      LocalDate.now().minusYears(1));
-            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK))
+            when(investmentRepository.findByInvestmentTypeAndStatus(InvestmentType.STOCK, LifecycleStatus.ACTIVE))
                 .thenReturn(List.of(inv1, inv2));
 
             scheduler.runAllAutoIncome();
@@ -510,7 +511,7 @@ class AutoIncomeSchedulerTest {
             verify(incomeRepository).save(any(IncomeEntry.class));
             ArgumentCaptor<Investment> fdCaptor = ArgumentCaptor.forClass(Investment.class);
             verify(investmentRepository).save(fdCaptor.capture());
-            assertThat(fdCaptor.getValue().isActive()).isFalse();
+            assertThat(fdCaptor.getValue().getStatus()).isEqualTo(LifecycleStatus.CLOSED);
         }
     }
 
@@ -676,7 +677,7 @@ class AutoIncomeSchedulerTest {
             // FD must be deactivated and persisted
             ArgumentCaptor<Investment> fdCaptor = ArgumentCaptor.forClass(Investment.class);
             verify(investmentRepository).save(fdCaptor.capture());
-            assertThat(fdCaptor.getValue().isActive()).isFalse();
+            assertThat(fdCaptor.getValue().getStatus()).isEqualTo(LifecycleStatus.CLOSED);
         }
 
         @Test
@@ -696,7 +697,7 @@ class AutoIncomeSchedulerTest {
             verify(incomeRepository).save(any(IncomeEntry.class));
             ArgumentCaptor<Investment> fdCaptor = ArgumentCaptor.forClass(Investment.class);
             verify(investmentRepository).save(fdCaptor.capture());
-            assertThat(fdCaptor.getValue().isActive()).isFalse();
+            assertThat(fdCaptor.getValue().getStatus()).isEqualTo(LifecycleStatus.CLOSED);
         }
     }
 
@@ -709,7 +710,7 @@ class AutoIncomeSchedulerTest {
         @Test
         @DisplayName("no investments in repository → self never invoked")
         void noActiveStocks_noInteractionsWithSelf() {
-            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK)).thenReturn(Collections.emptyList());
+            when(investmentRepository.findByInvestmentTypeAndStatus(InvestmentType.STOCK, LifecycleStatus.ACTIVE)).thenReturn(Collections.emptyList());
 
             scheduler.seedMissingStockPrices();
 
@@ -720,7 +721,7 @@ class AutoIncomeSchedulerTest {
         @DisplayName("investment with null symbol is excluded before grouping")
         void investmentWithNoSymbol_excluded() {
             Investment inv = buildStockInvestment(null, LocalDate.now().minusYears(1));
-            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK)).thenReturn(List.of(inv));
+            when(investmentRepository.findByInvestmentTypeAndStatus(InvestmentType.STOCK, LifecycleStatus.ACTIVE)).thenReturn(List.of(inv));
 
             scheduler.seedMissingStockPrices();
 
@@ -732,7 +733,7 @@ class AutoIncomeSchedulerTest {
         void multipleInvestmentsSameSymbol_selfCalledOnce() {
             Investment inv1 = buildStockInvestment("TCS", LocalDate.now().minusYears(1));
             Investment inv2 = buildStockInvestment("TCS", LocalDate.now().minusMonths(6));
-            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK)).thenReturn(List.of(inv1, inv2));
+            when(investmentRepository.findByInvestmentTypeAndStatus(InvestmentType.STOCK, LifecycleStatus.ACTIVE)).thenReturn(List.of(inv1, inv2));
 
             scheduler.seedMissingStockPrices();
 
@@ -745,7 +746,7 @@ class AutoIncomeSchedulerTest {
             // Production code sleeps 1 s between symbols — this test takes ~1 s
             Investment inv1 = buildStockInvestment("RELIANCE", LocalDate.now().minusYears(1));
             Investment inv2 = buildStockInvestment("TCS",      LocalDate.now().minusYears(1));
-            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK)).thenReturn(List.of(inv1, inv2));
+            when(investmentRepository.findByInvestmentTypeAndStatus(InvestmentType.STOCK, LifecycleStatus.ACTIVE)).thenReturn(List.of(inv1, inv2));
 
             scheduler.seedMissingStockPrices();
 

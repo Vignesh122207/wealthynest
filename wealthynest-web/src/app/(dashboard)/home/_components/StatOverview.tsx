@@ -166,7 +166,7 @@ export function StatOverview({
 }: StatOverviewProps) {
   const { fmt } = useAmountFormatter();
   const isYear = viewMode === "year";
-  const active = useMemo(() => investments.filter(i => i.active), [investments]);
+  const active = useMemo(() => investments.filter(i => i.status === "ACTIVE"), [investments]);
   const invested = useMemo(() => active.reduce((s, i) => s + i.investedAmount, 0), [active]);
   const current  = useMemo(() => active.reduce((s, i) => s + i.currentValue,   0), [active]);
   const invGainPct = invested > 0 ? ((current - invested) / invested) * 100 : undefined;

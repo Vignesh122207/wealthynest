@@ -1,5 +1,6 @@
 package com.wealthynest.infra.scheduler;
 
+import com.wealthynest.common.entity.LifecycleStatus;
 import com.wealthynest.domain.income.entity.IncomeEntry;
 import com.wealthynest.domain.income.entity.IncomePaymentMode;
 import com.wealthynest.domain.income.entity.IncomeSource;
@@ -56,7 +57,7 @@ public class AutoIncomeScheduler {
         // Group by symbol — one Yahoo API call per distinct symbol regardless of how many
         // users hold it. This changes time complexity from O(total_investments) to O(symbols).
         Map<String, List<Investment>> bySymbol = investmentRepository
-            .findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK)
+            .findByInvestmentTypeAndStatus(InvestmentType.STOCK, LifecycleStatus.ACTIVE)
             .stream()
             .filter(i -> i.getSymbol() != null && i.getPurchaseDate() != null)
             .collect(Collectors.groupingBy(Investment::getSymbol));
@@ -249,7 +250,7 @@ public class AutoIncomeScheduler {
     // ─── Bond coupons ─────────────────────────────────────────────────────────
 
     private void processBondCoupons() {
-        investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.BOND)
+        investmentRepository.findByInvestmentTypeAndStatus(InvestmentType.BOND, LifecycleStatus.ACTIVE)
             .stream()
             .filter(i -> i.getCouponRate() != null && i.getCouponFrequency() != null
                 && i.getPurchaseDate() != null)
@@ -306,7 +307,7 @@ public class AutoIncomeScheduler {
     // ─── FD interest & maturity ───────────────────────────────────────────────
 
     private void processFDInterestAndMaturity() {
-        investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.FD)
+        investmentRepository.findByInvestmentTypeAndStatus(InvestmentType.FD, LifecycleStatus.ACTIVE)
             .stream()
             .filter(i -> i.getCouponRate() != null && i.getPurchaseDate() != null)
             .forEach(fd -> self.processSingleFD(fd));
@@ -326,7 +327,8 @@ public class AutoIncomeScheduler {
                 "FD maturity: " + fd.getBankName() + " ₹" + fd.getInvestedAmount() + " @ " + fd.getCouponRate() + "%");
             saveIncomeLog(fd, income, "FD_MATURITY", maturity, interest);
 
-            fd.setActive(false);
+            // Maturity is a real-world terminal event, same as a stock being fully sold.
+            fd.setStatus(LifecycleStatus.CLOSED);
             investmentRepository.save(fd);
             log.info("FD maturity ₹{} for {} on {}", interest, fd.getId(), maturity);
         } catch (Exception e) {
@@ -347,7 +349,7 @@ public class AutoIncomeScheduler {
     /** Seeds live Yahoo price for all active STOCK investments that have no StockPriceCache entry. */
     public void seedMissingStockPrices() {
         // Collect distinct symbols across all active stock holdings
-        List<Investment> stocks = investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK).stream()
+        List<Investment> stocks = investmentRepository.findByInvestmentTypeAndStatus(InvestmentType.STOCK, LifecycleStatus.ACTIVE).stream()
             .filter(i -> i.getSymbol() != null)
             .toList();
 

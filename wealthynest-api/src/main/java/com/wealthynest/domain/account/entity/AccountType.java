@@ -1,7 +1,7 @@
 package com.wealthynest.domain.account.entity;
 
 public enum AccountType {
-    CASH_WALLET, BANK_ACCOUNT, EMERGENCY_FUND, CREDIT_CARD, LOAN, INVESTMENT;
+    CASH_WALLET, BANK_ACCOUNT, CREDIT_CARD, LOAN;
 
     /** Liability accounts owe money: balance = outstanding, payments in reduce it. */
     public boolean isLiability() {

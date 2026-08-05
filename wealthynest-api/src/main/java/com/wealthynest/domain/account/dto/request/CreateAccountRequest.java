@@ -1,5 +1,6 @@
 package com.wealthynest.domain.account.dto.request;
 
+import com.wealthynest.common.entity.AccountPurpose;
 import com.wealthynest.domain.account.entity.AccountType;
 import com.wealthynest.domain.account.entity.LoanType;
 import jakarta.validation.constraints.*;
@@ -16,6 +17,10 @@ public class CreateAccountRequest {
     @Size(max = 20)  private String accountNumber;
     @NotNull @DecimalMin("0") private BigDecimal openingBalance;
     @DecimalMin("0") private BigDecimal lowBalanceThreshold;
+
+    // Optional "what is this money for" tag — only valid when accountType == BANK_ACCOUNT.
+    private AccountPurpose purpose;
+    @Size(max = 100) private String purposeLabel;
 
     // Credit card fields (only used when accountType = CREDIT_CARD)
     @DecimalMin("0") private BigDecimal creditLimit;

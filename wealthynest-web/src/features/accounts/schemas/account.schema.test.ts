@@ -105,4 +105,38 @@ describe("createAccountSchema", () => {
       expect(result.success).toBe(false);
     });
   });
+
+  describe("purpose superRefine", () => {
+    const baseBank = { accountType: "BANK_ACCOUNT" as const, name: "Savings", openingBalance: 1000 };
+
+    it("accepts a purpose on a BANK_ACCOUNT", () => {
+      expect(createAccountSchema.safeParse({ ...baseBank, purpose: "EMERGENCY_FUND" }).success).toBe(true);
+    });
+
+    it("rejects a purpose on a non-BANK_ACCOUNT type", () => {
+      const result = createAccountSchema.safeParse({ ...baseCashWallet, purpose: "EMERGENCY_FUND" });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.flatten().fieldErrors.purpose).toContain("Purpose can only be set on a Bank Account");
+      }
+    });
+
+    it("rejects CUSTOM purpose with no label", () => {
+      const result = createAccountSchema.safeParse({ ...baseBank, purpose: "CUSTOM" });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.flatten().fieldErrors.purposeLabel).toContain("A custom purpose needs a short label");
+      }
+    });
+
+    it("accepts CUSTOM purpose once a label is provided", () => {
+      const result = createAccountSchema.safeParse({ ...baseBank, purpose: "CUSTOM", purposeLabel: "Sabbatical" });
+      expect(result.success).toBe(true);
+    });
+
+    it("treats a null purpose (as returned by the API for an unset field) as absent, not invalid", () => {
+      const result = createAccountSchema.safeParse({ ...baseBank, purpose: null });
+      expect(result.success).toBe(true);
+    });
+  });
 });

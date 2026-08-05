@@ -28,6 +28,7 @@ import {NetWorthBanner} from "./_components/NetWorthBanner";
 import {AutoLinkedAssets} from "./_components/AutoLinkedAssets";
 import {AssetsSection} from "./_components/AssetsSection";
 import {LiabilitiesSection} from "./_components/LiabilitiesSection";
+import {PurposeSection} from "./_components/PurposeSection";
 
 // Lazy-loaded: only fetched once a user actually opens the add/edit form.
 const AssetForm     = dynamic(() => import("@/features/assets/components/AssetForm").then(m => m.AssetForm), { ssr: false });
@@ -89,16 +90,15 @@ export default function NetWorthPage() {
     return { invBreakdown: inv, manualBreakdown: manual };
   }, [summary]);
 
-  // Pie chart: cash & bank + emergency fund + per-investment-type slices + manual asset types.
-  // Colors are assigned positionally (largest slice first) by withCategoricalColors, not per
-  // category — fixed per-category colors collided whenever two categories landed in the same
-  // chart (e.g. Real Estate and Stocks were both indigo).
+  // Pie chart: cash & bank + per-investment-type slices + manual asset types. Purpose-tagged
+  // money (Emergency Fund, etc.) is earmarked within these totals, not a separate slice — it's
+  // shown in the "By Purpose" section instead. Colors are assigned positionally (largest slice
+  // first) by withCategoricalColors, not per category — fixed per-category colors collided
+  // whenever two categories landed in the same chart (e.g. Real Estate and Stocks were both indigo).
   const pieData = useMemo(() => {
     const slices: { name: string; value: number }[] = [];
-    const emergencyFund = summary?.emergencyFund ?? 0;
-    const cashAndBank   = (summary?.liquidBalance ?? 0) - emergencyFund;
-    if (cashAndBank > 0)   slices.push({ name: "Cash & Bank",    value: cashAndBank });
-    if (emergencyFund > 0) slices.push({ name: "Emergency Fund", value: emergencyFund });
+    const cashAndBank = summary?.liquidBalance ?? 0;
+    if (cashAndBank > 0) slices.push({ name: "Cash & Bank", value: cashAndBank });
     // Investment type breakdown (from assetBreakdown where available, else single total)
     if (invBreakdown.length > 0) {
       invBreakdown.forEach(b => {
@@ -230,6 +230,8 @@ export default function NetWorthPage() {
           onAdd={() => setShowAssetForm(true)}
           onEdit={a => { setShowAssetForm(false); setEditAsset(a); }}
           fmt={fmt} />
+
+        <PurposeSection purposeBreakdown={summary?.purposeBreakdown} fmt={fmt} />
 
         <LiabilitiesSection
           summary={summary} liabilities={liabilities}

@@ -13,7 +13,6 @@ import java.util.UUID;
 @Getter @Builder @NoArgsConstructor @AllArgsConstructor
 public class InvestmentResponse {
     private UUID       id;
-    private UUID       assetId;
     private String     investmentType;
     private String     symbol;
     private String     exchange;
@@ -48,8 +47,11 @@ public class InvestmentResponse {
     private String     debitAccountName;
     private BigDecimal tdsRate;       // TDS % for bond coupons
     private BigDecimal brokerage;     // Brokerage paid on purchase
+    private String     broker;        // Purely descriptive — which platform holds this
+    private String     purpose;
+    private String     purposeLabel;
     private String     notes;
-    private boolean    active;
+    private String     status;
     private Instant    createdAt;
     // Price cache data
     private BigDecimal dayChange;

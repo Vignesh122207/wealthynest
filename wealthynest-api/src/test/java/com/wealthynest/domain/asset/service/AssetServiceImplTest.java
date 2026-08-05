@@ -8,9 +8,6 @@ import com.wealthynest.domain.asset.entity.Asset;
 import com.wealthynest.domain.asset.entity.AssetType;
 import com.wealthynest.domain.asset.mapper.AssetMapper;
 import com.wealthynest.domain.asset.repository.AssetRepository;
-import com.wealthynest.domain.investment.entity.Investment;
-import com.wealthynest.domain.investment.entity.InvestmentType;
-import com.wealthynest.domain.investment.repository.InvestmentRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -37,7 +34,6 @@ class AssetServiceImplTest {
 
     @Mock private AssetRepository      assetRepository;
     @Mock private AssetMapper          assetMapper;
-    @Mock private InvestmentRepository investmentRepository;
 
     @InjectMocks
     private AssetServiceImpl service;
@@ -154,36 +150,15 @@ class AssetServiceImplTest {
     class GetAssetsTests {
 
         @Test
-        @DisplayName("excludes assets that are linked to an active investment (shown via the portfolio instead)")
-        void excludesInvestmentLinkedAssets() {
-            UUID linkedAssetId = UUID.randomUUID();
-            UUID standaloneAssetId = UUID.randomUUID();
-            Asset linked = Asset.builder().userId(userId).name("Linked").build();
-            ReflectionTestUtils.setField(linked, "id", linkedAssetId);
-            Asset standalone = Asset.builder().userId(userId).name("Standalone").build();
-            ReflectionTestUtils.setField(standalone, "id", standaloneAssetId);
-            when(assetRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(linked, standalone));
-
-            Investment inv = Investment.builder().userId(userId).assetId(linkedAssetId)
-                    .investmentType(InvestmentType.STOCK).investedAmount(BigDecimal.ZERO).currentValue(BigDecimal.ZERO).build();
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(inv));
-
-            List<AssetResponse> result = service.getAssets(userId, null);
-
-            assertThat(result).extracting(AssetResponse::getName).containsExactly("Standalone");
-        }
-
-        @Test
-        @DisplayName("returns all assets unfiltered when no investments reference any of them")
-        void returnsAllWhenNoInvestmentLinks() {
+        @DisplayName("returns every active asset for the user, mapped to a response")
+        void returnsAllActiveAssets() {
             Asset asset = Asset.builder().userId(userId).name("Real Estate").build();
             ReflectionTestUtils.setField(asset, "id", UUID.randomUUID());
             when(assetRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(asset));
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of());
 
             List<AssetResponse> result = service.getAssets(userId, null);
 
-            assertThat(result).hasSize(1);
+            assertThat(result).extracting(AssetResponse::getName).containsExactly("Real Estate");
         }
     }
 

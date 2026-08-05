@@ -1,5 +1,6 @@
 package com.wealthynest.domain.networth.service;
 
+import com.wealthynest.common.entity.LifecycleStatus;
 import com.wealthynest.domain.account.dto.response.AccountResponse;
 import com.wealthynest.domain.account.service.WalletAccountService;
 import com.wealthynest.domain.asset.entity.Asset;
@@ -11,6 +12,8 @@ import com.wealthynest.domain.liability.repository.LiabilityRepository;
 import com.wealthynest.domain.networth.dto.response.NetWorthSummaryResponse;
 import com.wealthynest.domain.networth.dto.response.NetWorthSummaryResponse.AssetBreakdown;
 import com.wealthynest.domain.networth.dto.response.NetWorthSummaryResponse.LiabilityBreakdown;
+import com.wealthynest.domain.networth.dto.response.NetWorthSummaryResponse.PurposeBreakdown;
+import com.wealthynest.domain.networth.dto.response.NetWorthSummaryResponse.PurposeItem;
 import com.wealthynest.domain.networth.entity.NetWorthSnapshot;
 import com.wealthynest.domain.networth.repository.NetWorthSnapshotRepository;
 import com.wealthynest.domain.user.entity.User;
@@ -40,7 +43,6 @@ public class NetWorthServiceImpl implements NetWorthService {
         List<AccountResponse> accounts = walletAccountService.getAccounts(userId);
 
         BigDecimal liquidBalance  = BigDecimal.ZERO;
-        BigDecimal emergencyFund  = BigDecimal.ZERO;
         BigDecimal creditCardDebt = BigDecimal.ZERO;
         BigDecimal loanDebt       = BigDecimal.ZERO;
         List<LiabilityBreakdown> creditCardBreakdown = new ArrayList<>();
@@ -48,10 +50,7 @@ public class NetWorthServiceImpl implements NetWorthService {
         Map<String, Integer>    loanCountByType       = new LinkedHashMap<>();
         for (AccountResponse a : accounts) {
             BigDecimal bal = a.getCurrentBalance() != null ? a.getCurrentBalance() : BigDecimal.ZERO;
-            if ("EMERGENCY_FUND".equals(a.getAccountType())) {
-                emergencyFund = emergencyFund.add(bal);
-                liquidBalance = liquidBalance.add(bal); // EF is liquid money, just earmarked
-            } else if ("CREDIT_CARD".equals(a.getAccountType())) {
+            if ("CREDIT_CARD".equals(a.getAccountType())) {
                 BigDecimal outstanding = bal.max(BigDecimal.ZERO); // outstanding is always non-negative
                 creditCardDebt = creditCardDebt.add(outstanding);
                 if (outstanding.compareTo(BigDecimal.ZERO) > 0) {
@@ -70,7 +69,8 @@ public class NetWorthServiceImpl implements NetWorthService {
                     loanCountByType.merge(type, 1, Integer::sum);
                 }
             } else {
-                // Cash, bank, and investment-account (broker cash) balances are all liquid assets
+                // Cash and bank balances are all liquid assets — regardless of any purpose tag,
+                // which is purely a display grouping, not a different balance bucket.
                 liquidBalance = liquidBalance.add(bal);
             }
         }
@@ -83,11 +83,7 @@ public class NetWorthServiceImpl implements NetWorthService {
         List<Asset> assets = assetRepository.findByUserIdAndActiveTrue(userId);
 
         // Investment-type breakdown built from investment repository so FD, PPF, REIT etc. display correctly
-        List<Investment> userInvestments = investmentRepository.findByUserIdAndActiveTrue(userId);
-        Set<UUID> invLinkedAssetIds = userInvestments.stream()
-                .filter(i -> i.getAssetId() != null)
-                .map(Investment::getAssetId)
-                .collect(Collectors.toSet());
+        List<Investment> userInvestments = investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE);
 
         Map<String, BigDecimal> invTypeValues = userInvestments.stream()
                 .filter(i -> i.getCurrentValue() != null)
@@ -109,12 +105,8 @@ public class NetWorthServiceImpl implements NetWorthService {
                 .sorted(Comparator.comparing(AssetBreakdown::getTotalValue).reversed())
                 .collect(Collectors.toList());
 
-        // Manual assets — exclude investment-linked assets (avoid double-counting in breakdown display)
-        List<Asset> manualOnlyAssets = assets.stream()
-                .filter(a -> !invLinkedAssetIds.contains(a.getId()))
-                .toList();
-
-        Map<String, List<Asset>> manualAssetsByType = manualOnlyAssets.stream()
+        // Every Asset row is a manual/physical holding now — Investment no longer links to one.
+        Map<String, List<Asset>> manualAssetsByType = assets.stream()
                 .collect(Collectors.groupingBy(a -> a.getAssetType().name()));
 
         List<AssetBreakdown> manualAssetBreakdown = manualAssetsByType.entrySet().stream()
@@ -131,7 +123,7 @@ public class NetWorthServiceImpl implements NetWorthService {
         List<AssetBreakdown> assetBreakdown = new ArrayList<>(invTypeBreakdown);
         assetBreakdown.addAll(manualAssetBreakdown);
 
-        BigDecimal manualAssetsValue = manualOnlyAssets.stream()
+        BigDecimal manualAssetsValue = assets.stream()
                 .map(Asset::getCurrentValue)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -178,6 +170,34 @@ public class NetWorthServiceImpl implements NetWorthService {
         }
         allLiabilityBreakdown.sort(Comparator.comparing(LiabilityBreakdown::getTotalOutstanding).reversed());
 
+        // ── Purpose breakdown ────────────────────────────────────────────────
+        // Pure re-slice of the same accounts/investments already counted once above (liquidBalance,
+        // investmentValue) — grouped by their optional purpose tag, never added into totalAssets.
+        // CUSTOM rows group by purposeLabel instead of the shared "CUSTOM" value, so two different
+        // custom goals never merge into one bucket.
+        Map<String, List<PurposeItem>> purposeItems = new LinkedHashMap<>();
+        Map<String, String>            purposeLabels = new LinkedHashMap<>();
+        for (AccountResponse a : accounts) {
+            if (a.getPurpose() == null) continue;
+            BigDecimal bal = a.getCurrentBalance() != null ? a.getCurrentBalance() : BigDecimal.ZERO;
+            addPurposeItem(purposeItems, purposeLabels, a.getPurpose(), a.getPurposeLabel(), "ACCOUNT", a.getName(), bal);
+        }
+        for (Investment i : userInvestments) {
+            if (i.getPurpose() == null) continue;
+            BigDecimal val = i.getCurrentValue() != null ? i.getCurrentValue() : BigDecimal.ZERO;
+            addPurposeItem(purposeItems, purposeLabels, i.getPurpose().name(), i.getPurposeLabel(),
+                    "INVESTMENT", resolveInvestmentName(i), val);
+        }
+        List<PurposeBreakdown> purposeBreakdown = purposeItems.entrySet().stream()
+                .map(e -> PurposeBreakdown.builder()
+                        .purpose(e.getKey())
+                        .label(purposeLabels.get(e.getKey()))
+                        .totalValue(e.getValue().stream().map(PurposeItem::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add))
+                        .items(e.getValue())
+                        .build())
+                .sorted(Comparator.comparing(PurposeBreakdown::getTotalValue).reversed())
+                .collect(Collectors.toList());
+
         // ── Totals ───────────────────────────────────────────────────────────
         BigDecimal totalAssets = liquidBalance
                 .add(investmentValue)
@@ -190,12 +210,42 @@ public class NetWorthServiceImpl implements NetWorthService {
                 .totalAssets(totalAssets)
                 .totalLiabilities(totalLiabilities)
                 .liquidBalance(liquidBalance)
-                .emergencyFund(emergencyFund)
                 .investmentValue(investmentValue)
                 .manualAssetsValue(manualAssetsValue)
                 .assetBreakdown(assetBreakdown)
                 .liabilityBreakdown(allLiabilityBreakdown)
+                .purposeBreakdown(purposeBreakdown)
                 .build();
+    }
+
+    /** Groups one account/investment's value into its purpose bucket — CUSTOM rows key off the
+     * free-text label instead of the shared "CUSTOM" value, so two different custom goals never
+     * merge into one bucket. */
+    private void addPurposeItem(Map<String, List<PurposeItem>> itemsByKey, Map<String, String> labelsByKey,
+                                 String purposeName, String purposeLabel, String sourceType, String name, BigDecimal amount) {
+        boolean isCustom = "CUSTOM".equals(purposeName);
+        String key   = isCustom ? "CUSTOM:" + purposeLabel : purposeName;
+        String label = isCustom ? purposeLabel : humanizePurpose(purposeName);
+        labelsByKey.putIfAbsent(key, label);
+        itemsByKey.computeIfAbsent(key, k -> new ArrayList<>())
+                .add(PurposeItem.builder().sourceType(sourceType).name(name).amount(amount).build());
+    }
+
+    private String humanizePurpose(String enumName) {
+        String[] words = enumName.split("_");
+        StringBuilder sb = new StringBuilder();
+        for (String w : words) {
+            if (sb.length() > 0) sb.append(' ');
+            sb.append(w.charAt(0)).append(w.substring(1).toLowerCase());
+        }
+        return sb.toString();
+    }
+
+    private String resolveInvestmentName(Investment inv) {
+        if (inv.getCompanyName() != null && !inv.getCompanyName().isBlank()) return inv.getCompanyName();
+        if (inv.getSymbol()      != null && !inv.getSymbol().isBlank())      return inv.getSymbol();
+        if (inv.getBankName()    != null && !inv.getBankName().isBlank())    return inv.getBankName();
+        return inv.getInvestmentType().name();
     }
 
     @Override @Transactional(readOnly = true)

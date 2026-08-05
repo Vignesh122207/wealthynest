@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QUERY_KEYS } from "@/lib/constants";
 import { createQueryClientWrapper } from "@/test-utils/queryClientWrapper";
-import { useAccounts, useCreateAccount, useDeleteAccount, useTransfer, useRecordLoanPayment } from "./useAccounts";
+import { useAccounts, useCloseAccount, useCreateAccount, useDeleteAccount, useTransfer, useRecordLoanPayment } from "./useAccounts";
 import { accountsApi } from "../api/accounts.api";
 import { toast } from "sonner";
 import type { WalletAccount, LoanPaymentResult } from "../types/account.types";
@@ -12,6 +12,7 @@ vi.mock("../api/accounts.api", () => ({
     getAccounts: vi.fn(),
     createAccount: vi.fn(),
     deleteAccount: vi.fn(),
+    closeAccount: vi.fn(),
     transfer: vi.fn(),
     recordLoanPayment: vi.fn(),
   },
@@ -85,19 +86,49 @@ describe("useCreateAccount", () => {
 });
 
 describe("useDeleteAccount", () => {
-  it("invalidates ACCOUNTS, DASHBOARD, GOALS, EXPENSES, and the plain 'income' key on success", async () => {
+  it("invalidates ACCOUNTS, DASHBOARD, and GOALS on success — only ever succeeds for a zero-history account", async () => {
     mockedApi.deleteAccount.mockResolvedValue(undefined);
     const { Wrapper, queryClient } = createQueryClientWrapper();
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 
     const { result } = renderHook(() => useDeleteAccount(), { wrapper: Wrapper });
-    result.current.mutate({ id: "a1", alsoDeleteTransactions: true });
+    result.current.mutate("a1");
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(mockedApi.deleteAccount).toHaveBeenCalledWith("a1", true);
+    expect(mockedApi.deleteAccount).toHaveBeenCalledWith("a1");
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEYS.ACCOUNTS });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEYS.EXPENSES });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["income"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEYS.DASHBOARD });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEYS.GOALS });
+  });
+
+  it("surfaces the API's own 409 message when the account has history", async () => {
+    mockedApi.deleteAccount.mockRejectedValue({
+      response: { data: { message: "This account has transaction history — close or archive it instead." } },
+    });
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useDeleteAccount(), { wrapper: Wrapper });
+    result.current.mutate("a1");
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(toast.error).toHaveBeenCalledWith("This account has transaction history — close or archive it instead.");
+  });
+});
+
+describe("useCloseAccount", () => {
+  it("invalidates ACCOUNTS, DASHBOARD, and GOALS on success", async () => {
+    mockedApi.closeAccount.mockResolvedValue({ id: "a1", status: "CLOSED" } as never);
+    const { Wrapper, queryClient } = createQueryClientWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const { result } = renderHook(() => useCloseAccount(), { wrapper: Wrapper });
+    result.current.mutate("a1");
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedApi.closeAccount).toHaveBeenCalledWith("a1");
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEYS.ACCOUNTS });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEYS.DASHBOARD });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEYS.GOALS });
   });
 });
 

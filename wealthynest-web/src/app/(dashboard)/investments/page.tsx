@@ -96,14 +96,10 @@ export default function InvestmentsPage() {
   const { mutate: update, isPending: updating } = useUpdateInvestment();
   const { mutate: remove }                      = useDeleteInvestment();
 
+  // Debit/credit picker for buys & sells — broker-float accounts are just purpose-tagged
+  // BANK_ACCOUNT rows now, already included here; no separate "investment account" type to filter.
   const bankAccounts = useMemo(() =>
-    accounts.filter((a: WalletAccount) => a.accountType === "BANK_ACCOUNT" && !a.archived),
-  [accounts]);
-
-  // Debit/credit picker for buys & sells: investment accounts (broker cash) are where these usually
-  // happen, so they're listed first, banks below — a single flat list, not sectioned by heading.
-  const investmentAccounts = useMemo(() =>
-    accounts.filter((a: WalletAccount) => a.accountType === "INVESTMENT" && !a.archived),
+    accounts.filter((a: WalletAccount) => a.accountType === "BANK_ACCOUNT" && a.status === "ACTIVE"),
   [accounts]);
 
   const filtered = useMemo(() => {
@@ -305,7 +301,7 @@ const tabCounts = useMemo(() => investments.reduce((acc, i) => {
                 defaultValues={editItem ? editDefaults(editItem) as StockFormDefaults : undefined}
                 editStock={editItem?.investmentType === "STOCK" ? editItem : null}
                 onSubmit={handleSubmit} onCancel={closeForm}
-                isPending={creating || updating} bankAccounts={bankAccounts} investmentAccounts={investmentAccounts}
+                isPending={creating || updating} bankAccounts={bankAccounts}
                 isEditing={!!editItem} />
             )}
             {tab === "mf" && (
@@ -313,7 +309,7 @@ const tabCounts = useMemo(() => investments.reduce((acc, i) => {
                 defaultValues={editItem ? editDefaults(editItem) as MFFormDefaults : undefined}
                 editMF={editItem?.investmentType === "MUTUAL_FUND" ? editItem : null}
                 onSubmit={handleSubmit} onCancel={closeForm}
-                isPending={creating || updating} bankAccounts={bankAccounts} investmentAccounts={investmentAccounts}
+                isPending={creating || updating} bankAccounts={bankAccounts}
                 isEditing={!!editItem} />
             )}
             {tab === "gold" && (
@@ -321,20 +317,20 @@ const tabCounts = useMemo(() => investments.reduce((acc, i) => {
                 defaultValues={editItem ? editDefaults(editItem) as Partial<GoldFormValues> : undefined}
                 onSubmit={handleSubmit} onCancel={closeForm}
                 isPending={creating || updating} goldPrice={goldPrice}
-                bankAccounts={bankAccounts} investmentAccounts={investmentAccounts} isEditing={!!editItem} />
+                bankAccounts={bankAccounts} isEditing={!!editItem} />
             )}
             {tab === "fd" && (
               <FDForm
                 defaultValues={editItem ? editDefaults(editItem) as Partial<FDFormValues> : undefined}
                 onSubmit={handleSubmit} onCancel={closeForm}
-                isPending={creating || updating} bankAccounts={bankAccounts} investmentAccounts={investmentAccounts}
+                isPending={creating || updating} bankAccounts={bankAccounts}
                 isEditing={!!editItem} />
             )}
             {tab === "bonds" && (
               <BondForm
                 defaultValues={editItem ? editDefaults(editItem) as Partial<BondFormValues> : undefined}
                 onSubmit={handleSubmit} onCancel={closeForm}
-                isPending={creating || updating} bankAccounts={bankAccounts} investmentAccounts={investmentAccounts}
+                isPending={creating || updating} bankAccounts={bankAccounts}
                 isEditing={!!editItem} />
             )}
             </div>
@@ -440,7 +436,7 @@ const tabCounts = useMemo(() => investments.reduce((acc, i) => {
               {visibleInvestments.map(inv => (
                 <InvestmentCard key={inv.id} inv={inv}
                   onEdit={() => { setTab(switchToTab(inv)); setEditItem(inv); setShowForm(true); }}
-                  bankAccounts={bankAccounts} investmentAccounts={investmentAccounts}
+                  bankAccounts={bankAccounts}
                   dividendRecords={
                     inv.investmentType === "STOCK"
                       ? (incomeHistory?.records.filter(r => r.investmentId === inv.id && r.incomeType === "DIVIDEND") ?? [])

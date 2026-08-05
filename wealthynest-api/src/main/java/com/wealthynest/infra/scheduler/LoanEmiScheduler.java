@@ -1,5 +1,6 @@
 package com.wealthynest.infra.scheduler;
 
+import com.wealthynest.common.entity.LifecycleStatus;
 import com.wealthynest.domain.account.entity.AccountType;
 import com.wealthynest.domain.account.entity.WalletAccount;
 import com.wealthynest.domain.account.repository.WalletAccountRepository;
@@ -29,7 +30,7 @@ public class LoanEmiScheduler {
         LocalDate today = LocalDate.now();
         int yyyymm = today.getYear() * 100 + today.getMonthValue();
 
-        List<WalletAccount> loans = accountRepository.findByAccountTypeAndArchivedFalse(AccountType.LOAN);
+        List<WalletAccount> loans = accountRepository.findByAccountTypeAndStatus(AccountType.LOAN, LifecycleStatus.ACTIVE);
         int paid = 0;
         for (WalletAccount loan : loans) {
             try {

@@ -1,6 +1,8 @@
 package com.wealthynest.domain.investment.entity;
 
+import com.wealthynest.common.entity.AccountPurpose;
 import com.wealthynest.common.entity.BaseEntity;
+import com.wealthynest.common.entity.LifecycleStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
@@ -11,7 +13,6 @@ import java.util.UUID;
 @Table(name = "investments")
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 public class Investment extends BaseEntity {
-    @Column(name = "asset_id",  nullable = false) private UUID assetId;
     @Column(name = "user_id",   nullable = false) private UUID userId;
 
     @Enumerated(EnumType.STRING)
@@ -41,8 +42,25 @@ public class Investment extends BaseEntity {
     @Column(name = "gold_karat") @Builder.Default private Integer goldKarat = 22;
     @Column(name = "linked_account_id") private UUID linkedAccountId;
     @Column(columnDefinition = "TEXT") private String notes;
-    @Column(name = "is_active") @Builder.Default private boolean active = true;
-    @Column(name = "debit_expense_id")  private UUID debitExpenseId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10)
+    @Builder.Default
+    private LifecycleStatus status = LifecycleStatus.ACTIVE;
+
+    /** Optional "what is this money for" tag — any investment type is eligible. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 30)
+    private AccountPurpose purpose;
+
+    /** Free-text label, set only when purpose == CUSTOM. */
+    @Column(name = "purpose_label", length = 100)
+    private String purposeLabel;
+
+    /** Purely descriptive — which platform holds this (Zerodha, Groww...), never affects funding. */
+    @Column(length = 50)
+    private String broker;
+
     @Column(name = "debit_account_id")  private UUID debitAccountId;
     @Column(name = "debit_transfer_id") private UUID debitTransferId;
 

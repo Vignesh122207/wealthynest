@@ -30,7 +30,7 @@ export function LoanPaymentModal({
   const outstanding = Math.max(0, payLoan.currentBalance);
   const estInterest = payLoan.apr ? Math.min(amt, Math.round(outstanding * payLoan.apr / 12) / 100) : 0;
   const payFromOptions = accounts
-    .filter(a => a.accountType === "BANK_ACCOUNT" || a.accountType === "CASH_WALLET" || a.accountType === "EMERGENCY_FUND")
+    .filter(a => (a.accountType === "BANK_ACCOUNT" || a.accountType === "CASH_WALLET") && a.status === "ACTIVE")
     .map(a => ({ value: a.id, label: `${a.name} — ${formatCurrencyCompact(a.currentBalance)}` }));
 
   return (

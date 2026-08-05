@@ -7,14 +7,12 @@ import com.wealthynest.domain.asset.dto.response.AssetResponse;
 import com.wealthynest.domain.asset.entity.Asset;
 import com.wealthynest.domain.asset.mapper.AssetMapper;
 import com.wealthynest.domain.asset.repository.AssetRepository;
-import com.wealthynest.domain.investment.repository.InvestmentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -23,7 +21,6 @@ import java.util.stream.Collectors;
 public class AssetServiceImpl implements AssetService {
     private final AssetRepository    assetRepository;
     private final AssetMapper        assetMapper;
-    private final InvestmentRepository investmentRepository;
 
     @Override @Transactional
     public AssetResponse createAsset(UUID userId, UUID familyId, CreateAssetRequest request) {
@@ -55,15 +52,9 @@ public class AssetServiceImpl implements AssetService {
 
     @Override @Transactional(readOnly = true)
     public List<AssetResponse> getAssets(UUID userId, UUID familyId) {
-        // Always personal — the family tab uses /families/{id}/net-worth for combined view
-        List<Asset> assets = assetRepository.findByUserIdAndActiveTrue(userId);
-        // Exclude investment-linked assets — they're shown via the investment portfolio breakdown
-        Set<UUID> invLinkedIds = investmentRepository.findByUserIdAndActiveTrue(userId).stream()
-                .filter(i -> i.getAssetId() != null)
-                .map(i -> i.getAssetId())
-                .collect(Collectors.toSet());
-        return assets.stream()
-                .filter(a -> !invLinkedIds.contains(a.getId()))
+        // Always personal — the family tab uses /families/{id}/net-worth for combined view.
+        // No investment-linked exclusion needed anymore — Investment no longer owns an Asset row.
+        return assetRepository.findByUserIdAndActiveTrue(userId).stream()
                 .map(assetMapper::toResponse)
                 .collect(Collectors.toList());
     }

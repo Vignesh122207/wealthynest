@@ -8,6 +8,7 @@ import {FormDatePicker} from "@/components/forms/FormDatePicker";
 import {AccountPicker} from "@/components/transactions/AccountPicker";
 import {LiveSearch, SelectedChip} from "../LiveSearch";
 import {FormButtons} from "./FormButtons";
+import {BrokerAndPurposeFields} from "./BrokerAndPurposeFields";
 import {type StockFormValues, stockSchema} from "@/features/investments/schemas/investment.schema";
 import {investmentsApi} from "@/features/investments/api/investments.api";
 import type {Investment, InvestmentSearchResult} from "@/features/investments/types/investment.types";
@@ -21,13 +22,12 @@ export type StockSubmitValues = StockFormValues & { symbol: string; name: string
 export type StockFormDefaults = Partial<Omit<StockFormValues, "units" | "avgBuyPrice">>
   & { units?: number | string; avgBuyPrice?: number | string };
 
-export function StockForm({ defaultValues, onSubmit, onCancel, isPending, bankAccounts, investmentAccounts, editStock, isEditing }: {
+export function StockForm({ defaultValues, onSubmit, onCancel, isPending, bankAccounts, editStock, isEditing }: {
   defaultValues?: StockFormDefaults;
   onSubmit: (v: StockSubmitValues) => void;
   onCancel: () => void;
   isPending: boolean;
   bankAccounts: PickerAccountList;
-  investmentAccounts: PickerAccountList;
   editStock?: Investment | null;
   isEditing: boolean;
 }) {
@@ -110,10 +110,10 @@ export function StockForm({ defaultValues, onSubmit, onCancel, isPending, bankAc
                 bankAccounts={bankAccounts} value={field.value ?? ""} onChange={field.onChange} />
             )} />
           )}
-          {!isEditing && (bankAccounts.length > 0 || investmentAccounts.length > 0) && (
+          {!isEditing && bankAccounts.length > 0 && (
             <Controller control={form.control} name="debitAccountId" render={({ field }) => (
               <AccountPicker label="Debit from Account (optional)" placeholder="None (no debit)" allowClear
-                bankAccounts={bankAccounts} investmentAccounts={investmentAccounts}
+                bankAccounts={bankAccounts}
                 value={field.value ?? ""} onChange={field.onChange} />
             )} />
           )}
@@ -121,6 +121,7 @@ export function StockForm({ defaultValues, onSubmit, onCancel, isPending, bankAc
             <FormCurrencyInput label="Brokerage (optional)" placeholder="0"
               {...form.register("brokerage")} />
           )}
+          <BrokerAndPurposeFields form={form} />
         </div>
       )}
 

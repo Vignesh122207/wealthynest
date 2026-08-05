@@ -9,20 +9,20 @@ import {FormCurrencyInput} from "@/components/forms/FormCurrencyInput";
 import {FormDatePicker} from "@/components/forms/FormDatePicker";
 import {AccountPicker} from "@/components/transactions/AccountPicker";
 import {FormButtons} from "./FormButtons";
+import {BrokerAndPurposeFields} from "./BrokerAndPurposeFields";
 import {type GoldFormValues, goldSchema} from "@/features/investments/schemas/investment.schema";
 import {KARAT_OPTIONS, type PickerAccountList} from "@/features/investments/constants";
 import {formatCurrency} from "@/lib/utils";
 
 type GoldPrice = { price18k: number; price22k: number; price24k: number };
 
-export function GoldForm({ defaultValues, onSubmit, onCancel, isPending, goldPrice, bankAccounts, investmentAccounts, isEditing }: {
+export function GoldForm({ defaultValues, onSubmit, onCancel, isPending, goldPrice, bankAccounts, isEditing }: {
   defaultValues?: Partial<GoldFormValues>;
   onSubmit: (v: GoldFormValues) => void;
   onCancel: () => void;
   isPending: boolean;
   goldPrice?: GoldPrice;
   bankAccounts: PickerAccountList;
-  investmentAccounts: PickerAccountList;
   isEditing: boolean;
 }) {
   const form = useForm<GoldFormValues>({
@@ -97,13 +97,14 @@ export function GoldForm({ defaultValues, onSubmit, onCancel, isPending, goldPri
             )}
           </div>
         )}
-        {!isEditing && (bankAccounts.length > 0 || investmentAccounts.length > 0) && (
+        {!isEditing && bankAccounts.length > 0 && (
           <Controller control={form.control} name="debitAccountId" render={({ field }) => (
             <AccountPicker label="Debit from Account (optional)" placeholder="None (no debit)" allowClear
-              bankAccounts={bankAccounts} investmentAccounts={investmentAccounts}
+              bankAccounts={bankAccounts}
               value={field.value ?? ""} onChange={field.onChange} />
           )} />
         )}
+        <BrokerAndPurposeFields form={form} />
       </div>
       <FormButtons onCancel={onCancel} isPending={isPending} label="Save Gold" color="amber" />
     </form>

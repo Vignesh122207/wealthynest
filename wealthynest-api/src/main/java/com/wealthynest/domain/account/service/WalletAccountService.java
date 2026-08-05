@@ -22,7 +22,12 @@ public interface WalletAccountService {
     AccountResponse                 updateAccount(UUID id, UUID userId, CreateAccountRequest request);
     AccountResponse                 archiveAccount(UUID id, UUID userId);
     AccountResponse                 unarchiveAccount(UUID id, UUID userId);
-    void                            deleteAccount(UUID id, UUID userId, boolean alsoDeleteTransactions);
+    /** ACTIVE only — a real-world terminal event (loan paid off, account closed at the bank).
+     * Unlike archive, this is not reversible in this version. */
+    AccountResponse                 closeAccount(UUID id, UUID userId);
+    /** Only succeeds when the account has zero history (no expense/income/transfer/investment-
+     * link/goal ever referenced it) — otherwise throws; close or archive instead. */
+    void                            deleteAccount(UUID id, UUID userId);
     TransferResponse                transfer(UUID userId, TransferRequest request);
     TransferResponse                updateTransfer(UUID transferId, UUID userId, UpdateTransferRequest request);
     void                            deleteTransfer(UUID transferId, UUID userId);

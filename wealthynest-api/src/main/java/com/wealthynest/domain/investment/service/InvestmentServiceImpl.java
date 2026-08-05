@@ -1,5 +1,7 @@
 package com.wealthynest.domain.investment.service;
 
+import com.wealthynest.common.entity.AccountPurpose;
+import com.wealthynest.common.entity.LifecycleStatus;
 import com.wealthynest.common.exception.AccessDeniedException;
 import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
@@ -7,9 +9,6 @@ import com.wealthynest.domain.account.entity.AccountTransfer;
 import com.wealthynest.domain.account.repository.AccountTransferRepository;
 import com.wealthynest.domain.account.repository.WalletAccountRepository;
 import com.wealthynest.domain.account.service.AccountOwnershipGuard;
-import com.wealthynest.domain.asset.entity.Asset;
-import com.wealthynest.domain.asset.entity.AssetType;
-import com.wealthynest.domain.asset.repository.AssetRepository;
 import com.wealthynest.domain.income.entity.IncomeEntry;
 import com.wealthynest.domain.income.entity.IncomePaymentMode;
 import com.wealthynest.domain.income.entity.IncomeSource;
@@ -49,7 +48,6 @@ public class InvestmentServiceImpl implements InvestmentService {
     private static final String SEED_TXN_NOTE = "Opening position (auto-recorded)";
 
     private final InvestmentRepository          investmentRepository;
-    private final AssetRepository               assetRepository;
     private final StockPriceCacheRepository     stockPriceCacheRepository;
     private final GoldPriceCacheRepository      goldPriceCacheRepository;
     private final MFNavCacheRepository          mfNavCacheRepository;
@@ -75,8 +73,8 @@ public class InvestmentServiceImpl implements InvestmentService {
                 && req.getUnits() != null && req.getUnits().compareTo(BigDecimal.ZERO) > 0
                 && req.getAvgBuyPrice() != null) {
             Optional<Investment> existing = investmentRepository
-                .findByUserIdAndSymbolAndInvestmentTypeAndActiveTrue(
-                    userId, req.getSymbol(), InvestmentType.STOCK);
+                .findByUserIdAndSymbolAndInvestmentTypeAndStatus(
+                    userId, req.getSymbol(), InvestmentType.STOCK, LifecycleStatus.ACTIVE);
             if (existing.isPresent()) {
                 Investment inv = existing.get();
                 // Seed initial transaction if not yet tracked
@@ -124,28 +122,10 @@ public class InvestmentServiceImpl implements InvestmentService {
 
         accountOwnershipGuard.validateAccountOwnership(req.getLinkedAccountId(), userId);
         accountOwnershipGuard.validateAccountOwnership(req.getDebitAccountId(), userId);
-
-        // Auto-create linked asset
-        UUID assetId = req.getAssetId();
-        if (assetId != null) {
-            // Otherwise a caller could point a new investment at someone else's asset —
-            // every later update would then overwrite that asset's real value (IDOR write).
-            UUID requestedAssetId = assetId;
-            assetRepository.findByIdAndUserId(requestedAssetId, userId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Asset", "id", requestedAssetId));
-        }
-        if (assetId == null) {
-            String name = nameFor(req);
-            Asset asset = Asset.builder()
-                .userId(userId).name(name)
-                .assetType(mapToAssetType(req.getInvestmentType()))
-                .currentValue(computeCurrentValue(req))
-                .currency("INR").active(true).asOfDate(LocalDate.now()).build();
-            assetId = assetRepository.save(asset).getId();
-        }
+        validatePurpose(req.getPurpose(), req.getPurposeLabel());
 
         Investment inv = Investment.builder()
-            .userId(userId).assetId(assetId)
+            .userId(userId)
             .investmentType(req.getInvestmentType())
             .symbol(req.getSymbol()).exchange(req.getExchange() != null ? req.getExchange() : "NSE")
             .schemeCode(req.getSchemeCode()).companyName(req.getCompanyName())
@@ -165,7 +145,10 @@ public class InvestmentServiceImpl implements InvestmentService {
             .linkedAccountId(req.getLinkedAccountId())
             .tdsRate(req.getTdsRate() != null ? req.getTdsRate() : BigDecimal.ZERO)
             .brokerage(req.getBrokerage() != null ? req.getBrokerage() : BigDecimal.ZERO)
-            .notes(req.getNotes()).active(true).build();
+            .broker(req.getBroker())
+            .purpose(req.getPurpose())
+            .purposeLabel(req.getPurpose() == AccountPurpose.CUSTOM ? req.getPurposeLabel() : null)
+            .notes(req.getNotes()).build();
 
         Investment saved = investmentRepository.save(inv);
 
@@ -245,7 +228,7 @@ public class InvestmentServiceImpl implements InvestmentService {
         if (isStock && req.getSymbol() != null
                 && !req.getSymbol().equalsIgnoreCase(inv.getSymbol())) {
             investmentRepository
-                .findByUserIdAndSymbolAndInvestmentTypeAndActiveTrue(userId, req.getSymbol(), InvestmentType.STOCK)
+                .findByUserIdAndSymbolAndInvestmentTypeAndStatus(userId, req.getSymbol(), InvestmentType.STOCK, LifecycleStatus.ACTIVE)
                 .ifPresent(other -> {
                     if (!other.getId().equals(id))
                         throw new IllegalArgumentException(
@@ -272,7 +255,13 @@ public class InvestmentServiceImpl implements InvestmentService {
         inv.setQuantityGrams(req.getQuantityGrams());
         inv.setLinkedAccountId(req.getLinkedAccountId());
         inv.setTdsRate(req.getTdsRate() != null ? req.getTdsRate() : BigDecimal.ZERO);
+        inv.setBroker(req.getBroker());
         inv.setNotes(req.getNotes());
+        if (req.getPurpose() != null) {
+            validatePurpose(req.getPurpose(), req.getPurposeLabel());
+            inv.setPurpose(req.getPurpose());
+            inv.setPurposeLabel(req.getPurpose() == AccountPurpose.CUSTOM ? req.getPurposeLabel() : null);
+        }
 
         if (isStock) {
             investmentRepository.save(inv); // save metadata first so ID is available
@@ -317,11 +306,6 @@ public class InvestmentServiceImpl implements InvestmentService {
             inv.setBrokerage(req.getBrokerage() != null ? req.getBrokerage() : BigDecimal.ZERO);
         }
 
-        assetRepository.findById(inv.getAssetId()).ifPresent(a -> {
-            a.setCurrentValue(inv.getCurrentValue());
-            a.setAsOfDate(LocalDate.now());
-            assetRepository.save(a);
-        });
         Investment saved = investmentRepository.save(inv);
 
         // When the auto-credit account changes, move existing income entries to the new account
@@ -351,22 +335,15 @@ public class InvestmentServiceImpl implements InvestmentService {
             inv.setDebitTransferId(null);
             inv.setDebitAccountId(null);
         }
-        inv.setActive(false);
+        // User-initiated hide, distinct from the system-driven CLOSED set by a full sell — see
+        // recalculateStockTotals. Never a hard delete; history is preserved either way.
+        inv.setStatus(LifecycleStatus.ARCHIVED);
         investmentRepository.save(inv);
-
-        // Deactivate the linked asset when no other active investment still references it
-        UUID assetId = inv.getAssetId();
-        if (assetId != null && !investmentRepository.existsByAssetIdAndActiveTrueAndIdNot(assetId, id)) {
-            assetRepository.findById(assetId).ifPresent(a -> {
-                a.setActive(false);
-                assetRepository.save(a);
-            });
-        }
     }
 
     @Override @Transactional(readOnly = true)
     public List<InvestmentResponse> getInvestments(UUID userId) {
-        return enrichAll(investmentRepository.findByUserIdAndActiveTrue(userId));
+        return enrichAll(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE));
     }
 
     @Override
@@ -621,7 +598,7 @@ public class InvestmentServiceImpl implements InvestmentService {
         }
 
         return InvestmentResponse.builder()
-            .id(inv.getId()).assetId(inv.getAssetId())
+            .id(inv.getId())
             .investmentType(inv.getInvestmentType().name())
             .symbol(inv.getSymbol()).exchange(inv.getExchange())
             .schemeCode(inv.getSchemeCode()).companyName(inv.getCompanyName())
@@ -645,8 +622,11 @@ public class InvestmentServiceImpl implements InvestmentService {
             .debitAccountName(debitAccountName)
             .tdsRate(inv.getTdsRate())
             .brokerage(inv.getBrokerage())
+            .broker(inv.getBroker())
+            .purpose(inv.getPurpose() != null ? inv.getPurpose().name() : null)
+            .purposeLabel(inv.getPurposeLabel())
             .notes(inv.getNotes())
-            .active(inv.isActive()).createdAt(inv.getCreatedAt())
+            .status(inv.getStatus().name()).createdAt(inv.getCreatedAt())
             .dayChange(dayChange).dayChangePct(dayChangePct)
             .week52High(w52h).week52Low(w52l)
             .priceLastUpdated(priceLastUpdated)
@@ -747,7 +727,7 @@ public class InvestmentServiceImpl implements InvestmentService {
 
     @Override @Transactional(readOnly = true)
     public List<DividendSuggestionResponse> getDividendSuggestions(UUID userId) {
-        List<Investment> stocks = investmentRepository.findByUserIdAndActiveTrue(userId).stream()
+        List<Investment> stocks = investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE).stream()
             .filter(i -> i.getInvestmentType() == InvestmentType.STOCK
                       && i.getSymbol() != null
                       && i.getUnits() != null
@@ -977,12 +957,12 @@ public class InvestmentServiceImpl implements InvestmentService {
 
     @Override @Transactional(readOnly = true)
     public Double computePortfolioXirr(UUID userId) {
-        return computeXirrForInvestments(investmentRepository.findByUserIdAndActiveTrue(userId));
+        return computeXirrForInvestments(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE));
     }
 
     @Override @Transactional(readOnly = true)
     public Double computeTypeXirr(UUID userId, InvestmentType type) {
-        List<Investment> investments = investmentRepository.findByUserIdAndActiveTrue(userId).stream()
+        List<Investment> investments = investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE).stream()
             .filter(inv -> inv.getInvestmentType() == type)
             .toList();
         return computeXirrForInvestments(investments);
@@ -1000,6 +980,13 @@ public class InvestmentServiceImpl implements InvestmentService {
             .orElseThrow(() -> new ResourceNotFoundException("Investment", "id", id));
         if (!inv.getUserId().equals(userId)) throw new AccessDeniedException();
         return inv;
+    }
+
+    /** CUSTOM requires a label — any investment type is otherwise eligible for a purpose tag. */
+    private void validatePurpose(AccountPurpose purpose, String purposeLabel) {
+        if (purpose == AccountPurpose.CUSTOM && (purposeLabel == null || purposeLabel.isBlank())) {
+            throw new BusinessException("A custom purpose needs a short label.", HttpStatus.BAD_REQUEST);
+        }
     }
 
 
@@ -1073,7 +1060,7 @@ public class InvestmentServiceImpl implements InvestmentService {
                     .units(units)
                     .accountId(accId)
                     .accountName(accName)
-                    .investmentActive(inv == null || inv.isActive())
+                    .investmentActive(inv == null || inv.getStatus() == LifecycleStatus.ACTIVE)
                     .credited(true)
                     .build());
         }
@@ -1110,7 +1097,7 @@ public class InvestmentServiceImpl implements InvestmentService {
                     .units(units)
                     .accountId(null)
                     .accountName(null)
-                    .investmentActive(inv.isActive())
+                    .investmentActive(inv.getStatus() == LifecycleStatus.ACTIVE)
                     .credited(false)
                     .build());
             }
@@ -1162,7 +1149,7 @@ public class InvestmentServiceImpl implements InvestmentService {
                         .accountId(bond.getLinkedAccountId())
                         .accountName(bondAccName)   // fix issue #14
                         .credited(false)
-                        .investmentActive(bond.isActive())
+                        .investmentActive(bond.getStatus() == LifecycleStatus.ACTIVE)
                         .build());
                 }
             }
@@ -1223,16 +1210,6 @@ public class InvestmentServiceImpl implements InvestmentService {
         if (inv.getSymbol()      != null && !inv.getSymbol().isBlank())      return inv.getSymbol();
         if (inv.getBankName()    != null && !inv.getBankName().isBlank())     return inv.getBankName();
         return inv.getInvestmentType().name();
-    }
-
-    private AssetType mapToAssetType(InvestmentType type) {
-        return switch (type) {
-            case STOCK, REIT    -> AssetType.STOCK;
-            case MUTUAL_FUND    -> AssetType.MUTUAL_FUND;
-            case BOND           -> AssetType.BOND;
-            case GOLD, GOLD_ETF -> AssetType.GOLD;
-            default             -> AssetType.OTHER;
-        };
     }
 
     // ── Dismiss dividend suggestion (issue #3) ───────────────────────────────
@@ -1359,7 +1336,7 @@ public class InvestmentServiceImpl implements InvestmentService {
      *   netQty       = totalBuyQty − totalSellQty
      *   investedAmount = netQty × avgBuyPrice            (cost basis of remaining shares)
      *
-     * Marks investment inactive when all shares are sold (netQty = 0).
+     * Sets status to CLOSED when all shares are sold (netQty = 0).
      */
     private void recalculateStockTotals(Investment inv, BigDecimal fallbackPrice) {
         UUID investmentId = inv.getId();
@@ -1389,11 +1366,13 @@ public class InvestmentServiceImpl implements InvestmentService {
                          : (fallbackPrice != null ? fallbackPrice : BigDecimal.ZERO);
         inv.setCurrentValue(inv.getUnits().multiply(price).setScale(2, RoundingMode.HALF_UP));
 
-        // If all shares are sold, deactivate the position
+        // All shares sold — a real-world terminal event, distinct from a user manually archiving
+        // (see deleteInvestment). Buying back in later reactivates it regardless of why it was
+        // inactive, same as the original active-boolean behavior.
         if (netQty.compareTo(BigDecimal.ZERO) == 0) {
-            inv.setActive(false);
-        } else if (!inv.isActive()) {
-            inv.setActive(true);
+            inv.setStatus(LifecycleStatus.CLOSED);
+        } else if (inv.getStatus() != LifecycleStatus.ACTIVE) {
+            inv.setStatus(LifecycleStatus.ACTIVE);
         }
 
         investmentRepository.save(inv);

@@ -1,6 +1,6 @@
 "use client";
 
-import {CreditCard, HandCoins, Landmark, TrendingUp, Wallet} from "lucide-react";
+import {CreditCard, HandCoins, Landmark, Wallet} from "lucide-react";
 import {PremiumIcon} from "@/components/icons/PremiumIcon";
 import {ACCOUNT_TYPE_META} from "@/lib/accountTypeMeta";
 import {cn} from "@/lib/utils";
@@ -12,11 +12,7 @@ interface AccountStatStripProps {
   bankAccounts: WalletAccount[];
   bankBalance: number;
   cashAccounts: WalletAccount[];
-  emergencyAccounts: WalletAccount[];
   cashBalance: number;
-  emergencyBal: number;
-  investAccounts: WalletAccount[];
-  investBalance: number;
   creditCards: WalletAccount[];
   creditCardDebt: number;
   loanAccounts: WalletAccount[];
@@ -25,12 +21,11 @@ interface AccountStatStripProps {
 }
 
 // One uniform card per type the user actually has (same size/shape as the type breakdowns
-// below), so someone with just a bank account and a credit card sees 2 cards, not 6 padded out
+// below), so someone with just a bank account and a credit card sees 2 cards, not 4 padded out
 // with empty types they haven't set up.
 export function AccountStatStrip({
-  accounts, totalAssetsAcrossAccounts, bankAccounts, bankBalance, cashAccounts, emergencyAccounts,
-  cashBalance, emergencyBal, investAccounts, investBalance, creditCards, creditCardDebt,
-  loanAccounts, loanDebt, fmt,
+  accounts, totalAssetsAcrossAccounts, bankAccounts, bankBalance, cashAccounts, cashBalance,
+  creditCards, creditCardDebt, loanAccounts, loanDebt, fmt,
 }: AccountStatStripProps) {
   if (accounts.length === 0) return null;
 
@@ -40,7 +35,7 @@ export function AccountStatStrip({
         <PremiumIcon icon={Wallet} tone="blue" size="xs" className="mb-2" />
         <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">Total Balance</p>
         <p className="text-base font-bold tabular-nums text-foreground">{fmt(totalAssetsAcrossAccounts)}</p>
-        <p className="text-[10px] text-muted-foreground/80">Cash, bank &amp; investments</p>
+        <p className="text-[10px] text-muted-foreground/80">Cash &amp; bank, purpose tags included</p>
       </div>
 
       {bankAccounts.length > 0 && (
@@ -52,29 +47,17 @@ export function AccountStatStrip({
         </div>
       )}
 
-      {/* Cash + Emergency Fund are two differently-colored concepts everywhere else in the app
-          (emerald / amber) — this card is a composite of both, so it deliberately stays neutral
-          rather than claiming either color. */}
-      {(cashAccounts.length + emergencyAccounts.length) > 0 && (
+      {cashAccounts.length > 0 && (
         <div className="bg-card border border-border rounded-2xl p-4">
-          <PremiumIcon icon={Wallet} tone="gray" size="xs" className="mb-2" />
-          <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">Cash &amp; Emergency</p>
-          <p className="text-base font-bold tabular-nums text-foreground">{fmt(cashBalance + emergencyBal)}</p>
-          <p className="text-[10px] text-muted-foreground/80">{cashAccounts.length + emergencyAccounts.length} account{(cashAccounts.length + emergencyAccounts.length) === 1 ? "" : "s"}</p>
+          <PremiumIcon icon={Wallet} hex={ACCOUNT_TYPE_META.CASH_WALLET.hex} size="xs" className="mb-2" />
+          <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">Cash Wallet</p>
+          <p className="text-base font-bold tabular-nums text-foreground">{fmt(cashBalance)}</p>
+          <p className="text-[10px] text-muted-foreground/80">{cashAccounts.length} account{cashAccounts.length === 1 ? "" : "s"}</p>
         </div>
       )}
 
       {/* Assets end here, liabilities (Credit Cards, Loans) follow — kept grouped so the strip
           reads assets-then-liabilities left to right. */}
-      {investAccounts.length > 0 && (
-        <div className="bg-card border border-border rounded-2xl p-4">
-          <PremiumIcon icon={TrendingUp} hex={ACCOUNT_TYPE_META.INVESTMENT.hex} size="xs" className="mb-2" />
-          <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">Investments</p>
-          <p className="text-base font-bold tabular-nums text-foreground">{fmt(investBalance)}</p>
-          <p className="text-[10px] text-muted-foreground/80">{investAccounts.length} broker{investAccounts.length === 1 ? "" : "s"}</p>
-        </div>
-      )}
-
       {creditCards.length > 0 && (
         <div className="bg-card border border-border rounded-2xl p-4">
           <PremiumIcon icon={CreditCard} hex={ACCOUNT_TYPE_META.CREDIT_CARD.hex} size="xs" className="mb-2" />

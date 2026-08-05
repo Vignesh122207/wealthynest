@@ -50,7 +50,7 @@ export default function DebtsPage() {
 
   const { data: debts = [], isLoading, isError, refetch } = useDebts();
   const { data: accountsData }            = useAccounts();
-  const accounts = (accountsData ?? []).filter(a => !a.archived && a.accountType !== "CREDIT_CARD");
+  const accounts = (accountsData ?? []).filter(a => a.status !== "ARCHIVED" && a.accountType !== "CREDIT_CARD");
 
   const { mutate: createDebt, isPending: creating } = useCreateDebt();
   const { mutate: updateDebt, isPending: updating } = useUpdateDebt();

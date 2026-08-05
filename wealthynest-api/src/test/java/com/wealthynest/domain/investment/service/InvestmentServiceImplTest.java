@@ -1,5 +1,7 @@
 package com.wealthynest.domain.investment.service;
 
+import com.wealthynest.common.entity.AccountPurpose;
+import com.wealthynest.common.entity.LifecycleStatus;
 import com.wealthynest.common.exception.AccessDeniedException;
 import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
@@ -7,8 +9,6 @@ import com.wealthynest.domain.account.entity.AccountTransfer;
 import com.wealthynest.domain.account.repository.AccountTransferRepository;
 import com.wealthynest.domain.account.repository.WalletAccountRepository;
 import com.wealthynest.domain.account.service.AccountOwnershipGuard;
-import com.wealthynest.domain.asset.entity.Asset;
-import com.wealthynest.domain.asset.repository.AssetRepository;
 import com.wealthynest.domain.income.repository.IncomeRepository;
 import com.wealthynest.domain.account.entity.WalletAccount;
 import com.wealthynest.domain.investment.dto.request.CreateInvestmentRequest;
@@ -54,7 +54,6 @@ import static org.mockito.Mockito.*;
 class InvestmentServiceImplTest {
 
     @Mock private InvestmentRepository          investmentRepository;
-    @Mock private AssetRepository               assetRepository;
     @Mock private StockPriceCacheRepository     stockPriceCacheRepository;
     @Mock private GoldPriceCacheRepository      goldPriceCacheRepository;
     @Mock private MFNavCacheRepository          mfNavCacheRepository;
@@ -82,10 +81,10 @@ class InvestmentServiceImplTest {
 
     private Investment.InvestmentBuilder baseInvestment() {
         return Investment.builder()
-                .userId(userId).assetId(UUID.randomUUID())
+                .userId(userId)
                 .investedAmount(new BigDecimal("100000"))
                 .currentValue(new BigDecimal("100000"))
-                .active(true);
+                .status(LifecycleStatus.ACTIVE);
     }
 
     private Investment withId(Investment inv) {
@@ -122,7 +121,7 @@ class InvestmentServiceImplTest {
                     .purchaseDate(LocalDate.of(2023, 1, 1))
                     .maturityDate(LocalDate.of(2024, 1, 1)) // 365 days, non-leap
                     .build());
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(fd));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(fd));
 
             InvestmentResponse response = service.getInvestments(userId).get(0);
 
@@ -140,7 +139,7 @@ class InvestmentServiceImplTest {
                     .purchaseDate(LocalDate.of(2023, 1, 1))
                     .maturityDate(LocalDate.of(2024, 1, 1))
                     .build());
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(fd));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(fd));
 
             InvestmentResponse response = service.getInvestments(userId).get(0);
 
@@ -158,7 +157,7 @@ class InvestmentServiceImplTest {
                     .purchaseDate(LocalDate.of(2023, 1, 1))
                     .maturityDate(LocalDate.of(2024, 1, 1))
                     .build());
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(fd));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(fd));
 
             InvestmentResponse response = service.getInvestments(userId).get(0);
 
@@ -177,7 +176,7 @@ class InvestmentServiceImplTest {
                         .purchaseDate(LocalDate.of(2023, 1, 1))
                         .maturityDate(LocalDate.of(2024, 1, 1))
                         .build());
-                when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(fd));
+                when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(fd));
 
                 InvestmentResponse response = service.getInvestments(userId).get(0);
 
@@ -194,7 +193,7 @@ class InvestmentServiceImplTest {
                     .purchaseDate(LocalDate.now().minusDays(30))
                     .maturityDate(null)
                     .build());
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(fd));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(fd));
 
             InvestmentResponse response = service.getInvestments(userId).get(0);
 
@@ -213,7 +212,7 @@ class InvestmentServiceImplTest {
                     .purchaseDate(LocalDate.now().minusDays(30))
                     .maturityDate(LocalDate.now().plusYears(1))
                     .build());
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(fd));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(fd));
 
             InvestmentResponse response = service.getInvestments(userId).get(0);
 
@@ -233,7 +232,7 @@ class InvestmentServiceImplTest {
                     .purchaseDate(LocalDate.now().minusDays(365))
                     .maturityDate(LocalDate.now().plusYears(5)) // far future -> accrual capped at "today"
                     .build());
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(fd));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(fd));
 
             InvestmentResponse response = service.getInvestments(userId).get(0);
 
@@ -261,7 +260,7 @@ class InvestmentServiceImplTest {
                     .tdsRate(BigDecimal.ZERO)
                     .purchaseDate(LocalDate.now().minusDays(365))
                     .build());
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(bond));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(bond));
 
             InvestmentResponse response = service.getInvestments(userId).get(0);
 
@@ -280,7 +279,7 @@ class InvestmentServiceImplTest {
                     .tdsRate(new BigDecimal("10"))
                     .purchaseDate(LocalDate.now().minusDays(365))
                     .build());
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(bond));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(bond));
 
             InvestmentResponse response = service.getInvestments(userId).get(0);
 
@@ -300,7 +299,7 @@ class InvestmentServiceImplTest {
                     .tdsRate(BigDecimal.ZERO)
                     .purchaseDate(LocalDate.now().minusDays(365))
                     .build());
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(bond));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(bond));
 
             InvestmentResponse response = service.getInvestments(userId).get(0);
 
@@ -320,7 +319,7 @@ class InvestmentServiceImplTest {
                     .purchaseDate(LocalDate.now().minusDays(730))
                     .maturityDate(LocalDate.now().minusDays(365)) // matured 365 days ago
                     .build());
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(bond));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(bond));
 
             InvestmentResponse response = service.getInvestments(userId).get(0);
 
@@ -339,7 +338,7 @@ class InvestmentServiceImplTest {
                     .units(new BigDecimal("100"))
                     .purchaseDate(LocalDate.now())
                     .build());
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(bond));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(bond));
 
             InvestmentResponse response = service.getInvestments(userId).get(0);
 
@@ -361,7 +360,7 @@ class InvestmentServiceImplTest {
                     .investedAmount(new BigDecimal("100000"))
                     .currentValue(new BigDecimal("125000"))
                     .build());
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(inv));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(inv));
 
             InvestmentResponse response = service.getInvestments(userId).get(0);
 
@@ -377,7 +376,7 @@ class InvestmentServiceImplTest {
                     .investedAmount(new BigDecimal("100000"))
                     .currentValue(new BigDecimal("80000"))
                     .build());
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(inv));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(inv));
 
             InvestmentResponse response = service.getInvestments(userId).get(0);
 
@@ -393,7 +392,7 @@ class InvestmentServiceImplTest {
                     .investedAmount(BigDecimal.ZERO)
                     .currentValue(new BigDecimal("500"))
                     .build());
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(inv));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(inv));
 
             InvestmentResponse response = service.getInvestments(userId).get(0);
 
@@ -520,7 +519,7 @@ class InvestmentServiceImplTest {
         @Test
         @DisplayName("returns null when the user has no active investments")
         void nullWhenNoInvestments() {
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of());
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of());
 
             assertThat(service.computePortfolioXirr(userId)).isNull();
         }
@@ -536,7 +535,7 @@ class InvestmentServiceImplTest {
                     .purchaseDate(LocalDate.now().minusDays(365)).build();
             ReflectionTestUtils.setField(inv2, "id", UUID.randomUUID());
 
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(inv1, inv2));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(inv1, inv2));
             when(sipTransactionRepository.findByInvestmentIdInOrderByTransactionDateAsc(any())).thenReturn(List.of());
             when(stockTransactionRepository.findByInvestmentIdInOrderByTransactionDateAsc(any())).thenReturn(List.of());
 
@@ -560,7 +559,7 @@ class InvestmentServiceImplTest {
                     .purchaseDate(LocalDate.now().minusDays(365)).build();
             ReflectionTestUtils.setField(fd, "id", UUID.randomUUID());
 
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(stock, fd));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(stock, fd));
             when(sipTransactionRepository.findByInvestmentIdInOrderByTransactionDateAsc(any())).thenReturn(List.of());
             when(stockTransactionRepository.findByInvestmentIdInOrderByTransactionDateAsc(any())).thenReturn(List.of());
 
@@ -599,7 +598,7 @@ class InvestmentServiceImplTest {
                     .units(new BigDecimal("10")).avgBuyPrice(new BigDecimal("100"))
                     .currentPrice(new BigDecimal("120"))
                     .build());
-            when(investmentRepository.findByUserIdAndSymbolAndInvestmentTypeAndActiveTrue(userId, "TCS", InvestmentType.STOCK))
+            when(investmentRepository.findByUserIdAndSymbolAndInvestmentTypeAndStatus(userId, "TCS", InvestmentType.STOCK, LifecycleStatus.ACTIVE))
                     .thenReturn(Optional.of(existing));
             when(stockTransactionRepository.countByInvestmentId(investmentId)).thenReturn(0L);
 
@@ -618,51 +617,9 @@ class InvestmentServiceImplTest {
             InvestmentResponse response = service.createInvestment(userId, req);
 
             verify(stockTransactionRepository, times(2)).save(any(StockTransaction.class)); // seed + new lot
-            verify(assetRepository, never()).save(any());
             assertThat(response.getUnits()).isEqualByComparingTo("15");
             assertThat(response.getAvgBuyPrice()).isEqualByComparingTo("103.3333");
             assertThat(response.getInvestedAmount()).isEqualByComparingTo("1550.00");
-        }
-
-        @Test
-        @DisplayName("auto-creates a linked asset when assetId is omitted on a new (non-merge) investment")
-        void autoCreatesLinkedAsset() {
-            CreateInvestmentRequest req = mockRequest();
-            when(req.getAssetId()).thenReturn(null);
-            when(req.getBankName()).thenReturn("HDFC Bank");
-            when(req.getCurrentValue()).thenReturn(new BigDecimal("100000"));
-            UUID newAssetId = UUID.randomUUID();
-            when(assetRepository.save(any(Asset.class))).thenAnswer(inv -> {
-                Asset a = inv.getArgument(0);
-                ReflectionTestUtils.setField(a, "id", newAssetId);
-                return a;
-            });
-            when(investmentRepository.save(any(Investment.class))).thenAnswer(inv -> {
-                Investment i = inv.getArgument(0);
-                ReflectionTestUtils.setField(i, "id", investmentId);
-                return i;
-            });
-
-            InvestmentResponse response = service.createInvestment(userId, req);
-
-            ArgumentCaptor<Asset> assetCaptor = ArgumentCaptor.forClass(Asset.class);
-            verify(assetRepository).save(assetCaptor.capture());
-            assertThat(assetCaptor.getValue().getName()).isEqualTo("HDFC Bank FD");
-            assertThat(response.getAssetId()).isEqualTo(newAssetId);
-        }
-
-        @Test
-        @DisplayName("rejects an explicit assetId that does not belong to the caller (IDOR guard)")
-        void rejectsAssetIdNotOwnedByCaller() {
-            UUID foreignAssetId = UUID.randomUUID();
-            CreateInvestmentRequest req = mockRequest();
-            when(req.getAssetId()).thenReturn(foreignAssetId);
-            when(assetRepository.findByIdAndUserId(foreignAssetId, userId)).thenReturn(Optional.empty());
-
-            assertThatThrownBy(() -> service.createInvestment(userId, req))
-                    .isInstanceOf(ResourceNotFoundException.class);
-
-            verify(investmentRepository, never()).save(any());
         }
 
         @Test
@@ -670,8 +627,6 @@ class InvestmentServiceImplTest {
         void createsDebitTransferWithBrokerage() {
             UUID debitAccountId = UUID.randomUUID();
             CreateInvestmentRequest req = mockRequest();
-            when(req.getAssetId()).thenReturn(UUID.randomUUID());
-            when(assetRepository.findByIdAndUserId(any(), eq(userId))).thenReturn(Optional.of(Asset.builder().build()));
             when(req.getDebitAccountId()).thenReturn(debitAccountId);
             when(req.getInvestedAmount()).thenReturn(new BigDecimal("100000"));
             when(req.getBrokerage()).thenReturn(new BigDecimal("50"));
@@ -691,13 +646,11 @@ class InvestmentServiceImplTest {
         }
 
         @Test
-        @DisplayName("accepts an explicit assetId that the caller does own")
-        void acceptsAssetIdOwnedByCaller() {
-            UUID assetId = UUID.randomUUID();
+        @DisplayName("saves broker and purpose when given, purely as descriptive metadata")
+        void savesBrokerAndPurpose() {
             CreateInvestmentRequest req = mockRequest();
-            when(req.getAssetId()).thenReturn(assetId);
-            when(assetRepository.findByIdAndUserId(assetId, userId))
-                    .thenReturn(Optional.of(Asset.builder().userId(userId).build()));
+            when(req.getBroker()).thenReturn("Zerodha");
+            when(req.getPurpose()).thenReturn(AccountPurpose.EMERGENCY_FUND);
             when(investmentRepository.save(any(Investment.class))).thenAnswer(inv -> {
                 Investment i = inv.getArgument(0);
                 ReflectionTestUtils.setField(i, "id", investmentId);
@@ -706,8 +659,19 @@ class InvestmentServiceImplTest {
 
             InvestmentResponse response = service.createInvestment(userId, req);
 
-            assertThat(response.getAssetId()).isEqualTo(assetId);
-            verify(assetRepository, never()).save(any());
+            assertThat(response.getBroker()).isEqualTo("Zerodha");
+            assertThat(response.getPurpose()).isEqualTo("EMERGENCY_FUND");
+        }
+
+        @Test
+        @DisplayName("CUSTOM purpose requires a non-blank label")
+        void customPurposeRequiresLabel() {
+            CreateInvestmentRequest req = mockRequest();
+            when(req.getPurpose()).thenReturn(AccountPurpose.CUSTOM);
+            when(req.getPurposeLabel()).thenReturn(null);
+
+            assertThatThrownBy(() -> service.createInvestment(userId, req)).isInstanceOf(BusinessException.class);
+            verify(investmentRepository, never()).save(any());
         }
 
         @Test
@@ -717,7 +681,7 @@ class InvestmentServiceImplTest {
                     .investmentType(InvestmentType.STOCK).symbol("TCS")
                     .units(new BigDecimal("10")).avgBuyPrice(new BigDecimal("100"))
                     .currentPrice(new BigDecimal("120")).build());
-            when(investmentRepository.findByUserIdAndSymbolAndInvestmentTypeAndActiveTrue(userId, "TCS", InvestmentType.STOCK))
+            when(investmentRepository.findByUserIdAndSymbolAndInvestmentTypeAndStatus(userId, "TCS", InvestmentType.STOCK, LifecycleStatus.ACTIVE))
                     .thenReturn(Optional.of(existing));
             when(stockTransactionRepository.countByInvestmentId(investmentId)).thenReturn(1L); // already seeded
 
@@ -748,13 +712,8 @@ class InvestmentServiceImplTest {
             when(req.getSymbol()).thenReturn("INFY");
             when(req.getUnits()).thenReturn(new BigDecimal("10"));
             when(req.getAvgBuyPrice()).thenReturn(new BigDecimal("1500"));
-            when(investmentRepository.findByUserIdAndSymbolAndInvestmentTypeAndActiveTrue(userId, "INFY", InvestmentType.STOCK))
+            when(investmentRepository.findByUserIdAndSymbolAndInvestmentTypeAndStatus(userId, "INFY", InvestmentType.STOCK, LifecycleStatus.ACTIVE))
                     .thenReturn(Optional.empty());
-            when(assetRepository.save(any(Asset.class))).thenAnswer(a -> {
-                Asset asset = a.getArgument(0);
-                ReflectionTestUtils.setField(asset, "id", UUID.randomUUID());
-                return asset;
-            });
             when(investmentRepository.save(any(Investment.class))).thenAnswer(inv -> {
                 Investment i = inv.getArgument(0);
                 ReflectionTestUtils.setField(i, "id", investmentId);
@@ -778,11 +737,6 @@ class InvestmentServiceImplTest {
             when(req.getGoldKarat()).thenReturn(null);
             when(req.getTdsRate()).thenReturn(null);
             when(req.getBrokerage()).thenReturn(null);
-            when(assetRepository.save(any(Asset.class))).thenAnswer(a -> {
-                Asset asset = a.getArgument(0);
-                ReflectionTestUtils.setField(asset, "id", UUID.randomUUID());
-                return asset;
-            });
             when(investmentRepository.save(any(Investment.class))).thenAnswer(inv -> {
                 Investment i = inv.getArgument(0);
                 ReflectionTestUtils.setField(i, "id", investmentId);
@@ -802,11 +756,6 @@ class InvestmentServiceImplTest {
         @Test
         @DisplayName("the after-commit hook backfills dividends for a STOCK, bond coupons for a BOND, and FD maturity for an FD")
         void afterCommitHookDispatchesBackfillByType() {
-            when(assetRepository.save(any(Asset.class))).thenAnswer(a -> {
-                Asset asset = a.getArgument(0);
-                ReflectionTestUtils.setField(asset, "id", UUID.randomUUID());
-                return asset;
-            });
             for (var pair : java.util.Map.of(
                     InvestmentType.STOCK, (Runnable) () -> verify(autoIncomeScheduler).backfillDividendsForStock(any()),
                     InvestmentType.BOND,  (Runnable) () -> verify(autoIncomeScheduler).backfillBondCoupons(any()),
@@ -836,11 +785,6 @@ class InvestmentServiceImplTest {
         void afterCommitHookSkipsBackfillForUnsupportedType() {
             CreateInvestmentRequest req = mockRequest();
             when(req.getInvestmentType()).thenReturn(InvestmentType.PPF);
-            when(assetRepository.save(any(Asset.class))).thenAnswer(a -> {
-                Asset asset = a.getArgument(0);
-                ReflectionTestUtils.setField(asset, "id", UUID.randomUUID());
-                return asset;
-            });
             when(investmentRepository.save(any(Investment.class))).thenAnswer(inv -> {
                 Investment i = inv.getArgument(0);
                 ReflectionTestUtils.setField(i, "id", investmentId);
@@ -888,7 +832,7 @@ class InvestmentServiceImplTest {
             when(investmentRepository.findById(investmentId)).thenReturn(Optional.of(inv));
             Investment other = baseInvestment().investmentType(InvestmentType.STOCK).symbol("INFY").build();
             ReflectionTestUtils.setField(other, "id", UUID.randomUUID());
-            when(investmentRepository.findByUserIdAndSymbolAndInvestmentTypeAndActiveTrue(userId, "INFY", InvestmentType.STOCK))
+            when(investmentRepository.findByUserIdAndSymbolAndInvestmentTypeAndStatus(userId, "INFY", InvestmentType.STOCK, LifecycleStatus.ACTIVE))
                     .thenReturn(Optional.of(other));
 
             CreateInvestmentRequest req = mockRequest();
@@ -910,7 +854,6 @@ class InvestmentServiceImplTest {
             when(req.getCurrentPrice()).thenReturn(null);
             when(req.getInvestedAmount()).thenReturn(new BigDecimal("75000"));
             when(req.getCurrentValue()).thenReturn(new BigDecimal("80000"));
-            when(assetRepository.findById(any())).thenReturn(Optional.empty());
             when(investmentRepository.save(any(Investment.class))).thenAnswer(a -> a.getArgument(0));
 
             InvestmentResponse response = service.updateInvestment(investmentId, userId, req);
@@ -920,23 +863,19 @@ class InvestmentServiceImplTest {
         }
 
         @Test
-        @DisplayName("syncs the linked asset's currentValue after a successful update")
-        void syncsLinkedAssetCurrentValue() {
-            UUID assetId = UUID.randomUUID();
-            Investment inv = withId(baseInvestment().investmentType(InvestmentType.FD).assetId(assetId).build());
+        @DisplayName("updates broker and purpose on an existing investment")
+        void updatesBrokerAndPurpose() {
+            Investment inv = withId(baseInvestment().investmentType(InvestmentType.FD).build());
             when(investmentRepository.findById(investmentId)).thenReturn(Optional.of(inv));
-            Asset asset = Asset.builder().userId(userId).currentValue(BigDecimal.ZERO).build();
-            when(assetRepository.findById(assetId)).thenReturn(Optional.of(asset));
             CreateInvestmentRequest req = mockRequest();
-            when(req.getInvestedAmount()).thenReturn(new BigDecimal("60000"));
-            when(req.getCurrentValue()).thenReturn(new BigDecimal("65000"));
+            when(req.getBroker()).thenReturn("Groww");
+            when(req.getPurpose()).thenReturn(AccountPurpose.RETIREMENT);
             when(investmentRepository.save(any(Investment.class))).thenAnswer(a -> a.getArgument(0));
 
-            service.updateInvestment(investmentId, userId, req);
+            InvestmentResponse response = service.updateInvestment(investmentId, userId, req);
 
-            ArgumentCaptor<Asset> assetCaptor = ArgumentCaptor.forClass(Asset.class);
-            verify(assetRepository).save(assetCaptor.capture());
-            assertThat(assetCaptor.getValue().getCurrentValue()).isEqualByComparingTo("65000");
+            assertThat(response.getBroker()).isEqualTo("Groww");
+            assertThat(response.getPurpose()).isEqualTo("RETIREMENT");
         }
 
         @Test
@@ -948,7 +887,6 @@ class InvestmentServiceImplTest {
             when(investmentRepository.findById(investmentId)).thenReturn(Optional.of(inv));
             AccountTransfer transfer = AccountTransfer.builder().amount(new BigDecimal("50000")).build();
             when(accountTransferRepository.findById(transferId)).thenReturn(Optional.of(transfer));
-            when(assetRepository.findById(any())).thenReturn(Optional.empty());
             when(investmentRepository.save(any(Investment.class))).thenAnswer(a -> a.getArgument(0));
             CreateInvestmentRequest req = mockRequest();
             when(req.getInvestedAmount()).thenReturn(new BigDecimal("70000"));
@@ -966,7 +904,6 @@ class InvestmentServiceImplTest {
             Investment inv = withId(baseInvestment().investmentType(InvestmentType.FD)
                     .investedAmount(new BigDecimal("50000")).debitTransferId(transferId).build());
             when(investmentRepository.findById(investmentId)).thenReturn(Optional.of(inv));
-            when(assetRepository.findById(any())).thenReturn(Optional.empty());
             when(investmentRepository.save(any(Investment.class))).thenAnswer(a -> a.getArgument(0));
             CreateInvestmentRequest req = mockRequest();
             when(req.getInvestedAmount()).thenReturn(new BigDecimal("50000")); // same as existing
@@ -987,7 +924,6 @@ class InvestmentServiceImplTest {
                     .quantity(new BigDecimal("10")).pricePerShare(new BigDecimal("100")).build();
             when(stockTransactionRepository.findByInvestmentIdOrderByTransactionDateAsc(investmentId))
                     .thenReturn(List.of(seed));
-            when(assetRepository.findById(any())).thenReturn(Optional.empty());
             when(investmentRepository.save(any(Investment.class))).thenAnswer(a -> a.getArgument(0));
             when(stockTransactionRepository.sumBuyQuantityByInvestmentId(investmentId)).thenReturn(new BigDecimal("20"));
             when(stockTransactionRepository.sumBuyAmountByInvestmentId(investmentId)).thenReturn(new BigDecimal("2200"));
@@ -1012,7 +948,6 @@ class InvestmentServiceImplTest {
             when(investmentRepository.findById(investmentId)).thenReturn(Optional.of(inv));
             when(stockTransactionRepository.findByInvestmentIdOrderByTransactionDateAsc(investmentId))
                     .thenReturn(List.of());
-            when(assetRepository.findById(any())).thenReturn(Optional.empty());
             when(investmentRepository.save(any(Investment.class))).thenAnswer(a -> a.getArgument(0));
             when(stockTransactionRepository.sumBuyQuantityByInvestmentId(investmentId)).thenReturn(new BigDecimal("15"));
             when(stockTransactionRepository.sumBuyAmountByInvestmentId(investmentId)).thenReturn(new BigDecimal("1500"));
@@ -1040,7 +975,6 @@ class InvestmentServiceImplTest {
             StockTransaction buyMore = StockTransaction.builder().investmentId(investmentId).transactionType("BUY").build();
             when(stockTransactionRepository.findByInvestmentIdOrderByTransactionDateAsc(investmentId))
                     .thenReturn(List.of(seed, buyMore));
-            when(assetRepository.findById(any())).thenReturn(Optional.empty());
             when(investmentRepository.save(any(Investment.class))).thenAnswer(a -> a.getArgument(0));
             when(stockTransactionRepository.sumBuyQuantityByInvestmentId(investmentId)).thenReturn(new BigDecimal("30"));
             when(stockTransactionRepository.sumBuyAmountByInvestmentId(investmentId)).thenReturn(new BigDecimal("3000"));
@@ -1062,7 +996,6 @@ class InvestmentServiceImplTest {
         void nullGoldKaratKeepsExisting() {
             Investment inv = withId(baseInvestment().investmentType(InvestmentType.GOLD).goldKarat(18).build());
             when(investmentRepository.findById(investmentId)).thenReturn(Optional.of(inv));
-            when(assetRepository.findById(any())).thenReturn(Optional.empty());
             when(investmentRepository.save(any(Investment.class))).thenAnswer(a -> a.getArgument(0));
             CreateInvestmentRequest req = mockRequest();
             when(req.getGoldKarat()).thenReturn(null);
@@ -1079,7 +1012,6 @@ class InvestmentServiceImplTest {
             UUID newAccountId = UUID.randomUUID();
             Investment inv = withId(baseInvestment().investmentType(InvestmentType.FD).linkedAccountId(oldAccountId).build());
             when(investmentRepository.findById(investmentId)).thenReturn(Optional.of(inv));
-            when(assetRepository.findById(any())).thenReturn(Optional.empty());
             when(investmentRepository.save(any(Investment.class))).thenAnswer(a -> a.getArgument(0));
 
             UUID incomeEntryId = UUID.randomUUID();
@@ -1105,7 +1037,6 @@ class InvestmentServiceImplTest {
             UUID accountId = UUID.randomUUID();
             Investment inv = withId(baseInvestment().investmentType(InvestmentType.FD).linkedAccountId(accountId).build());
             when(investmentRepository.findById(investmentId)).thenReturn(Optional.of(inv));
-            when(assetRepository.findById(any())).thenReturn(Optional.empty());
             when(investmentRepository.save(any(Investment.class))).thenAnswer(a -> a.getArgument(0));
             CreateInvestmentRequest req = mockRequest();
             when(req.getLinkedAccountId()).thenReturn(accountId); // same
@@ -1123,7 +1054,6 @@ class InvestmentServiceImplTest {
             UUID unrelatedAccountId = UUID.randomUUID();
             Investment inv = withId(baseInvestment().investmentType(InvestmentType.FD).linkedAccountId(oldAccountId).build());
             when(investmentRepository.findById(investmentId)).thenReturn(Optional.of(inv));
-            when(assetRepository.findById(any())).thenReturn(Optional.empty());
             when(investmentRepository.save(any(Investment.class))).thenAnswer(a -> a.getArgument(0));
 
             UUID incomeEntryId = UUID.randomUUID();
@@ -1159,32 +1089,16 @@ class InvestmentServiceImplTest {
         }
 
         @Test
-        @DisplayName("soft-deletes (active=false) and deactivates the linked asset when no other active investment references it")
-        void softDeletesAndDeactivatesOrphanedAsset() {
-            UUID assetId = UUID.randomUUID();
-            Investment inv = withId(baseInvestment().assetId(assetId).build());
+        @DisplayName("sets status=ARCHIVED — a user-initiated hide, never a hard delete")
+        void setsStatusArchived() {
+            Investment inv = withId(baseInvestment().build());
             when(investmentRepository.findById(investmentId)).thenReturn(Optional.of(inv));
-            when(investmentRepository.existsByAssetIdAndActiveTrueAndIdNot(assetId, investmentId)).thenReturn(false);
-            Asset asset = Asset.builder().active(true).build();
-            when(assetRepository.findById(assetId)).thenReturn(Optional.of(asset));
 
             service.deleteInvestment(investmentId, userId);
 
-            assertThat(inv.isActive()).isFalse();
-            assertThat(asset.isActive()).isFalse();
-        }
-
-        @Test
-        @DisplayName("does NOT deactivate the linked asset while another active investment still references it")
-        void keepsAssetActiveWhenStillReferenced() {
-            UUID assetId = UUID.randomUUID();
-            Investment inv = withId(baseInvestment().assetId(assetId).build());
-            when(investmentRepository.findById(investmentId)).thenReturn(Optional.of(inv));
-            when(investmentRepository.existsByAssetIdAndActiveTrueAndIdNot(assetId, investmentId)).thenReturn(true);
-
-            service.deleteInvestment(investmentId, userId);
-
-            verify(assetRepository, never()).findById(any());
+            assertThat(inv.getStatus()).isEqualTo(LifecycleStatus.ARCHIVED);
+            verify(investmentRepository, never()).delete(any());
+            verify(investmentRepository, never()).deleteById(any());
         }
 
         @Test
@@ -1193,7 +1107,6 @@ class InvestmentServiceImplTest {
             UUID transferId = UUID.randomUUID();
             Investment inv = withId(baseInvestment().debitTransferId(transferId).debitAccountId(UUID.randomUUID()).build());
             when(investmentRepository.findById(investmentId)).thenReturn(Optional.of(inv));
-            when(investmentRepository.existsByAssetIdAndActiveTrueAndIdNot(any(), any())).thenReturn(true);
 
             service.deleteInvestment(investmentId, userId);
 
@@ -1251,15 +1164,15 @@ class InvestmentServiceImplTest {
 
             assertThat(inv.getAvgBuyPrice()).isEqualByComparingTo("110"); // 2200/20
             assertThat(inv.getUnits()).isEqualByComparingTo("20");
-            assertThat(inv.isActive()).isTrue();
+            assertThat(inv.getStatus()).isEqualTo(LifecycleStatus.ACTIVE);
         }
 
         @Test
-        @DisplayName("selling the entire position deactivates the investment (netQty = 0)")
-        void sellingEntirePositionDeactivates() {
+        @DisplayName("selling the entire position sets status=CLOSED (netQty = 0) — a real-world terminal event, not a user archive")
+        void sellingEntirePositionCloses() {
             Investment inv = withId(baseInvestment().investmentType(InvestmentType.STOCK)
                     .symbol("TCS").units(new BigDecimal("10")).avgBuyPrice(new BigDecimal("100"))
-                    .currentPrice(new BigDecimal("120")).active(true).build());
+                    .currentPrice(new BigDecimal("120")).status(LifecycleStatus.ACTIVE).build());
             when(investmentRepository.findById(investmentId)).thenReturn(Optional.of(inv));
             when(stockTransactionRepository.countByInvestmentId(investmentId)).thenReturn(1L);
             when(stockTransactionRepository.save(any(StockTransaction.class))).thenAnswer(a -> {
@@ -1281,7 +1194,7 @@ class InvestmentServiceImplTest {
 
             service.addStockTransaction(investmentId, userId, sellReq);
 
-            assertThat(inv.isActive()).isFalse();
+            assertThat(inv.getStatus()).isEqualTo(LifecycleStatus.CLOSED);
             assertThat(inv.getUnits()).isEqualByComparingTo("0");
         }
 
@@ -1291,7 +1204,7 @@ class InvestmentServiceImplTest {
             UUID accountId = UUID.randomUUID();
             Investment inv = withId(baseInvestment().investmentType(InvestmentType.STOCK)
                     .symbol("TCS").units(new BigDecimal("10")).avgBuyPrice(new BigDecimal("100"))
-                    .currentPrice(new BigDecimal("120")).active(true).build());
+                    .currentPrice(new BigDecimal("120")).status(LifecycleStatus.ACTIVE).build());
             when(investmentRepository.findById(investmentId)).thenReturn(Optional.of(inv));
             when(stockTransactionRepository.countByInvestmentId(investmentId)).thenReturn(1L);
             when(stockTransactionRepository.save(any(StockTransaction.class))).thenAnswer(a -> a.getArgument(0));
@@ -1553,7 +1466,7 @@ class InvestmentServiceImplTest {
                     .dayChange(new BigDecimal("5")).dayChangePct(new BigDecimal("3.4"))
                     .week52High(new BigDecimal("200")).week52Low(new BigDecimal("100"))
                     .lastUpdated(Instant.now()).build();
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(inv));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(inv));
             when(stockPriceCacheRepository.findById("TCS")).thenReturn(Optional.of(cache));
             // getInvestments batches this via enrichAll (one grouped query for the whole list)
             // rather than enrich's own single-item countByInvestmentId fallback — see
@@ -1575,7 +1488,7 @@ class InvestmentServiceImplTest {
         void stockMissingCacheKeepsStoredValue() {
             Investment inv = withId(baseInvestment().investmentType(InvestmentType.STOCK)
                     .symbol("ZZZZ").units(new BigDecimal("10")).currentValue(new BigDecimal("999")).build());
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(inv));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(inv));
             when(stockPriceCacheRepository.findById("ZZZZ")).thenReturn(Optional.empty());
 
             InvestmentResponse response = service.getInvestments(userId).get(0);
@@ -1591,7 +1504,7 @@ class InvestmentServiceImplTest {
                     .schemeCode("MF001").units(new BigDecimal("100")).build());
             MFNavCache cache = MFNavCache.builder().schemeCode("MF001").nav(new BigDecimal("25"))
                     .lastUpdated(Instant.now()).build();
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(inv));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(inv));
             when(mfNavCacheRepository.findById("MF001")).thenReturn(Optional.of(cache));
 
             InvestmentResponse response = service.getInvestments(userId).get(0);
@@ -1607,7 +1520,7 @@ class InvestmentServiceImplTest {
                     .goldKarat(24).quantityGrams(new BigDecimal("10")).build());
             GoldPriceCache cache = GoldPriceCache.builder()
                     .price24kPerGram(new BigDecimal("6000")).lastUpdated(Instant.now()).build();
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(inv));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(inv));
             when(goldPriceCacheRepository.findById(1)).thenReturn(Optional.of(cache));
 
             InvestmentResponse response = service.getInvestments(userId).get(0);
@@ -1622,7 +1535,7 @@ class InvestmentServiceImplTest {
                     .goldKarat(18).quantityGrams(new BigDecimal("10")).build());
             GoldPriceCache cache = GoldPriceCache.builder()
                     .price18kPerGram(new BigDecimal("4500")).lastUpdated(Instant.now()).build();
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(inv));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(inv));
             when(goldPriceCacheRepository.findById(1)).thenReturn(Optional.of(cache));
 
             InvestmentResponse response = service.getInvestments(userId).get(0);
@@ -1637,7 +1550,7 @@ class InvestmentServiceImplTest {
                     .goldKarat(18).quantityGrams(new BigDecimal("10")).build());
             GoldPriceCache cache = GoldPriceCache.builder()
                     .price24kPerGram(new BigDecimal("6000")).lastUpdated(Instant.now()).build();
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(inv));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(inv));
             when(goldPriceCacheRepository.findById(1)).thenReturn(Optional.of(cache));
 
             InvestmentResponse response = service.getInvestments(userId).get(0);
@@ -1653,7 +1566,7 @@ class InvestmentServiceImplTest {
                     .goldKarat(22).quantityGrams(new BigDecimal("10")).build());
             GoldPriceCache cache = GoldPriceCache.builder()
                     .price22kPerGram(new BigDecimal("5500")).lastUpdated(Instant.now()).build();
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(inv));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(inv));
             when(goldPriceCacheRepository.findById(1)).thenReturn(Optional.of(cache));
 
             InvestmentResponse response = service.getInvestments(userId).get(0);
@@ -1669,7 +1582,7 @@ class InvestmentServiceImplTest {
                     .debitAccountId(debitAccountId).build());
             WalletAccount account = WalletAccount.builder().name("HDFC Savings").build();
             ReflectionTestUtils.setField(account, "id", debitAccountId);
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(inv));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(inv));
             // getInvestments batches this via enrichAll (one findAllById for the whole list)
             // rather than enrich's own single-item findById fallback.
             when(accountRepository.findAllById(List.of(debitAccountId))).thenReturn(List.of(account));
@@ -1854,7 +1767,7 @@ class InvestmentServiceImplTest {
                     .symbol("TCS").units(new BigDecimal("10")).purchaseDate(LocalDate.now().minusYears(1)).build());
             NseCorporateAction ca = NseCorporateAction.builder()
                     .symbol("TCS").exDate(LocalDate.now().minusDays(10)).dividendPerShare(new BigDecimal("5")).build();
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(stock));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(stock));
             when(dismissedDividendRepository.findByUserId(userId)).thenReturn(List.of());
             when(corpActionRepository.findBySymbolInAndExDateAfterOrderByExDateDesc(Set.of("TCS"), stock.getPurchaseDate()))
                     .thenReturn(List.of(ca));
@@ -1878,7 +1791,7 @@ class InvestmentServiceImplTest {
                     .symbol("TCS").exDate(exDate).dividendPerShare(new BigDecimal("5")).build();
             InvestmentIncomeLog log = InvestmentIncomeLog.builder()
                     .investmentId(investmentId).incomeType("DIVIDEND").eventDate(exDate).build();
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(stock));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(stock));
             when(dismissedDividendRepository.findByUserId(userId)).thenReturn(List.of());
             when(corpActionRepository.findBySymbolInAndExDateAfterOrderByExDateDesc(Set.of("TCS"), stock.getPurchaseDate()))
                     .thenReturn(List.of(ca));
@@ -1901,7 +1814,7 @@ class InvestmentServiceImplTest {
                     .symbol("TCS").exDate(exDate).dividendPerShare(new BigDecimal("5")).build();
             DismissedDividend dismissed = DismissedDividend.builder()
                     .userId(userId).investmentId(investmentId).exDate(exDate).build();
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(stock));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(stock));
             when(dismissedDividendRepository.findByUserId(userId)).thenReturn(List.of(dismissed));
             when(corpActionRepository.findBySymbolInAndExDateAfterOrderByExDateDesc(Set.of("TCS"), stock.getPurchaseDate()))
                     .thenReturn(List.of(ca));
@@ -1920,7 +1833,7 @@ class InvestmentServiceImplTest {
                     .symbol("TCS").units(new BigDecimal("10")).purchaseDate(LocalDate.now().minusYears(1)).build());
             NseCorporateAction ca = NseCorporateAction.builder()
                     .symbol("TCS").exDate(LocalDate.now().minusDays(10)).dividendPerShare(BigDecimal.ZERO).build();
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(stock));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(stock));
             when(dismissedDividendRepository.findByUserId(userId)).thenReturn(List.of());
             when(corpActionRepository.findBySymbolInAndExDateAfterOrderByExDateDesc(Set.of("TCS"), stock.getPurchaseDate()))
                     .thenReturn(List.of(ca));
@@ -1942,7 +1855,7 @@ class InvestmentServiceImplTest {
                     .symbol("TCS").units(new BigDecimal("5")).purchaseDate(LocalDate.now().minusDays(5)).build());
             NseCorporateAction ca = NseCorporateAction.builder()
                     .symbol("TCS").exDate(LocalDate.now().minusDays(10)).dividendPerShare(new BigDecimal("5")).build();
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(older, newer));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(older, newer));
             when(dismissedDividendRepository.findByUserId(userId)).thenReturn(List.of());
             when(corpActionRepository.findBySymbolInAndExDateAfterOrderByExDateDesc(Set.of("TCS"), older.getPurchaseDate()))
                     .thenReturn(List.of(ca));
@@ -1961,7 +1874,7 @@ class InvestmentServiceImplTest {
         @DisplayName("non-stock and stocks with missing symbol/units/purchaseDate are filtered out before lookup")
         void filtersIneligibleInvestments() {
             Investment fd = withId(baseInvestment().investmentType(InvestmentType.FD).build());
-            when(investmentRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(fd));
+            when(investmentRepository.findByUserIdAndStatus(userId, LifecycleStatus.ACTIVE)).thenReturn(List.of(fd));
 
             assertThat(service.getDividendSuggestions(userId)).isEmpty();
             // Short-circuits on the empty eligible-stocks list before any further lookup —

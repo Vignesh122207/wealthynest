@@ -1,6 +1,6 @@
 "use client";
 
-import {Archive, ChevronDown, X} from "lucide-react";
+import {Archive, ChevronDown, Lock, X} from "lucide-react";
 import {Controller, type UseFormReturn} from "react-hook-form";
 import {PremiumIcon} from "@/components/icons/PremiumIcon";
 import {AccountPicker} from "@/components/transactions/AccountPicker";
@@ -9,8 +9,8 @@ import {FormCurrencyInput} from "@/components/forms/FormCurrencyInput";
 import {FormSelect} from "@/components/forms/FormSelect";
 import {BankNameInput} from "@/features/accounts/components/BankNameInput";
 import {ACCOUNT_TYPE_META} from "@/lib/accountTypeMeta";
-import {type CreateAccountForm, LOAN_TYPE_LABELS, LOAN_TYPE_OPTIONS} from "@/features/accounts/schemas/account.schema";
-import {INDIAN_BANKS, STOCK_BROKERS} from "@/lib/constants";
+import {type CreateAccountForm, LOAN_TYPE_LABELS, LOAN_TYPE_OPTIONS, PURPOSE_OPTIONS} from "@/features/accounts/schemas/account.schema";
+import {INDIAN_BANKS} from "@/lib/constants";
 import {cn, formatCurrency} from "@/lib/utils";
 import {useSidebarOffsetClass} from "@/hooks/useSidebarOffsetClass";
 import type {AccountType, WalletAccount} from "@/features/accounts/types/account.types";
@@ -34,6 +34,8 @@ interface AccountFormModalProps {
   adjusting: boolean;
   onClose: () => void;
   onArchive: () => void;
+  /** ACTIVE → CLOSED — a real-world terminal event, not reversible. Only offered on an ACTIVE account. */
+  onCloseAccount: () => void;
   onSubmit: (v: CreateAccountForm) => void;
 }
 
@@ -43,15 +45,16 @@ interface AccountFormModalProps {
 // `editAccount` rather than threaded in as separate props, since both are already passed down.
 export function AccountFormModal({
   modal, editAccount, createForm, accounts, bankInput, setBankInput, showCCDetails, setShowCCDetails,
-  actualBalance, setActualBalance, currSymbol, creating, updating, adjusting, onClose, onArchive, onSubmit,
+  actualBalance, setActualBalance, currSymbol, creating, updating, adjusting, onClose, onArchive, onCloseAccount, onSubmit,
 }: AccountFormModalProps) {
   const watchedType = createForm.watch("accountType");
   const activeType  = modal === "create" ? watchedType : (editAccount?.accountType ?? watchedType);
   const isCCForm     = activeType === "CREDIT_CARD";
   const isBankForm   = activeType === "BANK_ACCOUNT";
   const isLoanForm   = activeType === "LOAN";
-  const isInvForm    = activeType === "INVESTMENT";
-  const isSimpleType = activeType === "CASH_WALLET" || activeType === "EMERGENCY_FUND";
+  const isSimpleType = activeType === "CASH_WALLET";
+  const watchedPurpose = createForm.watch("purpose");
+  const isEditActive = modal === "edit" && editAccount?.status !== "CLOSED" && editAccount?.status !== "ARCHIVED";
 
   // Balance-reconciliation preview for the Edit form's "Actual balance" field.
   const editBalanceTarget     = parseFloat(actualBalance);
@@ -82,17 +85,29 @@ export function AccountFormModal({
                 ? (isCCForm ? "Edit Card" : "Edit Account")
                 : "New Account"}
             </h3>
-            {modal === "edit" && editAccount && (
-              <div className="relative group shrink-0">
-                <button type="button" onClick={onArchive}
-                  aria-label="Archive"
-                  className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground/60 hover:text-amber-500 hover:bg-amber-500/10 transition-all">
-                  <Archive className="w-4 h-4" />
-                </button>
-                <span className="pointer-events-none absolute top-full right-0 mt-1.5 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-[11px] font-medium text-background opacity-0 translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:translate-y-0 z-10">
-                  Archive
-                </span>
-              </div>
+            {isEditActive && (
+              <>
+                <div className="relative group shrink-0">
+                  <button type="button" onClick={onCloseAccount}
+                    aria-label="Close account"
+                    className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground/60 hover:text-rose-500 hover:bg-rose-500/10 transition-all">
+                    <Lock className="w-4 h-4" />
+                  </button>
+                  <span className="pointer-events-none absolute top-full right-0 mt-1.5 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-[11px] font-medium text-background opacity-0 translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:translate-y-0 z-10">
+                    Close (permanent)
+                  </span>
+                </div>
+                <div className="relative group shrink-0">
+                  <button type="button" onClick={onArchive}
+                    aria-label="Archive"
+                    className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground/60 hover:text-amber-500 hover:bg-amber-500/10 transition-all">
+                    <Archive className="w-4 h-4" />
+                  </button>
+                  <span className="pointer-events-none absolute top-full right-0 mt-1.5 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-[11px] font-medium text-background opacity-0 translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:translate-y-0 z-10">
+                    Archive
+                  </span>
+                </div>
+              </>
             )}
             <button type="button" onClick={onClose} aria-label="Close"
               className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground/60 hover:text-foreground hover:bg-muted transition-all shrink-0">
@@ -101,23 +116,22 @@ export function AccountFormModal({
           </div>
           <form onSubmit={createForm.handleSubmit(onSubmit)} className="space-y-4">
             {modal === "create" && (
-              <div className="grid grid-cols-3 gap-2">
-                {(["CASH_WALLET", "BANK_ACCOUNT", "EMERGENCY_FUND", "CREDIT_CARD", "LOAN", "INVESTMENT"] as AccountType[]).map(t => {
+              <div className="grid grid-cols-4 gap-2">
+                {(["CASH_WALLET", "BANK_ACCOUNT", "CREDIT_CARD", "LOAN"] as AccountType[]).map(t => {
                   const m = ACCOUNT_TYPE_META[t];
                   const Icon = m.icon;
-                  const singleton    = t === "CASH_WALLET" || t === "EMERGENCY_FUND";
+                  const singleton    = t === "CASH_WALLET";
                   const alreadyExists = singleton && accounts.some(a => a.accountType === t);
                   const selected = watchedType === t && !alreadyExists;
                   return (
                     <button key={t} type="button" data-testid={`account-type-${t}`} disabled={alreadyExists}
                       onClick={() => {
                         // Full reset (not setValue) — clears every type-specific field
-                        // (apr, creditLimit, loanType, etc.) left over from whichever type
-                        // was selected before, so it can't silently ride along on submit.
+                        // (apr, creditLimit, loanType, purpose, etc.) left over from whichever
+                        // type was selected before, so it can't silently ride along on submit.
                         createForm.reset({
                           accountType: t,
-                          name: t === "CASH_WALLET" ? "Cash Wallet" : t === "EMERGENCY_FUND" ? "Emergency Fund"
-                            : t === "INVESTMENT" ? "Investment Account" : t === "CREDIT_CARD" ? "Credit Card" : t === "LOAN" ? "Loan" : "",
+                          name: t === "CASH_WALLET" ? "Cash Wallet" : t === "CREDIT_CARD" ? "Credit Card" : t === "LOAN" ? "Loan" : "",
                           openingBalance: createForm.getValues("openingBalance"),
                         });
                         setBankInput("");
@@ -136,19 +150,34 @@ export function AccountFormModal({
               </div>
             )}
 
-            {(isCCForm || isBankForm || isLoanForm || isInvForm) && (
+            {(isCCForm || isBankForm || isLoanForm) && (
               <BankNameInput
-                label={isCCForm ? "Card Issuer (Bank)" : isLoanForm ? "Lender (Bank / NBFC)" : isInvForm ? "Broker / Platform" : "Bank Name"}
-                suggestions={isInvForm ? STOCK_BROKERS : INDIAN_BANKS}
+                label={isCCForm ? "Card Issuer (Bank)" : isLoanForm ? "Lender (Bank / NBFC)" : "Bank Name"}
+                suggestions={INDIAN_BANKS}
                 value={bankInput}
                 onChange={v => { setBankInput(v);
                   if (isBankForm) createForm.setValue("name", v || "Bank Account");
-                  if (isInvForm)  createForm.setValue("name", v || "Investment Account");
                   if (isCCForm)   createForm.setValue("name", v ? `${v} Card` : "");
                   if (isLoanForm) {
                     const label = LOAN_TYPE_LABELS[createForm.getValues("loanType") ?? ""];
                     createForm.setValue("name", label ? `${v} ${label}`.trim() : (v || "Loan"));
                   } }} />
+            )}
+
+            {isBankForm && (
+              <div className="space-y-2">
+                <FormSelect label="Purpose (optional)" options={PURPOSE_OPTIONS} placeholder="What is this money for?"
+                  error={createForm.formState.errors.purpose?.message}
+                  value={createForm.watch("purpose") ?? ""}
+                  onChange={e => createForm.setValue("purpose", (e.target.value || undefined) as CreateAccountForm["purpose"])} />
+                {watchedPurpose === "CUSTOM" && (
+                  <div>
+                    <input {...createForm.register("purposeLabel")} placeholder="e.g. Sabbatical fund"
+                      className="w-full h-10 px-3 rounded-xl text-sm bg-background border border-border text-foreground placeholder-muted-foreground/40 outline-none focus:border-indigo-500 transition-all" />
+                    {createForm.formState.errors.purposeLabel && <p className="text-xs text-red-500 mt-1">{createForm.formState.errors.purposeLabel.message}</p>}
+                  </div>
+                )}
+              </div>
             )}
 
             {isLoanForm && (
@@ -317,9 +346,8 @@ export function AccountFormModal({
                 </div>
                 <Controller control={createForm.control} name="autopayAccountId" render={({ field }) => (
                   <AccountPicker label="Auto-pay EMI from (optional)" placeholder="Manual payments only" allowClear
-                    cashAccounts={accounts.filter(a => a.accountType === "CASH_WALLET" && !a.archived)}
-                    bankAccounts={accounts.filter(a => a.accountType === "BANK_ACCOUNT" && !a.archived)}
-                    emergencyFundAccounts={accounts.filter(a => a.accountType === "EMERGENCY_FUND" && !a.archived)}
+                    cashAccounts={accounts.filter(a => a.accountType === "CASH_WALLET" && a.status === "ACTIVE")}
+                    bankAccounts={accounts.filter(a => a.accountType === "BANK_ACCOUNT" && a.status === "ACTIVE")}
                     creditAccounts={[]}
                     value={field.value ?? ""} onChange={field.onChange} />
                 )} />

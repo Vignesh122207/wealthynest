@@ -3,9 +3,6 @@ package com.wealthynest.domain.asset.repository;
 import com.wealthynest.domain.asset.entity.Asset;
 import com.wealthynest.domain.asset.entity.AssetType;
 import com.wealthynest.domain.family.entity.Family;
-import com.wealthynest.domain.investment.entity.Investment;
-import com.wealthynest.domain.investment.entity.InvestmentType;
-import com.wealthynest.domain.investment.repository.InvestmentRepository;
 import com.wealthynest.domain.user.entity.User;
 import com.wealthynest.testsupport.AbstractRepositoryTest;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,16 +19,10 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Verifies AssetRepository, focusing on sumManualAssetValueByUser's NOT IN subquery — it must
- * exclude any Asset that already has an active Investment pointing at it (to avoid double-counting
- * the same holding once as a manual Asset and once as a portfolio Investment in net-worth totals).
- */
 class AssetRepositoryTest extends AbstractRepositoryTest {
 
     @Autowired private TestEntityManager entityManager;
     @Autowired private AssetRepository assetRepository;
-    @Autowired private InvestmentRepository investmentRepository;
 
     private UUID userId;
     private UUID familyId;
@@ -109,61 +100,21 @@ class AssetRepositoryTest extends AbstractRepositoryTest {
         }
 
         @Test
-        @DisplayName("sumManualAssetValueByUser excludes an asset that has an active linked Investment")
-        void sumManualExcludesInvestmentLinkedAsset() {
-            Asset manualAsset = persistAsset(userId, null, new BigDecimal("1000"), true);
-            Asset investedAsset = persistAsset(userId, null, new BigDecimal("2000"), true);
-            entityManager.flush();
-
-            Investment investment = Investment.builder().userId(userId).assetId(investedAsset.getId())
-                    .investmentType(InvestmentType.STOCK).symbol("INFY").investedAmount(new BigDecimal("1800"))
-                    .currentValue(new BigDecimal("2000")).active(true).build();
-            entityManager.persist(investment);
-            entityManager.flush();
-
-            BigDecimal sum = assetRepository.sumManualAssetValueByUser(userId);
-
-            assertThat(sum).isEqualByComparingTo("1000"); // only the manual (non-invested) asset
-        }
-
-        @Test
-        @DisplayName("sumManualAssetValueByUser includes an asset whose linked Investment is inactive")
-        void sumManualIncludesAssetWithInactiveInvestment() {
-            Asset asset = persistAsset(userId, null, new BigDecimal("1000"), true);
-            entityManager.flush();
-
-            Investment inactiveInvestment = Investment.builder().userId(userId).assetId(asset.getId())
-                    .investmentType(InvestmentType.STOCK).symbol("INFY").investedAmount(new BigDecimal("900"))
-                    .currentValue(new BigDecimal("1000")).active(false).build();
-            entityManager.persist(inactiveInvestment);
-            entityManager.flush();
-
-            BigDecimal sum = assetRepository.sumManualAssetValueByUser(userId);
-
-            assertThat(sum).isEqualByComparingTo("1000"); // inactive investment doesn't count as "linked"
-        }
-
-        @Test
-        @DisplayName("sumManualAssetValueByUserIn aggregates the manual-asset exclusion across multiple users")
+        @DisplayName("sumManualAssetValueByUserIn aggregates active assets across multiple users in one query")
         void sumManualByUserInAggregatesAcrossUsers() {
             User user2 = User.builder().fullName("Jack").email("jack-" + UUID.randomUUID() + "@x.com")
                     .passwordHash("hash").build();
             entityManager.persist(user2);
             entityManager.flush();
 
-            Asset manual1 = persistAsset(userId, null, new BigDecimal("1000"), true);
-            Asset invested2 = persistAsset(user2.getId(), null, new BigDecimal("2000"), true);
-            entityManager.flush();
-
-            Investment investment = Investment.builder().userId(user2.getId()).assetId(invested2.getId())
-                    .investmentType(InvestmentType.STOCK).symbol("TCS").investedAmount(new BigDecimal("1800"))
-                    .currentValue(new BigDecimal("2000")).active(true).build();
-            entityManager.persist(investment);
+            persistAsset(userId, null, new BigDecimal("1000"), true);
+            persistAsset(user2.getId(), null, new BigDecimal("2000"), true);
+            persistAsset(user2.getId(), null, new BigDecimal("500"), false); // inactive — excluded
             entityManager.flush();
 
             BigDecimal sum = assetRepository.sumManualAssetValueByUserIn(List.of(userId, user2.getId()));
 
-            assertThat(sum).isEqualByComparingTo("1000"); // only user1's manual asset; user2's is investment-linked
+            assertThat(sum).isEqualByComparingTo("3000");
         }
     }
 

@@ -1,8 +1,9 @@
+import type { AccountPurpose, LifecycleStatus } from "@/features/accounts/types/account.types";
+
 export type InvestmentType = 'STOCK' | 'MUTUAL_FUND' | 'BOND' | 'FD' | 'GOLD' | 'GOLD_ETF' | 'PPF' | 'NPS' | 'REIT' | 'OTHER';
 
 export interface Investment {
   id:             string;
-  assetId:        string;
   investmentType: InvestmentType;
   symbol?:        string;
   exchange?:      string;
@@ -36,8 +37,11 @@ export interface Investment {
   debitAccountName?: string;
   tdsRate?:          number;
   brokerage?:        number;
+  broker?:           string;
+  purpose?:          AccountPurpose | null;
+  purposeLabel?:     string | null;
   notes?:         string;
-  active:         boolean;
+  status:         LifecycleStatus;
   createdAt:      string;
   dayChange?:     number;
   dayChangePct?:  number;
@@ -75,6 +79,9 @@ export interface CreateInvestmentPayload {
   debitAccountId?:      string;
   tdsRate?:             number;
   brokerage?:           number;
+  broker?:              string;
+  purpose?:             AccountPurpose;
+  purposeLabel?:        string;
   notes?:               string;
 }
 

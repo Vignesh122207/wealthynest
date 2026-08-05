@@ -204,36 +204,17 @@ class IncomeRepositoryTest extends AbstractRepositoryTest {
     }
 
     @Nested
-    @DisplayName("account unlink vs hard-delete on account closure")
-    class AccountUnlinkTests {
+    @DisplayName("existsByAccountId — used by the account-delete history guard")
+    class ExistsByAccountIdTests {
 
         @Test
-        @DisplayName("clearAccountId nulls the account reference without deleting the income row")
-        void clearAccountIdNullsReferenceKeepsRow() {
-            IncomeEntry e = persistIncome(new BigDecimal("100"), LocalDate.of(2026, 6, 1), false, account);
+        @DisplayName("detects an account with at least one income entry, and not one with none")
+        void detectsAccountHistory() {
+            persistIncome(new BigDecimal("100"), LocalDate.of(2026, 6, 1), false, account);
             entityManager.flush();
-            entityManager.clear();
 
-            incomeRepository.clearAccountId(account.getId());
-            entityManager.clear();
-
-            IncomeEntry reloaded = entityManager.find(IncomeEntry.class, e.getId());
-            assertThat(reloaded).isNotNull();
-            assertThat(reloaded.getAccountId()).isNull();
-        }
-
-        @Test
-        @DisplayName("deleteByAccountId removes the income rows outright")
-        void deleteByAccountIdRemovesRows() {
-            IncomeEntry e = persistIncome(new BigDecimal("100"), LocalDate.of(2026, 6, 1), false, account);
-            entityManager.flush();
-            entityManager.clear();
-
-            incomeRepository.deleteByAccountId(account.getId());
-            entityManager.flush();
-            entityManager.clear();
-
-            assertThat(entityManager.find(IncomeEntry.class, e.getId())).isNull();
+            assertThat(incomeRepository.existsByAccountId(account.getId())).isTrue();
+            assertThat(incomeRepository.existsByAccountId(UUID.randomUUID())).isFalse();
         }
     }
 }

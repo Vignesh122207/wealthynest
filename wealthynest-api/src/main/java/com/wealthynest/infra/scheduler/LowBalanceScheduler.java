@@ -1,5 +1,6 @@
 package com.wealthynest.infra.scheduler;
 
+import com.wealthynest.common.entity.LifecycleStatus;
 import com.wealthynest.domain.account.entity.WalletAccount;
 import com.wealthynest.domain.account.repository.WalletAccountRepository;
 import com.wealthynest.domain.account.service.WalletAccountService;
@@ -26,7 +27,7 @@ public class LowBalanceScheduler {
     @Transactional
     public void checkAllAccounts() {
         int checked = 0;
-        for (WalletAccount account : accountRepository.findByArchivedFalseAndLowBalanceThresholdIsNotNull()) {
+        for (WalletAccount account : accountRepository.findByStatusAndLowBalanceThresholdIsNotNull(LifecycleStatus.ACTIVE)) {
             try {
                 walletAccountService.checkLowBalance(account.getId(), account.getUserId());
                 checked++;

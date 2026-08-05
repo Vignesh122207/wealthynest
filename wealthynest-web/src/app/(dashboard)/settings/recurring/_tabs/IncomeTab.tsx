@@ -285,7 +285,7 @@ export function IncomeTab() {
 
   const { data: rules   = [], isLoading }           = useRecurringIncome();
   const { data: accountsData }                      = useAccounts();
-  const accounts = (accountsData ?? []).filter(a => !a.archived);
+  const accounts = (accountsData ?? []).filter(a => a.status !== "ARCHIVED");
   const { mutate: createRule, isPending: creating } = useCreateRecurringIncome();
   const { mutate: updateRule, isPending: updating } = useUpdateRecurringIncome();
   const { mutate: toggleRule, isPending: toggling } = useToggleRecurringIncome();

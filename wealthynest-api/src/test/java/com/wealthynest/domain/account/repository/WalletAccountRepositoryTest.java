@@ -1,5 +1,6 @@
 package com.wealthynest.domain.account.repository;
 
+import com.wealthynest.common.entity.LifecycleStatus;
 import com.wealthynest.domain.account.entity.AccountType;
 import com.wealthynest.domain.account.entity.WalletAccount;
 import com.wealthynest.domain.user.entity.User;
@@ -34,10 +35,10 @@ class WalletAccountRepositoryTest extends AbstractRepositoryTest {
         entityManager.flush();
     }
 
-    private WalletAccount persistAccount(AccountType type, boolean archived, boolean primary,
+    private WalletAccount persistAccount(AccountType type, LifecycleStatus status, boolean primary,
                                           BigDecimal lowBalanceThreshold) {
         WalletAccount a = WalletAccount.builder().userId(userId).accountType(type).name(type.name())
-                .archived(archived).primary(primary).lowBalanceThreshold(lowBalanceThreshold).build();
+                .status(status).primary(primary).lowBalanceThreshold(lowBalanceThreshold).build();
         entityManager.persist(a);
         return a;
     }
@@ -45,10 +46,10 @@ class WalletAccountRepositoryTest extends AbstractRepositoryTest {
     @Test
     @DisplayName("findByUserIdOrderByCreatedAtAsc returns oldest-first")
     void findByUserOrdersOldestFirst() throws InterruptedException {
-        WalletAccount older = persistAccount(AccountType.BANK_ACCOUNT, false, false, null);
+        WalletAccount older = persistAccount(AccountType.BANK_ACCOUNT, LifecycleStatus.ACTIVE, false, null);
         entityManager.flush();
         Thread.sleep(5);
-        WalletAccount newer = persistAccount(AccountType.CASH_WALLET, false, false, null);
+        WalletAccount newer = persistAccount(AccountType.CASH_WALLET, LifecycleStatus.ACTIVE, false, null);
         entityManager.flush();
 
         List<WalletAccount> result = walletAccountRepository.findByUserIdOrderByCreatedAtAsc(userId);
@@ -57,33 +58,33 @@ class WalletAccountRepositoryTest extends AbstractRepositoryTest {
     }
 
     @Test
-    @DisplayName("findByUserIdAndArchivedTrueOrderByCreatedAtAsc excludes non-archived accounts")
+    @DisplayName("findByUserIdAndStatusOrderByCreatedAtAsc excludes non-archived accounts")
     void findArchivedExcludesActive() {
-        persistAccount(AccountType.BANK_ACCOUNT, false, false, null);
-        WalletAccount archived = persistAccount(AccountType.CASH_WALLET, true, false, null);
+        persistAccount(AccountType.BANK_ACCOUNT, LifecycleStatus.ACTIVE, false, null);
+        WalletAccount archived = persistAccount(AccountType.CASH_WALLET, LifecycleStatus.ARCHIVED, false, null);
         entityManager.flush();
 
-        List<WalletAccount> result = walletAccountRepository.findByUserIdAndArchivedTrueOrderByCreatedAtAsc(userId);
+        List<WalletAccount> result = walletAccountRepository.findByUserIdAndStatusOrderByCreatedAtAsc(userId, LifecycleStatus.ARCHIVED);
 
         assertThat(result).extracting(WalletAccount::getId).containsExactly(archived.getId());
     }
 
     @Test
-    @DisplayName("findByUserIdInAndArchivedFalse batches across multiple users, excluding archived")
+    @DisplayName("findByUserIdInAndStatusNot batches across multiple users, excluding archived")
     void findByUserIdInExcludesArchived() {
         User user2 = User.builder().fullName("Quinn").email("quinn-" + UUID.randomUUID() + "@x.com")
                 .passwordHash("hash").build();
         entityManager.persist(user2);
         entityManager.flush();
 
-        WalletAccount mine = persistAccount(AccountType.BANK_ACCOUNT, false, false, null);
-        WalletAccount myArchived = persistAccount(AccountType.CASH_WALLET, true, false, null);
+        WalletAccount mine = persistAccount(AccountType.BANK_ACCOUNT, LifecycleStatus.ACTIVE, false, null);
+        persistAccount(AccountType.CASH_WALLET, LifecycleStatus.ARCHIVED, false, null); // mine, archived — excluded
         WalletAccount theirs = WalletAccount.builder().userId(user2.getId()).accountType(AccountType.BANK_ACCOUNT)
                 .name("Theirs").build();
         entityManager.persist(theirs);
         entityManager.flush();
 
-        List<WalletAccount> result = walletAccountRepository.findByUserIdInAndArchivedFalse(List.of(userId, user2.getId()));
+        List<WalletAccount> result = walletAccountRepository.findByUserIdInAndStatusNot(List.of(userId, user2.getId()), LifecycleStatus.ARCHIVED);
 
         assertThat(result).extracting(WalletAccount::getId).containsExactlyInAnyOrder(mine.getId(), theirs.getId());
     }
@@ -93,28 +94,20 @@ class WalletAccountRepositoryTest extends AbstractRepositoryTest {
     class ExistenceTests {
 
         @Test
-        @DisplayName("existsByUserIdAndAccountType matches regardless of archived state")
-        void existsByUserAndTypeIgnoresArchived() {
-            persistAccount(AccountType.CREDIT_CARD, true, false, null);
+        @DisplayName("existsByUserIdAndAccountTypeAndStatus matches the exact status given")
+        void existsByUserAndTypeAndStatusMatchesExactly() {
+            persistAccount(AccountType.CREDIT_CARD, LifecycleStatus.ARCHIVED, false, null);
             entityManager.flush();
 
-            assertThat(walletAccountRepository.existsByUserIdAndAccountType(userId, AccountType.CREDIT_CARD)).isTrue();
-        }
-
-        @Test
-        @DisplayName("existsByUserIdAndAccountTypeAndArchivedFalse excludes archived accounts")
-        void existsByUserAndTypeAndActiveExcludesArchived() {
-            persistAccount(AccountType.CREDIT_CARD, true, false, null);
-            entityManager.flush();
-
-            assertThat(walletAccountRepository.existsByUserIdAndAccountTypeAndArchivedFalse(userId, AccountType.CREDIT_CARD)).isFalse();
+            assertThat(walletAccountRepository.existsByUserIdAndAccountTypeAndStatus(userId, AccountType.CREDIT_CARD, LifecycleStatus.ARCHIVED)).isTrue();
+            assertThat(walletAccountRepository.existsByUserIdAndAccountTypeAndStatus(userId, AccountType.CREDIT_CARD, LifecycleStatus.ACTIVE)).isFalse();
         }
     }
 
     @Test
     @DisplayName("findByIdAndUserId and findByIdAndUserIdForUpdate both scope to the owning user")
     void findByIdAndUserIdScopesToOwner() {
-        WalletAccount a = persistAccount(AccountType.BANK_ACCOUNT, false, false, null);
+        WalletAccount a = persistAccount(AccountType.BANK_ACCOUNT, LifecycleStatus.ACTIVE, false, null);
         entityManager.flush();
 
         assertThat(walletAccountRepository.findByIdAndUserId(a.getId(), userId)).isPresent();
@@ -125,20 +118,21 @@ class WalletAccountRepositoryTest extends AbstractRepositoryTest {
     }
 
     @Test
-    @DisplayName("findByArchivedFalseAndLowBalanceThresholdIsNotNull only returns active accounts with a configured threshold")
+    @DisplayName("findByStatusAndLowBalanceThresholdIsNotNull only returns active accounts with a configured threshold")
     void findLowBalanceCandidatesFiltersCorrectly() {
         // Unscoped by design (LowBalanceScheduler sweeps every account system-wide), so a
         // full-suite run sharing one Testcontainers Postgres with other tests that create real
         // thresholded accounts means this can't assert an absolute count — assert the delta caused
         // by this test's own inserts instead (see feedback_test_infra_patterns.md).
-        long before = walletAccountRepository.findByArchivedFalseAndLowBalanceThresholdIsNotNull().size();
+        long before = walletAccountRepository.findByStatusAndLowBalanceThresholdIsNotNull(LifecycleStatus.ACTIVE).size();
 
-        WalletAccount candidate = persistAccount(AccountType.BANK_ACCOUNT, false, false, new BigDecimal("1000")); // candidate
-        persistAccount(AccountType.BANK_ACCOUNT, false, false, null); // no threshold — excluded
-        persistAccount(AccountType.BANK_ACCOUNT, true, false, new BigDecimal("500")); // archived — excluded
+        WalletAccount candidate = persistAccount(AccountType.BANK_ACCOUNT, LifecycleStatus.ACTIVE, false, new BigDecimal("1000")); // candidate
+        persistAccount(AccountType.BANK_ACCOUNT, LifecycleStatus.ACTIVE, false, null); // no threshold — excluded
+        persistAccount(AccountType.BANK_ACCOUNT, LifecycleStatus.ARCHIVED, false, new BigDecimal("500")); // archived — excluded
+
         entityManager.flush();
 
-        List<WalletAccount> result = walletAccountRepository.findByArchivedFalseAndLowBalanceThresholdIsNotNull();
+        List<WalletAccount> result = walletAccountRepository.findByStatusAndLowBalanceThresholdIsNotNull(LifecycleStatus.ACTIVE);
 
         assertThat(result).hasSize((int) before + 1);
         assertThat(result).extracting(WalletAccount::getId).contains(candidate.getId());
@@ -149,8 +143,8 @@ class WalletAccountRepositoryTest extends AbstractRepositoryTest {
     @Test
     @DisplayName("clearPrimaryForType unsets primary only for accounts of the given type")
     void clearPrimaryForTypeScopesToType() {
-        WalletAccount primaryBank = persistAccount(AccountType.BANK_ACCOUNT, false, true, null);
-        WalletAccount primaryCash = persistAccount(AccountType.CASH_WALLET, false, true, null);
+        WalletAccount primaryBank = persistAccount(AccountType.BANK_ACCOUNT, LifecycleStatus.ACTIVE, true, null);
+        WalletAccount primaryCash = persistAccount(AccountType.CASH_WALLET, LifecycleStatus.ACTIVE, true, null);
         entityManager.flush();
         entityManager.clear();
 

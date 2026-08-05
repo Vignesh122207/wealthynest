@@ -15,7 +15,6 @@ public class NetWorthSummaryResponse {
 
     // Auto-linked asset buckets
     private BigDecimal liquidBalance;       // cash wallet + bank accounts
-    private BigDecimal emergencyFund;       // emergency fund accounts
     private BigDecimal investmentValue;     // total investment portfolio value
 
     // Manual assets total
@@ -24,6 +23,10 @@ public class NetWorthSummaryResponse {
     // Breakdown lists for the UI
     private List<AssetBreakdown>     assetBreakdown;
     private List<LiabilityBreakdown> liabilityBreakdown;
+
+    /** Re-slice of the same accounts/investments already counted once above, grouped by their
+     * optional purpose tag — never added into totalAssets, purely a display breakdown. */
+    private List<PurposeBreakdown> purposeBreakdown;
 
     @Getter @Builder
     public static class AssetBreakdown {
@@ -37,5 +40,20 @@ public class NetWorthSummaryResponse {
         private String     liabilityType;
         private BigDecimal totalOutstanding;
         private long       count;
+    }
+
+    @Getter @Builder
+    public static class PurposeBreakdown {
+        private String     purpose;     // enum name, or the CUSTOM label's own grouping key
+        private String     label;       // display label — purpose name, or the custom label itself
+        private BigDecimal totalValue;
+        private List<PurposeItem> items;
+    }
+
+    @Getter @Builder
+    public static class PurposeItem {
+        private String     sourceType;  // "ACCOUNT" or "INVESTMENT"
+        private String     name;
+        private BigDecimal amount;
     }
 }

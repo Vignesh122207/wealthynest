@@ -63,20 +63,15 @@ class GoalRepositoryTest extends AbstractRepositoryTest {
     }
 
     @Test
-    @DisplayName("clearAccountId nulls the account reference without deleting the goal")
-    void clearAccountIdNullsReference() {
+    @DisplayName("existsByAccountId detects a goal linked to this account (used by the account-delete history guard)")
+    void existsByAccountIdDetectsLink() {
         WalletAccount account = WalletAccount.builder().userId(userId).accountType(AccountType.BANK_ACCOUNT)
                 .name("Savings").build();
         entityManager.persist(account);
-        Goal goal = persistGoal(account.getId());
+        persistGoal(account.getId());
         entityManager.flush();
-        entityManager.clear();
 
-        goalRepository.clearAccountId(account.getId());
-        entityManager.clear();
-
-        Goal reloaded = entityManager.find(Goal.class, goal.getId());
-        assertThat(reloaded).isNotNull();
-        assertThat(reloaded.getAccountId()).isNull();
+        assertThat(goalRepository.existsByAccountId(account.getId())).isTrue();
+        assertThat(goalRepository.existsByAccountId(UUID.randomUUID())).isFalse();
     }
 }

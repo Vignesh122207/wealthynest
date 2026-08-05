@@ -1,5 +1,6 @@
 package com.wealthynest.domain.account.repository;
 
+import com.wealthynest.common.entity.LifecycleStatus;
 import com.wealthynest.domain.account.entity.AccountType;
 import com.wealthynest.domain.account.entity.WalletAccount;
 import jakarta.persistence.LockModeType;
@@ -15,12 +16,12 @@ import java.util.UUID;
 @Repository
 public interface WalletAccountRepository extends JpaRepository<WalletAccount, UUID> {
     List<WalletAccount> findByUserIdOrderByCreatedAtAsc(UUID userId);
-    List<WalletAccount> findByUserIdAndArchivedTrueOrderByCreatedAtAsc(UUID userId);
-    List<WalletAccount> findByUserIdInAndArchivedFalse(List<UUID> userIds);
-    boolean existsByUserIdAndAccountType(UUID userId, AccountType accountType);
-    boolean existsByUserIdAndAccountTypeAndArchivedFalse(UUID userId, AccountType accountType);
+    List<WalletAccount> findByUserIdAndStatusOrderByCreatedAtAsc(UUID userId, LifecycleStatus status);
+    /** ACTIVE + CLOSED accounts for a set of users — excludes only ARCHIVED (user-hidden). */
+    List<WalletAccount> findByUserIdInAndStatusNot(List<UUID> userIds, LifecycleStatus status);
+    boolean existsByUserIdAndAccountTypeAndStatus(UUID userId, AccountType accountType, LifecycleStatus status);
     Optional<WalletAccount> findByIdAndUserId(UUID id, UUID userId);
-    List<WalletAccount> findByAccountTypeAndArchivedFalse(AccountType accountType);
+    List<WalletAccount> findByAccountTypeAndStatus(AccountType accountType, LifecycleStatus status);
 
     /**
      * Same lookup as findByIdAndUserId but takes a row-level lock (SELECT ... FOR UPDATE) held for
@@ -33,7 +34,7 @@ public interface WalletAccountRepository extends JpaRepository<WalletAccount, UU
     Optional<WalletAccount> findByIdAndUserIdForUpdate(UUID id, UUID userId);
 
     /** Candidates for the daily low-balance sweep — accounts with an alert threshold configured. */
-    List<WalletAccount> findByArchivedFalseAndLowBalanceThresholdIsNotNull();
+    List<WalletAccount> findByStatusAndLowBalanceThresholdIsNotNull(LifecycleStatus status);
 
     @Modifying
     @Query("UPDATE WalletAccount a SET a.primary = false " +

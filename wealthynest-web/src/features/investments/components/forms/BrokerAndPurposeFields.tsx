@@ -1,0 +1,38 @@
+"use client";
+
+import type {FieldValues, Path, UseFormReturn} from "react-hook-form";
+import {FormSelect} from "@/components/forms/FormSelect";
+import {BankNameInput} from "@/features/accounts/components/BankNameInput";
+import {PURPOSE_OPTIONS} from "@/features/accounts/schemas/account.schema";
+import {STOCK_BROKERS} from "@/lib/constants";
+
+type PurposeFields = { broker?: string; purpose?: string; purposeLabel?: string };
+
+// Shared across all 5 investment-type forms (Stock/MF/Gold/FD/Bond) — broker + purpose are the
+// same optional metadata regardless of investment type, so the field markup lives here once.
+export function BrokerAndPurposeFields<T extends FieldValues & PurposeFields>({ form }: { form: UseFormReturn<T> }) {
+  const purpose = form.watch("purpose" as Path<T>) as string | undefined;
+  const broker  = form.watch("broker" as Path<T>) as string | undefined;
+  const errors  = form.formState.errors as Partial<Record<keyof PurposeFields, { message?: string }>>;
+
+  return (
+    <>
+      <BankNameInput label="Broker / Platform (optional)" suggestions={STOCK_BROKERS}
+        value={broker ?? ""}
+        onChange={v => form.setValue("broker" as Path<T>, (v || undefined) as never, { shouldValidate: true })} />
+      <div className="space-y-2">
+        <FormSelect label="Purpose (optional)" options={PURPOSE_OPTIONS} placeholder="What is this for?"
+          error={errors.purpose?.message}
+          value={purpose ?? ""}
+          onChange={e => form.setValue("purpose" as Path<T>, (e.target.value || undefined) as never, { shouldValidate: true })} />
+        {purpose === "CUSTOM" && (
+          <div>
+            <input {...form.register("purposeLabel" as Path<T>)} placeholder="e.g. Down payment fund"
+              className="w-full h-10 px-3 rounded-xl text-sm bg-background border border-border text-foreground placeholder-muted-foreground/40 outline-none focus:border-indigo-500 transition-all" />
+            {errors.purposeLabel && <p className="text-xs text-red-500 mt-1">{errors.purposeLabel.message}</p>}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}

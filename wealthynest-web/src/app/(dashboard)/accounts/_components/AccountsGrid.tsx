@@ -18,8 +18,6 @@ interface AccountsGridProps {
   allAccountsOrdered: WalletAccount[];
   bankAccounts: WalletAccount[];
   cashAccounts: WalletAccount[];
-  emergencyAccounts: WalletAccount[];
-  investAccounts: WalletAccount[];
   creditCards: WalletAccount[];
   loanAccounts: WalletAccount[];
   renderAccountCard: (a: WalletAccount) => React.ReactNode;
@@ -27,11 +25,13 @@ interface AccountsGridProps {
 }
 
 // The Accounts page's main content — loading skeleton, empty state, the unified "All" grid, and
-// the six per-type sections. Pulled out of the page purely to cut its size; every value here is
-// already computed/held by the page.
+// the four per-type sections. Pulled out of the page purely to cut its size; every value here is
+// already computed/held by the page. Purpose (Emergency Fund, etc.) is a tag shown inline on a
+// Bank Account's own card now, not a separate type or section — same for what used to be a
+// distinct "Investment Account" type (broker cash float is just a purpose-tagged bank account).
 export function AccountsGrid({
   isLoading, isError, onRetry, accounts, sectionFilter, allAccountsOrdered, bankAccounts, cashAccounts,
-  emergencyAccounts, investAccounts, creditCards, loanAccounts, renderAccountCard, onCreate,
+  creditCards, loanAccounts, renderAccountCard, onCreate,
 }: AccountsGridProps) {
   if (isLoading) {
     return (
@@ -48,10 +48,10 @@ export function AccountsGrid({
   if (accounts.length === 0) {
     return (
       <EmptyState icon={Wallet} title="No accounts yet"
-        description="Set up your Bank Account, Cash Wallet, Credit Card, Loan, or Investment Account."
+        description="Set up your Bank Account, Cash Wallet, Credit Card, or Loan."
         action={
           <div className="flex flex-wrap gap-2 justify-center">
-            {(["BANK_ACCOUNT", "CASH_WALLET", "EMERGENCY_FUND", "CREDIT_CARD", "LOAN", "INVESTMENT"] as AccountType[]).map(t => {
+            {(["BANK_ACCOUNT", "CASH_WALLET", "CREDIT_CARD", "LOAN"] as AccountType[]).map(t => {
               const m = ACCOUNT_TYPE_META[t];
               return (
                 <button key={t} onClick={() => onCreate(t)}
@@ -66,9 +66,9 @@ export function AccountsGrid({
   }
 
   if (sectionFilter === "all") {
-    // Unified view: every account, one continuous grid, ordered Bank → Cash & Emergency →
-    // Investments → Credit Cards → Loans — a lone Bank account and a lone Cash Wallet land in
-    // the same row instead of each sitting alone in its own full-width section.
+    // Unified view: every account, one continuous grid, ordered Bank → Cash Wallet → Credit
+    // Cards → Loans — a lone Bank account and a lone Cash Wallet land in the same row instead of
+    // each sitting alone in its own full-width section.
     return (
       <div className="grid gap-4 lg:grid-cols-2 animate-fade-in-up">
         {allAccountsOrdered.map(a => renderAccountCard(a))}
@@ -114,66 +114,21 @@ export function AccountsGrid({
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <PremiumIcon icon={ACCOUNT_TYPE_META.CASH_WALLET.icon} hex={ACCOUNT_TYPE_META.CASH_WALLET.hex} size="xs" />
-              <h2 className="text-sm font-semibold text-foreground">Cash &amp; Emergency</h2>
+              <h2 className="text-sm font-semibold text-foreground">Cash Wallet</h2>
             </div>
-            <div className="flex items-center gap-3">
-              {cashAccounts.length === 0 && (
-                <button onClick={() => onCreate("CASH_WALLET")} className="text-xs text-emerald-500 dark:text-emerald-400 hover:underline flex items-center gap-1 transition-colors">
-                  <Plus className="w-3 h-3" /> Cash Wallet
-                </button>
-              )}
-              {emergencyAccounts.length === 0 && (
-                <button onClick={() => onCreate("EMERGENCY_FUND")} className="text-xs text-amber-500 dark:text-amber-400 hover:underline flex items-center gap-1 transition-colors">
-                  <Plus className="w-3 h-3" /> Emergency Fund
-                </button>
-              )}
-            </div>
+            {cashAccounts.length === 0 && (
+              <button onClick={() => onCreate("CASH_WALLET")} className="text-xs text-emerald-500 dark:text-emerald-400 hover:underline flex items-center gap-1 transition-colors">
+                <Plus className="w-3 h-3" /> Cash Wallet
+              </button>
+            )}
           </div>
-          <div className="grid gap-4 lg:grid-cols-2">
-            {cashAccounts.length > 0
-              ? cashAccounts.map(a => renderAccountCard(a))
-              : <div className="bg-card border border-dashed border-border rounded-2xl p-5 text-center">
-                  <p className="text-sm text-muted-foreground">No cash wallet</p>
-                  <button onClick={() => onCreate("CASH_WALLET")} className="mt-2 text-xs text-emerald-500 dark:text-emerald-400 hover:underline transition-colors">+ Set up</button>
-                </div>
-            }
-            {emergencyAccounts.length > 0
-              ? emergencyAccounts.map(a => renderAccountCard(a))
-              : <div className="bg-card border border-dashed border-border rounded-2xl p-5 text-center">
-                  <p className="text-sm text-muted-foreground">No emergency fund</p>
-                  <button onClick={() => onCreate("EMERGENCY_FUND")} className="mt-2 text-xs text-amber-500 dark:text-amber-400 hover:underline transition-colors">+ Set up</button>
-                </div>
-            }
-          </div>
-        </section>
-      )}
-
-      {sectionFilter === "invest" && (
-        <section className="animate-fade-in-up delay-300">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <PremiumIcon icon={ACCOUNT_TYPE_META.INVESTMENT.icon} hex={ACCOUNT_TYPE_META.INVESTMENT.hex} size="xs" />
-              <h2 className="text-sm font-semibold text-foreground">Investment Accounts</h2>
-            </div>
-            <button onClick={() => onCreate("INVESTMENT")}
-              className="text-xs text-sky-500 dark:text-sky-400 hover:underline flex items-center gap-1 transition-colors">
-              <Plus className="w-3 h-3" /> Add Account
-            </button>
-          </div>
-          {investAccounts.length > 0 ? (
-            <div className="grid gap-4 lg:grid-cols-2">
-              {investAccounts.map(a => renderAccountCard(a))}
-              {investAccounts.length % 2 === 1 && (
-                <AddMoreCard label="Investment Account" type="INVESTMENT" onClick={() => onCreate("INVESTMENT")} />
-              )}
-            </div>
-          ) : (
-            <div className="bg-card border border-dashed border-border rounded-2xl p-5 text-center">
-              <p className="text-sm text-muted-foreground">No investment accounts</p>
-              <p className="text-xs text-muted-foreground/80 mt-1">Track cash parked with your broker (Zerodha, Groww…) and buy investments from it.</p>
-              <button onClick={() => onCreate("INVESTMENT")} className="mt-2 text-xs text-sky-500 dark:text-sky-400 hover:underline transition-colors">+ Add Investment Account</button>
-            </div>
-          )}
+          {cashAccounts.length > 0
+            ? <div className="grid gap-4 lg:grid-cols-2">{cashAccounts.map(a => renderAccountCard(a))}</div>
+            : <div className="bg-card border border-dashed border-border rounded-2xl p-5 text-center">
+                <p className="text-sm text-muted-foreground">No cash wallet</p>
+                <button onClick={() => onCreate("CASH_WALLET")} className="mt-2 text-xs text-emerald-500 dark:text-emerald-400 hover:underline transition-colors">+ Set up</button>
+              </div>
+          }
         </section>
       )}
 

@@ -9,17 +9,17 @@ import {FormSelect} from "@/components/forms/FormSelect";
 import {FormDatePicker} from "@/components/forms/FormDatePicker";
 import {AccountPicker} from "@/components/transactions/AccountPicker";
 import {FormButtons} from "./FormButtons";
+import {BrokerAndPurposeFields} from "./BrokerAndPurposeFields";
 import {type FDFormValues, fdSchema} from "@/features/investments/schemas/investment.schema";
 import {COMPOUND_FREQ, type PickerAccountList} from "@/features/investments/constants";
 import {formatCurrency} from "@/lib/utils";
 
-export function FDForm({ defaultValues, onSubmit, onCancel, isPending, bankAccounts, investmentAccounts, isEditing }: {
+export function FDForm({ defaultValues, onSubmit, onCancel, isPending, bankAccounts, isEditing }: {
   defaultValues?: Partial<FDFormValues>;
   onSubmit: (v: FDFormValues) => void;
   onCancel: () => void;
   isPending: boolean;
   bankAccounts: PickerAccountList;
-  investmentAccounts: PickerAccountList;
   isEditing: boolean;
 }) {
   const form = useForm<FDFormValues>({
@@ -71,13 +71,14 @@ export function FDForm({ defaultValues, onSubmit, onCancel, isPending, bankAccou
               bankAccounts={bankAccounts} value={field.value ?? ""} onChange={field.onChange} testId="fd-linked-account-picker" />
           )} />
         )}
-        {!isEditing && (bankAccounts.length > 0 || investmentAccounts.length > 0) && (
+        {!isEditing && bankAccounts.length > 0 && (
           <Controller control={form.control} name="debitAccountId" render={({ field }) => (
             <AccountPicker label="Debit from Account (optional)" placeholder="None (no debit)" allowClear
-              bankAccounts={bankAccounts} investmentAccounts={investmentAccounts}
+              bankAccounts={bankAccounts}
               value={field.value ?? ""} onChange={field.onChange} testId="fd-debit-account-picker" />
           )} />
         )}
+        <BrokerAndPurposeFields form={form} />
       </div>
       <FormButtons onCancel={onCancel} isPending={isPending} label="Save FD" color="sky" />
     </form>

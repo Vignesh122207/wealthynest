@@ -1,5 +1,7 @@
 package com.wealthynest.domain.account.service;
 
+import com.wealthynest.common.entity.AccountPurpose;
+import com.wealthynest.common.entity.LifecycleStatus;
 import com.wealthynest.common.exception.AccessDeniedException;
 import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
@@ -106,6 +108,8 @@ class WalletAccountServiceImplTest {
         lenient().when(req.getEmiDay()).thenReturn(null);
         lenient().when(req.getAutopayAccountId()).thenReturn(null);
         lenient().when(req.getLoanEndDate()).thenReturn(null);
+        lenient().when(req.getPurpose()).thenReturn(null);
+        lenient().when(req.getPurposeLabel()).thenReturn(null);
         return req;
     }
 
@@ -181,9 +185,9 @@ class WalletAccountServiceImplTest {
     class CreateAccountTests {
 
         @Test
-        @DisplayName("blocks a second active CASH_WALLET (singleton type)")
+        @DisplayName("blocks a second active CASH_WALLET (the one remaining singleton type)")
         void blocksSecondActiveSingletonType() {
-            when(accountRepository.existsByUserIdAndAccountTypeAndArchivedFalse(userId, AccountType.CASH_WALLET)).thenReturn(true);
+            when(accountRepository.existsByUserIdAndAccountTypeAndStatus(userId, AccountType.CASH_WALLET, LifecycleStatus.ACTIVE)).thenReturn(true);
             CreateAccountRequest req = createRequest(AccountType.CASH_WALLET, BigDecimal.ZERO);
 
             assertThatThrownBy(() -> service.createAccount(userId, req)).isInstanceOf(BusinessException.class);
@@ -191,13 +195,61 @@ class WalletAccountServiceImplTest {
         }
 
         @Test
-        @DisplayName("blocks creating a singleton type when an archived one already exists (must restore instead)")
+        @DisplayName("blocks creating CASH_WALLET when an archived one already exists (must restore instead)")
         void blocksWhenArchivedSingletonExists() {
-            when(accountRepository.existsByUserIdAndAccountTypeAndArchivedFalse(userId, AccountType.EMERGENCY_FUND)).thenReturn(false);
-            when(accountRepository.existsByUserIdAndAccountType(userId, AccountType.EMERGENCY_FUND)).thenReturn(true);
-            CreateAccountRequest req = createRequest(AccountType.EMERGENCY_FUND, BigDecimal.ZERO);
+            when(accountRepository.existsByUserIdAndAccountTypeAndStatus(userId, AccountType.CASH_WALLET, LifecycleStatus.ACTIVE)).thenReturn(false);
+            when(accountRepository.existsByUserIdAndAccountTypeAndStatus(userId, AccountType.CASH_WALLET, LifecycleStatus.ARCHIVED)).thenReturn(true);
+            CreateAccountRequest req = createRequest(AccountType.CASH_WALLET, BigDecimal.ZERO);
 
             assertThatThrownBy(() -> service.createAccount(userId, req)).isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("EMERGENCY_FUND purpose has no singleton constraint — a second BANK_ACCOUNT can carry it")
+        void noSingletonConstraintOnEmergencyFundPurpose() {
+            when(accountRepository.save(any(WalletAccount.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
+            CreateAccountRequest req = createRequest(AccountType.BANK_ACCOUNT, BigDecimal.ZERO);
+            when(req.getPurpose()).thenReturn(AccountPurpose.EMERGENCY_FUND);
+
+            service.createAccount(userId, req); // must not throw, regardless of any existing EF-tagged account
+
+            verify(accountRepository).save(any(WalletAccount.class));
+        }
+
+        @Test
+        @DisplayName("rejects purpose on a non-BANK_ACCOUNT type")
+        void rejectsPurposeOnNonBankAccount() {
+            CreateAccountRequest req = createRequest(AccountType.CASH_WALLET, BigDecimal.ZERO);
+            when(req.getPurpose()).thenReturn(AccountPurpose.GENERAL_SAVINGS);
+
+            assertThatThrownBy(() -> service.createAccount(userId, req)).isInstanceOf(BusinessException.class);
+            verify(accountRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("CUSTOM purpose requires a non-blank label")
+        void customPurposeRequiresLabel() {
+            CreateAccountRequest req = createRequest(AccountType.BANK_ACCOUNT, BigDecimal.ZERO);
+            when(req.getPurpose()).thenReturn(AccountPurpose.CUSTOM);
+            when(req.getPurposeLabel()).thenReturn(null);
+
+            assertThatThrownBy(() -> service.createAccount(userId, req)).isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("CUSTOM purpose with a label is saved with both fields set")
+        void customPurposeWithLabelSaved() {
+            when(accountRepository.save(any(WalletAccount.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
+            CreateAccountRequest req = createRequest(AccountType.BANK_ACCOUNT, BigDecimal.ZERO);
+            when(req.getPurpose()).thenReturn(AccountPurpose.CUSTOM);
+            when(req.getPurposeLabel()).thenReturn("Sabbatical");
+
+            service.createAccount(userId, req);
+
+            ArgumentCaptor<WalletAccount> captor = ArgumentCaptor.forClass(WalletAccount.class);
+            verify(accountRepository).save(captor.capture());
+            assertThat(captor.getValue().getPurpose()).isEqualTo(AccountPurpose.CUSTOM);
+            assertThat(captor.getValue().getPurposeLabel()).isEqualTo("Sabbatical");
         }
 
         @Test
@@ -246,7 +298,7 @@ class WalletAccountServiceImplTest {
         @DisplayName("the first bank account is automatically made primary; a later one is not")
         void firstBankAccountBecomesPrimary() {
             when(accountRepository.save(any(WalletAccount.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
-            when(accountRepository.existsByUserIdAndAccountTypeAndArchivedFalse(userId, AccountType.BANK_ACCOUNT))
+            when(accountRepository.existsByUserIdAndAccountTypeAndStatus(userId, AccountType.BANK_ACCOUNT, LifecycleStatus.ACTIVE))
                     .thenReturn(false); // no existing bank account yet
             CreateAccountRequest req = createRequest(AccountType.BANK_ACCOUNT, BigDecimal.ZERO);
 
@@ -261,7 +313,7 @@ class WalletAccountServiceImplTest {
         @DisplayName("a second bank account is NOT automatically made primary")
         void secondBankAccountNotAutoPrimary() {
             when(accountRepository.save(any(WalletAccount.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
-            when(accountRepository.existsByUserIdAndAccountTypeAndArchivedFalse(userId, AccountType.BANK_ACCOUNT))
+            when(accountRepository.existsByUserIdAndAccountTypeAndStatus(userId, AccountType.BANK_ACCOUNT, LifecycleStatus.ACTIVE))
                     .thenReturn(true); // already has one
             CreateAccountRequest req = createRequest(AccountType.BANK_ACCOUNT, BigDecimal.ZERO);
 
@@ -276,43 +328,75 @@ class WalletAccountServiceImplTest {
     // ─── archiveAccount / unarchiveAccount ───────────────────────────────────────
 
     @Nested
-    @DisplayName("archiveAccount / unarchiveAccount")
+    @DisplayName("archiveAccount / unarchiveAccount / closeAccount")
     class ArchiveTests {
 
         @Test
-        @DisplayName("archiving sets archived=true")
-        void archiveSetsFlag() {
+        @DisplayName("archiving an ACTIVE account sets status=ARCHIVED")
+        void archiveSetsStatus() {
             WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).build());
             when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
             when(accountRepository.save(any(WalletAccount.class))).thenAnswer(inv -> inv.getArgument(0));
 
             service.archiveAccount(accountId, userId);
 
-            assertThat(account.isArchived()).isTrue();
+            assertThat(account.getStatus()).isEqualTo(LifecycleStatus.ARCHIVED);
+        }
+
+        @Test
+        @DisplayName("archiving a CLOSED account is rejected — CLOSED is a different, terminal bucket")
+        void archiveRejectsClosedAccount() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).status(LifecycleStatus.CLOSED).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+            assertThatThrownBy(() -> service.archiveAccount(accountId, userId)).isInstanceOf(BusinessException.class);
+            verify(accountRepository, never()).save(any());
         }
 
         @Test
         @DisplayName("unarchiving a singleton type is blocked while another active one of the same type exists")
         void unarchiveBlockedBySingletonConflict() {
-            WalletAccount account = withId(baseAccount(AccountType.CASH_WALLET).archived(true).build());
+            WalletAccount account = withId(baseAccount(AccountType.CASH_WALLET).status(LifecycleStatus.ARCHIVED).build());
             when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
-            when(accountRepository.existsByUserIdAndAccountTypeAndArchivedFalse(userId, AccountType.CASH_WALLET)).thenReturn(true);
+            when(accountRepository.existsByUserIdAndAccountTypeAndStatus(userId, AccountType.CASH_WALLET, LifecycleStatus.ACTIVE)).thenReturn(true);
 
             assertThatThrownBy(() -> service.unarchiveAccount(accountId, userId)).isInstanceOf(BusinessException.class);
-            assertThat(account.isArchived()).isTrue(); // unchanged
+            assertThat(account.getStatus()).isEqualTo(LifecycleStatus.ARCHIVED); // unchanged
         }
 
         @Test
         @DisplayName("unarchiving succeeds when no conflicting active singleton exists")
         void unarchiveSucceedsWithoutConflict() {
-            WalletAccount account = withId(baseAccount(AccountType.CASH_WALLET).archived(true).build());
+            WalletAccount account = withId(baseAccount(AccountType.CASH_WALLET).status(LifecycleStatus.ARCHIVED).build());
             when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
-            when(accountRepository.existsByUserIdAndAccountTypeAndArchivedFalse(userId, AccountType.CASH_WALLET)).thenReturn(false);
+            when(accountRepository.existsByUserIdAndAccountTypeAndStatus(userId, AccountType.CASH_WALLET, LifecycleStatus.ACTIVE)).thenReturn(false);
             when(accountRepository.save(any(WalletAccount.class))).thenAnswer(inv -> inv.getArgument(0));
 
             service.unarchiveAccount(accountId, userId);
 
-            assertThat(account.isArchived()).isFalse();
+            assertThat(account.getStatus()).isEqualTo(LifecycleStatus.ACTIVE);
+        }
+
+        @Test
+        @DisplayName("closing an ACTIVE account sets status=CLOSED")
+        void closeSetsStatus() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+            when(accountRepository.save(any(WalletAccount.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            service.closeAccount(accountId, userId);
+
+            assertThat(account.getStatus()).isEqualTo(LifecycleStatus.CLOSED);
+        }
+
+        @Test
+        @DisplayName("closing an already-CLOSED or ARCHIVED account is rejected — only ACTIVE can be closed")
+        void closeRejectsNonActiveAccount() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).status(LifecycleStatus.ARCHIVED).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+            assertThatThrownBy(() -> service.closeAccount(accountId, userId)).isInstanceOf(BusinessException.class);
+            verify(accountRepository, never()).save(any());
         }
     }
 
@@ -657,10 +741,10 @@ class WalletAccountServiceImplTest {
             when(req.getApr()).thenReturn(new BigDecimal("9.5"));
             UUID autopayId = UUID.randomUUID();
             when(req.getAutopayAccountId()).thenReturn(autopayId);
-            WalletAccount investmentAccount = WalletAccount.builder()
-                    .userId(userId).accountType(AccountType.INVESTMENT).build();
-            ReflectionTestUtils.setField(investmentAccount, "id", autopayId);
-            when(accountRepository.findByIdAndUserId(autopayId, userId)).thenReturn(Optional.of(investmentAccount));
+            WalletAccount liabilityAccount = WalletAccount.builder()
+                    .userId(userId).accountType(AccountType.CREDIT_CARD).build();
+            ReflectionTestUtils.setField(liabilityAccount, "id", autopayId);
+            when(accountRepository.findByIdAndUserId(autopayId, userId)).thenReturn(Optional.of(liabilityAccount));
 
             assertThatThrownBy(() -> service.updateAccount(accountId, userId, req))
                     .isInstanceOf(BusinessException.class)
@@ -695,34 +779,87 @@ class WalletAccountServiceImplTest {
     @DisplayName("deleteAccount")
     class DeleteAccountTests {
 
-        @Test
-        @DisplayName("alsoDeleteTransactions=true purges expense/income rows instead of detaching them")
-        void purgesTransactionsWhenRequested() {
+        private WalletAccount stubZeroHistoryAccount() {
             WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).build());
             when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
-            when(transferRepository.findByAccountId(accountId)).thenReturn(List.of());
-
-            service.deleteAccount(accountId, userId, true);
-
-            verify(expenseRepository).deleteByAccountId(accountId);
-            verify(incomeRepository).deleteByAccountId(accountId);
-            verify(expenseRepository, never()).clearAccountId(any());
-            verify(incomeRepository, never()).clearAccountId(any());
+            lenient().when(expenseRepository.existsByAccountId(accountId)).thenReturn(false);
+            lenient().when(incomeRepository.existsByAccountId(accountId)).thenReturn(false);
+            lenient().when(transferRepository.findByAccountId(accountId)).thenReturn(List.of());
+            lenient().when(investmentRepository.existsByDebitAccountId(accountId)).thenReturn(false);
+            lenient().when(investmentRepository.existsByLinkedAccountId(accountId)).thenReturn(false);
+            lenient().when(goalRepository.existsByAccountId(accountId)).thenReturn(false);
+            return account;
         }
 
         @Test
-        @DisplayName("alsoDeleteTransactions=false detaches expense/income rows instead of deleting them")
-        void detachesTransactionsByDefault() {
-            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).build());
-            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
-            when(transferRepository.findByAccountId(accountId)).thenReturn(List.of());
+        @DisplayName("deletes outright when the account has zero history of any kind")
+        void deletesWhenNoHistory() {
+            WalletAccount account = stubZeroHistoryAccount();
 
-            service.deleteAccount(accountId, userId, false);
+            service.deleteAccount(accountId, userId);
 
-            verify(expenseRepository).clearAccountId(accountId);
-            verify(incomeRepository).clearAccountId(accountId);
-            verify(expenseRepository, never()).deleteByAccountId(any());
             verify(accountRepository).delete(account);
+        }
+
+        @Test
+        @DisplayName("rejects deletion when the account has expense history")
+        void rejectsWhenExpenseHistoryExists() {
+            stubZeroHistoryAccount();
+            when(expenseRepository.existsByAccountId(accountId)).thenReturn(true);
+
+            assertThatThrownBy(() -> service.deleteAccount(accountId, userId)).isInstanceOf(BusinessException.class);
+            verify(accountRepository, never()).delete(any());
+        }
+
+        @Test
+        @DisplayName("rejects deletion when the account has income history")
+        void rejectsWhenIncomeHistoryExists() {
+            stubZeroHistoryAccount();
+            when(incomeRepository.existsByAccountId(accountId)).thenReturn(true);
+
+            assertThatThrownBy(() -> service.deleteAccount(accountId, userId)).isInstanceOf(BusinessException.class);
+            verify(accountRepository, never()).delete(any());
+        }
+
+        @Test
+        @DisplayName("rejects deletion when the account has transfer history")
+        void rejectsWhenTransferHistoryExists() {
+            stubZeroHistoryAccount();
+            AccountTransfer t = AccountTransfer.builder().userId(userId).fromAccountId(accountId).amount(BigDecimal.TEN).build();
+            when(transferRepository.findByAccountId(accountId)).thenReturn(List.of(t));
+
+            assertThatThrownBy(() -> service.deleteAccount(accountId, userId)).isInstanceOf(BusinessException.class);
+            verify(accountRepository, never()).delete(any());
+        }
+
+        @Test
+        @DisplayName("rejects deletion when an investment is funded from this account")
+        void rejectsWhenInvestmentDebitLinkExists() {
+            stubZeroHistoryAccount();
+            when(investmentRepository.existsByDebitAccountId(accountId)).thenReturn(true);
+
+            assertThatThrownBy(() -> service.deleteAccount(accountId, userId)).isInstanceOf(BusinessException.class);
+            verify(accountRepository, never()).delete(any());
+        }
+
+        @Test
+        @DisplayName("rejects deletion when an investment credits income to this account")
+        void rejectsWhenInvestmentLinkedAccountExists() {
+            stubZeroHistoryAccount();
+            when(investmentRepository.existsByLinkedAccountId(accountId)).thenReturn(true);
+
+            assertThatThrownBy(() -> service.deleteAccount(accountId, userId)).isInstanceOf(BusinessException.class);
+            verify(accountRepository, never()).delete(any());
+        }
+
+        @Test
+        @DisplayName("rejects deletion when a goal is linked to this account")
+        void rejectsWhenGoalLinkExists() {
+            stubZeroHistoryAccount();
+            when(goalRepository.existsByAccountId(accountId)).thenReturn(true);
+
+            assertThatThrownBy(() -> service.deleteAccount(accountId, userId)).isInstanceOf(BusinessException.class);
+            verify(accountRepository, never()).delete(any());
         }
     }
 
@@ -816,10 +953,10 @@ class WalletAccountServiceImplTest {
         }
 
         @Test
-        @DisplayName("delegates to findByUserIdInAndArchivedFalse and enriches the batch")
+        @DisplayName("delegates to findByUserIdInAndStatusNot(ARCHIVED) and enriches the batch")
         void delegatesAndEnriches() {
             WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).build());
-            when(accountRepository.findByUserIdInAndArchivedFalse(List.of(userId))).thenReturn(List.of(account));
+            when(accountRepository.findByUserIdInAndStatusNot(List.of(userId), LifecycleStatus.ARCHIVED)).thenReturn(List.of(account));
             when(incomeRepository.sumByAccountIdsGrouped(any())).thenReturn(List.of());
             when(expenseRepository.sumByAccountIdsGrouped(any())).thenReturn(List.of());
             when(transferRepository.sumTransfersInGrouped(any())).thenReturn(List.of());

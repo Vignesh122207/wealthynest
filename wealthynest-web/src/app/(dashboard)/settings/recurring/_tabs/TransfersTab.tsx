@@ -97,16 +97,12 @@ function RuleFormModal({
               cashAccounts={byType(fromChoices, "CASH_WALLET")}
               bankAccounts={byType(fromChoices, "BANK_ACCOUNT")}
               creditAccounts={byType(fromChoices, "CREDIT_CARD")}
-              emergencyFundAccounts={byType(fromChoices, "EMERGENCY_FUND")}
-              investmentAccounts={byType(fromChoices, "INVESTMENT")}
               value={fromAccountId} onChange={setFromAccountId} />
 
             <AccountPicker label="To Account" testId="recurring-transfer-to-account-picker"
               cashAccounts={byType(toChoices, "CASH_WALLET")}
               bankAccounts={byType(toChoices, "BANK_ACCOUNT")}
               creditAccounts={byType(toChoices, "CREDIT_CARD")}
-              emergencyFundAccounts={byType(toChoices, "EMERGENCY_FUND")}
-              investmentAccounts={byType(toChoices, "INVESTMENT")}
               value={toAccountId} onChange={setToAccountId} placeholder="Select destination account" />
 
             <div>
@@ -262,7 +258,7 @@ export function TransfersTab() {
 
   const { data: rules   = [], isLoading }           = useRecurringTransfer();
   const { data: accountsData }                      = useAccounts();
-  const accounts = (accountsData ?? []).filter(a => !a.archived);
+  const accounts = (accountsData ?? []).filter(a => a.status !== "ARCHIVED");
   const { mutate: createRule, isPending: creating } = useCreateRecurringTransfer();
   const { mutate: updateRule, isPending: updating } = useUpdateRecurringTransfer();
   const { mutate: toggleRule, isPending: toggling } = useToggleRecurringTransfer();

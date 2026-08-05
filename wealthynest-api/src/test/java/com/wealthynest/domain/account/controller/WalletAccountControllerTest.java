@@ -189,15 +189,26 @@ class WalletAccountControllerTest {
         }
 
         @Test
-        @DisplayName("DELETE /accounts/{id} passes alsoDeleteTransactions through and returns 204")
-        void deletePassesQueryParamThrough() throws Exception {
+        @DisplayName("DELETE /accounts/{id} delegates the path id and authenticated userId, returns 204")
+        void deleteDelegatesToService() throws Exception {
             SecurityTestUtils.authenticateAs(userId, null);
             UUID accountId = UUID.randomUUID();
 
-            mockMvc.perform(delete("/api/v1/accounts/{id}", accountId).param("alsoDeleteTransactions", "true"))
+            mockMvc.perform(delete("/api/v1/accounts/{id}", accountId))
                     .andExpect(status().isNoContent());
 
-            org.mockito.Mockito.verify(accountService).deleteAccount(accountId, userId, true);
+            org.mockito.Mockito.verify(accountService).deleteAccount(accountId, userId);
+        }
+
+        @Test
+        @DisplayName("PATCH /accounts/{id}/close delegates the path id and authenticated userId")
+        void closeDelegatesToService() throws Exception {
+            SecurityTestUtils.authenticateAs(userId, null);
+            UUID accountId = UUID.randomUUID();
+            when(accountService.closeAccount(accountId, userId)).thenReturn(sampleAccount());
+
+            mockMvc.perform(patch("/api/v1/accounts/{id}/close", accountId))
+                    .andExpect(status().isOk());
         }
 
         @Test

@@ -12,15 +12,13 @@ interface WalletOverviewProps {
   accounts: WalletAccount[];
 }
 
-const TYPE_ORDER: AccountType[] = ["BANK_ACCOUNT", "EMERGENCY_FUND", "CASH_WALLET", "INVESTMENT", "CREDIT_CARD", "LOAN"];
+const TYPE_ORDER: AccountType[] = ["BANK_ACCOUNT", "CASH_WALLET", "CREDIT_CARD", "LOAN"];
 
 const GROUP_LABEL: Record<AccountType, string> = {
-  BANK_ACCOUNT:   "Bank Accounts",
-  EMERGENCY_FUND: "Emergency Fund",
-  CASH_WALLET:    "Cash Wallets",
-  INVESTMENT:     "Investments",
-  CREDIT_CARD:    "Credit Cards",
-  LOAN:           "Loans",
+  BANK_ACCOUNT: "Bank Accounts",
+  CASH_WALLET:  "Cash Wallets",
+  CREDIT_CARD:  "Credit Cards",
+  LOAN:         "Loans",
 };
 
 function daysUntil(dateStr?: string): number | null {
@@ -30,9 +28,9 @@ function daysUntil(dateStr?: string): number | null {
 
 export function WalletOverview({ accounts }: WalletOverviewProps) {
   const { fmt } = useAmountFormatter();
-  const active = accounts.filter(a => !a.archived);
+  const active = accounts.filter(a => a.status !== "ARCHIVED");
 
-  // Total balance = everything the user actually owns (cash, bank, emergency fund, broker cash) —
+  // Total balance = everything the user actually owns (cash + bank, purpose-tagged or not) —
   // credit cards and loans are liabilities, not counted here.
   const totalBalance = active
     .filter(a => a.accountType !== "CREDIT_CARD" && a.accountType !== "LOAN")
@@ -74,7 +72,7 @@ export function WalletOverview({ accounts }: WalletOverviewProps) {
       <div className="mt-2 mb-3 p-3 rounded-xl bg-primary/8 border border-primary/15">
         <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mb-1">Total Balance</p>
         <p className="text-xl font-bold text-foreground tabular-nums">{fmt(totalBalance)}</p>
-        <p className="text-[11px] text-muted-foreground/80 mt-0.5">Cash, bank &amp; emergency fund combined</p>
+        <p className="text-[11px] text-muted-foreground/80 mt-0.5">Cash &amp; bank accounts combined</p>
       </div>
 
       <div className="flex-1 divide-y divide-border/40">

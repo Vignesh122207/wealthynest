@@ -45,7 +45,7 @@ function holdingName(inv: Investment): string {
 
 export function InvestmentPanel({ investments, chart }: InvestmentPanelProps) {
   const { fmt } = useAmountFormatter();
-  const active = useMemo(() => investments.filter(i => i.active), [investments]);
+  const active = useMemo(() => investments.filter(i => i.status === "ACTIVE"), [investments]);
 
   // Mirrors the Investments page's own OverviewTab computation exactly (sum
   // investedAmount/currentValue across every holding — stocks, bonds, FD, gold,

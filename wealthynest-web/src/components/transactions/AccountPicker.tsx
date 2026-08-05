@@ -12,15 +12,16 @@ import {DropdownPanel} from "./DropdownPanel";
 
 export type PickerAccount = {
   id: string; name: string; bankName?: string; currentBalance: number; primary?: boolean;
-  kind: "CASH" | "BANK" | "CREDIT" | "EF" | "INVESTMENT";
+  kind: "CASH" | "BANK" | "CREDIT";
 };
 
 // Reuses ACCOUNT_TYPE_META (the Accounts page's own source of truth) instead
 // of a separate local icon map — those had drifted apart (this picker used
 // Building2 for "bank", the Accounts page used Landmark for the same concept).
+// Emergency-fund/broker-float accounts are plain BANK_ACCOUNT rows now (purpose is a tag, not a
+// structural type) — callers pass them in via bankAccounts like any other bank account.
 const KIND_TO_ACCOUNT_TYPE = {
-  CASH: "CASH_WALLET", BANK: "BANK_ACCOUNT", CREDIT: "CREDIT_CARD", EF: "EMERGENCY_FUND",
-  INVESTMENT: "INVESTMENT",
+  CASH: "CASH_WALLET", BANK: "BANK_ACCOUNT", CREDIT: "CREDIT_CARD",
 } as const;
 
 export function accountPickerLabel(a: { name: string; bankName?: string }) {
@@ -34,18 +35,17 @@ export function accountPickerLabel(a: { name: string; bankName?: string }) {
 }
 
 export function AccountPicker({
-  label = "Paid Via", cashAccounts = [], bankAccounts, creditAccounts = [], emergencyFundAccounts = [],
-  investmentAccounts = [], value, onChange, error, placeholder = "Select account", allowClear = false, clearLabel = "None",
+  label = "Paid Via", cashAccounts = [], bankAccounts, creditAccounts = [],
+  value, onChange, error, placeholder = "Select account", allowClear = false, clearLabel = "None",
   testId = "account-picker",
 }: {
   label?: string;
   cashAccounts?:   { id: string; name: string; currentBalance: number }[];
+  /** Includes any purpose-tagged (Emergency Fund, broker float, ...) Bank Accounts — purpose is
+   * just a display tag, not a separate account group, so callers pass them in here like any
+   * other bank account rather than as a separate list. */
   bankAccounts:    { id: string; name: string; bankName?: string; currentBalance: number; primary?: boolean }[];
   creditAccounts?: { id: string; name: string; bankName?: string; currentBalance: number }[];
-  /** Optional — most callers (Expense/Income/Transfer) never pass this; Goals does, since linking a goal to an Emergency Fund account is a common case. */
-  emergencyFundAccounts?: { id: string; name: string; currentBalance: number }[];
-  /** Optional — Investments page passes broker/investment accounts so a buy/sell can debit or credit them directly. */
-  investmentAccounts?: { id: string; name: string; bankName?: string; currentBalance: number }[];
   value: string; onChange: (id: string) => void; error?: string;
   /** Trigger text shown when nothing is selected. */
   placeholder?: string;
@@ -63,8 +63,6 @@ export function AccountPicker({
     ...cashAccounts.map(a => ({ ...a, kind: "CASH" as const })),
     ...bankAccounts.map(a => ({ ...a, kind: "BANK" as const })),
     ...creditAccounts.map(a => ({ ...a, kind: "CREDIT" as const })),
-    ...emergencyFundAccounts.map(a => ({ ...a, kind: "EF" as const })),
-    ...investmentAccounts.map(a => ({ ...a, kind: "INVESTMENT" as const })),
   ];
   const selected = accounts.find(a => a.id === value);
   const selectedMeta = selected ? ACCOUNT_TYPE_META[KIND_TO_ACCOUNT_TYPE[selected.kind]] : undefined;
