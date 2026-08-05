@@ -154,6 +154,21 @@ class VaultServiceImplTest {
         assertThat(captor.getValue().getBreachCount()).isNull();
     }
 
+    @Test
+    @DisplayName("createItem skips the HIBP breach check for a numeric ATM PIN/MPIN secret, leaving breachCount null")
+    void createItemSkipsBreachCheckForNumericPin() {
+        when(vaultEncryptionService.encrypt(anyString())).thenReturn(new VaultEncryptionService.EncryptedSecret("ct", "iv", 1));
+        when(vaultItemRepository.save(any(VaultItem.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
+
+        service.createItem(userId, request("7392"));
+
+        ArgumentCaptor<VaultItem> captor = ArgumentCaptor.forClass(VaultItem.class);
+        verify(vaultItemRepository).save(captor.capture());
+        assertThat(captor.getValue().getBreachCount()).isNull();
+        assertThat(captor.getValue().getStrengthLevel()).isGreaterThan(1);
+        verifyNoInteractions(hibpClient);
+    }
+
     // ─── updateItem ──────────────────────────────────────────────────────────────
 
     @Nested

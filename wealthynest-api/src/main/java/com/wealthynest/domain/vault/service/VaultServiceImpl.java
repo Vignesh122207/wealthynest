@@ -281,8 +281,11 @@ public class VaultServiceImpl implements VaultService {
 
     /** Have I Been Pwned k-anonymity check: only a 5-char SHA-1 prefix leaves the server.
      * Returns null (unknown) on any failure — the caller must treat that as "not checked",
-     * never as "clean". */
+     * never as "clean". A 4/6-digit numeric secret is a bank PIN, not a password — HIBP's corpus
+     * is comprehensive enough that virtually every possible PIN appears in it somewhere, so
+     * "breached" there is a meaningless universal-positive, not a signal about this PIN. */
     private Integer checkBreach(String plaintext) {
+        if (VaultPasswordStrengthEvaluator.isNumericPin(plaintext)) return null;
         try {
             MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
             byte[] digest = sha1.digest(plaintext.getBytes(StandardCharsets.UTF_8));
