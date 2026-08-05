@@ -35,18 +35,29 @@ export interface PaceForecast {
   pctVsAvg: number | null;
 }
 
-/** Projects this month's full-month savings from the pace set so far (income/expenses to
- * date, extrapolated across the whole month), compared against the average of prior months'
- * actual savings. `pctVsAvg` is null when there's no prior-month history to compare against
- * (too new an account), that average is exactly zero (a % comparison against zero is
- * meaningless), or the comparison would be nonsensical (see PACE_PCT_SANITY_CAP below) —
- * callers show the projected amount alone in that case.
+/** Projects this month's full-month savings from the expense pace set so far (month-to-date
+ * expenses, extrapolated across the whole month) against income as already recorded — NOT
+ * extrapolated, unlike expenses — compared against the average of prior months' actual savings.
+ * `pctVsAvg` is null when there's no prior-month history to compare against (too new an account),
+ * that average is exactly zero (a % comparison against zero is meaningless), or the comparison
+ * would be nonsensical (see PACE_PCT_SANITY_CAP below) — callers show the projected amount alone
+ * in that case.
  *
- * Returns null outright before day 5 of the month: extrapolating from only a few days
- * multiplies whatever happened so far by daysInMonth/dayOfMonth (day 1 → ~30x), so one
- * lumpy transaction (a bonus, an FD maturity) produces a wildly unstable "pace" and an
- * even wilder pctVsAvg against a normal-sized average. Waiting for a working week's worth
- * of data keeps the extrapolation multiplier under ~6x. */
+ * Income is deliberately NOT scaled by daysInMonth/dayOfMonth the way expenses are: real income
+ * (salary in particular) typically lands as one lump-sum entry on a single pay day, not a smooth
+ * daily accrual, so an already-complete month's income re-multiplied by ~6x once it's landed early
+ * produces a wildly overstated "projected savings" — a real, reported bug (a ₹1,22,770 salary
+ * credited by day 5 of a 31-day month rendered as "on pace to save ₹7,61,171"). Expenses genuinely
+ * do accrue transaction-by-transaction through the month, so that side keeps the run-rate
+ * projection; income-to-date is used as-is, on the assumption it's already at or near its
+ * full-month total (understating a genuinely still-arriving income stream is the safer failure
+ * mode here than overstating one that already landed).
+ *
+ * Returns null outright before day 5 of the month: extrapolating expenses from only a few days
+ * multiplies whatever happened so far by daysInMonth/dayOfMonth (day 1 → ~30x), so one lumpy
+ * expense (a large EMI, an annual premium) produces a wildly unstable "pace" and an even wilder
+ * pctVsAvg against a normal-sized average. Waiting for a working week's worth of data keeps the
+ * extrapolation multiplier under ~6x. */
 const PACE_PCT_SANITY_CAP = 500;
 
 export function getPaceForecast(
@@ -59,7 +70,8 @@ export function getPaceForecast(
   if (income == null && expenses == null) return null;
   if (dayOfMonth < 5 || daysInMonth <= 0) return null;
 
-  const projected = ((income ?? 0) - (expenses ?? 0)) / dayOfMonth * daysInMonth;
+  const projectedExpenses = (expenses ?? 0) / dayOfMonth * daysInMonth;
+  const projected = (income ?? 0) - projectedExpenses;
   const validPrior = priorMonthsSaved.filter(v => Number.isFinite(v));
   if (validPrior.length === 0) return { amount: projected, pctVsAvg: null };
 
@@ -67,12 +79,13 @@ export function getPaceForecast(
   if (avg === 0) return { amount: projected, pctVsAvg: null };
 
   const pctVsAvg = ((projected - avg) / Math.abs(avg)) * 100;
-  // The day-5 gate above only bounds the *date*-extrapolation multiplier (~6x) — it does nothing
-  // for a single unusually large one-time transaction (a bonus, an FD maturity) landing early in
-  // the month, which still produces a technically-correct but meaningless-looking percentage
-  // (e.g. "4606% above average") once compared against a normal-sized prior-month average. Past
-  // this point the comparison itself has stopped being informative, so drop it and fall back to
-  // showing the projected amount alone — same treatment as the avg === 0 case above.
+  // The day-5 gate above only bounds the expense-side *date*-extrapolation multiplier (~6x) — it
+  // does nothing for a single unusually large real transaction (a big bonus landing in income, an
+  // annual premium or EMI landing in expenses), which still produces a technically-correct but
+  // meaningless-looking percentage (e.g. "4606% above average") once compared against a
+  // normal-sized prior-month average. Past this point the comparison itself has stopped being
+  // informative, so drop it and fall back to showing the projected amount alone — same treatment
+  // as the avg === 0 case above.
   if (Math.abs(pctVsAvg) > PACE_PCT_SANITY_CAP) return { amount: projected, pctVsAvg: null };
 
   return { amount: projected, pctVsAvg };
