@@ -105,6 +105,15 @@ interface CategorySpendLike {
   amount:       number;
 }
 
+// Same lumpy-transaction risk getPaceForecast's own sanity cap guards against, applied here too:
+// a single one-time purchase (a big-ticket buy, an annual premium) landing early in the month gets
+// multiplied by the same daysInMonth/dayOfMonth run-rate, and for a category with little or no
+// prior spend that produces a technically-derived but wildly implausible "on pace to spend ₹X
+// more" claim — the real production bug this guards against was the pace-forecast card showing
+// this same pattern for total income; a category's month-to-date amount is even more likely to be
+// a single lumpy transaction than the whole-account total is. See getCategoryDeltaInsights below.
+const CATEGORY_PACE_SANITY_CAP_PCT = 500;
+
 /** Category-level spend deltas vs. the prior period. Comparing a still-in-progress month's
  * spend-so-far against a completed prior month is apples-to-oranges — early in the month every
  * category looks "down" purely because fewer days have passed, not because of any real change in
@@ -113,7 +122,13 @@ interface CategorySpendLike {
  * returns [] outright before day 7 — a single category's spend is lower-volume/noisier than total
  * income/expenses, so it needs a few more data points than getPaceForecast's own day-5 gate before
  * the projection is stable. A past (already-closed) month skips both the gate and the projection —
- * both sides of the comparison are already complete, so the raw delta is already a valid fact. */
+ * both sides of the comparison are already complete, so the raw delta is already a valid fact.
+ *
+ * A projected delta is dropped outright (not just the amount kept without a stat, since unlike the
+ * pace-forecast card there's no secondary "hide the %, keep the amount" fallback here — the amount
+ * itself IS the whole claim) when it's implausibly large against the larger of this category's own
+ * prior spend or a fraction of the user's overall average spend (a per-category historical average
+ * isn't available here) — see CATEGORY_PACE_SANITY_CAP_PCT above. */
 export function getCategoryDeltaInsights(
   current:  CategorySpendLike[],
   previous: CategorySpendLike[],
@@ -131,7 +146,14 @@ export function getCategoryDeltaInsights(
     const prev   = prevMap.get(c.categoryId) ?? 0;
     const amount = projected ? (c.amount / dayOfMonth) * daysInMonth : c.amount;
     const delta  = amount - prev;
-    if (Math.abs(delta) >= threshold) deltas.push({ category: c.categoryName, delta, projected });
+    if (Math.abs(delta) < threshold) continue;
+
+    if (projected) {
+      const baseline = Math.max(prev, avgMonthlySpend * 0.5);
+      if (baseline > 0 && (Math.abs(delta) / baseline) * 100 > CATEGORY_PACE_SANITY_CAP_PCT) continue;
+    }
+
+    deltas.push({ category: c.categoryName, delta, projected });
   }
   return deltas.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).slice(0, 3);
 }

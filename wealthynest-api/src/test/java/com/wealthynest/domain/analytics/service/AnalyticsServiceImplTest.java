@@ -335,10 +335,13 @@ class AnalyticsServiceImplTest {
         }
 
         @Test
-        @DisplayName("6-month trend wraps across a year boundary and floors 'saved' at zero")
-        void monthlyTrendWrapsYearBoundaryAndFloorsSaved() {
+        @DisplayName("6-month trend wraps across a year boundary and does not floor a negative 'saved'")
+        void monthlyTrendWrapsYearBoundaryAllowsNegativeSaved() {
             stubDashboardDefaults(2026, 2); // Feb -> trend spans back into the previous year
-            // Nov of prior year: income 100, expense 500 -> would be -400, floored to 0
+            // Nov of prior year: income 100, expense 500 -> -400, unclamped — matches getAnnualTrend
+            // below. A floor here used to silently hide a real overspending month, which inflated
+            // the historical average the frontend's Smart Insights pace forecast compares the
+            // current month against; see getDashboard's own comment on tSaved.
             when(incomeRepository.sumByUserAndYearGroupedByMonth(userId, 2025))
                     .thenReturn(List.<Object[]>of(new Object[]{11, new BigDecimal("100")}));
             when(expenseRepository.sumByUserAndYearGroupedByMonth(userId, 2025))
@@ -350,7 +353,7 @@ class AnalyticsServiceImplTest {
             MonthlyTrendResponse novEntry = response.getMonthlyTrend().stream()
                     .filter(t -> t.getYear() == 2025 && t.getMonth() == 11).findFirst().orElseThrow();
             assertThat(novEntry.getLabel()).isEqualTo("Nov");
-            assertThat(novEntry.getSaved()).isEqualByComparingTo("0"); // floored, not -400
+            assertThat(novEntry.getSaved()).isEqualByComparingTo("-400");
             // First and last entries in the 6-month window bracket the requested (year, month)
             assertThat(response.getMonthlyTrend().get(5).getYear()).isEqualTo(2026);
             assertThat(response.getMonthlyTrend().get(5).getMonth()).isEqualTo(2);
@@ -393,7 +396,7 @@ class AnalyticsServiceImplTest {
         }
 
         @Test
-        @DisplayName("unlike the dashboard trend, annual trend does NOT floor a negative 'saved' at zero")
+        @DisplayName("does not floor a negative 'saved' at zero — matches the dashboard trend")
         void annualTrendAllowsNegativeSaved() {
             when(incomeRepository.sumByUserAndYearGroupedByMonth(userId, 2026))
                     .thenReturn(List.<Object[]>of(new Object[]{6, new BigDecimal("100")}));

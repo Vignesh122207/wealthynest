@@ -184,6 +184,30 @@ describe("getCategoryDeltaInsights", () => {
     expect(result).toHaveLength(3);
     expect(result.map(r => r.category)).toEqual(["D", "B", "C"]);
   });
+
+  // Regression: a single one-time purchase early in the month, in a category with little/no prior
+  // spend, used to get multiplied by the same run-rate math as the income bug — a ₹50,000
+  // electronics buy on day 7 of a 31-day month projected to "₹2,21,429 more than last month".
+  it("drops a projected delta that's implausible against the category's own history", () => {
+    const current  = [cat("c1", "Electronics", 50000)];
+    const previous: ReturnType<typeof cat>[] = [];
+    const result = getCategoryDeltaInsights(current, previous, {
+      isCurrentMonth: true, dayOfMonth: 7, daysInMonth: 31, avgMonthlySpend: 20000,
+    });
+    expect(result).toEqual([]);
+  });
+
+  it("still surfaces a large but plausible projected delta under the sanity cap", () => {
+    // Projected ₹4500 vs. a real ₹1200 prior month is a genuinely big, meaningful swing (275%
+    // above this category's own history) — must not be suppressed by the same guard.
+    const current  = [cat("c1", "Dining", 1500)];
+    const previous = [cat("c1", "Dining", 1200)];
+    const result = getCategoryDeltaInsights(current, previous, {
+      isCurrentMonth: true, dayOfMonth: 10, daysInMonth: 30, avgMonthlySpend: 2000,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].delta).toBeCloseTo(3300, 0);
+  });
 });
 
 describe("getAnomalyInsight", () => {
