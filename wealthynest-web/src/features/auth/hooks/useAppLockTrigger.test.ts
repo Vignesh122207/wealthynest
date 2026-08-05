@@ -40,7 +40,7 @@ const mockedIsBiometricUnlockEnabled = vi.mocked(isBiometricUnlockEnabled);
 
 const pinUser: User = {
   id: "u1", fullName: "Alice", email: "a@x.com", role: "MEMBER",
-  active: true, createdAt: "2026-01-01", pinEnabled: true, hasPasskeys: false,
+  active: true, createdAt: "2026-01-01", pinEnabled: true, hasPasskeys: false, loginAlertEnabled: true,
 };
 
 function setVisibility(state: "visible" | "hidden") {

@@ -15,6 +15,8 @@ import com.wealthynest.domain.auth.repository.EmailVerificationTokenRepository;
 import com.wealthynest.domain.auth.repository.PasswordResetTokenRepository;
 import com.wealthynest.domain.auth.repository.RefreshTokenRepository;
 import com.wealthynest.domain.auth.repository.WebAuthnCredentialRepository;
+import com.wealthynest.domain.admin.entity.SystemSetting;
+import com.wealthynest.domain.admin.repository.SystemSettingRepository;
 import com.wealthynest.domain.user.entity.User;
 import com.wealthynest.domain.user.mapper.UserMapper;
 import com.wealthynest.domain.user.repository.UserRepository;
@@ -74,6 +76,7 @@ public class AuthServiceImpl implements AuthService {
     private final WebAuthnCredentialRepository     webAuthnCredentialRepository;
     private final GoogleIdTokenValidator            googleIdTokenValidator;
     private final RestClient                        googleOAuthClient; // @Bean("googleOAuthClient") — matched by field name, same as ExternalPriceServiceImpl's RestClient fields
+    private final SystemSettingRepository           systemSettingRepository;
 
     @Value("${wealthynest.mail.frontend-url}")
     private String frontendUrl;
@@ -206,7 +209,7 @@ public class AuthServiceImpl implements AuthService {
         user.setLastLoginAt(Instant.now());
         userRepository.save(user);
         auditService.log(user.getId(), "LOGIN_SUCCESS", "USER", user.getId(), null, null, ipAddress, userAgent);
-        emailService.sendNewSignInEmail(user.getEmail(), user.getFullName(), ipAddress, userAgent, Instant.now());
+        sendNewSignInEmailIfEnabled(user, ipAddress, userAgent);
         revokeIfOwnedByUser(previousRefreshToken, user.getId());
         return buildAuthResponse(user, request.isRememberMe(), ipAddress, userAgent);
     }
@@ -855,9 +858,22 @@ public class AuthServiceImpl implements AuthService {
         // uncommitted row (identical race), and deferring costs nothing extra for the ordinary
         // already-committed-user case, so there's no need to special-case which branch ran.
         logAfterCommit(user.getId(), "GOOGLE_LOGIN_SUCCESS", user.getId(), ipAddress, userAgent);
-        emailService.sendNewSignInEmail(user.getEmail(), user.getFullName(), ipAddress, userAgent, Instant.now());
+        sendNewSignInEmailIfEnabled(user, ipAddress, userAgent);
         revokeIfOwnedByUser(previousRefreshToken, user.getId());
         return buildAuthResponse(user, rememberMe, ipAddress, userAgent);
+    }
+
+    // Gated by both the per-user opt-out (User#loginAlertEnabled, controlled from Settings →
+    // Security) and the admin-controlled global kill switch (SystemSetting#loginAlertEmailEnabled)
+    // — the admin switch takes precedence, so flipping it off silences the email for every user
+    // regardless of their individual preference.
+    private void sendNewSignInEmailIfEnabled(User user, String ipAddress, String userAgent) {
+        if (!user.isLoginAlertEnabled()) return;
+        boolean globallyEnabled = systemSettingRepository.findById(SystemSetting.SINGLETON_ID)
+                .map(SystemSetting::isLoginAlertEmailEnabled)
+                .orElse(true);
+        if (!globallyEnabled) return;
+        emailService.sendNewSignInEmail(user.getEmail(), user.getFullName(), ipAddress, userAgent, Instant.now());
     }
 
     private void sendVerificationEmail(User user) {

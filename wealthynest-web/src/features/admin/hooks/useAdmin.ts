@@ -128,3 +128,25 @@ export function useUpdateJobSchedule() {
     onError: () => toast.error("Failed to update schedule"),
   });
 }
+
+// ── System Settings ──────────────────────────────────────────────────────────
+
+export function useSystemSettings() {
+  return useQuery({
+    queryKey: ["admin", "system-settings"],
+    queryFn:  adminApi.getSystemSettings,
+  });
+}
+
+export function useUpdateSystemSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (loginAlertEmailEnabled: boolean) =>
+      adminApi.updateSystemSettings(loginAlertEmailEnabled),
+    onSuccess: () => {
+      toast.success("Settings updated");
+      qc.invalidateQueries({ queryKey: ["admin", "system-settings"] });
+    },
+    onError: () => toast.error("Failed to update settings"),
+  });
+}

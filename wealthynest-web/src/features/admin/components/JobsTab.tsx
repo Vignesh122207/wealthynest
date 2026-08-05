@@ -1,7 +1,15 @@
 import {useState} from "react";
-import {Activity, Check, CheckCircle2, Clock, Loader2, Pencil, Play, RefreshCw, XCircle} from "lucide-react";
-import {useAdminJobs, useSystemHealth, useTriggerJob, useUpdateJobSchedule} from "@/features/admin/hooks/useAdmin";
+import {Activity, Bell, Check, CheckCircle2, Clock, Loader2, Pencil, Play, RefreshCw, XCircle} from "lucide-react";
+import {
+  useAdminJobs,
+  useSystemHealth,
+  useSystemSettings,
+  useTriggerJob,
+  useUpdateJobSchedule,
+  useUpdateSystemSettings,
+} from "@/features/admin/hooks/useAdmin";
 import type {JobScheduleConfig} from "@/features/admin/api/admin.api";
+import {Toggle} from "@/components/ui/Toggle";
 import {cn} from "@/lib/utils";
 
 // Same status vocabulary as JobStatusBadge below, but Actuator health components report
@@ -64,6 +72,43 @@ function SystemHealthCard() {
       {!checked && !isFetching && (
         <p className="px-4 py-6 text-center text-sm text-muted-foreground">Click &quot;Check now&quot; to fetch live status</p>
       )}
+    </div>
+  );
+}
+
+// Admin-controlled kill switch for the per-login "new sign-in" email (see
+// AuthServiceImpl#sendNewSignInEmailIfEnabled) — takes precedence over every individual user's
+// own Settings → Security preference, for shutting the email off platform-wide (e.g. during an
+// outage in the mail provider) without having to touch every account.
+function SystemSettingsCard() {
+  const { data, isLoading } = useSystemSettings();
+  const { mutate, isPending } = useUpdateSystemSettings();
+  const enabled = data?.loginAlertEmailEnabled ?? true;
+
+  return (
+    <div className="bg-card border border-border rounded-2xl overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <div className="flex items-center gap-2">
+          <Bell className="w-4 h-4 text-muted-foreground" />
+          <h2 className="text-sm font-semibold text-foreground">System Settings</h2>
+        </div>
+        {isLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+      </div>
+      <div className="flex items-center gap-3.5 px-4 py-4">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-foreground">Sign-in email alerts</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Platform-wide kill switch for the &quot;new sign-in&quot; email — off here overrides every
+            user&apos;s own preference.
+          </p>
+        </div>
+        <Toggle
+          checked={enabled}
+          disabled={isLoading || isPending}
+          onChange={(next) => mutate(next)}
+          testId="admin-login-alert-toggle"
+        />
+      </div>
     </div>
   );
 }
@@ -146,6 +191,7 @@ export function JobsTab() {
   return (
     <div className="space-y-4">
       <SystemHealthCard />
+      <SystemSettingsCard />
       <div className="bg-card border border-border rounded-2xl overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <h2 className="text-sm font-semibold text-foreground">Scheduled Jobs</h2>

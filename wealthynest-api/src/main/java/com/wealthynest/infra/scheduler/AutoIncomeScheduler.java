@@ -365,35 +365,43 @@ public class AutoIncomeScheduler {
                     Thread.currentThread().interrupt(); return;
                 }
             }
-            String symbol = e.getKey();
-            Investment inv = e.getValue();
-            try {
-                BigDecimal price = externalPriceService.fetchStockPrice(yahooTicker(inv));
-                if (price == null) { log.warn("Yahoo returned null price for {}", symbol); continue; }
+            self.refreshSinglePrice(e.getKey(), e.getValue());
+        }
+    }
 
-                // Upsert cache
-                StockPriceCache cache = stockPriceCacheRepository.findById(symbol)
-                    .orElse(StockPriceCache.builder().symbol(symbol)
-                        .exchange(inv.getExchange() != null ? inv.getExchange() : "NSE").build());
-                if (cache.getCurrentPrice() != null) {
-                    BigDecimal prev = cache.getCurrentPrice();
-                    cache.setPreviousClose(prev);
-                    BigDecimal chg = price.subtract(prev);
-                    cache.setDayChange(chg);
-                    if (prev.compareTo(BigDecimal.ZERO) > 0)
-                        cache.setDayChangePct(chg.divide(prev, 4, RoundingMode.HALF_UP)
-                            .multiply(BigDecimal.valueOf(100)));
-                }
-                cache.setCurrentPrice(price);
-                cache.setLastUpdated(Instant.now());
-                stockPriceCacheRepository.save(cache);
+    /**
+     * Fetches and persists the live price for a single symbol. Must run through the {@code self}
+     * proxy (see class-level self-injection note) — {@code investmentRepository.bulkUpdatePriceBySymbol}
+     * is a bulk update query and Hibernate rejects it outside an active transaction.
+     */
+    @Transactional
+    public void refreshSinglePrice(String symbol, Investment inv) {
+        try {
+            BigDecimal price = externalPriceService.fetchStockPrice(yahooTicker(inv));
+            if (price == null) { log.warn("Yahoo returned null price for {}", symbol); return; }
 
-                // Single bulk UPDATE for all users holding this symbol — O(1) round-trip
-                int rows = investmentRepository.bulkUpdatePriceBySymbol(symbol, price);
-                log.info("Refreshed ₹{} for {} ({} investment rows)", price, symbol, rows);
-            } catch (Exception ex) {
-                log.warn("Price refresh failed for {}: {}", symbol, ex.getMessage());
+            // Upsert cache
+            StockPriceCache cache = stockPriceCacheRepository.findById(symbol)
+                .orElse(StockPriceCache.builder().symbol(symbol)
+                    .exchange(inv.getExchange() != null ? inv.getExchange() : "NSE").build());
+            if (cache.getCurrentPrice() != null) {
+                BigDecimal prev = cache.getCurrentPrice();
+                cache.setPreviousClose(prev);
+                BigDecimal chg = price.subtract(prev);
+                cache.setDayChange(chg);
+                if (prev.compareTo(BigDecimal.ZERO) > 0)
+                    cache.setDayChangePct(chg.divide(prev, 4, RoundingMode.HALF_UP)
+                        .multiply(BigDecimal.valueOf(100)));
             }
+            cache.setCurrentPrice(price);
+            cache.setLastUpdated(Instant.now());
+            stockPriceCacheRepository.save(cache);
+
+            // Single bulk UPDATE for all users holding this symbol — O(1) round-trip
+            int rows = investmentRepository.bulkUpdatePriceBySymbol(symbol, price);
+            log.info("Refreshed ₹{} for {} ({} investment rows)", price, symbol, rows);
+        } catch (Exception ex) {
+            log.warn("Price refresh failed for {}: {}", symbol, ex.getMessage());
         }
     }
 

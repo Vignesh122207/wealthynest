@@ -45,6 +45,13 @@ test.describe("Home dashboard — dynamic reflow", () => {
     context = await browser.newContext({ storageState: storageStateFor(user.auth) });
     page = await context.newPage();
     home = new HomePage(page);
+
+    // Pins the browser clock to day 15 of the real current month for this whole suite.
+    // getCategoryDeltaInsights (home.utils.ts) gates category-delta insights until day 7 of an
+    // in-progress month, so the category-delta seed data above needs a stable, safely-past-the-
+    // gate day rather than whatever day this suite happens to actually run on — same rationale as
+    // the pace-forecast test further down, which pins the same day 15 for the same reason.
+    await page.clock.install({ time: new Date(today.getFullYear(), today.getMonth(), 15) });
   });
 
   test.afterAll(async () => {
@@ -97,6 +104,9 @@ test.describe("Home dashboard — dynamic reflow", () => {
     await expect(home.periodNavLabel).toHaveText(/^[A-Za-z]{3} \d{4}$/); // e.g. "Aug 2026"
     // Month mode: the one MONTHLY budget seeded above (over its limit) is the only budget counted.
     await expect(home.budgetProgressCaption).toHaveText("0 of 1");
+    // The detail panel below the ring must agree with it — it used to always receive every
+    // budget unfiltered regardless of the toggle, so it never actually hit this empty state.
+    await expect(home.budgetSection.getByText("No budgets set for this month")).not.toBeVisible();
     const monthLabel = await home.periodNavLabel.textContent();
     const billsVisibleBefore = await home.upcomingBillsCard.isVisible();
 
@@ -104,27 +114,41 @@ test.describe("Home dashboard — dynamic reflow", () => {
     await expect(home.periodNavLabel).toHaveText(/^\d{4}$/); // just the year, no month
     await expect(page.getByText("YTD Income")).toBeVisible();
     await expect(page.getByText("YTD Expenses")).toBeVisible();
-    // No YEARLY-type budget was ever seeded in this file, so Year mode's ring — a different
-    // dataset than Month's — has nothing to show, proving it actually swapped rather than just
-    // relabeling the same monthly count.
+    // Budget Progress follows the toggle like every other tile (see StatOverview's activeBudgets
+    // comment) — Year mode counts only YEARLY budgets, and none were seeded in this file, so it
+    // falls into the "no budgets for this period" empty state rather than repeating Month's count.
     await expect(home.budgetProgressCaption).toHaveText("—");
+    // The detail panel must independently reach its own "no yearly budgets" empty state too —
+    // before the fix it kept showing the seeded MONTHLY budget's row here instead, contradicting
+    // the ring right above it.
+    await expect(home.budgetSection.getByText("No yearly budgets set")).toBeVisible();
     // Upcoming Bills is deliberately period-blind — same (absent) either way here.
     expect(await home.upcomingBillsCard.isVisible()).toBe(billsVisibleBefore);
 
     await home.switchToMonthMode();
     await expect(home.periodNavLabel).toHaveText(monthLabel!);
     await expect(home.budgetProgressCaption).toHaveText("0 of 1");
+    await expect(home.budgetSection.getByText("No budgets set for this month")).not.toBeVisible();
   });
 
   test("pace-to-save forecast hides on a past month and reappears on the current month @regression", async () => {
+    // getPaceForecast (home.utils.ts) returns null before day 5 of the month — too few days of
+    // real spend to extrapolate a stable pace (see its own comment) — so asserting the forecast
+    // is visible "on the current month" would fail every 1st-4th of the month regardless of the
+    // app behaving correctly. Pin the browser clock to day 15 of the real current month/year
+    // (same period the expenses seeded in beforeAll query against) instead of whatever day this
+    // actually runs on.
+    const now = new Date();
+    await page.clock.install({ time: new Date(now.getFullYear(), now.getMonth(), 15) });
+
     await home.gotoHome();
-    await expect(page.getByText("pace to save this month")).toBeVisible();
+    await expect(page.getByText(/on pace to save/)).toBeVisible();
 
     await page.getByLabel("Previous month").click();
-    await expect(page.getByText("pace to save this month")).not.toBeVisible();
+    await expect(page.getByText(/on pace to save/)).not.toBeVisible();
 
     await page.getByLabel("Next month").click();
-    await expect(page.getByText("pace to save this month")).toBeVisible();
+    await expect(page.getByText(/on pace to save/)).toBeVisible();
   });
 
   // Spend-anomaly is the other current-month-only insight, but seeding a real one requires

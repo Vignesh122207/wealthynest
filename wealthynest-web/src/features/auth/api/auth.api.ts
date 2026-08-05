@@ -9,7 +9,7 @@ export const authApi = {
   // automatically (see RefreshCookieService on the backend).
   logout:   async (): Promise<void> => { await apiClient.post("/auth/logout"); },
   getMe:    async (): Promise<User> => (await apiClient.get<ApiResponse<User>>("/users/me")).data.data,
-  updateProfile: async (data: { fullName?: string }): Promise<User> =>
+  updateProfile: async (data: { fullName?: string; loginAlertEnabled?: boolean }): Promise<User> =>
     (await apiClient.patch<ApiResponse<User>>("/users/me", data)).data.data,
   changePassword: async (data: { currentPassword: string; newPassword: string }): Promise<void> => {
     await apiClient.post("/users/me/change-password", data);

@@ -77,4 +77,11 @@ public class User extends BaseEntity {
     @Column(name = "auth_provider", nullable = false, length = 20)
     @Builder.Default
     private String authProvider = "LOCAL";
+
+    /** Per-user opt-out for the "new sign-in" email sent on every password/Google login (see
+     * AuthServiceImpl.login / signInWithGooglePayload). Also gated by the admin-controlled
+     * SystemSetting#loginAlertEmailEnabled kill switch, which takes precedence over this. */
+    @Column(name = "login_alert_enabled", nullable = false)
+    @Builder.Default
+    private boolean loginAlertEnabled = true;
 }

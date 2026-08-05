@@ -166,7 +166,9 @@ class AutoIncomeSchedulerTest {
 
             scheduler.runAllAutoIncome();
 
-            verifyNoInteractions(mockSelf);
+            // Excluded from dividend processing specifically (requires purchaseDate) — price
+            // refresh doesn't need it, so self.refreshSinglePrice is still legitimately called.
+            verify(mockSelf, never()).processSymbolDividends(anyString(), anyList());
         }
 
         @Test
@@ -698,65 +700,93 @@ class AutoIncomeSchedulerTest {
         }
     }
 
-    // ─── SeedMissingStockPricesTests ──────────────────────────────────────────────
+    // ─── SeedMissingStockPricesTests (outer loop, accessed via seedMissingStockPrices) ──
 
     @Nested
     @DisplayName("seedMissingStockPrices")
     class SeedMissingStockPricesTests {
 
         @Test
-        @DisplayName("no investments in repository → no Yahoo calls")
-        void noActiveStocks_noYahooCalls() {
+        @DisplayName("no investments in repository → self never invoked")
+        void noActiveStocks_noInteractionsWithSelf() {
             when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK)).thenReturn(Collections.emptyList());
 
             scheduler.seedMissingStockPrices();
 
-            verifyNoInteractions(externalPriceService, stockPriceCacheRepository);
+            verifyNoInteractions(mockSelf);
         }
 
         @Test
-        @DisplayName("Yahoo returns null price → bulk update skipped, no exception")
-        void yahooReturnsNull_warnsAndContinues() {
-            Investment inv = buildStockInvestment("RELIANCE", LocalDate.now().minusYears(1));
+        @DisplayName("investment with null symbol is excluded before grouping")
+        void investmentWithNoSymbol_excluded() {
+            Investment inv = buildStockInvestment(null, LocalDate.now().minusYears(1));
             when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK)).thenReturn(List.of(inv));
-            when(externalPriceService.fetchStockPrice(anyString())).thenReturn(null);
 
             scheduler.seedMissingStockPrices();
+
+            verifyNoInteractions(mockSelf);
+        }
+
+        @Test
+        @DisplayName("two investments with same symbol → self.refreshSinglePrice called once (deduplication)")
+        void multipleInvestmentsSameSymbol_selfCalledOnce() {
+            Investment inv1 = buildStockInvestment("TCS", LocalDate.now().minusYears(1));
+            Investment inv2 = buildStockInvestment("TCS", LocalDate.now().minusMonths(6));
+            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK)).thenReturn(List.of(inv1, inv2));
+
+            scheduler.seedMissingStockPrices();
+
+            verify(mockSelf, times(1)).refreshSinglePrice(eq("TCS"), any());
+        }
+
+        @Test
+        @DisplayName("two distinct symbols → self.refreshSinglePrice called once per symbol")
+        void twoDistinctSymbols_selfCalledTwice() {
+            // Production code sleeps 1 s between symbols — this test takes ~1 s
+            Investment inv1 = buildStockInvestment("RELIANCE", LocalDate.now().minusYears(1));
+            Investment inv2 = buildStockInvestment("TCS",      LocalDate.now().minusYears(1));
+            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK)).thenReturn(List.of(inv1, inv2));
+
+            scheduler.seedMissingStockPrices();
+
+            verify(mockSelf).refreshSinglePrice(eq("RELIANCE"), eq(inv1));
+            verify(mockSelf).refreshSinglePrice(eq("TCS"),      eq(inv2));
+        }
+    }
+
+    // ─── RefreshSinglePriceTests (per-symbol @Transactional write, tested directly — this is
+    // the method that must run through the self proxy in production so Hibernate sees an active
+    // transaction for investmentRepository.bulkUpdatePriceBySymbol) ──────────────────────────
+
+    @Nested
+    @DisplayName("refreshSinglePrice")
+    class RefreshSinglePriceTests {
+
+        @Test
+        @DisplayName("Yahoo returns null price → bulk update skipped, no exception")
+        void yahooReturnsNull_warnsAndSkips() {
+            Investment inv = buildStockInvestment("RELIANCE", LocalDate.now().minusYears(1));
+            when(externalPriceService.fetchStockPrice("RELIANCE.NS")).thenReturn(null);
+
+            scheduler.refreshSinglePrice("RELIANCE", inv);
 
             verify(investmentRepository, never()).bulkUpdatePriceBySymbol(anyString(), any());
         }
 
         @Test
-        @DisplayName("single symbol → cache created (or updated) and bulk update called")
-        void singleSymbol_cacheCreatedAndBulkUpdateCalled() {
+        @DisplayName("new symbol → cache created and bulk update called")
+        void newSymbol_cacheCreatedAndBulkUpdateCalled() {
             Investment inv = buildStockInvestment("RELIANCE", LocalDate.now().minusYears(1));
             BigDecimal price = new BigDecimal("2500.00");
-            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK)).thenReturn(List.of(inv));
             when(externalPriceService.fetchStockPrice("RELIANCE.NS")).thenReturn(price);
             when(stockPriceCacheRepository.findById("RELIANCE")).thenReturn(Optional.empty());
             when(stockPriceCacheRepository.save(any())).thenReturn(new StockPriceCache());
             when(investmentRepository.bulkUpdatePriceBySymbol("RELIANCE", price)).thenReturn(1);
 
-            scheduler.seedMissingStockPrices();
+            scheduler.refreshSinglePrice("RELIANCE", inv);
 
             verify(stockPriceCacheRepository).save(any(StockPriceCache.class));
             verify(investmentRepository).bulkUpdatePriceBySymbol("RELIANCE", price);
-        }
-
-        @Test
-        @DisplayName("two investments with same symbol → only one Yahoo call (deduplication)")
-        void multipleInvestmentsSameSymbol_onlyOneYahooCall() {
-            Investment inv1 = buildStockInvestment("TCS", LocalDate.now().minusYears(1));
-            Investment inv2 = buildStockInvestment("TCS", LocalDate.now().minusMonths(6));
-            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK)).thenReturn(List.of(inv1, inv2));
-            when(externalPriceService.fetchStockPrice("TCS.NS")).thenReturn(new BigDecimal("3700"));
-            when(stockPriceCacheRepository.findById("TCS")).thenReturn(Optional.empty());
-            when(stockPriceCacheRepository.save(any())).thenReturn(new StockPriceCache());
-            when(investmentRepository.bulkUpdatePriceBySymbol(eq("TCS"), any())).thenReturn(2);
-
-            scheduler.seedMissingStockPrices();
-
-            verify(externalPriceService, times(1)).fetchStockPrice("TCS.NS");
         }
 
         @Test
@@ -768,13 +798,12 @@ class AutoIncomeSchedulerTest {
             StockPriceCache existingCache = StockPriceCache.builder()
                 .symbol("INFY").exchange("NSE").currentPrice(prev).build();
 
-            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK)).thenReturn(List.of(inv));
             when(externalPriceService.fetchStockPrice("INFY.NS")).thenReturn(newPx);
             when(stockPriceCacheRepository.findById("INFY")).thenReturn(Optional.of(existingCache));
             when(stockPriceCacheRepository.save(any())).thenReturn(existingCache);
             lenient().when(investmentRepository.bulkUpdatePriceBySymbol(eq("INFY"), any())).thenReturn(1);
 
-            scheduler.seedMissingStockPrices();
+            scheduler.refreshSinglePrice("INFY", inv);
 
             ArgumentCaptor<StockPriceCache> captor = ArgumentCaptor.forClass(StockPriceCache.class);
             verify(stockPriceCacheRepository).save(captor.capture());
@@ -783,22 +812,14 @@ class AutoIncomeSchedulerTest {
         }
 
         @Test
-        @DisplayName("two distinct symbols → two Yahoo calls and two bulk updates")
-        void twoDistinctSymbols_twoBulkUpdates() {
-            // Production code sleeps 1 s between symbols — this test takes ~1 s
-            Investment inv1 = buildStockInvestment("RELIANCE", LocalDate.now().minusYears(1));
-            Investment inv2 = buildStockInvestment("TCS",      LocalDate.now().minusYears(1));
-            when(investmentRepository.findByInvestmentTypeAndActiveTrue(InvestmentType.STOCK)).thenReturn(List.of(inv1, inv2));
-            when(externalPriceService.fetchStockPrice("RELIANCE.NS")).thenReturn(new BigDecimal("2500"));
-            when(externalPriceService.fetchStockPrice("TCS.NS")).thenReturn(new BigDecimal("3700"));
-            when(stockPriceCacheRepository.findById(anyString())).thenReturn(Optional.empty());
-            when(stockPriceCacheRepository.save(any())).thenReturn(new StockPriceCache());
-            lenient().when(investmentRepository.bulkUpdatePriceBySymbol(anyString(), any())).thenReturn(1);
+        @DisplayName("Yahoo call throws → warning logged, exception swallowed (does not propagate)")
+        void yahooThrows_swallowsException() {
+            Investment inv = buildStockInvestment("RELIANCE", LocalDate.now().minusYears(1));
+            when(externalPriceService.fetchStockPrice("RELIANCE.NS")).thenThrow(new RuntimeException("Yahoo down"));
 
-            scheduler.seedMissingStockPrices();
+            scheduler.refreshSinglePrice("RELIANCE", inv);
 
-            verify(investmentRepository).bulkUpdatePriceBySymbol(eq("RELIANCE"), any());
-            verify(investmentRepository).bulkUpdatePriceBySymbol(eq("TCS"),      any());
+            verify(investmentRepository, never()).bulkUpdatePriceBySymbol(anyString(), any());
         }
     }
 }

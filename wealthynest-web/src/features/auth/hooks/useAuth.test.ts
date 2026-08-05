@@ -39,7 +39,7 @@ const mockedGetPasskeyAssertion = vi.mocked(getPasskeyAssertion);
 
 const baseUser: User = {
   id: "u1", fullName: "Alice Smith", email: "a@x.com", role: "MEMBER",
-  active: true, createdAt: "2026-01-01", pinEnabled: false, hasPasskeys: false,
+  active: true, createdAt: "2026-01-01", pinEnabled: false, hasPasskeys: false, loginAlertEnabled: true,
 };
 const authResponse: AuthResponse = {
   accessToken: "at", user: baseUser,
@@ -288,6 +288,19 @@ describe("useUpdateProfile", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(useAuthStore.getState().user).toEqual(updated);
     expect(toast.success).toHaveBeenCalledWith("Profile updated");
+  });
+
+  it("passes loginAlertEnabled through and writes the returned user into the auth store", async () => {
+    const updated = { ...baseUser, loginAlertEnabled: false };
+    mockedApi.updateProfile.mockResolvedValue(updated);
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useUpdateProfile(), { wrapper: Wrapper });
+    result.current.mutate({ loginAlertEnabled: false });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedApi.updateProfile).toHaveBeenCalledWith({ loginAlertEnabled: false });
+    expect(useAuthStore.getState().user?.loginAlertEnabled).toBe(false);
   });
 });
 

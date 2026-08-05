@@ -15,7 +15,7 @@ const mockedApi = vi.mocked(authApi);
 
 const baseUser: User = {
   id: "u1", fullName: "Alice Smith", email: "a@x.com", role: "MEMBER",
-  active: true, createdAt: "2026-01-01", pinEnabled: false, hasPasskeys: false,
+  active: true, createdAt: "2026-01-01", pinEnabled: false, hasPasskeys: false, loginAlertEnabled: true,
 };
 
 function renderModal(props: Partial<{ currentPassword: string }> = {}) {

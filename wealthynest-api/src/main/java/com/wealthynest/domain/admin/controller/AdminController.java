@@ -5,6 +5,7 @@ import com.wealthynest.common.response.ApiResponse;
 import com.wealthynest.common.response.PagedResponse;
 import com.wealthynest.common.security.SecurityUtils;
 import com.wealthynest.common.util.ClientIpResolver;
+import com.wealthynest.domain.admin.dto.response.SystemSettingsResponse;
 import com.wealthynest.domain.admin.entity.JobScheduleConfig;
 import com.wealthynest.domain.admin.service.AdminService;
 import com.wealthynest.domain.admin.service.JobSchedulerService;
@@ -129,5 +130,21 @@ public class AdminController {
             @RequestParam String cron) {
         return ResponseEntity.ok(ApiResponse.success(
             jobSchedulerService.updateSchedule(jobName, cron)));
+    }
+
+    // ── System settings ──────────────────────────────────────────────────────
+
+    @GetMapping("/settings")
+    public ResponseEntity<ApiResponse<SystemSettingsResponse>> getSystemSettings() {
+        return ResponseEntity.ok(ApiResponse.success(adminService.getSystemSettings()));
+    }
+
+    @PatchMapping("/settings")
+    public ResponseEntity<ApiResponse<SystemSettingsResponse>> updateSystemSettings(
+            @RequestParam boolean loginAlertEmailEnabled, HttpServletRequest request) {
+        UUID actorId = SecurityUtils.getCurrentUserId().orElse(null);
+        SystemSettingsResponse saved = adminService.updateSystemSettings(
+                loginAlertEmailEnabled, actorId, clientIpResolver.resolve(request), request.getHeader("User-Agent"));
+        return ResponseEntity.ok(ApiResponse.success(saved));
     }
 }

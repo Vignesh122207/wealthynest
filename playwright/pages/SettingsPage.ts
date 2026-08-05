@@ -121,6 +121,15 @@ export class SettingsPage extends BasePage {
     return this.page.getByTestId("lockout-banner");
   }
 
+  /** PinSetupModal's own step-up screen — shown only when replacing an already-set PIN (not
+   * first-time setup), per AuthServiceImpl#enablePin's own password-required check. No-op to call
+   * when this isn't the flow being tested; every "Forgot your PIN?"/replace-PIN path needs this
+   * before the keypad below is even rendered. */
+  async confirmPasswordForPinReset(password: string): Promise<void> {
+    await this.page.getByTestId("pin-setup-password-input").fill(password);
+    await this.page.getByTestId("pin-setup-password-submit").click();
+  }
+
   /** Choose-then-confirm, same PIN both times — PinSetupModal.tsx's own two-step flow, driven via
    * the on-screen keypad (this is the one PIN surface that never uses a native-keyboard input).
    * Waits for the "Confirm your PIN" heading between rounds — usePinEntryFlow's own 180ms delay

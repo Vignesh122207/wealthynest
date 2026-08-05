@@ -2,6 +2,7 @@ package com.wealthynest.domain.admin.service;
 
 import com.wealthynest.common.audit.AuditLogResponse;
 import com.wealthynest.common.response.PagedResponse;
+import com.wealthynest.domain.admin.dto.response.SystemSettingsResponse;
 import com.wealthynest.domain.user.dto.response.UserResponse;
 import com.wealthynest.domain.user.entity.UserRole;
 import org.springframework.data.domain.Pageable;
@@ -23,4 +24,9 @@ public interface AdminService {
      * financial records for audit/compliance and only scrubs identity. */
     void deleteUserPermanently(UUID targetId, UUID actorId, String ipAddress, String userAgent);
     PagedResponse<AuditLogResponse> getAuditLogs(Pageable pageable, UUID userId, String action);
+
+    SystemSettingsResponse getSystemSettings();
+    /** Global kill switch for the per-login "new sign-in" email — overrides every user's own
+     * loginAlertEnabled preference when turned off. */
+    SystemSettingsResponse updateSystemSettings(boolean loginAlertEmailEnabled, UUID actorId, String ipAddress, String userAgent);
 }

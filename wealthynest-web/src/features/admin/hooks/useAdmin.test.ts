@@ -4,7 +4,7 @@ import { createQueryClientWrapper } from "@/test-utils/queryClientWrapper";
 import {
   useAdminStats, useAdminUsers, useToggleUserActive, useUpdateUserRole, useResetUserPassword,
   useDeleteUserPermanently, useAdminAuditLogs, useUserGrowth, useAdminJobs, useTriggerJob,
-  useUpdateJobSchedule, useSystemHealth,
+  useUpdateJobSchedule, useSystemHealth, useSystemSettings, useUpdateSystemSettings,
 } from "./useAdmin";
 import { adminApi } from "../api/admin.api";
 import { toast } from "sonner";
@@ -14,6 +14,7 @@ vi.mock("../api/admin.api", () => ({
     getStats: vi.fn(), listUsers: vi.fn(), toggleActive: vi.fn(), updateRole: vi.fn(),
     resetPassword: vi.fn(), deleteUserPermanently: vi.fn(), getAuditLogs: vi.fn(), getUserGrowth: vi.fn(),
     listJobs: vi.fn(), triggerJob: vi.fn(), updateSchedule: vi.fn(), getSystemHealth: vi.fn(),
+    getSystemSettings: vi.fn(), updateSystemSettings: vi.fn(),
   },
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -250,5 +251,33 @@ describe("useUpdateJobSchedule", () => {
     expect(mockedApi.updateSchedule).toHaveBeenCalledWith("AUTO_INCOME", "0 15 3 * * *");
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["admin", "jobs"] });
     expect(toast.success).toHaveBeenCalledWith("Schedule updated");
+  });
+});
+
+describe("useSystemSettings", () => {
+  it("fetches the current settings", async () => {
+    mockedApi.getSystemSettings.mockResolvedValue({ loginAlertEmailEnabled: false });
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useSystemSettings(), { wrapper: Wrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual({ loginAlertEmailEnabled: false });
+  });
+});
+
+describe("useUpdateSystemSettings", () => {
+  it("passes the new value through, invalidates the settings query, and toasts", async () => {
+    mockedApi.updateSystemSettings.mockResolvedValue({ loginAlertEmailEnabled: false });
+    const { Wrapper, queryClient } = createQueryClientWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const { result } = renderHook(() => useUpdateSystemSettings(), { wrapper: Wrapper });
+    result.current.mutate(false);
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedApi.updateSystemSettings).toHaveBeenCalledWith(false);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["admin", "system-settings"] });
+    expect(toast.success).toHaveBeenCalledWith("Settings updated");
   });
 });

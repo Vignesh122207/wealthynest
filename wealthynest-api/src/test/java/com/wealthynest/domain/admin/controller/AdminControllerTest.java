@@ -303,4 +303,43 @@ class AdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].userEmail").value("alice@x.com"));
     }
+
+    // ── System settings ──────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("getSystemSettings returns the service's current settings")
+    void getSystemSettingsReturnsCurrentValue() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null, UserRole.ADMIN);
+        when(adminService.getSystemSettings()).thenReturn(
+                com.wealthynest.domain.admin.dto.response.SystemSettingsResponse.builder()
+                        .loginAlertEmailEnabled(false).build());
+
+        mockMvc.perform(get("/api/v1/admin/settings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.loginAlertEmailEnabled").value(false));
+    }
+
+    @Test
+    @DisplayName("updateSystemSettings passes the query param and authenticated actor id through")
+    void updateSystemSettingsDelegatesToService() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null, UserRole.ADMIN);
+        when(adminService.updateSystemSettings(eq(false), eq(userId), any(), any())).thenReturn(
+                com.wealthynest.domain.admin.dto.response.SystemSettingsResponse.builder()
+                        .loginAlertEmailEnabled(false).build());
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .patch("/api/v1/admin/settings")
+                        .param("loginAlertEmailEnabled", "false"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.loginAlertEmailEnabled").value(false));
+    }
+
+    @Test
+    @DisplayName("a non-admin is rejected from the system settings endpoint")
+    void nonAdminCannotReadSystemSettings() throws Exception {
+        SecurityTestUtils.authenticateAs(userId, null, UserRole.MEMBER);
+
+        mockMvc.perform(get("/api/v1/admin/settings"))
+                .andExpect(status().isForbidden());
+    }
 }

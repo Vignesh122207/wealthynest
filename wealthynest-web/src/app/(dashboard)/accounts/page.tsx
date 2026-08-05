@@ -320,7 +320,7 @@ export default function AccountsPage() {
   const handleAddExpense = (v: ExpenseFormValues) => {
     const target = accounts.find(a => a.id === v.accountId);
     const paymentMethod = target?.accountType === "CASH_WALLET" ? "CASH"
-      : target?.accountType === "CREDIT_CARD" ? "CREDIT_CARD" : "BANK_ACCOUNT";
+      : target?.accountType === "CREDIT_CARD" ? "CREDIT_CARD" : target?.accountType ? "BANK_ACCOUNT" : undefined;
     createExpense({ accountId: v.accountId, categoryId: v.categoryId, amount: Number(v.amount),
       description: v.description, expenseDate: v.expenseDate, paymentMethod }, { onSuccess: close });
   };

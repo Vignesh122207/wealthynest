@@ -106,4 +106,29 @@ test.describe("Transactions", () => {
     await transactionsPage.typeTab("income").click();
     await transactionsPage.expectRowNotVisible(expense.description);
   });
+
+  // Regression for a real bug: useIncome only takes year/month, not a date range, so Custom
+  // mode's income fetch was scoped to whatever `year` state happened to be — which Custom mode's
+  // own date pickers never touch — instead of the actual picked range. Landing on the page
+  // (defaulted to the current year, never navigated via the Year toggle) and picking a Custom
+  // range in a past year silently fetched the current year's income and filtered *that* down to
+  // the past-year range, always yielding zero rows regardless of real data.
+  test("Custom date range in a year other than the page's default still shows that year's income @regression", async ({ transactionsPage }, testInfo) => {
+    const user = readRegressionUser(testInfo.project.name);
+    const auth = await api.login({ email: user.email, password: user.password });
+    const lastYear = new Date().getFullYear() - 1;
+    const uniqueDescription = `LastYearIncome-${faker.string.alphanumeric(8)}`;
+    await api.createIncome(auth.accessToken, {
+      source: "SALARY", amount: 12345, incomeDate: `${lastYear}-06-15`,
+      periodMonth: 6, periodYear: lastYear, description: uniqueDescription,
+    });
+
+    // Never switches to Year mode, so `year` state stays at the current year the whole time —
+    // the exact scenario that silently returned zero income rows before the fix.
+    await transactionsPage.gotoTransactions();
+    await transactionsPage.typeTab("income").click();
+    await transactionsPage.setCustomDateRange(`${lastYear}-01-01`, `${lastYear}-12-31`);
+
+    await transactionsPage.expectRowVisible(uniqueDescription);
+  });
 });

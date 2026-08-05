@@ -5,6 +5,8 @@ import com.wealthynest.common.audit.AuditService;
 import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.domain.account.repository.AccountTransferRepository;
+import com.wealthynest.domain.admin.entity.SystemSetting;
+import com.wealthynest.domain.admin.repository.SystemSettingRepository;
 import com.wealthynest.domain.asset.repository.AssetRepository;
 import com.wealthynest.domain.auth.repository.RefreshTokenRepository;
 import com.wealthynest.domain.auth.repository.WebAuthnCredentialRepository;
@@ -26,6 +28,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -58,6 +61,7 @@ class AdminServiceImplTest {
     @Mock private InvestmentIncomeLogRepository investmentIncomeLogRepository;
     @Mock private AccountTransferRepository    accountTransferRepository;
     @Mock private SupportTicketRepository      supportTicketRepository;
+    @Mock private SystemSettingRepository      systemSettingRepository;
 
     @InjectMocks
     private AdminServiceImpl service;
@@ -400,6 +404,48 @@ class AdminServiceImplTest {
             var result = service.getAuditLogs(pageable, null, null);
 
             assertThat(result.getData().get(0).getUserEmail()).isEqualTo("unknown");
+        }
+    }
+
+    @Nested
+    @DisplayName("system settings")
+    class SystemSettingsTests {
+
+        @Test
+        @DisplayName("getSystemSettings falls back to enabled=true when no row exists yet")
+        void getSystemSettings_missingRow_defaultsToEnabled() {
+            when(systemSettingRepository.findById(SystemSetting.SINGLETON_ID)).thenReturn(Optional.empty());
+
+            var result = service.getSystemSettings();
+
+            assertThat(result.isLoginAlertEmailEnabled()).isTrue();
+        }
+
+        @Test
+        @DisplayName("getSystemSettings reflects the persisted row")
+        void getSystemSettings_returnsPersistedValue() {
+            when(systemSettingRepository.findById(SystemSetting.SINGLETON_ID))
+                .thenReturn(Optional.of(SystemSetting.builder().loginAlertEmailEnabled(false).build()));
+
+            var result = service.getSystemSettings();
+
+            assertThat(result.isLoginAlertEmailEnabled()).isFalse();
+        }
+
+        @Test
+        @DisplayName("updateSystemSettings persists the new value and audit-logs the change")
+        void updateSystemSettings_persistsAndAudits() {
+            SystemSetting existing = SystemSetting.builder().loginAlertEmailEnabled(true).build();
+            when(systemSettingRepository.findById(SystemSetting.SINGLETON_ID)).thenReturn(Optional.of(existing));
+            when(systemSettingRepository.save(any(SystemSetting.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            var result = service.updateSystemSettings(false, actorId, "127.0.0.1", "JUnit");
+
+            assertThat(result.isLoginAlertEmailEnabled()).isFalse();
+            ArgumentCaptor<SystemSetting> captor = ArgumentCaptor.forClass(SystemSetting.class);
+            verify(systemSettingRepository).save(captor.capture());
+            assertThat(captor.getValue().isLoginAlertEmailEnabled()).isFalse();
+            verify(auditService).log(eq(actorId), eq("SYSTEM_SETTINGS_UPDATED"), eq("SYSTEM_SETTING"), isNull(), any(), any(), eq("127.0.0.1"), eq("JUnit"));
         }
     }
 }

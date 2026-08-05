@@ -45,6 +45,10 @@ export class HomePage extends BasePage {
     return this.page.getByTestId(TEST_IDS.home.budgetProgressCaption);
   }
 
+  get budgetSection(): Locator {
+    return this.page.getByTestId(TEST_IDS.home.budgetSection);
+  }
+
   periodToggle(mode: "month" | "year"): Locator {
     return this.page.getByTestId(TEST_IDS.home.periodToggle(mode));
   }

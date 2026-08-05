@@ -125,6 +125,33 @@ class UserServiceImplTest {
             UpdateProfileRequest req = mock(UpdateProfileRequest.class);
             assertThatThrownBy(() -> service.updateProfile(userId, req)).isInstanceOf(ResourceNotFoundException.class);
         }
+
+        @Test
+        @DisplayName("a non-null loginAlertEnabled overwrites the existing preference")
+        void appliesLoginAlertEnabled() {
+            User user = withId(User.builder().loginAlertEnabled(true).build());
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+            UpdateProfileRequest req = mock(UpdateProfileRequest.class);
+            when(req.getLoginAlertEnabled()).thenReturn(false);
+
+            service.updateProfile(userId, req);
+
+            assertThat(user.isLoginAlertEnabled()).isFalse();
+        }
+
+        @Test
+        @DisplayName("a null loginAlertEnabled leaves the existing preference untouched")
+        void ignoresNullLoginAlertEnabled() {
+            User user = withId(User.builder().loginAlertEnabled(false).build());
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+            UpdateProfileRequest req = mock(UpdateProfileRequest.class);
+
+            service.updateProfile(userId, req);
+
+            assertThat(user.isLoginAlertEnabled()).isFalse();
+        }
     }
 
     // ─── changePassword ──────────────────────────────────────────────────────────

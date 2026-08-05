@@ -229,7 +229,7 @@ export function AccountFormModal({
                   }}
                   testId="account-actual-balance-input" />
                 <p className="text-[11px] text-muted-foreground/70 text-center">
-                  Prefilled from the app — change it to match your {isCCForm || isLoanForm ? "statement" : "bank"} if they&apos;ve drifted apart.
+                  Prefilled from the app — change it to match your {isCCForm || isLoanForm ? "statement" : "bank"}{" "}if they&apos;ve drifted apart.
                 </p>
                 {actualBalance !== "" && !isNaN(editBalanceTarget) && editBalanceDiff !== 0 && (
                   <div className={cn("rounded-xl px-3 py-2 text-sm flex items-center justify-between",

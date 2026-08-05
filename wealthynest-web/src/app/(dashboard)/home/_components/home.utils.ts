@@ -65,6 +65,51 @@ export function getPaceForecast(
   return { amount: projected, pctVsAvg: ((projected - avg) / Math.abs(avg)) * 100 };
 }
 
+export interface CategoryDelta {
+  category:  string;
+  delta:     number;
+  /** True when `delta` is a pace-projected full-month estimate rather than a completed-month
+   * actual — callers word these two cases differently (a projection, not a settled fact). */
+  projected: boolean;
+}
+
+interface CategorySpendLike {
+  categoryId:   string;
+  categoryName: string;
+  amount:       number;
+}
+
+/** Category-level spend deltas vs. the prior period. Comparing a still-in-progress month's
+ * spend-so-far against a completed prior month is apples-to-oranges — early in the month every
+ * category looks "down" purely because fewer days have passed, not because of any real change in
+ * behavior. For the current month this pace-projects each category's month-to-date amount to a
+ * full-month estimate (same elapsed-day run-rate math as getPaceForecast) before comparing, and
+ * returns [] outright before day 7 — a single category's spend is lower-volume/noisier than total
+ * income/expenses, so it needs a few more data points than getPaceForecast's own day-5 gate before
+ * the projection is stable. A past (already-closed) month skips both the gate and the projection —
+ * both sides of the comparison are already complete, so the raw delta is already a valid fact. */
+export function getCategoryDeltaInsights(
+  current:  CategorySpendLike[],
+  previous: CategorySpendLike[],
+  opts: { isCurrentMonth: boolean; dayOfMonth: number; daysInMonth: number; avgMonthlySpend: number },
+): CategoryDelta[] {
+  const { isCurrentMonth, dayOfMonth, daysInMonth, avgMonthlySpend } = opts;
+  if (isCurrentMonth && dayOfMonth < 7) return [];
+
+  const projected = isCurrentMonth && daysInMonth > 0;
+  const prevMap    = new Map(previous.map(c => [c.categoryId, c.amount]));
+  const threshold  = Math.max(100, avgMonthlySpend * 0.05);
+
+  const deltas: CategoryDelta[] = [];
+  for (const c of current) {
+    const prev   = prevMap.get(c.categoryId) ?? 0;
+    const amount = projected ? (c.amount / dayOfMonth) * daysInMonth : c.amount;
+    const delta  = amount - prev;
+    if (Math.abs(delta) >= threshold) deltas.push({ category: c.categoryName, delta, projected });
+  }
+  return deltas.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).slice(0, 3);
+}
+
 export interface AnomalyInsight {
   title:   string;
   message: string;

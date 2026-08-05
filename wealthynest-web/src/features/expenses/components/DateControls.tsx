@@ -68,10 +68,10 @@ export function DateControls({ dateMode, setDateMode, year, setYear, month, setM
       {dateMode === "custom" && (
         <div className="flex items-center gap-3 flex-wrap">
           <div className="w-44">
-            <FormDatePicker label="From" value={customStart} onChange={setCustomStart} placeholder="Start date" />
+            <FormDatePicker label="From" testId="date-range-from" value={customStart} onChange={setCustomStart} placeholder="Start date" />
           </div>
           <div className="w-44">
-            <FormDatePicker label="To" value={customEnd} onChange={setCustomEnd} placeholder="End date" />
+            <FormDatePicker label="To" testId="date-range-to" value={customEnd} onChange={setCustomEnd} placeholder="End date" />
           </div>
           {customStart && customEnd && customEnd < customStart && (
             <p className="text-xs text-red-500 w-full">&quot;To&quot; date must be on or after &quot;From&quot; date.</p>
