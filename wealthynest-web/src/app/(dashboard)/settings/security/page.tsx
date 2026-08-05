@@ -117,13 +117,74 @@ function StatusPill({ on, children }: { on: boolean; children: React.ReactNode }
   );
 }
 
+// ─── Protection score — one glance instead of five status pills ────────────
+// Counts only the checks that actually apply to this session (e.g. skips the biometric check
+// entirely on a browser with no WebAuthn support) so a device that can't offer a given method
+// isn't penalized for it.
+function useProtectionScore() {
+  const { user } = useAuthStore();
+  const isNative = useIsNativePlatform();
+  const supported = useWebAuthnSupport();
+  const { data: nativeBiometric } = useNativeBiometricStatus();
+  const { data: passkeys = [] } = usePasskeys();
+
+  const pinOn = !!user?.pinEnabled;
+  const alertsOn = user?.loginAlertEnabled ?? true;
+  const biometricApplicable = isNative ? !!nativeBiometric?.available : supported;
+  const biometricOn = isNative ? !!nativeBiometric?.enabled : passkeys.length > 0;
+
+  const checks = [pinOn, alertsOn, ...(biometricApplicable ? [biometricOn] : [])];
+  const total = checks.length;
+  const enabledCount = checks.filter(Boolean).length;
+
+  return { percent: total ? Math.round((enabledCount / total) * 100) : 0, enabledCount, total };
+}
+
+function ProtectionRing({ percent }: { percent: number }) {
+  const r = 26;
+  const c = 2 * Math.PI * r;
+  return (
+    <div className="relative w-14 h-14 shrink-0">
+      <svg width="56" height="56" viewBox="0 0 56 56" className="-rotate-90">
+        <circle cx="28" cy="28" r={r} fill="none" strokeWidth="6" className="stroke-brand-500/15" />
+        <circle
+          cx="28" cy="28" r={r} fill="none" strokeWidth="6" strokeLinecap="round"
+          className="stroke-brand-500 transition-[stroke-dashoffset] duration-500 ease-out"
+          strokeDasharray={c} strokeDashoffset={c * (1 - percent / 100)}
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center text-[13px] font-bold text-foreground tabular-nums">
+        {percent}%
+      </div>
+    </div>
+  );
+}
+
+function ProtectionHero() {
+  const { percent, enabledCount, total } = useProtectionScore();
+  const label = percent === 100 ? "Fully protected" : percent >= 50 ? "Almost there" : "Add a layer of protection";
+  const copy = percent === 100
+    ? "PIN, fingerprint unlock, and sign-in alerts are all on for this account."
+    : `${enabledCount} of ${total} protections on — turn on the rest below.`;
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-4 flex items-center gap-4">
+      <div className="absolute inset-0 bg-gradient-to-br from-brand-500/10 to-transparent pointer-events-none" />
+      <ProtectionRing percent={percent} />
+      <div className="relative min-w-0">
+        <p className="text-sm font-bold text-foreground">{label}</p>
+        <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{copy}</p>
+      </div>
+    </div>
+  );
+}
+
 // ─── Unlock this device — PIN + fingerprint/passkey merged into one card ────
 // These used to be up to three separate always-rendered-or-null cards (PIN, web passkeys, native
 // biometric), and turning on native biometric used to leave a second, separate "enable passkey"
 // card asking for the same fingerprint a moment later. Grouping them (and putting this ahead of
-// the password form) puts the thing a phone user actually taps daily first; see BiometricRow's own
-// comment below for why native now shows at most one setup ask, with the passkey row appearing
-// only once there's something to manage.
+// the password form) puts the thing a phone user actually taps daily first; see FingerprintRow's
+// own comment below for why native now renders as a single row instead of two.
 
 function PinRow() {
   const { user } = useAuthStore();
@@ -153,7 +214,7 @@ function PinRow() {
 
   const closeSetup = () => { setShowSetup(false); setResetPassword(undefined); };
 
-  // Mirrors NativeBiometricRow/PasskeyRow's own toggle below — PIN used to be a tap-through link
+  // Mirrors FingerprintRow/PasskeyRow's own toggle below — PIN used to be a tap-through link
   // when off and an always-on switch when on, the one unlock method here that didn't behave like
   // its neighbors. Flipping it on can't just flip a boolean (a PIN has to actually be chosen), so
   // "on" opens the setup flow instead of enabling directly. Flipping it off no longer disables
@@ -194,33 +255,88 @@ function PinRow() {
   );
 }
 
-// Native only — a bare fingerprint/face toggle with nothing stored behind it (see the original
-// NativeBiometricSection's own reasoning, preserved here: this is a local re-proof on an
-// already-valid session, not a remote credential, so "enable" just confirms the device can pass a
-// biometric check and remembers that preference).
-function NativeBiometricRow() {
+// Native only — merges what used to be two rows (bare fingerprint app-lock toggle, plus a
+// separate "enable passkey" card for the same sensor) into one. Turning the toggle on both arms
+// local biometric app-lock AND auto-provisions the real WebAuthn credential Vault reveal/export
+// needs (see useEnableBiometricUnlock) — so there's one setup ask, not two. The credential itself
+// still needs a place to be managed (renamed, removed, a second device added), which is what the
+// "Manage" line below the toggle expands into — tucked away by default instead of rendered as its
+// own always-visible card, since most users never need it. If auto-provisioning was declined or
+// failed, that line still appears (toggle is on, but there's no passkey yet) with "Retry" instead
+// of "Manage", offering a manual way to finish setup for the exact same credential.
+function FingerprintRow() {
   const { data, isLoading } = useNativeBiometricStatus();
   const { mutate: enable, isPending: enabling } = useEnableBiometricUnlock();
   const { mutate: disable, isPending: disabling } = useDisableBiometricUnlock();
+  const supported = useWebAuthnSupport();
+  const { data: passkeys = [] } = usePasskeys();
+  const { mutate: deletePasskey } = useDeletePasskey();
+  const [showManage, setShowManage] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
 
   if (isLoading || !data?.available) return null;
 
+  const hasPasskey = passkeys.length > 0;
+  const canManage = supported && (data.enabled || hasPasskey);
+
   return (
-    <div className="flex items-center gap-3.5 px-4 py-4 min-h-[64px]">
-      <PremiumIcon icon={Fingerprint} tone={data.enabled ? "green" : "gray"} size="sm" />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-foreground flex items-center gap-2 flex-wrap">
-          Fingerprint &amp; face unlock
-          <StatusPill on={data.enabled}>{data.enabled ? "ENABLED" : "NOT SET UP"}</StatusPill>
-        </p>
-        <p className="text-xs text-muted-foreground mt-0.5">Unlock instantly — no typing needed</p>
+    <div>
+      <div className="flex items-center gap-3.5 px-4 py-4 min-h-[64px]">
+        <PremiumIcon icon={Fingerprint} tone={data.enabled ? "green" : "gray"} size="sm" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-foreground flex items-center gap-2 flex-wrap">
+            Fingerprint unlock
+            <StatusPill on={data.enabled}>{data.enabled ? "ENABLED" : "NOT SET UP"}</StatusPill>
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {data.enabled ? "Also unlocks Vault reveals & exports" : "Unlocks the app and Vault with one tap"}
+          </p>
+        </div>
+        <Toggle
+          checked={data.enabled}
+          disabled={enabling || disabling}
+          onChange={(v) => (v ? enable() : disable())}
+          testId={data.enabled ? "security-biometric-disable" : "security-biometric-enable-toggle"}
+        />
       </div>
-      <Toggle
-        checked={data.enabled}
-        disabled={enabling || disabling}
-        onChange={(v) => (v ? enable() : disable())}
-        testId={data.enabled ? "security-biometric-disable" : "security-biometric-enable-toggle"}
-      />
+
+      {canManage && (
+        <button
+          onClick={() => (hasPasskey ? setShowManage(v => !v) : setShowAdd(true))}
+          data-testid="security-biometric-manage-toggle"
+          className="w-full flex items-center justify-between gap-2 px-4 pb-3 sm:pl-[46px] text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <span>{hasPasskey ? `${passkeys.length} device${passkeys.length === 1 ? "" : "s"} added` : "Setup didn't finish on this device"}</span>
+          <span className="font-semibold text-brand-600 dark:text-brand-300">{hasPasskey ? (showManage ? "Hide" : "Manage") : "Retry"}</span>
+        </button>
+      )}
+
+      {showManage && hasPasskey && (
+        <div className="space-y-2 px-4 pb-3 sm:pl-[46px]">
+          {passkeys.map(p => (
+            <div key={p.id} className="flex items-center justify-between gap-3 bg-muted/40 rounded-xl px-3 py-2.5">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-foreground truncate">{p.nickname || "This device"}</p>
+                <p className="text-[11px] text-muted-foreground/70">
+                  Added {formatDate(p.createdAt)}{p.lastUsedAt ? ` · Last used ${formatDate(p.lastUsedAt)}` : ""}
+                </p>
+              </div>
+              <button onClick={() => deletePasskey(p.id)} title="Remove" data-testid="security-passkey-delete"
+                className="text-muted-foreground/60 hover:text-red-500 transition-colors shrink-0 p-2 -m-2 rounded-lg">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+          <button onClick={() => setShowAdd(true)} data-testid="security-passkey-add-toggle"
+            className="w-full h-9 rounded-xl text-xs font-medium bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 dark:text-brand-300 border border-brand-500/20 transition-colors">
+            Add another device
+          </button>
+        </div>
+      )}
+
+      {showAdd && (
+        <PasskeyAddModal enabled={hasPasskey} onClose={() => setShowAdd(false)} />
+      )}
     </div>
   );
 }
@@ -282,11 +398,6 @@ function PasskeyRow() {
   const { mutate: deletePasskey } = useDeletePasskey();
   const [showAdd, setShowAdd] = useState(false);
   const enabled = passkeys.length > 0;
-  // On native, NativeBiometricRow already covers "unlock instantly" for opening the app — this
-  // row's job there is the credential Vault reveal/export actually checks (VaultStepUpFields only
-  // accepts a real passkey, never the bare local BiometricPrompt), so the copy needs to say that
-  // instead of repeating NativeBiometricRow's pitch back at the user as if it were a duplicate.
-  const isNative = useIsNativePlatform();
 
   return (
     <div>
@@ -310,9 +421,7 @@ function PasskeyRow() {
             )}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {isNative
-              ? "Set up automatically when you turn on fingerprint unlock above — this is what Vault items and other sensitive actions check"
-              : "Unlock instantly with your fingerprint, face, or screen lock — no separate biometric setup, it's all part of the passkey"}
+            Unlock instantly with your fingerprint, face, or screen lock — no separate biometric setup, it&apos;s all part of the passkey
           </p>
         </div>
         <button onClick={() => setShowAdd(true)} data-testid="security-passkey-add-toggle"
@@ -347,28 +456,14 @@ function PasskeyRow() {
   );
 }
 
-// NativeBiometricRow is a local-only app-lock re-proof; PasskeyRow registers a real
-// server-verified credential — the only fingerprint-style option VaultStepUpFields accepts for
-// reveal/export (see its own comment for why bare native biometric isn't enough there). That
-// credential is now provisioned automatically the moment NativeBiometricRow's toggle is turned on
-// (see useEnableBiometricUnlock), so PasskeyRow no longer needs to appear as a second, separate
-// "set up your fingerprint" ask on native — it only surfaces once there's something to actually
-// manage: an existing passkey, or fingerprint unlock already on but still missing one (a
-// declined/failed auto-provision, surfaced here as a manual retry).
+// Native gets FingerprintRow (bare app-lock toggle + the WebAuthn credential it auto-provisions,
+// merged into one row — see FingerprintRow's own comment). Web/desktop has no native biometric
+// layer to merge into, so PasskeyRow renders standalone there, same as before.
 function BiometricRow() {
   const isNative = useIsNativePlatform();
   const supported = useWebAuthnSupport();
-  const { data: nativeBiometric } = useNativeBiometricStatus();
-  const { data: passkeys = [] } = usePasskeys();
 
-  if (isNative) {
-    return (
-      <>
-        <NativeBiometricRow />
-        {supported && (nativeBiometric?.enabled || passkeys.length > 0) && <PasskeyRow />}
-      </>
-    );
-  }
+  if (isNative) return <FingerprintRow />;
   if (!supported) return null;
   return <PasskeyRow />;
 }
@@ -760,6 +855,8 @@ export default function SecurityPage() {
       <Header title="Security" subtitle="Your account's protection, at a glance" />
       <PageWrapper>
         <div className="max-w-lg md:max-w-3xl mx-auto space-y-6">
+
+          <ProtectionHero />
 
           <UnlockMethodsCard />
 
