@@ -11,6 +11,8 @@ import {
   isBiometryError,
   isNativePlatform,
 } from "../utils/nativeBiometric";
+import {isWebAuthnSupported} from "../utils/webauthn";
+import {usePasskeys, useRegisterPasskey} from "./useAuth";
 
 const NATIVE_BIOMETRIC_QUERY_KEY = ["auth", "nativeBiometric"];
 
@@ -48,10 +50,25 @@ export function useNativeBiometricStatus() {
   });
 }
 
+/** Enabling local fingerprint app-lock also provisions the real WebAuthn credential Vault
+ * reveal/export requires (VaultServiceImpl's own class comment explains why the bare check above
+ * can't stand in for it — it proves nothing to the server). Without this, "Fingerprint & face
+ * unlock" would arm app-lock but silently leave Vault fingerprint unlock demanding a second,
+ * separate "enable passkey" tap for the exact same sensor a moment later — the redundant setup
+ * flow this replaces. Best-effort and silent: skipped when a passkey already exists or this device
+ * can't run a passkey ceremony, and a declined/failed ceremony still leaves local biometric app-lock
+ * enabled (SecurityPage's passkey row offers a manual retry either way). */
 export function useEnableBiometricUnlock() {
   const qc = useQueryClient();
+  const { data: passkeys } = usePasskeys();
+  const { mutateAsync: registerPasskey } = useRegisterPasskey();
   return useMutation({
-    mutationFn: enableBiometricUnlock,
+    mutationFn: async () => {
+      await enableBiometricUnlock();
+      if (!passkeys?.length && await isWebAuthnSupported()) {
+        await registerPasskey("This device").catch(() => {}); // useRegisterPasskey already toasts its own failure
+      }
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: NATIVE_BIOMETRIC_QUERY_KEY }),
     onError: (e: unknown) => {
       if (isBiometryError(e) && e.code === BiometryErrorType.userCancel) return; // user cancelled — silent

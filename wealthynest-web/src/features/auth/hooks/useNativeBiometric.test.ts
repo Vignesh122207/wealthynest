@@ -8,6 +8,8 @@ import {
   isNativePlatform, isBiometricHardwareAvailable, isBiometricUnlockEnabled,
   enableBiometricUnlock, disableBiometricUnlock, isBiometryError,
 } from "../utils/nativeBiometric";
+import { isWebAuthnSupported } from "../utils/webauthn";
+import { usePasskeys, useRegisterPasskey } from "./useAuth";
 import { toast } from "sonner";
 
 vi.mock("../utils/nativeBiometric", () => ({
@@ -19,6 +21,13 @@ vi.mock("../utils/nativeBiometric", () => ({
   disableBiometricUnlock: vi.fn(),
   isBiometryError: vi.fn(() => false),
 }));
+vi.mock("../utils/webauthn", () => ({
+  isWebAuthnSupported: vi.fn(() => Promise.resolve(false)),
+}));
+vi.mock("./useAuth", () => ({
+  usePasskeys: vi.fn(() => ({ data: [] })),
+  useRegisterPasskey: vi.fn(() => ({ mutateAsync: vi.fn() })),
+}));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const mockedIsNativePlatform = vi.mocked(isNativePlatform);
@@ -27,9 +36,15 @@ const mockedIsBiometricUnlockEnabled = vi.mocked(isBiometricUnlockEnabled);
 const mockedEnableBiometricUnlock = vi.mocked(enableBiometricUnlock);
 const mockedDisableBiometricUnlock = vi.mocked(disableBiometricUnlock);
 const mockedIsBiometryError = vi.mocked(isBiometryError);
+const mockedIsWebAuthnSupported = vi.mocked(isWebAuthnSupported);
+const mockedUsePasskeys = vi.mocked(usePasskeys);
+const mockedUseRegisterPasskey = vi.mocked(useRegisterPasskey);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockedIsWebAuthnSupported.mockResolvedValue(false);
+  mockedUsePasskeys.mockReturnValue({ data: [] } as unknown as ReturnType<typeof usePasskeys>);
+  mockedUseRegisterPasskey.mockReturnValue({ mutateAsync: vi.fn() } as unknown as ReturnType<typeof useRegisterPasskey>);
 });
 
 describe("useIsNativePlatform", () => {
@@ -98,6 +113,66 @@ describe("useEnableBiometricUnlock", () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(toast.error).toHaveBeenCalledWith("Couldn't enable fingerprint unlock");
+  });
+
+  it("also registers a passkey when this device supports one and the account has none yet", async () => {
+    mockedEnableBiometricUnlock.mockResolvedValue(undefined);
+    mockedIsWebAuthnSupported.mockResolvedValue(true);
+    mockedUsePasskeys.mockReturnValue({ data: [] } as unknown as ReturnType<typeof usePasskeys>);
+    const registerPasskey = vi.fn().mockResolvedValue(undefined);
+    mockedUseRegisterPasskey.mockReturnValue({ mutateAsync: registerPasskey } as unknown as ReturnType<typeof useRegisterPasskey>);
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useEnableBiometricUnlock(), { wrapper: Wrapper });
+    act(() => { result.current.mutate(); });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(registerPasskey).toHaveBeenCalledWith("This device");
+  });
+
+  it("skips passkey registration when a passkey is already registered", async () => {
+    mockedEnableBiometricUnlock.mockResolvedValue(undefined);
+    mockedIsWebAuthnSupported.mockResolvedValue(true);
+    mockedUsePasskeys.mockReturnValue({ data: [{ id: "1" }] } as unknown as ReturnType<typeof usePasskeys>);
+    const registerPasskey = vi.fn().mockResolvedValue(undefined);
+    mockedUseRegisterPasskey.mockReturnValue({ mutateAsync: registerPasskey } as unknown as ReturnType<typeof useRegisterPasskey>);
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useEnableBiometricUnlock(), { wrapper: Wrapper });
+    act(() => { result.current.mutate(); });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(registerPasskey).not.toHaveBeenCalled();
+  });
+
+  it("skips passkey registration when this device can't run a passkey ceremony", async () => {
+    mockedEnableBiometricUnlock.mockResolvedValue(undefined);
+    mockedIsWebAuthnSupported.mockResolvedValue(false);
+    mockedUsePasskeys.mockReturnValue({ data: [] } as unknown as ReturnType<typeof usePasskeys>);
+    const registerPasskey = vi.fn().mockResolvedValue(undefined);
+    mockedUseRegisterPasskey.mockReturnValue({ mutateAsync: registerPasskey } as unknown as ReturnType<typeof useRegisterPasskey>);
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useEnableBiometricUnlock(), { wrapper: Wrapper });
+    act(() => { result.current.mutate(); });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(registerPasskey).not.toHaveBeenCalled();
+  });
+
+  it("still succeeds locally when the auto-provisioned passkey registration fails", async () => {
+    mockedEnableBiometricUnlock.mockResolvedValue(undefined);
+    mockedIsWebAuthnSupported.mockResolvedValue(true);
+    mockedUsePasskeys.mockReturnValue({ data: [] } as unknown as ReturnType<typeof usePasskeys>);
+    const registerPasskey = vi.fn().mockRejectedValue(new Error("declined"));
+    mockedUseRegisterPasskey.mockReturnValue({ mutateAsync: registerPasskey } as unknown as ReturnType<typeof useRegisterPasskey>);
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useEnableBiometricUnlock(), { wrapper: Wrapper });
+    act(() => { result.current.mutate(); });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(toast.error).not.toHaveBeenCalledWith("Couldn't enable fingerprint unlock");
   });
 });
 

@@ -119,10 +119,11 @@ function StatusPill({ on, children }: { on: boolean; children: React.ReactNode }
 
 // ─── Unlock this device — PIN + fingerprint/passkey merged into one card ────
 // These used to be up to three separate always-rendered-or-null cards (PIN, web passkeys, native
-// biometric). On any given device only one of the latter two can ever actually render — a phone
-// gets native biometric, a browser gets passkeys, never both — so the old 3-card layout was
-// scaffolding for a case that never happens on screen. Grouping them (and putting this ahead of
-// the password form) puts the thing a phone user actually taps daily first.
+// biometric), and turning on native biometric used to leave a second, separate "enable passkey"
+// card asking for the same fingerprint a moment later. Grouping them (and putting this ahead of
+// the password form) puts the thing a phone user actually taps daily first; see BiometricRow's own
+// comment below for why native now shows at most one setup ask, with the passkey row appearing
+// only once there's something to manage.
 
 function PinRow() {
   const { user } = useAuthStore();
@@ -310,7 +311,7 @@ function PasskeyRow() {
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
             {isNative
-              ? "Required to unlock Vault items and other sensitive actions with your fingerprint — separate from the app unlock toggle above"
+              ? "Set up automatically when you turn on fingerprint unlock above — this is what Vault items and other sensitive actions check"
               : "Unlock instantly with your fingerprint, face, or screen lock — no separate biometric setup, it's all part of the passkey"}
           </p>
         </div>
@@ -346,23 +347,25 @@ function PasskeyRow() {
   );
 }
 
-// AppLockScreen deliberately offers only one biometric CTA at a time (native BiometricPrompt and
-// a passkey both claim the same physical sensor for that single "unlock the lock screen" action),
-// but that doesn't hold here: NativeBiometricRow is a local-only app-lock re-proof, while
-// PasskeyRow registers a real server-verified credential — the only fingerprint-style option
-// VaultStepUpFields accepts for reveal/export (see its own comment for why bare native biometric
-// isn't enough there). Gating PasskeyRow out entirely on native left Android with no way to ever
-// register a passkey, which made the vault's "Use passkey instead" option permanently unreachable
-// there — so both rows render on native, each gated on its own availability check.
+// NativeBiometricRow is a local-only app-lock re-proof; PasskeyRow registers a real
+// server-verified credential — the only fingerprint-style option VaultStepUpFields accepts for
+// reveal/export (see its own comment for why bare native biometric isn't enough there). That
+// credential is now provisioned automatically the moment NativeBiometricRow's toggle is turned on
+// (see useEnableBiometricUnlock), so PasskeyRow no longer needs to appear as a second, separate
+// "set up your fingerprint" ask on native — it only surfaces once there's something to actually
+// manage: an existing passkey, or fingerprint unlock already on but still missing one (a
+// declined/failed auto-provision, surfaced here as a manual retry).
 function BiometricRow() {
   const isNative = useIsNativePlatform();
   const supported = useWebAuthnSupport();
+  const { data: nativeBiometric } = useNativeBiometricStatus();
+  const { data: passkeys = [] } = usePasskeys();
 
   if (isNative) {
     return (
       <>
         <NativeBiometricRow />
-        {supported && <PasskeyRow />}
+        {supported && (nativeBiometric?.enabled || passkeys.length > 0) && <PasskeyRow />}
       </>
     );
   }
