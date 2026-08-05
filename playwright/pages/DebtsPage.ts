@@ -72,6 +72,16 @@ export class DebtsPage extends BasePage {
     await this.card(contactName).click();
   }
 
+  async editDebtAmount(contactName: string, newAmount: number): Promise<void> {
+    await this.editDebt(contactName);
+    await this.page.getByTestId("debt-amount-input").fill(String(newAmount));
+    await Promise.all([
+      waitForApiResponse(this.page, "/debts", "PUT"),
+      this.page.getByTestId("debt-form-submit").click(),
+    ]);
+    await waitForDialogClosed(this.page);
+  }
+
   async deleteDebt(contactName: string): Promise<void> {
     await this.editDebt(contactName);
     await this.page.getByRole("button", { name: "Delete", exact: true }).click();
@@ -96,5 +106,13 @@ export class DebtsPage extends BasePage {
 
   async expectValidationError(text: string | RegExp): Promise<void> {
     await expect(this.page.getByText(text)).toBeVisible();
+  }
+
+  /** Opens the payment modal and submits an amount over the remaining balance — no network wait,
+   * since PaymentModal's own client-side check should block the submit before any request fires. */
+  async attemptOverpay(contactName: string, amount: number): Promise<void> {
+    await this.card(contactName).getByTestId("debt-card-pay-button").click();
+    await this.page.getByTestId("debt-payment-amount-input").fill(String(amount));
+    await this.page.getByTestId("debt-payment-submit").click();
   }
 }

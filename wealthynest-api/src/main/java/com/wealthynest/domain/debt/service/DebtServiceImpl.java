@@ -134,6 +134,15 @@ public class DebtServiceImpl implements DebtService {
                     transferRepository.save(t);
                 });
             }
+            // Editing the amount can change which side of "fully paid" the debt is on in either
+            // direction — raising it can un-settle an already-SETTLED debt (it now has a real
+            // positive remaining, but a settled debt's Pay Back action is hidden client-side, so
+            // there'd be no way to ever pay that off), and lowering it below what's already been
+            // recorded as amountSettled should settle it, not leave status stuck on PARTIAL/ACTIVE
+            // forever with a permanently-unusable Pay Back button (any positive payment would
+            // exceed the — now negative — remaining balance recordPayment validates against).
+            // Never touched status before; this keeps it honest relative to the real numbers.
+            record.setStatus(computeStatus(record.getAmount(), record.getAmountSettled()));
         }
 
         return toResponse(debtRecordRepository.save(record));
@@ -194,6 +203,14 @@ public class DebtServiceImpl implements DebtService {
         record.setAmountSettled(settled);
         record.setStatus(settled.compareTo(record.getAmount()) >= 0 ? DebtStatus.SETTLED : DebtStatus.PARTIAL);
         return toResponse(debtRecordRepository.save(record));
+    }
+
+    /** Same ACTIVE/PARTIAL/SETTLED boundary recordPayment already applies after a payment —
+     * factored out so update() can re-derive it after an amount edit too, since that can move
+     * a debt across the same boundary in either direction. */
+    private DebtStatus computeStatus(BigDecimal amount, BigDecimal amountSettled) {
+        if (amountSettled.compareTo(BigDecimal.ZERO) <= 0) return DebtStatus.ACTIVE;
+        return amountSettled.compareTo(amount) >= 0 ? DebtStatus.SETTLED : DebtStatus.PARTIAL;
     }
 
     @Override

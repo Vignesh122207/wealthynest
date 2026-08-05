@@ -43,7 +43,12 @@ public class GoalServiceImpl implements GoalService {
     @Transactional
     public GoalResponse create(UUID userId, UUID familyId, CreateGoalRequest req) {
         BigDecimal saved = req.getSavedAmount() != null ? req.getSavedAmount() : BigDecimal.ZERO;
-        if (saved.compareTo(req.getTargetAmount()) > 0)
+        // A linked goal's saved amount is just a snapshot of the account's balance at link time —
+        // toResponse() always re-derives the *displayed* figure live from the account afterwards,
+        // so this stored value isn't authoritative once linked, and the account can perfectly
+        // validly already hold more than the goal's target (the goal simply starts complete).
+        // Only an unlinked, manually-tracked goal needs this cap on what a user can type in.
+        if (req.getAccountId() == null && saved.compareTo(req.getTargetAmount()) > 0)
             throw new BusinessException("Amount already saved cannot exceed the target amount", HttpStatus.BAD_REQUEST);
         accountOwnershipGuard.validateAccountOwnership(req.getAccountId(), userId);
 
@@ -72,9 +77,15 @@ public class GoalServiceImpl implements GoalService {
         if (req.getIcon()         != null) goal.setIcon(req.getIcon());
         if (req.getColor()        != null) goal.setColor(req.getColor());
         if (req.getTargetAmount() != null) goal.setTargetAmount(req.getTargetAmount());
+        // Same "linked goals aren't capped" reasoning as create() above — accountId/unlinkAccount
+        // arrive in this same request when (un)linking happens alongside a savedAmount edit (see
+        // GoalsPage.onUpdateSubmit), so this has to look at where the goal is *ending up* linked,
+        // not just goal.getAccountId()'s pre-update value.
+        boolean willBeLinked = !Boolean.TRUE.equals(req.getUnlinkAccount())
+            && (req.getAccountId() != null || goal.getAccountId() != null);
         if (req.getSavedAmount()  != null) {
             BigDecimal target = req.getTargetAmount() != null ? req.getTargetAmount() : goal.getTargetAmount();
-            if (req.getSavedAmount().compareTo(target) > 0)
+            if (!willBeLinked && req.getSavedAmount().compareTo(target) > 0)
                 throw new BusinessException("Amount saved cannot exceed the target amount", HttpStatus.BAD_REQUEST);
             goal.setSavedAmount(req.getSavedAmount());
         }

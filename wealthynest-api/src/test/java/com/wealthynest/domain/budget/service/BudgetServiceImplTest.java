@@ -1,6 +1,7 @@
 package com.wealthynest.domain.budget.service;
 
 import com.wealthynest.common.exception.AccessDeniedException;
+import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.domain.budget.dto.request.CreateBudgetRequest;
 import com.wealthynest.domain.budget.dto.request.UpdateBudgetRequest;
@@ -507,6 +508,69 @@ class BudgetServiceImplTest {
             assertThatThrownBy(() -> service.updateBudget(budgetId, userId, null, request))
                     .isInstanceOf(AccessDeniedException.class);
             verify(budgetRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("throws BusinessException and never saves when the new category already has a budget of the same type")
+        void categoryChangeToOneAlreadyTakenByAnotherBudgetOfSameTypeRejected() {
+            // Regression: updateBudget used to reassign categoryId with no uniqueness check at
+            // all, unlike createOrUpdateBudget's own findByCategoryIdAndBudgetType upsert lookup —
+            // retargeting an existing budget onto a category that already had a MONTHLY budget
+            // silently produced two live MONTHLY rows for that category, each independently
+            // tracking (and double-counting) the same expenses.
+            UUID newCategoryId = UUID.randomUUID();
+            UUID otherBudgetId = UUID.randomUUID();
+            Budget budget = buildBudget(userId, null, BudgetType.MONTHLY, new BigDecimal("100"), new BigDecimal("80"));
+            Budget conflicting = Budget.builder()
+                    .userId(userId).categoryId(newCategoryId).budgetType(BudgetType.MONTHLY)
+                    .amount(new BigDecimal("200")).periodMonth(0).periodYear(0).build();
+            ReflectionTestUtils.setField(conflicting, "id", otherBudgetId);
+            when(budgetRepository.findById(budgetId)).thenReturn(Optional.of(budget));
+            when(budgetRepository.findByUserIdAndCategoryIdAndBudgetType(userId, newCategoryId, BudgetType.MONTHLY))
+                    .thenReturn(Optional.of(conflicting));
+            UpdateBudgetRequest request = updateRequest(null, null, newCategoryId);
+
+            assertThatThrownBy(() -> service.updateBudget(budgetId, userId, null, request))
+                    .isInstanceOf(BusinessException.class);
+            verify(budgetRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("changing categoryId to one with a budget of a DIFFERENT type is not a conflict")
+        void categoryChangeToOneTakenByOtherTypeAllowed() {
+            UUID newCategoryId = UUID.randomUUID();
+            Budget budget = buildBudget(userId, null, BudgetType.MONTHLY, new BigDecimal("100"), new BigDecimal("80"));
+            when(budgetRepository.findById(budgetId)).thenReturn(Optional.of(budget));
+            when(budgetRepository.save(any(Budget.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(categoryRepository.findById(any())).thenReturn(Optional.of(buildCategory()));
+            when(expenseRepository.sumByUserCategoryAndMonth(any(), any(), anyInt(), anyInt())).thenReturn(BigDecimal.ZERO);
+            when(expenseRepository.sumByUserCategoryAndYear(any(), any(), anyInt())).thenReturn(BigDecimal.ZERO);
+            // findByUserIdAndCategoryIdAndBudgetType(..., MONTHLY) is only ever asked about the
+            // *same* budgetType being edited — a YEARLY budget on newCategoryId (if any) is a
+            // different Optional this test never stubs, defaulting to empty, which is the point.
+            UpdateBudgetRequest request = updateRequest(null, null, newCategoryId);
+
+            service.updateBudget(budgetId, userId, null, request);
+
+            ArgumentCaptor<Budget> saved = ArgumentCaptor.forClass(Budget.class);
+            verify(budgetRepository).save(saved.capture());
+            assertThat(saved.getValue().getCategoryId()).isEqualTo(newCategoryId);
+        }
+
+        @Test
+        @DisplayName("a conflicting budget that is this SAME budget row (categoryId unchanged) is not treated as a conflict")
+        void noConflictWhenConflictIsSelf() {
+            Budget budget = buildBudget(userId, null, BudgetType.MONTHLY, new BigDecimal("100"), new BigDecimal("80"));
+            when(budgetRepository.findById(budgetId)).thenReturn(Optional.of(budget));
+            when(budgetRepository.save(any(Budget.class))).thenAnswer(inv -> inv.getArgument(0));
+            // categoryId in the request equals the budget's own current categoryId -> the
+            // "!equals(budget.getCategoryId())" guard should skip the conflict lookup entirely.
+            UpdateBudgetRequest request = updateRequest(new BigDecimal("500"), null, categoryId);
+
+            service.updateBudget(budgetId, userId, null, request);
+
+            verify(budgetRepository, never()).findByUserIdAndCategoryIdAndBudgetType(any(), any(), any());
+            verify(budgetRepository).save(any(Budget.class));
         }
     }
 

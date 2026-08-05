@@ -284,6 +284,61 @@ class DebtServiceImplTest {
 
             verify(transferRepository, never()).findById(any());
         }
+
+        // Regression: update() used to leave `status` completely untouched after an amount edit,
+        // so it could drift arbitrarily far from the true amount/amountSettled relationship —
+        // either a SETTLED debt silently gaining a real positive remaining with no way to pay it
+        // off (Pay Back is hidden client-side once settled), or a PARTIAL/ACTIVE debt stuck
+        // forever with 0 real remaining and a Pay Back button that always 400s (any positive
+        // payment exceeds the now-negative unfloored remaining recordPayment validates against).
+
+        @Test
+        @DisplayName("raising the amount above amountSettled un-settles an already-SETTLED debt")
+        void raisingAmountUnsettlesSettledDebt() {
+            DebtRecord record = withId(baseRecord()
+                    .amount(new BigDecimal("1000")).amountSettled(new BigDecimal("1000"))
+                    .status(DebtStatus.SETTLED).build());
+            when(debtRecordRepository.findByIdAndUserId(debtId, userId)).thenReturn(Optional.of(record));
+            stubSaveEcho();
+            stubEmptyPaymentsAndTransfer();
+            UpdateDebtRequest req = updateRequest(null, null, new BigDecimal("1500"), null);
+
+            service.update(debtId, userId, req);
+
+            assertThat(record.getStatus()).isEqualTo(DebtStatus.PARTIAL);
+        }
+
+        @Test
+        @DisplayName("lowering the amount to/below amountSettled settles a PARTIAL debt instead of leaving it stuck")
+        void loweringAmountBelowSettledSettlesDebt() {
+            DebtRecord record = withId(baseRecord()
+                    .amount(new BigDecimal("1000")).amountSettled(new BigDecimal("600"))
+                    .status(DebtStatus.PARTIAL).build());
+            when(debtRecordRepository.findByIdAndUserId(debtId, userId)).thenReturn(Optional.of(record));
+            stubSaveEcho();
+            stubEmptyPaymentsAndTransfer();
+            UpdateDebtRequest req = updateRequest(null, null, new BigDecimal("500"), null);
+
+            service.update(debtId, userId, req);
+
+            assertThat(record.getStatus()).isEqualTo(DebtStatus.SETTLED);
+        }
+
+        @Test
+        @DisplayName("changing the amount on a debt with no payments yet keeps status ACTIVE")
+        void amountChangeWithNoPaymentsStaysActive() {
+            DebtRecord record = withId(baseRecord()
+                    .amount(new BigDecimal("1000")).amountSettled(BigDecimal.ZERO)
+                    .status(DebtStatus.ACTIVE).build());
+            when(debtRecordRepository.findByIdAndUserId(debtId, userId)).thenReturn(Optional.of(record));
+            stubSaveEcho();
+            stubEmptyPaymentsAndTransfer();
+            UpdateDebtRequest req = updateRequest(null, null, new BigDecimal("2000"), null);
+
+            service.update(debtId, userId, req);
+
+            assertThat(record.getStatus()).isEqualTo(DebtStatus.ACTIVE);
+        }
     }
 
     // ─── recordPayment ───────────────────────────────────────────────────────────

@@ -143,4 +143,17 @@ export class BudgetsPage extends BasePage {
     await this.page.getByTestId(TEST_IDS.budgetForm.categoryPickerTrigger).click();
     await expect(this.page.getByTestId(TEST_IDS.budgetForm.categoryPickerPanel).getByText(categoryName, { exact: true })).toHaveCount(0);
   }
+
+  /** Same invariant as expectCategoryNotInCreatePicker, but for BudgetDetailModal's edit-form
+   * picker — opened against some *other* budget (editingCategoryName) so the picker actually
+   * offers a choice; taken categories must not appear there either. */
+  async expectCategoryNotInEditPicker(editingCategoryName: string, takenCategoryName: string): Promise<void> {
+    await this.openEditByCategory(editingCategoryName);
+    await this.page.getByTestId("budget-edit-category-picker-trigger").click();
+    await expect(this.page.getByTestId("budget-edit-category-picker-panel").getByText(takenCategoryName, { exact: true })).toHaveCount(0);
+  }
+
+  async expectAnnualSpent(text: string): Promise<void> {
+    await expect(this.page.getByTestId("budget-annual-spent")).toHaveText(text);
+  }
 }

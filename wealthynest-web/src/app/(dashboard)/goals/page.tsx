@@ -1,7 +1,7 @@
 "use client";
 
 import {useMemo, useState} from "react";
-import {ChevronDown, ChevronUp, Plus, Target, Trophy} from "lucide-react";
+import {ChevronDown, ChevronUp, Pause, Plus, Target, Trophy} from "lucide-react";
 import {Header} from "@/components/layout/Header";
 import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
 import {EmptyState} from "@/components/shared/EmptyState";
@@ -27,6 +27,7 @@ export default function GoalsPage() {
   const [unlinkGoalId, setUnlinkGoalId] = useState<string | null>(null);
   const [savingsGoal,  setSavingsGoal]  = useState<Goal | null>(null);
   const [showDone,     setShowDone]     = useState(false);
+  const [showPaused,   setShowPaused]   = useState(false);
 
   const { data: goals = [], isLoading, isError, refetch } = useGoals();
   const { mutate: createGoal, isPending: creating } = useCreateGoal();
@@ -56,7 +57,12 @@ export default function GoalsPage() {
     return complete ? "#34C759" : GOAL_COLORS[(colorIndex.get(g.id) ?? 0) % GOAL_COLORS.length];
   };
 
-  const activeGoals    = sorted.filter(g => g.savedAmount < g.targetAmount);
+  // Paused-but-incomplete goals get their own section (like Completed Goals' own collapsible
+  // section below) instead of sitting inline within Active Goals distinguished only by a small
+  // badge — easy to miss in a longer list, and the whole point of pausing is that it's not
+  // something you're actively working toward right now.
+  const activeGoals    = sorted.filter(g => g.savedAmount < g.targetAmount && !g.paused);
+  const pausedGoals    = sorted.filter(g => g.savedAmount < g.targetAmount && g.paused);
   const completedGoals = sorted.filter(g => g.savedAmount >= g.targetAmount);
 
   const totalTarget    = goals.reduce((s, g) => s + g.targetAmount, 0);
@@ -181,7 +187,7 @@ export default function GoalsPage() {
         ) : (
           <>
             {/* Urgency legend */}
-            {activeGoals.length > 0 && (
+            {(activeGoals.length > 0 || pausedGoals.length > 0) && (
               <div className="flex items-center gap-4 text-[11px] text-muted-foreground flex-wrap">
                 <span className="font-medium text-foreground/50 uppercase tracking-wide text-xs">Urgency:</span>
                 <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500 shrink-0" /> Overdue / &lt;30 days</span>
@@ -204,6 +210,33 @@ export default function GoalsPage() {
                       onAddSavings={() => setSavingsGoal(g)} />
                   ))}
                 </div>
+              </section>
+            )}
+
+            {pausedGoals.length > 0 && (
+              <section>
+                <button onClick={() => setShowPaused(v => !v)}
+                  className="flex items-center gap-2 mb-3 group w-full">
+                  <Pause className="w-4 h-4 text-muted-foreground" />
+                  <h2 className="text-sm font-semibold text-foreground group-hover:text-foreground/80 transition-colors">
+                    Paused Goals
+                  </h2>
+                  <span className="text-xs text-muted-foreground">{pausedGoals.length}</span>
+                  <div className="ml-auto">
+                    {showPaused
+                      ? <ChevronUp   className="w-3.5 h-3.5 text-muted-foreground" />
+                      : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
+                  </div>
+                </button>
+                {showPaused && (
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    {pausedGoals.map(g => (
+                      <GoalCard key={g.id} goal={g} goalColor={colorFor(g)}
+                        onEdit={() => { setShowCreate(false); setEditGoal(g); }}
+                        onAddSavings={() => setSavingsGoal(g)} />
+                    ))}
+                  </div>
+                )}
               </section>
             )}
 

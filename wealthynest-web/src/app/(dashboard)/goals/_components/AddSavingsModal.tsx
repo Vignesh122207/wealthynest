@@ -27,10 +27,17 @@ export function AddSavingsModal({ goal, goalColor, onClose }: { goal: Goal; goal
       setError(`Cannot withdraw more than ${formatCurrency(goal.savedAmount)} saved.`);
       return;
     }
+    // Reject rather than silently cap at the target — this used to clamp newSaved to
+    // goal.targetAmount with no feedback, so entering more than what's actually needed just
+    // dropped the excess with no indication only part of it was applied. The "Full" quick-fill
+    // button above already covers "add exactly what's left", so this only fires when someone
+    // types more than that on purpose.
+    if (mode === "add" && n > remaining) {
+      setError(`This goal only needs ${formatCurrency(remaining)} more to reach its target.`);
+      return;
+    }
     setError("");
-    const newSaved = mode === "add"
-      ? Math.min(goal.targetAmount, goal.savedAmount + n)
-      : Math.max(0, goal.savedAmount - n);
+    const newSaved = mode === "add" ? goal.savedAmount + n : Math.max(0, goal.savedAmount - n);
     updateGoal({ id: goal.id, payload: { savedAmount: newSaved } }, { onSuccess: onClose });
   };
 
