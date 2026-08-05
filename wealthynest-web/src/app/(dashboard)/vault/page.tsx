@@ -98,7 +98,8 @@ export default function VaultPage() {
     return list.filter(i =>
       i.title.toLowerCase().includes(q) ||
       i.username?.toLowerCase().includes(q) ||
-      i.category?.toLowerCase().includes(q));
+      i.category?.toLowerCase().includes(q) ||
+      i.url?.toLowerCase().includes(q));
   }, [items, search, typeFilter]);
 
   const loginCount    = items.filter(i => i.itemType === "LOGIN").length;
@@ -134,6 +135,10 @@ export default function VaultPage() {
 
       {showCreate && (
         <VaultItemForm isCreate accentColor={VAULT_BRASS}
+          // Defaults to whatever type the active tab implies (e.g. opening the FAB from the Notes
+          // tab starts a Secure Note instead of always defaulting to Login) — LOGIN/Favorites/All
+          // still default to LOGIN, matching the prior behavior.
+          defaultValues={{ itemType: typeFilter === "NOTE" ? "SECURE_NOTE" : "LOGIN" }}
           onSubmit={onCreateSubmit} onCancel={() => setShowCreate(false)} isPending={creating} />
       )}
 

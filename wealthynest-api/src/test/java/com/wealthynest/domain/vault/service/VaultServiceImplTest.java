@@ -97,6 +97,12 @@ class VaultServiceImplTest {
         return req;
     }
 
+    private VaultItemRequest noteRequest(String secret) {
+        VaultItemRequest req = request(secret);
+        ReflectionTestUtils.setField(req, "itemType", VaultItemType.SECURE_NOTE);
+        return req;
+    }
+
     // ─── createItem ──────────────────────────────────────────────────────────────
 
     @Test
@@ -167,6 +173,34 @@ class VaultServiceImplTest {
         assertThat(captor.getValue().getBreachCount()).isNull();
         assertThat(captor.getValue().getStrengthLevel()).isGreaterThan(1);
         verifyNoInteractions(hibpClient);
+    }
+
+    @Test
+    @DisplayName("createItem never computes secretHash/strengthLevel/breachCount for a SECURE_NOTE — a note's content isn't a credential")
+    void createItemSkipsHealthForSecureNote() {
+        when(vaultEncryptionService.encrypt(anyString())).thenReturn(new VaultEncryptionService.EncryptedSecret("ct", "iv", 1));
+        when(vaultItemRepository.save(any(VaultItem.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
+
+        service.createItem(userId, noteRequest("Meeting notes: call John Tuesday at 3pm"));
+
+        ArgumentCaptor<VaultItem> captor = ArgumentCaptor.forClass(VaultItem.class);
+        verify(vaultItemRepository).save(captor.capture());
+        assertThat(captor.getValue().getSecretHash()).isNull();
+        assertThat(captor.getValue().getStrengthLevel()).isNull();
+        assertThat(captor.getValue().getBreachCount()).isNull();
+        verifyNoInteractions(hibpClient, vaultSecretHasher);
+    }
+
+    @Test
+    @DisplayName("createItem rejects a non-blank totpSecret on a SECURE_NOTE")
+    void createItemRejectsTotpOnSecureNote() {
+        VaultItemRequest req = noteRequest("some note");
+        ReflectionTestUtils.setField(req, "totpSecret", "JBSWY3DPEHPK3PXP");
+
+        assertThatThrownBy(() -> service.createItem(userId, req))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("only supported for logins");
+        verifyNoInteractions(vaultItemRepository, vaultEncryptionService);
     }
 
     // ─── updateItem ──────────────────────────────────────────────────────────────
@@ -269,6 +303,69 @@ class VaultServiceImplTest {
 
             assertThat(item.getTotpCiphertext()).isEqualTo("totp-ct");
             assertThat(item.getTotpIv()).isEqualTo("totp-iv");
+        }
+
+        @Test
+        @DisplayName("rejects a non-blank totpSecret when the item is (or is becoming) a SECURE_NOTE")
+        void rejectsTotpOnSecureNote() {
+            VaultItemRequest req = noteRequest(null);
+            ReflectionTestUtils.setField(req, "totpSecret", "JBSWY3DPEHPK3PXP");
+
+            assertThatThrownBy(() -> service.updateItem(itemId, userId, req))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("only supported for logins");
+            verifyNoInteractions(vaultItemRepository, vaultEncryptionService);
+        }
+
+        @Test
+        @DisplayName("never computes health for a SECURE_NOTE even when it gets a new secret")
+        void skipsHealthForSecureNoteWithNewSecret() {
+            VaultItem item = withId(VaultItem.builder().userId(userId).itemType(VaultItemType.SECURE_NOTE)
+                    .secretCiphertext("old-ct").secretIv("old-iv").build());
+            when(vaultItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+            when(vaultItemRepository.save(any(VaultItem.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(vaultEncryptionService.encrypt(anyString())).thenReturn(new VaultEncryptionService.EncryptedSecret("ct", "iv", 1));
+
+            service.updateItem(itemId, userId, noteRequest("Updated note body"));
+
+            assertThat(item.getSecretHash()).isNull();
+            assertThat(item.getStrengthLevel()).isNull();
+            assertThat(item.getBreachCount()).isNull();
+            verifyNoInteractions(hibpClient, vaultSecretHasher);
+        }
+
+        @Test
+        @DisplayName("clears stale health fields when an existing LOGIN item is changed to a SECURE_NOTE")
+        void clearsHealthWhenFlippedFromLoginToNote() {
+            VaultItem item = withId(VaultItem.builder().userId(userId).itemType(VaultItemType.LOGIN)
+                    .secretCiphertext("old-ct").secretIv("old-iv")
+                    .secretHash("stale-hash").strengthLevel(0).breachCount(3).build());
+            when(vaultItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+            when(vaultItemRepository.save(any(VaultItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            // No new secret supplied — just relabeling the item's type, which alone must still
+            // clear the old password's leftover weak/breached/reused flags.
+            service.updateItem(itemId, userId, noteRequest(null));
+
+            assertThat(item.getSecretHash()).isNull();
+            assertThat(item.getStrengthLevel()).isNull();
+            assertThat(item.getBreachCount()).isNull();
+        }
+
+        @Test
+        @DisplayName("computes fresh health when an existing SECURE_NOTE is changed to a LOGIN with a new secret")
+        void computesHealthWhenFlippedFromNoteToLogin() {
+            VaultItem item = withId(VaultItem.builder().userId(userId).itemType(VaultItemType.SECURE_NOTE)
+                    .secretCiphertext("old-ct").secretIv("old-iv").build());
+            when(vaultItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+            when(vaultItemRepository.save(any(VaultItem.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(vaultEncryptionService.encrypt(anyString())).thenReturn(new VaultEncryptionService.EncryptedSecret("ct", "iv", 1));
+            when(vaultSecretHasher.hash("s3cret")).thenReturn("deadbeef");
+
+            service.updateItem(itemId, userId, request("s3cret"));
+
+            assertThat(item.getSecretHash()).isEqualTo("deadbeef");
+            assertThat(item.getStrengthLevel()).isNotNull();
         }
     }
 
@@ -377,7 +474,7 @@ class VaultServiceImplTest {
         void validStepUpTokenSkipsPasswordCheck() {
             RevealVaultItemRequest req = new RevealVaultItemRequest();
             ReflectionTestUtils.setField(req, "stepUpToken", "trusted-token");
-            when(valueOperations.get("vault-stepup:" + userId)).thenReturn("trusted-token");
+            when(valueOperations.get("vault-stepup:reveal:" + userId)).thenReturn("trusted-token");
             when(vaultEncryptionService.decrypt("ct", "iv", 1)).thenReturn("plaintext-secret");
             when(vaultItemRepository.save(any(VaultItem.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -385,6 +482,78 @@ class VaultServiceImplTest {
 
             assertThat(response.getSecret()).isEqualTo("plaintext-secret");
             verifyNoInteractions(userRepository, passwordEncoder);
+        }
+
+        @Test
+        @DisplayName("a trust token issued by a prior reveal is scoped to \"reveal\" and does not satisfy export's step-up")
+        void revealScopedTokenDoesNotSatisfyExport() {
+            when(valueOperations.get(anyString())).thenReturn(null);
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(passwordEncoder.matches("correct", "hashed-pw")).thenReturn(true);
+            when(vaultEncryptionService.decrypt("ct", "iv", 1)).thenReturn("plaintext-secret");
+            when(vaultItemRepository.save(any(VaultItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            VaultItemSecretResponse response = service.revealSecret(itemId, userId, revealRequest("correct"), "1.2.3.4", "ua");
+
+            // The token was stored under the "reveal" scope key — export's own lookup (a different
+            // key) never returns it, so this asserts the token issued above is scope-isolated rather
+            // than re-driving exportCsv (which is covered separately in ExportCsvTests).
+            verify(valueOperations).set(eq("vault-stepup:reveal:" + userId), eq(response.getStepUpToken()), any());
+        }
+
+        @Test
+        @DisplayName("recomputes strength/breach for a numeric PIN secret on reveal (self-healing for items saved before PIN-aware scoring existed), with no HIBP call")
+        void selfHealsStalePinHealthOnReveal() {
+            item.setItemType(VaultItemType.LOGIN);
+            item.setStrengthLevel(0);
+            item.setBreachCount(5);
+            when(valueOperations.get(anyString())).thenReturn(null);
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(passwordEncoder.matches("correct", "hashed-pw")).thenReturn(true);
+            when(vaultEncryptionService.decrypt("ct", "iv", 1)).thenReturn("7392");
+            when(vaultItemRepository.save(any(VaultItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            service.revealSecret(itemId, userId, revealRequest("correct"), "1.2.3.4", "ua");
+
+            assertThat(item.getStrengthLevel()).isGreaterThan(1);
+            assertThat(item.getBreachCount()).isNull();
+            verifyNoInteractions(hibpClient);
+        }
+
+        @Test
+        @DisplayName("does not touch health fields on reveal for a non-PIN secret (avoids an unnecessary HIBP call on every reveal)")
+        void doesNotRecomputeHealthForNonPinOnReveal() {
+            item.setItemType(VaultItemType.LOGIN);
+            item.setStrengthLevel(3);
+            item.setBreachCount(0);
+            when(valueOperations.get(anyString())).thenReturn(null);
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(passwordEncoder.matches("correct", "hashed-pw")).thenReturn(true);
+            when(vaultEncryptionService.decrypt("ct", "iv", 1)).thenReturn("Tr0ub4dor&3");
+            when(vaultItemRepository.save(any(VaultItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            service.revealSecret(itemId, userId, revealRequest("correct"), "1.2.3.4", "ua");
+
+            assertThat(item.getStrengthLevel()).isEqualTo(3);
+            assertThat(item.getBreachCount()).isZero();
+            verifyNoInteractions(hibpClient, vaultSecretHasher);
+        }
+
+        @Test
+        @DisplayName("does not touch health fields on reveal for a SECURE_NOTE")
+        void doesNotRecomputeHealthForNoteOnReveal() {
+            item.setItemType(VaultItemType.SECURE_NOTE);
+            when(valueOperations.get(anyString())).thenReturn(null);
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(passwordEncoder.matches("correct", "hashed-pw")).thenReturn(true);
+            when(vaultEncryptionService.decrypt("ct", "iv", 1)).thenReturn("1234");
+            when(vaultItemRepository.save(any(VaultItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            service.revealSecret(itemId, userId, revealRequest("correct"), "1.2.3.4", "ua");
+
+            assertThat(item.getStrengthLevel()).isNull();
+            assertThat(item.getBreachCount()).isNull();
+            verifyNoInteractions(hibpClient, vaultSecretHasher);
         }
 
         @Test
