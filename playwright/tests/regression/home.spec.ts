@@ -59,42 +59,46 @@ test.describe("Home dashboard — dynamic reflow", () => {
     await context.close();
   });
 
-  test("no over-budget, no debts: attention row is absent; Insights alone reclaims its row @regression", async () => {
+  test("no over-budget, no debts: Insights alone reclaims the alerts row @regression", async () => {
     await home.gotoHome();
     await home.expectLoaded();
 
-    await expect(home.attentionRow).not.toBeVisible();
+    await expect(home.alertsRow).toBeVisible();
+    await expect(home.overBudgetBanner).not.toBeVisible();
+    await expect(home.debtPulse).not.toBeVisible();
     await expect(home.smartInsightsCard).toBeVisible();
     await expect(home.upcomingBillsCard).not.toBeVisible();
-    await home.expectSpansFullRow(home.smartInsightsCard, page.getByTestId("smart-alerts-row"));
+    await home.expectSpansFullRow(home.smartInsightsCard, home.alertsRow);
   });
 
-  test("an over-budget budget alone shows the banner full-width, no debt card @regression", async () => {
+  test("an over-budget budget shares the row with Smart Insights @regression", async () => {
     await api.createBudget(accessToken, { categoryId, amount: 1000, budgetType: "MONTHLY" });
 
     await home.gotoHome();
-    await expect(home.attentionRow).toBeVisible();
     await expect(home.overBudgetBanner).toBeVisible();
     await expect(home.overBudgetBanner).toContainText("1 budget over limit");
     await expect(home.debtPulse).not.toBeVisible();
-    await home.expectSpansFullRow(home.overBudgetBanner, home.attentionRow);
+    await expect(home.smartInsightsCard).toBeVisible();
+    await home.expectSharesRow(home.overBudgetBanner, home.smartInsightsCard, home.alertsRow);
   });
 
-  test("adding a debt makes the banner and DebtPulse share the row @regression", async () => {
+  test("adding a debt: banner+DebtPulse share a row, Insights alone reclaims the trailing row @regression", async () => {
     await api.createDebt(accessToken, { type: "LENT", contactName: "Reflow Test Contact", amount: 5000 });
 
     await home.gotoHome();
     await expect(home.overBudgetBanner).toBeVisible();
     await expect(home.debtPulse).toBeVisible();
-    await home.expectSharesRow(home.overBudgetBanner, home.debtPulse, home.attentionRow);
+    await home.expectSharesRow(home.overBudgetBanner, home.debtPulse, home.alertsRow);
+    await home.expectSpansFullRow(home.smartInsightsCard, home.alertsRow);
   });
 
-  test("dismissing the over-budget banner leaves DebtPulse alone, full-width @regression", async () => {
+  test("dismissing the over-budget banner leaves DebtPulse sharing the row with Smart Insights @regression", async () => {
     await home.dismissOverBudgetBanner();
 
     await expect(home.overBudgetBanner).not.toBeVisible();
     await expect(home.debtPulse).toBeVisible();
-    await home.expectSpansFullRow(home.debtPulse, home.attentionRow);
+    await expect(home.smartInsightsCard).toBeVisible();
+    await home.expectSharesRow(home.debtPulse, home.smartInsightsCard, home.alertsRow);
   });
 
   // ── Round 2: Month/Year toggle ──────────────────────────────────────────────

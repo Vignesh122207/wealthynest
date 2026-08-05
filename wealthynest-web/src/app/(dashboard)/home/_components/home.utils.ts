@@ -190,14 +190,14 @@ export function getAnomalyInsight(
   return top ? { title: top.title, message: top.message } : null;
 }
 
-/** Combines the three Smart Insights sources into the capped, priority-ordered list SmartAlerts
- * actually renders: anomaly first (rare, server-detected — the single most actionable signal),
- * then category deltas (already ranked by |delta| descending, most significant swings first),
- * then the pace forecast last (the most general of the three, and the one most likely to have
- * already degraded to "amount only" once getPaceForecast's own sanity cap kicks in on a lumpy
- * month). Capped to 3 — matches SmartAlerts' own lg:grid-cols-3 layout — so when there are more
- * than 3 real candidates, the least useful ones simply don't make the cut instead of everything
- * piling in and wrapping to a second row. */
+/** Combines the three Smart Insights sources into the capped, priority-ordered list
+ * SmartInsightsCard actually renders: anomaly first (rare, server-detected — the single most
+ * actionable signal), then category deltas (already ranked by |delta| descending, most
+ * significant swings first), then the pace forecast last (the most general of the three, and
+ * the one most likely to have already degraded to "amount only" once getPaceForecast's own
+ * sanity cap kicks in on a lumpy month). Capped to 3 — matches SmartInsightsCard's own
+ * lg:grid-cols-3 layout — so when there are more than 3 real candidates, the least useful ones
+ * simply don't make the cut instead of everything piling in and wrapping to a second row. */
 export function buildSmartInsights(
   anomalyInsight: AnomalyInsight | null,
   categoryDeltaInsights: SmartInsight[],

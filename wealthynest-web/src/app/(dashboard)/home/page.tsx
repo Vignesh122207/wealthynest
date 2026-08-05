@@ -33,8 +33,8 @@ import {buildUsageCounts, sortByUsage} from "@/lib/mostUsed";
 import {GreetingBanner, type HomeViewMode} from "./_components/GreetingBanner";
 import {SecuritySetupPrompt} from "./_components/SecuritySetupPrompt";
 import {StatOverview} from "./_components/StatOverview";
-import {SmartAlerts, type SmartInsight} from "./_components/SmartAlerts";
-import {AttentionRow} from "./_components/AttentionRow";
+import {type SmartInsight} from "./_components/SmartAlerts";
+import {AlertsRow} from "./_components/AlertsRow";
 import {WalletOverview} from "./_components/WalletOverview";
 import {BudgetSection} from "./_components/BudgetSection";
 import {TransactionList} from "./_components/TransactionList";
@@ -412,9 +412,9 @@ export default function DashboardPage() {
             isLoading={dataLoading}
           />
 
-          {/* ── Attention row: over-budget banner + debt pulse, reflowing to fill the row
-              whichever of the two is (or isn't) present ── */}
-          <AttentionRow
+          {/* ── Alerts row: over-budget banner, debt pulse, Smart Insights, Upcoming Bills —
+              reflowing to fill the row whichever subset is (or isn't) present ── */}
+          <AlertsRow
             overBudgetCount={overBudgetCount}
             overBudgetDismissed={overBudgetDismissed}
             onDismissOverBudget={() => {
@@ -423,10 +423,6 @@ export default function DashboardPage() {
             }}
             debts={debts}
             periodLabel={viewMode}
-          />
-
-          {/* ── Smart insights + upcoming bills ── */}
-          <SmartAlerts
             smartInsights={visibleSmartInsights}
             upcomingBills={upcomingBills}
           />

@@ -131,11 +131,10 @@ export const TEST_IDS = {
     monthLabel: "analytics-month-label",
   },
   home: {
-    attentionRow:       "attention-row",
+    alertsRow:          "alerts-row",
     overBudgetBanner:   "over-budget-banner",
     overBudgetDismiss:  "over-budget-dismiss",
     debtPulseWrap:      "debt-pulse-wrap",
-    smartAlertsRow:     "smart-alerts-row",
     smartInsightsCard:  "smart-insights-card",
     upcomingBillsCard:  "upcoming-bills-card",
     periodToggle: (mode: "month" | "year") => `period-toggle-${mode}`,
