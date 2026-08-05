@@ -139,6 +139,26 @@ export class AccountsPage extends BasePage {
     return this.page.getByText(/Archived Accounts/);
   }
 
+  get closedAccountsToggle(): Locator {
+    return this.page.getByText(/Closed Accounts/);
+  }
+
+  /** The Close icon in the edit modal (Lock icon, "Close account" aria-label) doesn't close
+   * directly — same confirm-dialog indirection as archiveAccount above. Closing is terminal (no
+   * reopen) and moves the account out of the active grid into its own collapsed "Closed
+   * Accounts" section (see ClosedAccountsSection.tsx) instead of staying mixed in with accounts
+   * you can still act on. `exact: true` matters here — the modal's own dismiss "X" button is also
+   * named "Close", which getByRole's default substring match would otherwise also hit. */
+  async closeAccount(accountName: string): Promise<void> {
+    await this.openEdit(accountName);
+    await this.page.getByRole("button", { name: "Close account", exact: true }).click();
+    await Promise.all([
+      waitForApiResponse(this.page, "/close", "PATCH"),
+      this.page.getByTestId(TEST_IDS.confirmDialog.confirm).click(),
+    ]);
+    await waitForDialogClosed(this.page);
+  }
+
   /** Accounts can only be permanently deleted from the Archived Accounts list (see
    * ArchivedAccountsSection.tsx) — there's no direct delete on an active account, so this
    * archives first if the account isn't already archived. Delete only ever succeeds when the

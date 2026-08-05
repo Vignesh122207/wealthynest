@@ -65,6 +65,19 @@ test.describe("Accounts", () => {
     await accountsPage.expectAccountNotVisible(bankName);
   });
 
+  test("closing an account moves it out of the active list into Closed Accounts @regression", async ({ accountsPage }) => {
+    const bankName = faker.company.name() + " Bank";
+    await accountsPage.gotoAccounts();
+    await accountsPage.createBankAccount({ bankName, openingBalance: 2000 });
+    await accountsPage.expectAccountVisible(bankName);
+
+    await accountsPage.closeAccount(bankName);
+    await accountsPage.expectAccountNotVisible(bankName);
+
+    await accountsPage.closedAccountsToggle.click();
+    await accountsPage.expectAccountVisible(bankName);
+  });
+
   test("deleting an account with history is rejected — close or archive instead @regression", async ({ accountsPage, transactionsPage }) => {
     const fromBank = faker.company.name() + " Bank";
     const toBank   = faker.company.name() + " Bank";

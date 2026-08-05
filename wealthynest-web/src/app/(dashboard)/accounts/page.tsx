@@ -47,6 +47,7 @@ import {AccountStatStrip} from "./_components/AccountStatStrip";
 import {AccountFilterTabs} from "./_components/AccountFilterTabs";
 import {AccountsGrid} from "./_components/AccountsGrid";
 import {ArchivedAccountsSection} from "./_components/ArchivedAccountsSection";
+import {ClosedAccountsSection} from "./_components/ClosedAccountsSection";
 
 // Lazy-loaded: all four are only ever needed after a user opens one of them, never on first
 // paint — keeping them out of the page's initial bundle shrinks it noticeably, since together
@@ -90,6 +91,7 @@ export default function AccountsPage() {
   const [deleteTarget, setDeleteTarget] = useState<WalletAccount | null>(null);
 
   const [showArchived, setShowArchived]      = useState(false);
+  const [showClosed, setShowClosed]          = useState(false);
   const { data: accounts = [], isLoading, isError, refetch }   = useAccounts();
   const { data: archivedAccounts = [] }      = useArchivedAccounts();
   const { data: allDebts  = [] }           = useDebts();
@@ -153,13 +155,19 @@ export default function AccountsPage() {
     defaultValues: { accountType: "CASH_WALLET", name: "Cash Wallet", openingBalance: undefined },
   });
 
-  // Purpose (Emergency Fund, etc.) is just a tag on a Bank Account now, not a separate type — a
-  // purpose-tagged account already lands in bankAccounts naturally. Same for what used to be a
-  // distinct "Investment Account" type (broker cash float is a purpose-tagged bank account too).
-  const cashAccounts = accounts.filter(a => a.accountType === "CASH_WALLET");
-  const bankAccounts = accounts.filter(a => a.accountType === "BANK_ACCOUNT");
-  const creditCards  = accounts.filter(a => a.accountType === "CREDIT_CARD");
-  const loanAccounts = accounts.filter(a => a.accountType === "LOAN");
+  // getAccounts() returns both ACTIVE and CLOSED rows (a closed account still needs to resolve
+  // in historical contexts) — CLOSED behaves like Archived on this page: pulled out of the main
+  // grid/totals/tabs into its own collapsed section below, not mixed in with the accounts you can
+  // still act on. Purpose (Emergency Fund, etc.) is just a tag on a Bank Account now, not a
+  // separate type — a purpose-tagged account already lands in bankAccounts naturally. Same for
+  // what used to be a distinct "Investment Account" type (broker cash float is a purpose-tagged
+  // bank account too).
+  const activeAccounts = accounts.filter(a => a.status === "ACTIVE");
+  const closedAccounts = accounts.filter(a => a.status === "CLOSED");
+  const cashAccounts = activeAccounts.filter(a => a.accountType === "CASH_WALLET");
+  const bankAccounts = activeAccounts.filter(a => a.accountType === "BANK_ACCOUNT");
+  const creditCards  = activeAccounts.filter(a => a.accountType === "CREDIT_CARD");
+  const loanAccounts = activeAccounts.filter(a => a.accountType === "LOAN");
 
   const SECTION_TYPES: Record<Exclude<typeof sectionFilter, "all">, AccountType[]> = {
     bank: ["BANK_ACCOUNT"], cash: ["CASH_WALLET"], cc: ["CREDIT_CARD"], loan: ["LOAN"],
@@ -167,6 +175,9 @@ export default function AccountsPage() {
   const filteredArchived = sectionFilter === "all"
     ? archivedAccounts
     : archivedAccounts.filter(a => SECTION_TYPES[sectionFilter].includes(a.accountType));
+  const filteredClosed = sectionFilter === "all"
+    ? closedAccounts
+    : closedAccounts.filter(a => SECTION_TYPES[sectionFilter].includes(a.accountType));
 
   const totalBalance   = [...cashAccounts, ...bankAccounts].reduce((s, a) => s + a.currentBalance, 0);
   const bankBalance    = bankAccounts.reduce((s, a) => s + a.currentBalance, 0);
@@ -432,7 +443,7 @@ export default function AccountsPage() {
           are one level too deep for next/dynamic to defer fetching its chunk until relevant. */}
       {(modal === "addMoney" || modal === "addExpense" || modal === "import" || modal === "transfer") && (
         <AccountTransactionModals
-          modal={modal} onClose={close} accounts={accounts} cashAccounts={cashAccounts}
+          modal={modal} onClose={close} accounts={activeAccounts} cashAccounts={cashAccounts}
           bankAccounts={bankAccounts} creditCards={creditCards} incomeCategories={incomeCategories}
           categoryOptions={categoryOptions} preAccount={preAccount} lockedExpenseAccount={lockedExpenseAccount}
           defaultIncomeSource={defaultIncomeSource} incomeSourceUsage={incomeSourceUsage}
@@ -447,7 +458,7 @@ export default function AccountsPage() {
         <div className="max-w-7xl mx-auto space-y-5">
 
         <AccountStatStrip
-          accounts={accounts} totalAssetsAcrossAccounts={totalAssetsAcrossAccounts}
+          accounts={activeAccounts} totalAssetsAcrossAccounts={totalAssetsAcrossAccounts}
           bankAccounts={bankAccounts} bankBalance={bankBalance}
           cashAccounts={cashAccounts} cashBalance={cashBalance}
           creditCards={creditCards} creditCardDebt={creditCardDebt}
@@ -455,16 +466,21 @@ export default function AccountsPage() {
         />
 
         <AccountFilterTabs
-          accounts={accounts} bankAccounts={bankAccounts} cashAccounts={cashAccounts}
+          accounts={activeAccounts} bankAccounts={bankAccounts} cashAccounts={cashAccounts}
           creditCards={creditCards} loanAccounts={loanAccounts}
           sectionFilter={sectionFilter} setSectionFilter={setSectionFilter}
         />
 
         <AccountsGrid
-          isLoading={isLoading} isError={isError} onRetry={refetch} accounts={accounts} sectionFilter={sectionFilter}
+          isLoading={isLoading} isError={isError} onRetry={refetch} accounts={activeAccounts} sectionFilter={sectionFilter}
           allAccountsOrdered={allAccountsOrdered} bankAccounts={bankAccounts} cashAccounts={cashAccounts}
           creditCards={creditCards} loanAccounts={loanAccounts}
           renderAccountCard={renderAccountCard} onCreate={openCreate}
+        />
+
+        <ClosedAccountsSection
+          filteredClosed={filteredClosed} showClosed={showClosed} setShowClosed={setShowClosed}
+          onDelete={(a) => setDeleteTarget(a)}
         />
 
         <ArchivedAccountsSection
