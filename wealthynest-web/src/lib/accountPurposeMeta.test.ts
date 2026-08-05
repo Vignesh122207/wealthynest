@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { resolvePurposeLabel } from "./accountPurposeMeta";
+import { PURPOSE_OPTIONS } from "@/features/accounts/schemas/account.schema";
+import { PURPOSE_ICON_META, resolvePurposeLabel } from "./accountPurposeMeta";
 
 describe("resolvePurposeLabel", () => {
   it("returns null when there's no purpose", () => {
@@ -23,5 +24,13 @@ describe("resolvePurposeLabel", () => {
 
   it("falls back to the raw value for an unrecognized purpose", () => {
     expect(resolvePurposeLabel("SOMETHING_NEW")).toBe("SOMETHING_NEW");
+  });
+});
+
+describe("PURPOSE_ICON_META", () => {
+  it("has an icon/tone entry for every purpose the picker can offer", () => {
+    for (const option of PURPOSE_OPTIONS) {
+      expect(PURPOSE_ICON_META[option.value], `missing icon meta for ${option.value}`).toBeDefined();
+    }
   });
 });

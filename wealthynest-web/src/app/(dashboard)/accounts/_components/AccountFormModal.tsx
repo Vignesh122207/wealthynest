@@ -7,9 +7,10 @@ import {AccountPicker} from "@/components/transactions/AccountPicker";
 import {BigAmountInput} from "@/components/transactions/BigAmountInput";
 import {FormCurrencyInput} from "@/components/forms/FormCurrencyInput";
 import {FormSelect} from "@/components/forms/FormSelect";
+import {PurposePicker} from "@/components/forms/PurposePicker";
 import {BankNameInput} from "@/features/accounts/components/BankNameInput";
 import {ACCOUNT_TYPE_META} from "@/lib/accountTypeMeta";
-import {type CreateAccountForm, LOAN_TYPE_LABELS, LOAN_TYPE_OPTIONS, PURPOSE_OPTIONS} from "@/features/accounts/schemas/account.schema";
+import {type CreateAccountForm, LOAN_TYPE_LABELS, LOAN_TYPE_OPTIONS} from "@/features/accounts/schemas/account.schema";
 import {INDIAN_BANKS} from "@/lib/constants";
 import {cn, formatCurrency} from "@/lib/utils";
 import {useSidebarOffsetClass} from "@/hooks/useSidebarOffsetClass";
@@ -166,10 +167,10 @@ export function AccountFormModal({
 
             {isBankForm && (
               <div className="space-y-2">
-                <FormSelect label="Purpose (optional)" options={PURPOSE_OPTIONS} placeholder="What is this money for?"
+                <PurposePicker
                   error={createForm.formState.errors.purpose?.message}
                   value={createForm.watch("purpose") ?? ""}
-                  onChange={e => createForm.setValue("purpose", (e.target.value || undefined) as CreateAccountForm["purpose"])} />
+                  onChange={v => createForm.setValue("purpose", (v || undefined) as CreateAccountForm["purpose"])} />
                 {watchedPurpose === "CUSTOM" && (
                   <div>
                     <input {...createForm.register("purposeLabel")} placeholder="e.g. Sabbatical fund"

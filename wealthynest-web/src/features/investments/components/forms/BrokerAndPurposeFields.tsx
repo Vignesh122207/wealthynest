@@ -1,9 +1,8 @@
 "use client";
 
 import type {FieldValues, Path, UseFormReturn} from "react-hook-form";
-import {FormSelect} from "@/components/forms/FormSelect";
+import {PurposePicker} from "@/components/forms/PurposePicker";
 import {BankNameInput} from "@/features/accounts/components/BankNameInput";
-import {PURPOSE_OPTIONS} from "@/features/accounts/schemas/account.schema";
 import {STOCK_BROKERS} from "@/lib/constants";
 
 type PurposeFields = { broker?: string; purpose?: string; purposeLabel?: string };
@@ -21,10 +20,10 @@ export function BrokerAndPurposeFields<T extends FieldValues & PurposeFields>({ 
         value={broker ?? ""}
         onChange={v => form.setValue("broker" as Path<T>, (v || undefined) as never, { shouldValidate: true })} />
       <div className="space-y-2">
-        <FormSelect label="Purpose (optional)" options={PURPOSE_OPTIONS} placeholder="What is this for?"
+        <PurposePicker label="Purpose (optional)" placeholder="What is this for?"
           error={errors.purpose?.message}
           value={purpose ?? ""}
-          onChange={e => form.setValue("purpose" as Path<T>, (e.target.value || undefined) as never, { shouldValidate: true })} />
+          onChange={v => form.setValue("purpose" as Path<T>, (v || undefined) as never, { shouldValidate: true })} />
         {purpose === "CUSTOM" && (
           <div>
             <input {...form.register("purposeLabel" as Path<T>)} placeholder="e.g. Down payment fund"
