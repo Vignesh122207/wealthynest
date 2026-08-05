@@ -28,6 +28,12 @@ type CardKey = "banner" | "debt" | "insights" | "bills";
 // Insights, Upcoming Bills) share one reflowing 2-column row instead of splitting into two
 // independently-stacked rows — whichever subset is present packs in pairs, and a trailing odd
 // card out reclaims the full row instead of leaving its partner column empty.
+//
+// items-start (not the grid default of stretch): these cards have genuinely different natural
+// heights — a 1-line DebtPulse pill next to a 3-item Smart Insights stack can differ by 150px+
+// — and stretching the shorter one to match turns it into a mostly-empty bordered box. Top-
+// aligning instead lets each card keep its own compact height; the leftover space below the
+// shorter card is just page background, not a stretched card shell.
 export function AlertsRow({
   overBudgetCount, overBudgetDismissed, onDismissOverBudget, debts, periodLabel,
   smartInsights, upcomingBills,
@@ -51,7 +57,7 @@ export function AlertsRow({
   const isWide = (key: CardKey) => wideLast && key === lastKey;
 
   return (
-    <div data-testid="alerts-row" className="grid gap-3 animate-fade-in-up delay-225 md:grid-cols-2">
+    <div data-testid="alerts-row" className="grid items-start gap-3 animate-fade-in-up delay-225 md:grid-cols-2">
       {showBanner && (
         <div data-testid="over-budget-banner" className={cn(
           "flex items-start gap-3 rounded-2xl border border-red-500/30 bg-red-500/8 px-4 py-3",
