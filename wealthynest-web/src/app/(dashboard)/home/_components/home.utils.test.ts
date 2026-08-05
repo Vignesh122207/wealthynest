@@ -1,7 +1,8 @@
 import {describe, expect, it} from "vitest";
-import {getAnomalyInsight, getCategoryDeltaInsights, getNetWorthBaseline, getPaceForecast, getYtdMonths, sumTrend} from "./home.utils";
+import {buildSmartInsights, getAnomalyInsight, getCategoryDeltaInsights, getNetWorthBaseline, getPaceForecast, getYtdMonths, sumTrend} from "./home.utils";
 import type {MonthlyTrend} from "@/features/dashboard/types/dashboard.types";
 import type {NetWorthHistoryPoint} from "@/features/networth/types/networth.types";
+import type {SmartInsight} from "./SmartAlerts";
 
 function trend(month: number, income: number, expenses: number): MonthlyTrend {
   return { year: 2026, month, label: "", income, expenses, saved: income - expenses };
@@ -89,6 +90,23 @@ describe("getPaceForecast", () => {
   it("computes a negative pctVsAvg when pacing below the prior average", () => {
     const result = getPaceForecast(1000, 900, 10, 31, [1000]);
     expect(result?.pctVsAvg).toBeLessThan(0);
+  });
+
+  it("hides pctVsAvg (but keeps the amount) when a lumpy one-time transaction blows the % past the sanity cap", () => {
+    // A ~₹2,58,000 net-so-far by day 5 (e.g. a bonus/FD maturity) extrapolated over 31 days
+    // against a modest ₹34,000 prior average is the real production case this regresses —
+    // mathematically "correct" but a meaningless-looking "4606% above average".
+    const result = getPaceForecast(258161, 0, 5, 31, [34014]);
+    expect(result?.amount).toBeCloseTo(1600598, -1);
+    expect(result?.pctVsAvg).toBeNull();
+  });
+
+  it("still surfaces a large but plausible pctVsAvg under the sanity cap", () => {
+    // 400% above average is a big swing but still a meaningful, real comparison — must not be
+    // suppressed by the same guard that hides the truly nonsensical case above.
+    const result = getPaceForecast(2000, 0, 10, 31, [1240]);
+    expect(result?.pctVsAvg).not.toBeNull();
+    expect(result?.pctVsAvg).toBeCloseTo(400, 0);
   });
 });
 
@@ -183,5 +201,48 @@ describe("getAnomalyInsight", () => {
 
   it("returns null for an empty notification list", () => {
     expect(getAnomalyInsight([], 2026, 8)).toBeNull();
+  });
+});
+
+describe("buildSmartInsights", () => {
+  const anomaly = { title: "Unusual Spend: Dining", message: "A Dining expense of ₹3000 is well above your usual ₹800." };
+  const deltas: SmartInsight[] = [
+    { kind: "delta", category: "Groceries",  delta: 2000, projected: false },
+    { kind: "delta", category: "Fuel",       delta: 1500, projected: false },
+    { kind: "delta", category: "Shopping",   delta: 1200, projected: false },
+  ];
+  const forecast = { amount: 5000, pctVsAvg: 10 };
+
+  it("returns an empty list when nothing qualifies", () => {
+    expect(buildSmartInsights(null, [], null)).toEqual([]);
+  });
+
+  it("caps at 3 even when all three sources have candidates", () => {
+    const result = buildSmartInsights(anomaly, deltas, forecast);
+    expect(result).toHaveLength(3);
+  });
+
+  it("puts anomaly first, ahead of category deltas and the forecast", () => {
+    const result = buildSmartInsights(anomaly, deltas, forecast);
+    expect(result[0]).toEqual({ kind: "anomaly", title: anomaly.title, message: anomaly.message });
+  });
+
+  it("fills remaining slots with category deltas (already ranked by significance) before the forecast", () => {
+    const result = buildSmartInsights(anomaly, deltas, forecast);
+    // anomaly + 2 deltas fills all 3 slots — the forecast and the 3rd delta both get dropped
+    expect(result[1]).toMatchObject({ kind: "delta", category: "Groceries" });
+    expect(result[2]).toMatchObject({ kind: "delta", category: "Fuel" });
+    expect(result.some(i => i.kind === "forecast")).toBe(false);
+  });
+
+  it("the forecast fills a slot when fewer than 3 deltas/anomaly are present", () => {
+    const result = buildSmartInsights(null, deltas.slice(0, 1), forecast);
+    expect(result).toHaveLength(2);
+    expect(result[1]).toEqual({ kind: "forecast", amount: forecast.amount, pctVsAvg: forecast.pctVsAvg });
+  });
+
+  it("omits a kind entirely when its source is absent, without leaving a gap", () => {
+    const result = buildSmartInsights(null, [], forecast);
+    expect(result).toEqual([{ kind: "forecast", amount: forecast.amount, pctVsAvg: forecast.pctVsAvg }]);
   });
 });

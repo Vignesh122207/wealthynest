@@ -40,7 +40,7 @@ import {BudgetSection} from "./_components/BudgetSection";
 import {TransactionList} from "./_components/TransactionList";
 import {GoalsSummary} from "./_components/GoalsSummary";
 import {TwoColRow} from "./_components/TwoColRow";
-import {getAnomalyInsight, getCategoryDeltaInsights, getNetWorthBaseline, getPaceForecast, getYtdMonths, sumTrend} from "./_components/home.utils";
+import {buildSmartInsights, getAnomalyInsight, getCategoryDeltaInsights, getNetWorthBaseline, getPaceForecast, getYtdMonths, sumTrend} from "./_components/home.utils";
 
 // Lazy-loaded: the Home dashboard's own bundle shouldn't carry all three quick-add forms just so
 // one can appear after a FAB click — each is only fetched the first time its modal actually opens.
@@ -295,9 +295,7 @@ export default function DashboardPage() {
 
   const anomalyInsight = isCurrentMonth ? getAnomalyInsight(serverNotifications, year, month) : null;
 
-  const smartInsights: SmartInsight[] = [...categoryDeltaInsights];
-  if (paceForecast)   smartInsights.push({ kind: "forecast", amount: paceForecast.amount, pctVsAvg: paceForecast.pctVsAvg });
-  if (anomalyInsight) smartInsights.push({ kind: "anomaly", title: anomalyInsight.title, message: anomalyInsight.message });
+  const visibleSmartInsights = buildSmartInsights(anomalyInsight, categoryDeltaInsights, paceForecast);
 
   return (
     <div className="flex flex-col flex-1 bg-background">
@@ -429,7 +427,7 @@ export default function DashboardPage() {
 
           {/* ── Smart insights + upcoming bills ── */}
           <SmartAlerts
-            smartInsights={smartInsights}
+            smartInsights={visibleSmartInsights}
             upcomingBills={upcomingBills}
           />
 

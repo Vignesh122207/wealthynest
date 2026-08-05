@@ -240,7 +240,12 @@ export default function BudgetsPage() {
   // annualSpent (from the API) is the actual full-calendar-year spend in each budget's
   // category regardless of type, so it pairs honestly with annualBudgeted — no extrapolation.
   const annualBudgeted   = monthlyBudgeted * 12 + yearlyBudgeted;
-  const annualSpent      = budgets.reduce((s, b) => s + b.annualSpent, 0);
+  // Deduped by categoryId, not a plain sum over `budgets` — a category can have both a
+  // MONTHLY and a YEARLY budget at once (see the picker's existingCategoryIds comment above),
+  // and BudgetServiceImpl puts the *same* category-level annualSpent figure on both rows, so
+  // summing every row double-counted that category's real annual spend.
+  const annualSpentByCategory = new Map(budgets.map(b => [b.categoryId, b.annualSpent]));
+  const annualSpent      = [...annualSpentByCategory.values()].reduce((s, v) => s + v, 0);
   const annualRemaining  = Math.max(0, annualBudgeted - annualSpent);
   const overBudgetCount  = budgets.filter(b => b.overBudget).length;
 
@@ -248,7 +253,7 @@ export default function BudgetsPage() {
     <div className="flex flex-col flex-1">
       <Header title="Budgets" subtitle="Set spending limits by category and track how you're pacing" />
       {editBudget && (
-        <BudgetDetailModal budget={editBudget} onClose={() => setEditBudget(null)}
+        <BudgetDetailModal budget={editBudget} allBudgets={budgets} onClose={() => setEditBudget(null)}
           onDelete={() => { setConfirmId(editBudget.id); setEditBudget(null); }} />
       )}
       {confirmId && (
@@ -441,7 +446,7 @@ export default function BudgetsPage() {
             <Card className="p-4">
               <PremiumIcon icon={Target} tone="red" size="xs" className="mb-2" />
               <p className="text-xs text-muted-foreground mb-1">Spent This Year</p>
-              <p className="text-lg font-bold text-red-600 dark:text-red-400 tabular-nums">{fmt(annualSpent)}</p>
+              <p data-testid="budget-annual-spent" className="text-lg font-bold text-red-600 dark:text-red-400 tabular-nums">{fmt(annualSpent)}</p>
               <span className="inline-flex items-center gap-1 mt-1.5 pl-1 pr-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-medium">
                 <BadgeCheck className="w-2.5 h-2.5" /> Actual · Jan–Dec {year}
               </span>

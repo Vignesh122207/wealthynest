@@ -101,6 +101,20 @@ class GoalServiceImplTest {
         }
 
         @Test
+        @DisplayName("does NOT throw when savedAmount exceeds targetAmount and an account is linked — a linked goal's saved amount is a live balance snapshot, not a user-typed cap")
+        void allowsSavedExceedingTargetWhenLinked() {
+            stubNoAccounts();
+            UUID accountId = UUID.randomUUID();
+            CreateGoalRequest req = createRequest(new BigDecimal("1000"), new BigDecimal("1500"), accountId);
+            when(goalRepository.save(any(Goal.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
+
+            GoalResponse response = service.create(userId, null, req);
+
+            assertThat(response.getAccountId()).isEqualTo(accountId);
+            verify(goalRepository).save(any(Goal.class));
+        }
+
+        @Test
         @DisplayName("null savedAmount defaults to zero")
         void nullSavedAmountDefaultsToZero() {
             stubNoAccounts();
@@ -240,6 +254,54 @@ class GoalServiceImplTest {
 
             verify(accountOwnershipGuard).validateAccountOwnership(newAccountId, userId);
             assertThat(goal.getAccountId()).isEqualTo(newAccountId);
+        }
+
+        @Test
+        @DisplayName("does NOT reject an over-target savedAmount when linking a new account in the same request")
+        void allowsSavedExceedingTargetWhenLinkingInSameRequest() {
+            Goal goal = withId(baseGoal().targetAmount(new BigDecimal("1000")).build());
+            when(goalRepository.findById(goalId)).thenReturn(Optional.of(goal));
+            stubNoAccounts();
+            when(goalRepository.save(any(Goal.class))).thenAnswer(inv -> inv.getArgument(0));
+            UUID newAccountId = UUID.randomUUID();
+            UpdateGoalRequest req = updateRequest();
+            when(req.getAccountId()).thenReturn(newAccountId);
+            when(req.getSavedAmount()).thenReturn(new BigDecimal("1500")); // > target(1000), but linking
+
+            service.update(goalId, userId, null, req);
+
+            assertThat(goal.getSavedAmount()).isEqualByComparingTo("1500");
+            assertThat(goal.getAccountId()).isEqualTo(newAccountId);
+        }
+
+        @Test
+        @DisplayName("does NOT reject an over-target savedAmount edit on a goal that's already linked (no accountId in this request)")
+        void allowsSavedExceedingTargetWhenAlreadyLinked() {
+            UUID existingAccount = UUID.randomUUID();
+            Goal goal = withId(baseGoal().targetAmount(new BigDecimal("1000")).accountId(existingAccount).build());
+            when(goalRepository.findById(goalId)).thenReturn(Optional.of(goal));
+            stubNoAccounts();
+            when(goalRepository.save(any(Goal.class))).thenAnswer(inv -> inv.getArgument(0));
+            UpdateGoalRequest req = updateRequest();
+            when(req.getSavedAmount()).thenReturn(new BigDecimal("1500"));
+
+            service.update(goalId, userId, null, req);
+
+            assertThat(goal.getSavedAmount()).isEqualByComparingTo("1500");
+        }
+
+        @Test
+        @DisplayName("still rejects an over-target savedAmount when simultaneously unlinking — the goal is going back to manually-tracked")
+        void rejectsSavedExceedingTargetWhenUnlinking() {
+            UUID existingAccount = UUID.randomUUID();
+            Goal goal = withId(baseGoal().targetAmount(new BigDecimal("1000")).accountId(existingAccount).build());
+            when(goalRepository.findById(goalId)).thenReturn(Optional.of(goal));
+            UpdateGoalRequest req = updateRequest();
+            when(req.getUnlinkAccount()).thenReturn(true);
+            when(req.getSavedAmount()).thenReturn(new BigDecimal("1500"));
+
+            assertThatThrownBy(() -> service.update(goalId, userId, null, req)).isInstanceOf(BusinessException.class);
+            verify(goalRepository, never()).save(any());
         }
 
         @Test

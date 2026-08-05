@@ -65,6 +65,36 @@ test.describe("Debts", () => {
     await debtsPage.expectDebtNotVisible(name);
   });
 
+  // Regression: update() used to leave `status` completely untouched after an amount edit, so a
+  // debt lowered below its already-recorded amountSettled got stuck "Partial" forever (0 real
+  // remaining, but a Pay Back button that always rejects any positive payment since it exceeds
+  // the now-negative unfloored remaining recordPayment validates against).
+  test("lowering a debt's amount to/below what's already been paid settles it instead of leaving it stuck @regression", async ({ debtsPage }) => {
+    const name = faker.person.fullName();
+    await debtsPage.gotoDebts();
+    await debtsPage.createDebt({ type: "LENT", contactName: name, amount: 1000 });
+    await debtsPage.recordPayment(name, 600);
+    await debtsPage.expectStatus(name, "Partial");
+
+    await debtsPage.editDebtAmount(name, 500);
+
+    await debtsPage.expectStatus(name, "Settled");
+  });
+
+  // PaymentModal previously had no client-side cap at all (unlike AddSavingsModal's equivalent
+  // withdraw check) — an overpayment only surfaced as a raw error toast after the backend
+  // rejected it. This asserts the inline message fires before any request goes out.
+  test("recording a payment over the remaining balance is rejected inline, before submit @regression", async ({ debtsPage }) => {
+    const name = faker.person.fullName();
+    await debtsPage.gotoDebts();
+    await debtsPage.createDebt({ type: "LENT", contactName: name, amount: 1000 });
+
+    await debtsPage.attemptOverpay(name, 1500);
+
+    await debtsPage.expectValidationError(/Cannot receive more than .*1,000 remaining/);
+    await debtsPage.expectStatus(name, "Active");
+  });
+
   test("Lent/Borrowed tabs filter the list @regression", async ({ debtsPage }) => {
     const lentName = faker.person.fullName();
     const borrowedName = faker.person.fullName();

@@ -51,7 +51,10 @@ export function GoalForm({ goal, goalColor, isCreate, onSubmit, onCancel, onClos
   const emergencyFundAccounts = accounts.filter(a => a.accountType === "EMERGENCY_FUND");
 
   const form = useForm<GoalFormValues>({
-    resolver: zodResolver(goalSchema),
+    // Rebuilt fresh each render from the current accountId state — zodResolver reads whichever
+    // resolver was most recently passed at validate time, so this stays in sync as the user
+    // links/unlinks an account without needing a manual re-validate trigger.
+    resolver: zodResolver(goalSchema(!!accountId)),
     defaultValues: {
       name: goal?.name ?? "", targetAmount: goal?.targetAmount ?? undefined,
       savedAmount: goal?.savedAmount ?? undefined, targetDate: goal?.targetDate ?? "",

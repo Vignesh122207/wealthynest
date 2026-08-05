@@ -41,8 +41,12 @@ function periodRange(budget: Budget): { startDate: string; endDate: string } {
   };
 }
 
-export function BudgetDetailModal({ budget, onClose, onDelete }: {
+export function BudgetDetailModal({ budget, allBudgets, onClose, onDelete }: {
   budget: Budget;
+  /** Full budget list (all types), used only to keep the category picker from offering a
+   * category that already has a budget of this same type — see the categoryOptions comment
+   * below for why this matters. */
+  allBudgets: Budget[];
   onClose: () => void;
   onDelete: () => void;
 }) {
@@ -70,7 +74,16 @@ export function BudgetDetailModal({ budget, onClose, onDelete }: {
     );
 
   const alert = budget.alertThreshold ?? 80;
-  const categoryOptions = categories.map(c => ({ value: c.id, label: c.name, icon: c.icon, color: c.color }));
+  // Excludes categories that already have a budget of this same type (from any *other* budget
+  // row — this one's own current category is never excluded, so switching back to it always
+  // stays possible) — same invariant the Create form's availableCategories enforces, and the
+  // backend's updateBudget now rejects server-side too if this ever gets bypassed.
+  const takenCategoryIds = new Set(
+    allBudgets.filter(b => b.budgetType === budget.budgetType && b.id !== budget.id).map(b => b.categoryId)
+  );
+  const categoryOptions = categories
+    .filter(c => c.id === selectedCategoryId || !takenCategoryIds.has(c.id))
+    .map(c => ({ value: c.id, label: c.name, icon: c.icon, color: c.color }));
 
   const { startDate, endDate } = periodRange(budget);
   const { data: personalPage, isLoading: personalLoading } = useExpenses(

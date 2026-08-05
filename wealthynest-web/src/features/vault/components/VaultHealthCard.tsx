@@ -7,6 +7,7 @@ import {PremiumIcon} from "@/components/icons/PremiumIcon";
 import {resolveVaultIcon} from "@/lib/categoryMeta";
 import {cn} from "@/lib/utils";
 import {useVaultHealth} from "../hooks/useVault";
+import {countDistinctVaultIssues} from "../lib/vaultHealth";
 import type {VaultHealthItemSummary, VaultHealthSummary, VaultItem} from "../types/vault.types";
 
 // Vault's own accent identity: brushed graphite + brass, echoing the auth screens' engraved-metal
@@ -91,7 +92,7 @@ export function VaultHealthCard({ items, onEditItem }: { items: VaultItem[]; onE
             <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: VAULT_BRASS_LIGHT }}>Vault Health</span>
           </div>
           <h3 className="text-white font-bold text-[15px] mb-1">
-            {hasIssues ? `${health.reusedCount + health.weakCount + health.breachedCount} things worth a look` : "All clear"}
+            {hasIssues ? `${countDistinctVaultIssues(health)} things worth a look` : "All clear"}
           </h3>
           <p className="text-white/55 text-xs mb-4 max-w-md">
             {hasIssues

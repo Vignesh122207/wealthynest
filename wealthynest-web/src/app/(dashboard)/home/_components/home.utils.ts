@@ -1,5 +1,6 @@
 import type {MonthlyTrend} from "@/features/dashboard/types/dashboard.types";
 import type {NetWorthHistoryPoint} from "@/features/networth/types/networth.types";
+import type {SmartInsight} from "./SmartAlerts";
 
 // Pure functions exported for testability without rendering — same precedent as
 // GreetingBanner's getSavingsInsight.
@@ -37,14 +38,17 @@ export interface PaceForecast {
 /** Projects this month's full-month savings from the pace set so far (income/expenses to
  * date, extrapolated across the whole month), compared against the average of prior months'
  * actual savings. `pctVsAvg` is null when there's no prior-month history to compare against
- * (too new an account) or that average is exactly zero (a % comparison against zero is
- * meaningless) — callers show the projected amount alone in that case.
+ * (too new an account), that average is exactly zero (a % comparison against zero is
+ * meaningless), or the comparison would be nonsensical (see PACE_PCT_SANITY_CAP below) —
+ * callers show the projected amount alone in that case.
  *
  * Returns null outright before day 5 of the month: extrapolating from only a few days
  * multiplies whatever happened so far by daysInMonth/dayOfMonth (day 1 → ~30x), so one
  * lumpy transaction (a bonus, an FD maturity) produces a wildly unstable "pace" and an
  * even wilder pctVsAvg against a normal-sized average. Waiting for a working week's worth
  * of data keeps the extrapolation multiplier under ~6x. */
+const PACE_PCT_SANITY_CAP = 500;
+
 export function getPaceForecast(
   income: number | undefined,
   expenses: number | undefined,
@@ -62,7 +66,16 @@ export function getPaceForecast(
   const avg = validPrior.reduce((s, v) => s + v, 0) / validPrior.length;
   if (avg === 0) return { amount: projected, pctVsAvg: null };
 
-  return { amount: projected, pctVsAvg: ((projected - avg) / Math.abs(avg)) * 100 };
+  const pctVsAvg = ((projected - avg) / Math.abs(avg)) * 100;
+  // The day-5 gate above only bounds the *date*-extrapolation multiplier (~6x) — it does nothing
+  // for a single unusually large one-time transaction (a bonus, an FD maturity) landing early in
+  // the month, which still produces a technically-correct but meaningless-looking percentage
+  // (e.g. "4606% above average") once compared against a normal-sized prior-month average. Past
+  // this point the comparison itself has stopped being informative, so drop it and fall back to
+  // showing the projected amount alone — same treatment as the avg === 0 case above.
+  if (Math.abs(pctVsAvg) > PACE_PCT_SANITY_CAP) return { amount: projected, pctVsAvg: null };
+
+  return { amount: projected, pctVsAvg };
 }
 
 export interface CategoryDelta {
@@ -140,4 +153,24 @@ export function getAnomalyInsight(
 
   const top = matches[0];
   return top ? { title: top.title, message: top.message } : null;
+}
+
+/** Combines the three Smart Insights sources into the capped, priority-ordered list SmartAlerts
+ * actually renders: anomaly first (rare, server-detected — the single most actionable signal),
+ * then category deltas (already ranked by |delta| descending, most significant swings first),
+ * then the pace forecast last (the most general of the three, and the one most likely to have
+ * already degraded to "amount only" once getPaceForecast's own sanity cap kicks in on a lumpy
+ * month). Capped to 3 — matches SmartAlerts' own lg:grid-cols-3 layout — so when there are more
+ * than 3 real candidates, the least useful ones simply don't make the cut instead of everything
+ * piling in and wrapping to a second row. */
+export function buildSmartInsights(
+  anomalyInsight: AnomalyInsight | null,
+  categoryDeltaInsights: SmartInsight[],
+  paceForecast: PaceForecast | null,
+): SmartInsight[] {
+  const insights: SmartInsight[] = [];
+  if (anomalyInsight) insights.push({ kind: "anomaly", title: anomalyInsight.title, message: anomalyInsight.message });
+  insights.push(...categoryDeltaInsights);
+  if (paceForecast) insights.push({ kind: "forecast", amount: paceForecast.amount, pctVsAvg: paceForecast.pctVsAvg });
+  return insights.slice(0, 3);
 }

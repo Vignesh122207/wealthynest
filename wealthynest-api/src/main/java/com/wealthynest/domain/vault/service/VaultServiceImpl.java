@@ -17,6 +17,7 @@ import com.wealthynest.domain.vault.dto.response.VaultHealthResponse;
 import com.wealthynest.domain.vault.dto.response.VaultItemResponse;
 import com.wealthynest.domain.vault.dto.response.VaultItemSecretResponse;
 import com.wealthynest.domain.vault.entity.VaultItem;
+import com.wealthynest.domain.vault.entity.VaultItemType;
 import com.wealthynest.domain.vault.mapper.VaultItemMapper;
 import com.wealthynest.domain.vault.repository.VaultItemRepository;
 import com.wealthynest.domain.vault.util.VaultPasswordStrengthEvaluator;
@@ -82,6 +83,13 @@ public class VaultServiceImpl implements VaultService {
         if (request.getSecret() == null || request.getSecret().isBlank()) {
             throw new BusinessException("A password or note value is required.", HttpStatus.BAD_REQUEST);
         }
+        requireNoTotpOutsideLogin(request.getItemType(), request.getTotpSecret());
+        boolean isLogin = request.getItemType() == VaultItemType.LOGIN;
+        // Computed before anything below touches the repository, so the outbound HIBP call in here
+        // runs before this transaction has any reason to check out a physical JDBC connection —
+        // see the matching comment in updateItem, where that ordering actually matters. Only LOGIN
+        // secrets get this at all — see applySecretHealthIfLogin's own comment for why.
+        SecretHealth health = isLogin ? computeSecretHealth(request.getSecret()) : null;
         VaultEncryptionService.EncryptedSecret encrypted = vaultEncryptionService.encrypt(request.getSecret());
 
         VaultItem item = VaultItem.builder()
@@ -96,7 +104,7 @@ public class VaultServiceImpl implements VaultService {
                 .secretIv(encrypted.iv())
                 .keyVersion(encrypted.keyVersion())
                 .build();
-        applySecretHealth(item, request.getSecret());
+        if (health != null) applySecretHealth(item, health);
         applyTotpSecret(item, request.getTotpSecret());
         item = vaultItemRepository.save(item);
 
@@ -107,6 +115,17 @@ public class VaultServiceImpl implements VaultService {
     @Override
     @Transactional
     public VaultItemResponse updateItem(UUID itemId, UUID userId, VaultItemRequest request) {
+        requireNoTotpOutsideLogin(request.getItemType(), request.getTotpSecret());
+        boolean hasNewSecret = request.getSecret() != null && !request.getSecret().isBlank();
+        boolean willBeLogin = request.getItemType() == VaultItemType.LOGIN;
+        // Computed BEFORE findAndValidate's SELECT below acquires this transaction's physical JDBC
+        // connection from the pool — checkBreach's outbound HIBP call only needs the plaintext, not
+        // the item, so running it first keeps that connection from sitting checked-out (bounded by
+        // the HIBP client's timeouts, but still real pool pressure under load) for the duration of a
+        // third-party network call. Only computed when the item will be a LOGIN — see
+        // applySecretHealth's call site below for why a SECURE_NOTE never gets this.
+        SecretHealth health = (hasNewSecret && willBeLogin) ? computeSecretHealth(request.getSecret()) : null;
+
         VaultItem item = findAndValidate(itemId, userId);
         // Bring any pre-existing fields left on an older key version up to current BEFORE applying
         // this call's own edits, so a call that only touches TOTP (leaving the password untouched)
@@ -119,18 +138,39 @@ public class VaultServiceImpl implements VaultService {
         item.setUrl(request.getUrl());
         item.setCategory(request.getCategory());
         item.setIcon(request.getIcon());
-        if (request.getSecret() != null && !request.getSecret().isBlank()) {
+        if (hasNewSecret) {
             VaultEncryptionService.EncryptedSecret encrypted = vaultEncryptionService.encrypt(request.getSecret());
             item.setSecretCiphertext(encrypted.ciphertext());
             item.setSecretIv(encrypted.iv());
             item.setKeyVersion(encrypted.keyVersion());
-            applySecretHealth(item, request.getSecret());
+        }
+        if (willBeLogin) {
+            if (health != null) applySecretHealth(item, health);
+        } else {
+            // A secure note's content isn't a credential — password-strength/breach/reuse scoring
+            // is meaningless for it (and actively misleading: ordinary prose reads as "weak" just
+            // for lacking digits/symbols). Clear any health fields left over from when this item
+            // might have been a LOGIN, so an old password's flags don't keep showing on what's now
+            // just a note.
+            item.setSecretHash(null);
+            item.setStrengthLevel(null);
+            item.setBreachCount(null);
         }
         applyTotpSecret(item, request.getTotpSecret());
         item = vaultItemRepository.save(item);
 
         auditService.log(userId, "VAULT_ITEM_UPDATED", "VAULT_ITEM", item.getId(), null, null, null, null);
         return vaultItemMapper.toResponse(item);
+    }
+
+    /** TOTP codes only make sense for a website LOGIN — a secure note has no "account" for a 2FA
+     * code to protect. The create/edit UI never offers the TOTP field outside LOGIN, but the API
+     * itself had no server-side check, so a client bypassing the UI could silently attach one to a
+     * note. */
+    private void requireNoTotpOutsideLogin(VaultItemType itemType, String totpSecret) {
+        if (itemType != VaultItemType.LOGIN && totpSecret != null && !totpSecret.isBlank()) {
+            throw new BusinessException("Two-factor codes are only supported for logins.", HttpStatus.BAD_REQUEST);
+        }
     }
 
     @Override
@@ -175,15 +215,26 @@ public class VaultServiceImpl implements VaultService {
         // no separate rotation/migration job needed.
         normalizeKeyVersion(item);
         item.setLastRevealedAt(Instant.now());
+        String secret = vaultEncryptionService.decrypt(item.getSecretCiphertext(), item.getSecretIv(), item.getKeyVersion());
+
+        // Same self-healing idea as normalizeKeyVersion above, for items saved before
+        // VaultPasswordStrengthEvaluator learned to recognize numeric PINs: a LOGIN item whose
+        // secret is a 4/6-digit PIN may still carry a stale "weak"/"breached" flag from the old
+        // generic-password heuristic. Safe to recompute unconditionally here — isNumericPin's
+        // branch in checkBreach short-circuits before any HIBP call, so this adds no network I/O,
+        // only the plaintext we've already decrypted above for the response itself.
+        if (item.getItemType() == VaultItemType.LOGIN && VaultPasswordStrengthEvaluator.isNumericPin(secret)) {
+            applySecretHealth(item, computeSecretHealth(secret));
+        }
         vaultItemRepository.save(item);
 
         auditService.log(userId, "VAULT_ITEM_REVEALED", "VAULT_ITEM", item.getId(), null, null, ipAddress, userAgent);
         return VaultItemSecretResponse.builder()
                 .id(item.getId())
-                .secret(vaultEncryptionService.decrypt(item.getSecretCiphertext(), item.getSecretIv(), item.getKeyVersion()))
+                .secret(secret)
                 .totpSecret(item.getTotpCiphertext() == null ? null
                         : vaultEncryptionService.decrypt(item.getTotpCiphertext(), item.getTotpIv(), item.getKeyVersion()))
-                .stepUpToken(issueStepUpToken(userId))
+                .stepUpToken(issueStepUpToken("reveal", userId))
                 .build();
     }
 
@@ -271,18 +322,32 @@ public class VaultServiceImpl implements VaultService {
                 .build();
     }
 
-    /** Computes and sets secret_hash/strength_level/breach_count on {@code item} from the
-     * plaintext about to be encrypted. Breach checking fails open — never blocks the save. */
-    private void applySecretHealth(VaultItem item, String plaintext) {
-        item.setSecretHash(vaultSecretHasher.hash(plaintext));
-        item.setStrengthLevel(VaultPasswordStrengthEvaluator.evaluate(plaintext));
-        item.setBreachCount(checkBreach(plaintext));
+    /** secret_hash/strength_level/breach_count for a plaintext about to be encrypted, computed as
+     * a standalone step (no {@link VaultItem} needed) precisely so callers can run it — including
+     * its outbound HIBP call — before doing any repository work. See createItem/updateItem for why
+     * that ordering matters. */
+    private record SecretHealth(String hash, int strengthLevel, Integer breachCount) {}
+
+    private SecretHealth computeSecretHealth(String plaintext) {
+        return new SecretHealth(
+                vaultSecretHasher.hash(plaintext),
+                VaultPasswordStrengthEvaluator.evaluate(plaintext),
+                checkBreach(plaintext));
+    }
+
+    private void applySecretHealth(VaultItem item, SecretHealth health) {
+        item.setSecretHash(health.hash());
+        item.setStrengthLevel(health.strengthLevel());
+        item.setBreachCount(health.breachCount());
     }
 
     /** Have I Been Pwned k-anonymity check: only a 5-char SHA-1 prefix leaves the server.
      * Returns null (unknown) on any failure — the caller must treat that as "not checked",
-     * never as "clean". */
+     * never as "clean". A 4/6-digit numeric secret is a bank PIN, not a password — HIBP's corpus
+     * is comprehensive enough that virtually every possible PIN appears in it somewhere, so
+     * "breached" there is a meaningless universal-positive, not a signal about this PIN. */
     private Integer checkBreach(String plaintext) {
+        if (VaultPasswordStrengthEvaluator.isNumericPin(plaintext)) return null;
         try {
             MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
             byte[] digest = sha1.digest(plaintext.getBytes(StandardCharsets.UTF_8));
@@ -386,7 +451,7 @@ public class VaultServiceImpl implements VaultService {
     private void requireStepUp(String scope, UUID userId, RevealVaultItemRequest request,
                                 String ipAddress, String userAgent) {
         String token = request.getStepUpToken();
-        if (token != null && !token.isBlank() && isValidStepUpToken(userId, token)) {
+        if (token != null && !token.isBlank() && isValidStepUpToken(scope, userId, token)) {
             return;
         }
         String pin = request.getPin();
@@ -476,11 +541,15 @@ public class VaultServiceImpl implements VaultService {
         clearFailedAttempts(scope, userId);
     }
 
-    private static String stepUpTokenKey(UUID userId) { return "vault-stepup:" + userId; }
+    /** Scoped by action ({@code "reveal"}/{@code "export"}) — a token granted while revealing one
+     * item must not also unlock a bulk export the user never consented to. The checkbox that grants
+     * this ("Skip this confirmation for other items until then") only ever talks about other
+     * reveals, so the token itself must not silently cover more ground than that. */
+    private static String stepUpTokenKey(String scope, UUID userId) { return "vault-stepup:" + scope + ":" + userId; }
 
-    private boolean isValidStepUpToken(UUID userId, String token) {
+    private boolean isValidStepUpToken(String scope, UUID userId, String token) {
         try {
-            String stored = redisTemplate.opsForValue().get(stepUpTokenKey(userId));
+            String stored = redisTemplate.opsForValue().get(stepUpTokenKey(scope, userId));
             // Constant-time compare — this is a bearer secret, so guard against a timing side
             // channel even though the token's 122 bits of entropy make it infeasible in practice.
             return stored != null && MessageDigest.isEqual(
@@ -492,12 +561,12 @@ public class VaultServiceImpl implements VaultService {
     }
 
     /** Issues (or refreshes) an opaque trust token the client may use in place of the password for
-     * subsequent reveal/export calls within {@link #STEP_UP_TOKEN_TTL}. Best-effort: if Redis is
-     * unavailable, callers just fall back to always requiring the password again. */
-    private String issueStepUpToken(UUID userId) {
+     * subsequent same-{@code scope} calls within {@link #STEP_UP_TOKEN_TTL}. Best-effort: if Redis
+     * is unavailable, callers just fall back to always requiring the password again. */
+    private String issueStepUpToken(String scope, UUID userId) {
         String token = UUID.randomUUID().toString();
         try {
-            redisTemplate.opsForValue().set(stepUpTokenKey(userId), token, STEP_UP_TOKEN_TTL);
+            redisTemplate.opsForValue().set(stepUpTokenKey(scope, userId), token, STEP_UP_TOKEN_TTL);
         } catch (Exception e) {
             log.warn("Failed to issue vault step-up token for user {}: {}", userId, e.getMessage());
         }

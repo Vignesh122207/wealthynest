@@ -25,6 +25,8 @@ type ApiError = { response?: { status?: number; data?: { message?: string } } };
 
 const CLIPBOARD_CLEAR_MS = 20_000;
 const TRUST_TTL_MINUTES = 5;
+const IDLE_HIDE_MS = 60_000;
+const ACTIVITY_EVENTS = ["mousemove", "keydown", "click", "scroll"] as const;
 // See VaultHealthCard for the full brass/graphite "vault door" identity this echoes.
 const VAULT_BRASS = "#d4a72c";
 
@@ -57,7 +59,11 @@ export function RevealSecretModal({ item, accentColor, onClose }: { item: VaultI
   });
   const method = form.watch("method") ?? "password";
 
-  useEffect(() => () => { if (clipboardTimer.current) clearTimeout(clipboardTimer.current); }, []);
+  // Deliberately NOT cancelled on unmount — the whole point of this timer is to clear the
+  // clipboard after the user is done here, and closing this modal right after copy-pasting (the
+  // most common flow) is exactly when it needs to still fire. A plain setTimeout survives the
+  // component that scheduled it; only a fresh copy from a still-mounted instance should replace it
+  // (handled below), never unmounting.
 
   const handleRevealed = (data: VaultItemSecret, trustRequested: boolean) => {
     setRevealed(data.secret);
@@ -108,16 +114,39 @@ export function RevealSecretModal({ item, accentColor, onClose }: { item: VaultI
     toast.success("Copied — clipboard clears in 20s");
     if (clipboardTimer.current) clearTimeout(clipboardTimer.current);
     clipboardTimer.current = setTimeout(async () => {
-      // Only clear if the clipboard still holds what we copied — a user who copied
-      // something else in the meantime shouldn't have that wiped out from under them.
       try {
+        // Only clear if the clipboard still holds what we copied — a user who copied
+        // something else in the meantime shouldn't have that wiped out from under them.
         const current = await navigator.clipboard.readText();
         if (current === revealed) await navigator.clipboard.writeText("");
       } catch {
-        // Clipboard read permission denied/unavailable — nothing to safely clear.
+        // Can't confirm what the clipboard currently holds (read permission denied/unavailable,
+        // e.g. Firefox without an explicit grant, or the tab lost focus) — clear it unconditionally
+        // rather than silently leaving the secret sitting there. Slightly more aggressive than the
+        // happy path (might wipe something else copied in the meantime), but that's the safer
+        // failure mode for a password manager's clipboard than never clearing at all.
+        try { await navigator.clipboard.writeText(""); } catch { /* Clipboard API entirely unavailable. */ }
       }
     }, CLIPBOARD_CLEAR_MS);
   };
+
+  // Re-masks the revealed secret after a stretch of no mouse/keyboard/scroll activity — an
+  // already-open reveal shouldn't keep sensitive plaintext on screen indefinitely if the user
+  // walks away, independent of the vault-wide trust/idle-lock (which only governs whether a
+  // *future* reveal skips the password prompt, not content already displayed).
+  useEffect(() => {
+    if (revealed === null) return;
+    let lastActivity = Date.now();
+    const onActivity = () => { lastActivity = Date.now(); };
+    ACTIVITY_EVENTS.forEach((e) => window.addEventListener(e, onActivity, { passive: true }));
+    const interval = setInterval(() => {
+      if (Date.now() - lastActivity >= IDLE_HIDE_MS) setShowSecret(false);
+    }, 5000);
+    return () => {
+      ACTIVITY_EVENTS.forEach((e) => window.removeEventListener(e, onActivity));
+      clearInterval(interval);
+    };
+  }, [revealed]);
 
   const apiError = error as ApiError | null;
   const errorMessage = apiError?.response?.data?.message

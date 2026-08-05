@@ -1,6 +1,7 @@
 package com.wealthynest.domain.budget.service;
 
 import com.wealthynest.common.exception.AccessDeniedException;
+import com.wealthynest.common.exception.BusinessException;
 import com.wealthynest.common.exception.ResourceNotFoundException;
 import com.wealthynest.domain.budget.dto.request.CreateBudgetRequest;
 import com.wealthynest.domain.budget.dto.request.UpdateBudgetRequest;
@@ -14,6 +15,7 @@ import com.wealthynest.domain.category.repository.CategoryRepository;
 import com.wealthynest.domain.category.service.CategoryOwnershipGuard;
 import com.wealthynest.domain.expense.repository.ExpenseRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +25,7 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -70,6 +73,21 @@ public class BudgetServiceImpl implements BudgetService {
         if (request.getRollover() != null)        budget.setRollover(request.getRollover());
         if (request.getCategoryId() != null) {
             categoryOwnershipGuard.validateCategoryOwnership(request.getCategoryId(), userId, familyId);
+            // Guards the same categoryId+budgetType uniqueness createOrUpdateBudget's own upsert
+            // lookup enforces on create — without this, retargeting an existing budget's category
+            // to one that already has a budget of the same type silently produced two live rows
+            // for that category+type, each independently tracking (and double-counting) the same
+            // expenses.
+            if (!request.getCategoryId().equals(budget.getCategoryId())) {
+                Optional<Budget> conflict = familyId != null
+                    ? budgetRepository.findByFamilyIdAndCategoryIdAndBudgetType(familyId, request.getCategoryId(), budget.getBudgetType())
+                    : budgetRepository.findByUserIdAndCategoryIdAndBudgetType(userId, request.getCategoryId(), budget.getBudgetType());
+                if (conflict.isPresent() && !conflict.get().getId().equals(budget.getId())) {
+                    throw new BusinessException(
+                        "A " + budget.getBudgetType().name().toLowerCase() + " budget for this category already exists.",
+                        HttpStatus.CONFLICT);
+                }
+            }
             budget.setCategoryId(request.getCategoryId());
         }
 

@@ -15,7 +15,13 @@
     --card-foreground: 222 47% 9%;
     --panel:       0 0% 100%;
     --primary:     23 52% 50%;
-    --primary-foreground: 0 0% 100%;
+    /* White-on-primary measured 3.7:1 here (2.39:1 in dark theme below) against WCAG AA's 4.5:1
+       floor for normal text/icons — caught by the home page's a11y test once the Month/Year
+       toggle button (bg-primary + text-primary-foreground, 12px) started rendering there, but the
+       same pairing is also what every focus-visible skip-link in the app uses. Reusing
+       --foreground's dark navy here instead of inventing a new stop keeps --primary itself (and
+       every bg-primary/8, text-primary, border-primary consumer) untouched. */
+    --primary-foreground: 222 47% 9%;
     --secondary:   220 20% 92%;
     --secondary-foreground: 222 47% 20%;
     --muted:       220 20% 94%;
@@ -69,7 +75,8 @@
     --card-foreground: 213 25% 92%;
     --panel:       213 52% 13%;
     --primary:     23 75% 64%;
-    --primary-foreground: 0 0% 100%;
+    /* Same fix as the light theme above — see that comment. */
+    --primary-foreground: 222 47% 9%;
     --secondary:   217 38% 16%;
     --secondary-foreground: 213 25% 92%;
     --muted:       217 38% 14%;

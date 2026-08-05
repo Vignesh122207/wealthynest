@@ -1,5 +1,7 @@
 import {expect, test} from "../../fixtures";
-import {randomGoal} from "../../test-data/factory";
+import {randomBankAccount, randomGoal} from "../../test-data/factory";
+import {readRegressionUser} from "../../helpers/auth.helper";
+import {api} from "../../helpers/api.helper";
 
 // Serial — see debts.spec.ts's comment: shares the regressionUser with every other file in
 // tests/regression/.
@@ -21,6 +23,39 @@ test.describe("Goals", () => {
     await goalsPage.gotoGoals();
     await goalsPage.createGoal({ name: goal.name, targetAmount: goal.targetAmount });
     await goalsPage.addSavings(goal.name, goal.targetAmount);
+
+    await goalsPage.expectComplete(goal.name);
+  });
+
+  // Regression: adding more than what's needed used to silently cap at the target with no
+  // feedback — the excess just vanished. Should reject inline instead, matching the withdraw
+  // side's existing "can't withdraw more than saved" check.
+  test("adding more savings than needed is rejected inline, not silently capped @regression", async ({ goalsPage }) => {
+    const goal = randomGoal();
+    await goalsPage.gotoGoals();
+    await goalsPage.createGoal({ name: goal.name, targetAmount: 1000 });
+
+    await goalsPage.attemptOvershootSavings(goal.name, 5000);
+
+    await expect(goalsPage.rawPage.getByText(/only needs .*1,000 more/)).toBeVisible();
+    await goalsPage.expectGoalVisible(goal.name);
+  });
+
+  // Regression: create()/update() used to reject savedAmount > targetAmount unconditionally,
+  // including for a linked goal whose savedAmount is just a snapshot of the account's live
+  // balance (see GoalServiceImpl's own comment) — an account that already holds more than the
+  // goal's target is a perfectly valid "goal already achieved" starting point, not invalid input.
+  test("linking an account whose balance already exceeds the target creates a completed goal, not a rejection @regression", async ({ goalsPage }, testInfo) => {
+    const user = readRegressionUser(testInfo.project.name);
+    const auth = await api.login({ email: user.email, password: user.password });
+    const bank = randomBankAccount();
+    const account = await api.createAccount(auth.accessToken, {
+      accountType: "BANK_ACCOUNT", name: bank.bankName, bankName: bank.bankName, openingBalance: 50000,
+    });
+    const goal = randomGoal();
+    await goalsPage.gotoGoals();
+
+    await goalsPage.createGoalLinkedToAccount({ name: goal.name, targetAmount: 1000, accountId: account.id });
 
     await goalsPage.expectComplete(goal.name);
   });

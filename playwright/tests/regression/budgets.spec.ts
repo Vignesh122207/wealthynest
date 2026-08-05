@@ -1,5 +1,5 @@
 import {test} from "../../fixtures";
-import {randomBudget, randomCategoryName} from "../../test-data/factory";
+import {randomBankAccount, randomBudget, randomCategoryName} from "../../test-data/factory";
 import {readRegressionUser} from "../../helpers/auth.helper";
 import {api} from "../../helpers/api.helper";
 
@@ -71,5 +71,48 @@ test.describe("Budgets", () => {
     // re-select it, which the UI doesn't even offer) is the real assertion here.
     await budgetsPage.gotoBudgets();
     await budgetsPage.expectCategoryNotInCreatePicker(categoryName);
+  });
+
+  // Regression: editing a budget's category to one that already has a budget of the same type
+  // used to be allowed with no check at all (unlike the Create form's own picker filtering),
+  // silently producing two live budget rows for that category+type — each independently
+  // tracking (and, on the "Spent This Year" stat card, double-counting) the same expenses.
+  test("editing a budget's category to one already used by another budget of the same type is rejected @regression", async ({ budgetsPage }, testInfo) => {
+    const takenCategory = await freshCategory(testInfo.project.name);
+    const editingCategory = await freshCategory(testInfo.project.name);
+    const budget = randomBudget();
+    await budgetsPage.gotoBudgets();
+    await budgetsPage.createMonthlyBudget({ categoryName: takenCategory, amount: budget.amount });
+    await budgetsPage.createMonthlyBudget({ categoryName: editingCategory, amount: budget.amount });
+
+    // Same assertion shape as the Create-form case above: the edit picker simply never offers
+    // the taken category, rather than offering it and rejecting the submit.
+    await budgetsPage.expectCategoryNotInEditPicker(editingCategory, takenCategory);
+  });
+
+  // Regression: a category with both a MONTHLY and a YEARLY budget (a combination the app
+  // explicitly supports — see budgets/page.tsx's existingCategoryIds comment) had its real
+  // annual spend counted twice in the "Spent This Year" stat card, because the backend puts the
+  // same category-level annualSpent figure on every budget row for that category and the page
+  // summed every row instead of deduping by category.
+  test("a category with both a Monthly and a Yearly budget doesn't double-count Spent This Year @regression", async ({ budgetsPage }, testInfo) => {
+    const user = readRegressionUser(testInfo.project.name);
+    const auth = await api.login({ email: user.email, password: user.password });
+    const category = await api.createCategory(auth.accessToken, { name: randomCategoryName(), type: "EXPENSE" });
+    const bank = randomBankAccount();
+    const account = await api.createAccount(auth.accessToken, {
+      accountType: "BANK_ACCOUNT", name: bank.bankName, bankName: bank.bankName, openingBalance: bank.openingBalance,
+    });
+    const today = new Date().toISOString().split("T")[0];
+    await api.createExpense(auth.accessToken, {
+      categoryId: category.id, accountId: account.id, amount: 555, expenseDate: today, description: "annualSpent double-count regression",
+    });
+
+    await budgetsPage.gotoBudgets();
+    await budgetsPage.createMonthlyBudget({ categoryName: category.name, amount: 10000 });
+    await budgetsPage.createYearlyBudget({ categoryName: category.name, amount: 20000 });
+
+    await budgetsPage.gotoBudgets();
+    await budgetsPage.expectAnnualSpent("₹555");
   });
 });

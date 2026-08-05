@@ -13,8 +13,8 @@ import {badgeTextColor, PremiumIcon} from "@/components/icons/PremiumIcon";
 import {cn} from "@/lib/utils";
 import {useIsDark} from "@/hooks/useIsDark";
 import {getVaultCategoryColor, resolveVaultIcon, VAULT_CATEGORY_META, VAULT_ICON_OPTIONS} from "@/lib/categoryMeta";
-import {type VaultItemFormValues, vaultItemSchema} from "../schemas/vault.schema";
-import {estimatePasswordStrength} from "../lib/passwordStrength";
+import {type VaultItemFormValues, VAULT_SECRET_MAX_LENGTH, vaultItemSchema} from "../schemas/vault.schema";
+import {estimatePasswordStrength, isNumericPin} from "../lib/passwordStrength";
 import {PasswordGeneratorPanel} from "./PasswordGeneratorPanel";
 import {VaultModalHeader} from "./VaultModalHeader";
 
@@ -56,6 +56,12 @@ export function VaultItemForm({ isCreate, accentColor, defaultValues, hasExistin
   const [customCategory, setCustomCategory] = useState(
     !!defaultValues?.category && !CATEGORY_PRESETS.includes(defaultValues.category)
   );
+  // Tracks whether the current icon came from an explicit user pick (icon picker) rather than a
+  // category's auto-derived default, so re-selecting/changing category doesn't silently overwrite
+  // a choice the user actually made. An item that already has an icon when this form opens is
+  // treated as "manual" too — we can't tell in general whether it was auto-derived or picked, and
+  // preserving it is the safer default of the two.
+  const [iconManuallySet, setIconManuallySet] = useState(!!defaultValues?.icon);
 
   const form = useForm<VaultItemFormValues>({
     resolver: zodResolver(vaultItemSchema(isCreate)),
@@ -140,7 +146,7 @@ export function VaultItemForm({ isCreate, accentColor, defaultValues, hasExistin
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Choose an icon</p>
                   {icon && (
-                    <button type="button" onClick={() => form.setValue("icon", undefined)}
+                    <button type="button" onClick={() => { form.setValue("icon", undefined); setIconManuallySet(false); }}
                       className="text-[11px] font-medium" style={{ color: VAULT_BRASS }}>
                       Use automatic
                     </button>
@@ -148,7 +154,7 @@ export function VaultItemForm({ isCreate, accentColor, defaultValues, hasExistin
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {VAULT_ICON_OPTIONS.map(({ key, icon: OptIcon }) => (
-                    <button key={key} type="button" onClick={() => form.setValue("icon", key)}
+                    <button key={key} type="button" onClick={() => { form.setValue("icon", key); setIconManuallySet(true); }}
                       className={cn("rounded-lg transition-all", icon === key ? "ring-2 ring-offset-2 ring-offset-card" : "opacity-70 hover:opacity-100")}
                       style={icon === key ? { boxShadow: `0 0 0 2px ${VAULT_BRASS}` } : undefined}>
                       <PremiumIcon icon={OptIcon} hex={previewColor} size="xs" />
@@ -191,7 +197,10 @@ export function VaultItemForm({ isCreate, accentColor, defaultValues, hasExistin
                     onClick={() => {
                       setCustomCategory(false);
                       form.setValue("category", c, { shouldValidate: true });
-                      if (meta) form.setValue("icon", meta.iconKey, { shouldValidate: true });
+                      // Only auto-apply the category's default icon when the user hasn't
+                      // explicitly picked one themselves — otherwise re-selecting/changing
+                      // category would silently discard that choice.
+                      if (meta && !iconManuallySet) form.setValue("icon", meta.iconKey, { shouldValidate: true });
                     }}
                     className={cn(
                       "h-9 pl-1.5 pr-3.5 rounded-full text-xs font-semibold transition-all flex items-center gap-2 shrink-0",
@@ -254,15 +263,21 @@ export function VaultItemForm({ isCreate, accentColor, defaultValues, hasExistin
                   </div>
                 }
                 {...form.register("secret")} />
+              <p className="text-[11px] text-muted-foreground text-right -mt-0.5">{secret.length}/{VAULT_SECRET_MAX_LENGTH}</p>
               {secret.length > 0 && (
                 <div className="space-y-1">
                   <div className="h-1 bg-muted/60 rounded-full overflow-hidden flex gap-0.5">
-                    {[0, 1, 2, 3].map(i => (
+                    {[0, 1, 2, 3, 4].map(i => (
                       <div key={i} className={cn("h-full flex-1 rounded-full transition-colors", i > strength.level && "bg-transparent")}
                         style={{ backgroundColor: i <= strength.level ? strength.color : undefined }} />
                     ))}
                   </div>
                   <p className="text-xs" style={{ color: strength.color }}>{strength.label}</p>
+                  {isNumericPin(secret) && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Rated as a PIN — not directly comparable to a password&apos;s strength.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -315,6 +330,7 @@ export function VaultItemForm({ isCreate, accentColor, defaultValues, hasExistin
                     focus:border-[#d4a72c] focus:ring-2 focus:ring-[#d4a72c]/20"
                   value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} />
               )} />
+              <p className="text-[11px] text-muted-foreground text-right -mt-1">{secret.length}/{VAULT_SECRET_MAX_LENGTH}</p>
               {form.formState.errors.secret?.message && (
                 <p className="text-xs text-red-500 dark:text-red-400">{form.formState.errors.secret.message}</p>
               )}

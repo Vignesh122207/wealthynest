@@ -2,6 +2,11 @@ import {z} from "zod";
 
 export const VAULT_ITEM_TYPE_VALUES = ["LOGIN", "SECURE_NOTE"] as const;
 
+/** Matches the backend's `@Size(max = 2000)` on VaultItemRequest.secret — shared here so the
+ * create/edit form's character counter can reference the same number instead of a duplicated
+ * literal. */
+export const VAULT_SECRET_MAX_LENGTH = 2000;
+
 const baseVaultItemSchema = z.object({
   itemType: z.enum(VAULT_ITEM_TYPE_VALUES, { errorMap: () => ({ message: "Type is required" }) }),
   title:    z.string().min(1, "Title is required").max(150),
@@ -9,7 +14,7 @@ const baseVaultItemSchema = z.object({
   url:      z.string().max(500).optional(),
   category: z.string().max(50).optional(),
   icon:     z.string().max(30).optional(),
-  secret:   z.string().max(2000).optional(),
+  secret:   z.string().max(VAULT_SECRET_MAX_LENGTH).optional(),
   totpSecret: z.string().max(200).optional(),
 });
 

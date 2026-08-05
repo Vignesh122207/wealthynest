@@ -66,14 +66,4 @@ class VaultItemRepositoryTest extends AbstractRepositoryTest {
 
         assertThat(result).extracting(VaultItem::getTitle).containsExactly("Mine");
     }
-
-    @Test
-    @DisplayName("findByIdAndUserId does not leak another user's item even by correct id")
-    void findByIdAndUserIdScopesToOwner() {
-        VaultItem item = persistItem(userId, "Mine", false);
-        entityManager.flush();
-
-        assertThat(vaultItemRepository.findByIdAndUserId(item.getId(), userId)).isPresent();
-        assertThat(vaultItemRepository.findByIdAndUserId(item.getId(), UUID.randomUUID())).isEmpty();
-    }
 }

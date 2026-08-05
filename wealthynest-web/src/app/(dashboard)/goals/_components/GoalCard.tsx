@@ -28,7 +28,9 @@ export function GoalCard({ goal, goalColor, onEdit, onAddSavings }: {
   }, [goal.targetDate, complete]);
 
   const monthsLeft    = daysLeft != null ? Math.max(1, Math.ceil(daysLeft / 30)) : null;
-  const monthlyNeeded = monthsLeft && !complete && remaining > 0
+  // A paused goal shouldn't nudge the user to keep saving toward it — that directly
+  // contradicts the pause they just chose.
+  const monthlyNeeded = monthsLeft && !complete && !goal.paused && remaining > 0
     ? Math.ceil(remaining / monthsLeft) : null;
 
   const urgency = complete ? "complete"
@@ -117,7 +119,7 @@ export function GoalCard({ goal, goalColor, onEdit, onAddSavings }: {
                 Save <span className="font-bold">{fmt(monthlyNeeded)}/month</span> to reach goal on time
               </p>
             </div>
-          ) : !goal.targetDate && remaining > 0 && (
+          ) : !goal.targetDate && !goal.paused && remaining > 0 && (
             <div className="flex items-center gap-1.5 bg-muted/60 border border-border rounded-xl px-3 py-2 mb-3">
               <Clock className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
               <p className="text-xs text-muted-foreground/80">Set a target date to see your monthly savings plan</p>
