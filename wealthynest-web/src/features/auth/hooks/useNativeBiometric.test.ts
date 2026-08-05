@@ -9,6 +9,7 @@ import {
   enableBiometricUnlock, disableBiometricUnlock, isBiometryError,
 } from "../utils/nativeBiometric";
 import { isWebAuthnSupported } from "../utils/webauthn";
+import { markBiometricPromptEnded, markBiometricPromptStarting } from "../store/appLock.store";
 import { usePasskeys, useRegisterPasskey } from "./useAuth";
 import { toast } from "sonner";
 
@@ -28,6 +29,10 @@ vi.mock("./useAuth", () => ({
   usePasskeys: vi.fn(() => ({ data: [] })),
   useRegisterPasskey: vi.fn(() => ({ mutateAsync: vi.fn() })),
 }));
+vi.mock("../store/appLock.store", () => ({
+  markBiometricPromptStarting: vi.fn(),
+  markBiometricPromptEnded: vi.fn(),
+}));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const mockedIsNativePlatform = vi.mocked(isNativePlatform);
@@ -39,6 +44,8 @@ const mockedIsBiometryError = vi.mocked(isBiometryError);
 const mockedIsWebAuthnSupported = vi.mocked(isWebAuthnSupported);
 const mockedUsePasskeys = vi.mocked(usePasskeys);
 const mockedUseRegisterPasskey = vi.mocked(useRegisterPasskey);
+const mockedMarkBiometricPromptStarting = vi.mocked(markBiometricPromptStarting);
+const mockedMarkBiometricPromptEnded = vi.mocked(markBiometricPromptEnded);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -173,6 +180,63 @@ describe("useEnableBiometricUnlock", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(toast.error).not.toHaveBeenCalledWith("Couldn't enable fingerprint unlock");
+  });
+
+  // Regression: Android's Credential Manager sheet pauses the hosting Activity exactly like
+  // BiometricPrompt does, and the status query (which flips `armed` in useAppLockTrigger for a
+  // user with no PIN/passkey yet) is only invalidated after this whole mutation resolves — i.e.
+  // after BOTH ceremonies. Without re-marking the ceremony active around the passkey step too,
+  // enableBiometricUnlock's own grace tail would already have expired by the time the lock
+  // trigger's zero-grace mount-time check runs, popping the lock screen mid-setup.
+  it("brackets the chained passkey ceremony with markBiometricPromptStarting/Ended", async () => {
+    mockedEnableBiometricUnlock.mockResolvedValue(undefined);
+    mockedIsWebAuthnSupported.mockResolvedValue(true);
+    mockedUsePasskeys.mockReturnValue({ data: [] } as unknown as ReturnType<typeof usePasskeys>);
+    let activeWhileRegistering = false;
+    const registerPasskey = vi.fn().mockImplementation(async () => {
+      activeWhileRegistering =
+        mockedMarkBiometricPromptStarting.mock.calls.length > 0 &&
+        mockedMarkBiometricPromptEnded.mock.calls.length === 0;
+    });
+    mockedUseRegisterPasskey.mockReturnValue({ mutateAsync: registerPasskey } as unknown as ReturnType<typeof useRegisterPasskey>);
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useEnableBiometricUnlock(), { wrapper: Wrapper });
+    act(() => { result.current.mutate(); });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(activeWhileRegistering).toBe(true);
+    expect(mockedMarkBiometricPromptEnded).toHaveBeenCalled();
+  });
+
+  it("still ends the bracket when the chained passkey registration fails", async () => {
+    mockedEnableBiometricUnlock.mockResolvedValue(undefined);
+    mockedIsWebAuthnSupported.mockResolvedValue(true);
+    mockedUsePasskeys.mockReturnValue({ data: [] } as unknown as ReturnType<typeof usePasskeys>);
+    const registerPasskey = vi.fn().mockRejectedValue(new Error("declined"));
+    mockedUseRegisterPasskey.mockReturnValue({ mutateAsync: registerPasskey } as unknown as ReturnType<typeof useRegisterPasskey>);
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useEnableBiometricUnlock(), { wrapper: Wrapper });
+    act(() => { result.current.mutate(); });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedMarkBiometricPromptStarting).toHaveBeenCalled();
+    expect(mockedMarkBiometricPromptEnded).toHaveBeenCalled();
+  });
+
+  it("doesn't touch the bracket at all when passkey registration is skipped", async () => {
+    mockedEnableBiometricUnlock.mockResolvedValue(undefined);
+    mockedIsWebAuthnSupported.mockResolvedValue(false);
+    mockedUsePasskeys.mockReturnValue({ data: [] } as unknown as ReturnType<typeof usePasskeys>);
+    const { Wrapper } = createQueryClientWrapper();
+
+    const { result } = renderHook(() => useEnableBiometricUnlock(), { wrapper: Wrapper });
+    act(() => { result.current.mutate(); });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedMarkBiometricPromptStarting).not.toHaveBeenCalled();
+    expect(mockedMarkBiometricPromptEnded).not.toHaveBeenCalled();
   });
 });
 
