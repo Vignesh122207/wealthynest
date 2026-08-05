@@ -17,7 +17,7 @@ public class VaultItemRequest {
 
     /** Plaintext password (LOGIN) or note body (SECURE_NOTE). Required on create;
      * on update, leave blank to keep the existing secret unchanged. */
-    private String secret;
+    @Size(max = 2000) private String secret;
 
     /** Optional base32 TOTP secret (LOGIN items only). {@code null} = don't touch the existing
      * TOTP secret; {@code ""} = remove it; non-blank = set/replace it. */

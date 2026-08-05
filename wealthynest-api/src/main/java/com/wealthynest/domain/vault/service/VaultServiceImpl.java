@@ -82,6 +82,10 @@ public class VaultServiceImpl implements VaultService {
         if (request.getSecret() == null || request.getSecret().isBlank()) {
             throw new BusinessException("A password or note value is required.", HttpStatus.BAD_REQUEST);
         }
+        // Computed before anything below touches the repository, so the outbound HIBP call in here
+        // runs before this transaction has any reason to check out a physical JDBC connection —
+        // see the matching comment in updateItem, where that ordering actually matters.
+        SecretHealth health = computeSecretHealth(request.getSecret());
         VaultEncryptionService.EncryptedSecret encrypted = vaultEncryptionService.encrypt(request.getSecret());
 
         VaultItem item = VaultItem.builder()
@@ -96,7 +100,7 @@ public class VaultServiceImpl implements VaultService {
                 .secretIv(encrypted.iv())
                 .keyVersion(encrypted.keyVersion())
                 .build();
-        applySecretHealth(item, request.getSecret());
+        applySecretHealth(item, health);
         applyTotpSecret(item, request.getTotpSecret());
         item = vaultItemRepository.save(item);
 
@@ -107,6 +111,14 @@ public class VaultServiceImpl implements VaultService {
     @Override
     @Transactional
     public VaultItemResponse updateItem(UUID itemId, UUID userId, VaultItemRequest request) {
+        // Computed BEFORE findAndValidate's SELECT below acquires this transaction's physical JDBC
+        // connection from the pool — checkBreach's outbound HIBP call only needs the plaintext, not
+        // the item, so running it first keeps that connection from sitting checked-out (bounded by
+        // the HIBP client's timeouts, but still real pool pressure under load) for the duration of a
+        // third-party network call.
+        boolean hasNewSecret = request.getSecret() != null && !request.getSecret().isBlank();
+        SecretHealth health = hasNewSecret ? computeSecretHealth(request.getSecret()) : null;
+
         VaultItem item = findAndValidate(itemId, userId);
         // Bring any pre-existing fields left on an older key version up to current BEFORE applying
         // this call's own edits, so a call that only touches TOTP (leaving the password untouched)
@@ -119,12 +131,12 @@ public class VaultServiceImpl implements VaultService {
         item.setUrl(request.getUrl());
         item.setCategory(request.getCategory());
         item.setIcon(request.getIcon());
-        if (request.getSecret() != null && !request.getSecret().isBlank()) {
+        if (hasNewSecret) {
             VaultEncryptionService.EncryptedSecret encrypted = vaultEncryptionService.encrypt(request.getSecret());
             item.setSecretCiphertext(encrypted.ciphertext());
             item.setSecretIv(encrypted.iv());
             item.setKeyVersion(encrypted.keyVersion());
-            applySecretHealth(item, request.getSecret());
+            applySecretHealth(item, health);
         }
         applyTotpSecret(item, request.getTotpSecret());
         item = vaultItemRepository.save(item);
@@ -271,12 +283,23 @@ public class VaultServiceImpl implements VaultService {
                 .build();
     }
 
-    /** Computes and sets secret_hash/strength_level/breach_count on {@code item} from the
-     * plaintext about to be encrypted. Breach checking fails open — never blocks the save. */
-    private void applySecretHealth(VaultItem item, String plaintext) {
-        item.setSecretHash(vaultSecretHasher.hash(plaintext));
-        item.setStrengthLevel(VaultPasswordStrengthEvaluator.evaluate(plaintext));
-        item.setBreachCount(checkBreach(plaintext));
+    /** secret_hash/strength_level/breach_count for a plaintext about to be encrypted, computed as
+     * a standalone step (no {@link VaultItem} needed) precisely so callers can run it — including
+     * its outbound HIBP call — before doing any repository work. See createItem/updateItem for why
+     * that ordering matters. */
+    private record SecretHealth(String hash, int strengthLevel, Integer breachCount) {}
+
+    private SecretHealth computeSecretHealth(String plaintext) {
+        return new SecretHealth(
+                vaultSecretHasher.hash(plaintext),
+                VaultPasswordStrengthEvaluator.evaluate(plaintext),
+                checkBreach(plaintext));
+    }
+
+    private void applySecretHealth(VaultItem item, SecretHealth health) {
+        item.setSecretHash(health.hash());
+        item.setStrengthLevel(health.strengthLevel());
+        item.setBreachCount(health.breachCount());
     }
 
     /** Have I Been Pwned k-anonymity check: only a 5-char SHA-1 prefix leaves the server.

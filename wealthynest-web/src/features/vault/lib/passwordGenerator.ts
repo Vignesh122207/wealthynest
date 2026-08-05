@@ -19,6 +19,22 @@ export const DEFAULT_GENERATOR_OPTIONS: PasswordGeneratorOptions = {
   length: 16, upper: true, digits: true, symbols: true,
 };
 
+/** Rejection-sampled random index in `[0, max)` from `crypto.getRandomValues` — plain
+ * `randomUint32 % max` is biased whenever `max` doesn't evenly divide 2^32 (true for every pool/
+ * wordlist size here), very slightly favoring the low end of the range. Discarding draws that fall
+ * in the trailing partial bucket removes that bias entirely rather than just shrinking it — this
+ * generates real account passwords, so it should be uniform, not merely "close enough". */
+function randomIndex(max: number): number {
+  const buf = new Uint32Array(1);
+  const limit = Math.floor(0x100000000 / max) * max;
+  let x: number;
+  do {
+    crypto.getRandomValues(buf);
+    x = buf[0];
+  } while (x >= limit);
+  return x % max;
+}
+
 /** Uses crypto.getRandomValues (not Math.random) — this generates real account passwords. */
 export function generatePassword(options: PasswordGeneratorOptions): string {
   let pool = LOWER;
@@ -26,9 +42,9 @@ export function generatePassword(options: PasswordGeneratorOptions): string {
   if (options.digits)  pool += DIGITS;
   if (options.symbols) pool += SYMBOLS;
 
-  const bytes = new Uint32Array(options.length);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => pool[b % pool.length]).join("");
+  let result = "";
+  for (let i = 0; i < options.length; i++) result += pool[randomIndex(pool.length)];
+  return result;
 }
 
 /** A compact diceware-style wordlist (common, unambiguous English words, 3-8 letters, no
@@ -82,9 +98,10 @@ const WORDLIST = [
 ] as const;
 
 /** RFC-6238-style passphrase generator (Bitwarden/1Password-style secondary mode), e.g.
- * "cedar-otter-lagoon-prism". Uses crypto.getRandomValues for uniform word selection. */
+ * "cedar-otter-lagoon-prism". Uses crypto.getRandomValues (via randomIndex) for uniform word
+ * selection. */
 export function generatePassphrase(wordCount: number): string {
-  const indices = new Uint32Array(wordCount);
-  crypto.getRandomValues(indices);
-  return Array.from(indices, (i) => WORDLIST[i % WORDLIST.length]).join("-");
+  const words: string[] = [];
+  for (let i = 0; i < wordCount; i++) words.push(WORDLIST[randomIndex(WORDLIST.length)]);
+  return words.join("-");
 }

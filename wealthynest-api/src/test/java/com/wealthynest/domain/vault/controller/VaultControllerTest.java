@@ -106,6 +106,20 @@ class VaultControllerTest {
                     .andExpect(status().isUnprocessableEntity())
                     .andExpect(jsonPath("$.fieldErrors.itemType").exists());
         }
+
+        @Test
+        @DisplayName("a secret over 2000 chars fails @Size validation")
+        void oversizedSecretFailsValidation() throws Exception {
+            SecurityTestUtils.authenticateAs(userId, null);
+            VaultItemRequest req = validRequest();
+            ReflectionTestUtils.setField(req, "secret", "a".repeat(2001));
+
+            mockMvc.perform(post("/api/v1/vault/items")
+                            .contentType("application/json")
+                            .content(objectMapper.writeValueAsString(req)))
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.fieldErrors.secret").exists());
+        }
     }
 
     @Test
