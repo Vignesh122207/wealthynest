@@ -65,10 +65,21 @@ describe("getPaceForecast", () => {
     expect(getPaceForecast(150000, 5000, 3, 31, [10000])).toBeNull();
   });
 
-  it("projects the full-month pace from the elapsed-day rate", () => {
-    // ₹500 net over 10 days → ₹1550 projected over a 31-day month
+  it("extrapolates expenses from the elapsed-day rate but takes income as already recorded", () => {
+    // ₹1000 spent over 10 days → ₹3100 projected expenses over a 31-day month; income (₹1500) is
+    // NOT scaled the same way, so net pace goes negative even though income exceeds MTD expenses —
+    // see getPaceForecast's own comment for why income isn't extrapolated like expenses are.
     const result = getPaceForecast(1500, 1000, 10, 31, []);
-    expect(result?.amount).toBeCloseTo(1550, 0);
+    expect(result?.amount).toBeCloseTo(1500 - 3100, 0);
+  });
+
+  // Regression for the real production bug this fixes: a ₹1,22,770 salary credited by day 5 of a
+  // 31-day month used to render as "on pace to save ₹7,61,171" (income re-multiplied by ~6.2x on
+  // top of already being the full month's income). With income no longer extrapolated, the
+  // projected amount is just what's actually there.
+  it("doesn't inflate an already-complete month's income when it lands as a single early lump sum", () => {
+    const result = getPaceForecast(122770, 0, 5, 31, []);
+    expect(result?.amount).toBeCloseTo(122770, 0);
   });
 
   it("returns pctVsAvg null when there's no prior-month history", () => {
@@ -82,8 +93,8 @@ describe("getPaceForecast", () => {
   });
 
   it("computes pctVsAvg against the average of prior months", () => {
-    // projected 1550, prior avg (1000+2000)/2=1500 → +50/1500 = 3.33%
-    const result = getPaceForecast(1500, 1000, 10, 31, [1000, 2000]);
+    // projected 3100 - 1550 = 1550, prior avg (1000+2000)/2=1500 → +50/1500 = 3.33%
+    const result = getPaceForecast(3100, 500, 10, 31, [1000, 2000]);
     expect(result?.pctVsAvg).toBeCloseTo(3.33, 1);
   });
 
@@ -92,19 +103,19 @@ describe("getPaceForecast", () => {
     expect(result?.pctVsAvg).toBeLessThan(0);
   });
 
-  it("hides pctVsAvg (but keeps the amount) when a lumpy one-time transaction blows the % past the sanity cap", () => {
-    // A ~₹2,58,000 net-so-far by day 5 (e.g. a bonus/FD maturity) extrapolated over 31 days
-    // against a modest ₹34,000 prior average is the real production case this regresses —
-    // mathematically "correct" but a meaningless-looking "4606% above average".
-    const result = getPaceForecast(258161, 0, 5, 31, [34014]);
-    expect(result?.amount).toBeCloseTo(1600598, -1);
+  it("hides pctVsAvg (but keeps the amount) when a lumpy expense blows the % past the sanity cap", () => {
+    // A large EMI/annual-premium expense hitting early in the month, extrapolated over the rest of
+    // it, against a modest prior average is still a real case this guards — mathematically
+    // "correct" but a meaningless-looking swing once compared to a normal month.
+    const result = getPaceForecast(0, 50000, 5, 31, [-4000]);
+    expect(result?.amount).toBeCloseTo(-310000, -1);
     expect(result?.pctVsAvg).toBeNull();
   });
 
   it("still surfaces a large but plausible pctVsAvg under the sanity cap", () => {
     // 400% above average is a big swing but still a meaningful, real comparison — must not be
     // suppressed by the same guard that hides the truly nonsensical case above.
-    const result = getPaceForecast(2000, 0, 10, 31, [1240]);
+    const result = getPaceForecast(6200, 0, 10, 31, [1240]);
     expect(result?.pctVsAvg).not.toBeNull();
     expect(result?.pctVsAvg).toBeCloseTo(400, 0);
   });
@@ -172,6 +183,30 @@ describe("getCategoryDeltaInsights", () => {
     });
     expect(result).toHaveLength(3);
     expect(result.map(r => r.category)).toEqual(["D", "B", "C"]);
+  });
+
+  // Regression: a single one-time purchase early in the month, in a category with little/no prior
+  // spend, used to get multiplied by the same run-rate math as the income bug — a ₹50,000
+  // electronics buy on day 7 of a 31-day month projected to "₹2,21,429 more than last month".
+  it("drops a projected delta that's implausible against the category's own history", () => {
+    const current  = [cat("c1", "Electronics", 50000)];
+    const previous: ReturnType<typeof cat>[] = [];
+    const result = getCategoryDeltaInsights(current, previous, {
+      isCurrentMonth: true, dayOfMonth: 7, daysInMonth: 31, avgMonthlySpend: 20000,
+    });
+    expect(result).toEqual([]);
+  });
+
+  it("still surfaces a large but plausible projected delta under the sanity cap", () => {
+    // Projected ₹4500 vs. a real ₹1200 prior month is a genuinely big, meaningful swing (275%
+    // above this category's own history) — must not be suppressed by the same guard.
+    const current  = [cat("c1", "Dining", 1500)];
+    const previous = [cat("c1", "Dining", 1200)];
+    const result = getCategoryDeltaInsights(current, previous, {
+      isCurrentMonth: true, dayOfMonth: 10, daysInMonth: 30, avgMonthlySpend: 2000,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].delta).toBeCloseTo(3300, 0);
   });
 });
 

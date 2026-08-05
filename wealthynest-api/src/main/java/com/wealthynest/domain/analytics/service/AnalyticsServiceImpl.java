@@ -158,7 +158,11 @@ public class AnalyticsServiceImpl implements AnalyticsService {
             int trendYear = period[0], trendMonth = period[1];
             BigDecimal tIncome  = incomeByYearMonth.get(trendYear).getOrDefault(trendMonth, BigDecimal.ZERO);
             BigDecimal tExpense = expenseByYearMonth.get(trendYear).getOrDefault(trendMonth, BigDecimal.ZERO);
-            BigDecimal tSaved = tIncome.subtract(tExpense).max(BigDecimal.ZERO);
+            // Unclamped — matches getAnnualTrend's own income.subtract(expense) below. A floor at
+            // zero here used to silently hide genuinely net-negative months (overspending), which
+            // both inflated the historical average getPaceForecast compares the current month's
+            // pace against on the frontend, and flattened real dips in the Six-Month Trend chart.
+            BigDecimal tSaved = tIncome.subtract(tExpense);
             String lbl = java.time.LocalDate.of(trendYear, trendMonth, 1)
                     .getMonth().getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.ENGLISH);
             monthlyTrend.add(MonthlyTrendResponse.builder()

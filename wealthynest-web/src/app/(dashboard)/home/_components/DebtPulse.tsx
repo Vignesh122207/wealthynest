@@ -38,7 +38,7 @@ export function DebtPulse({ debts }: DebtPulseProps) {
   return (
     <Link
       href="/debts"
-      // h-full: this can sit side-by-side with the over-budget banner in AttentionRow, whose
+      // h-full: this can sit side-by-side with the over-budget banner in AlertsRow, whose
       // 2-line message makes it taller — without h-full this card was capped to its own
       // (shorter, single-line) content height inside the stretched grid cell, leaving bare
       // background below it instead of a matching card. bg/border intensity matched to the

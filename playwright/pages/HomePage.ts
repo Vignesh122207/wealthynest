@@ -13,8 +13,8 @@ export class HomePage extends BasePage {
     await this.expectHeaderTitle("Home");
   }
 
-  get attentionRow(): Locator {
-    return this.page.getByTestId(TEST_IDS.home.attentionRow);
+  get alertsRow(): Locator {
+    return this.page.getByTestId(TEST_IDS.home.alertsRow);
   }
 
   get overBudgetBanner(): Locator {

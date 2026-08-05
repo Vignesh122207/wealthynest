@@ -5,9 +5,11 @@ import {AlertTriangle, X} from "lucide-react";
 import {cn} from "@/lib/utils";
 import {PremiumIcon} from "@/components/icons/PremiumIcon";
 import type {DebtRecord} from "@/features/debts/types/debt.types";
+import type {Expense} from "@/features/expenses/types/expense.types";
 import {DebtPulse} from "./DebtPulse";
+import {SmartInsightsCard, UpcomingBillsCard, type SmartInsight} from "./SmartAlerts";
 
-interface AttentionRowProps {
+interface AlertsRowProps {
   overBudgetCount:     number;
   overBudgetDismissed: boolean;
   onDismissOverBudget: () => void;
@@ -16,28 +18,44 @@ interface AttentionRowProps {
    * over limit, Year mode counts yearly ones (see StatOverview's matching ring), so the banner
    * text always agrees with whichever ring is currently showing. */
   periodLabel:         "month" | "year";
+  smartInsights:       SmartInsight[];
+  upcomingBills:       Expense[];
 }
 
-// Over-budget banner + DebtPulse share one row: whichever is alone takes the full row,
-// both split 1fr/1fr, neither renders nothing — the same "don't leave an orphan grid
-// column" rule as SmartAlerts' Insights/Bills row, applied here since these two are the
-// dashboard's other pair of independently-optional "something needs your attention" cards.
-export function AttentionRow({
+type CardKey = "banner" | "debt" | "insights" | "bills";
+
+// All four "something needs your attention" cards (over-budget banner, DebtPulse, Smart
+// Insights, Upcoming Bills) share one reflowing 2-column row instead of splitting into two
+// independently-stacked rows — whichever subset is present packs in pairs, and a trailing odd
+// card out reclaims the full row instead of leaving its partner column empty.
+export function AlertsRow({
   overBudgetCount, overBudgetDismissed, onDismissOverBudget, debts, periodLabel,
-}: AttentionRowProps) {
-  const showBanner = !overBudgetDismissed && overBudgetCount > 0;
-  const hasDebts   = debts.some(d => d.status !== "SETTLED");
+  smartInsights, upcomingBills,
+}: AlertsRowProps) {
+  const showBanner  = !overBudgetDismissed && overBudgetCount > 0;
+  const hasDebts    = debts.some(d => d.status !== "SETTLED");
+  const hasInsights = smartInsights.length > 0;
+  const hasBills    = upcomingBills.length > 0;
 
-  if (!showBanner && !hasDebts) return null;
+  const visible: CardKey[] = [
+    ...(showBanner ? (["banner"] as const) : []),
+    ...(hasDebts ? (["debt"] as const) : []),
+    ...(hasInsights ? (["insights"] as const) : []),
+    ...(hasBills ? (["bills"] as const) : []),
+  ];
+  if (visible.length === 0) return null;
 
-  const wide = !(showBanner && hasDebts);
+  // Odd count out: the last card in reading order has no pair, so it spans both columns.
+  const wideLast = visible.length % 2 === 1;
+  const lastKey = visible[visible.length - 1];
+  const isWide = (key: CardKey) => wideLast && key === lastKey;
 
   return (
-    <div data-testid="attention-row" className={cn("grid gap-3 animate-fade-in-up delay-225", !wide && "md:grid-cols-2")}>
+    <div data-testid="alerts-row" className="grid gap-3 animate-fade-in-up delay-225 md:grid-cols-2">
       {showBanner && (
         <div data-testid="over-budget-banner" className={cn(
           "flex items-start gap-3 rounded-2xl border border-red-500/30 bg-red-500/8 px-4 py-3",
-          wide && "md:col-span-2"
+          isWide("banner") && "md:col-span-2"
         )}>
           <PremiumIcon icon={AlertTriangle} tone="red" size="xs" className="mt-0.5" />
           <div className="flex-1 min-w-0 space-y-1">
@@ -55,10 +73,12 @@ export function AttentionRow({
         </div>
       )}
       {hasDebts && (
-        <div data-testid="debt-pulse-wrap" className={cn(wide && "md:col-span-2")}>
+        <div data-testid="debt-pulse-wrap" className={cn(isWide("debt") && "md:col-span-2")}>
           <DebtPulse debts={debts} />
         </div>
       )}
+      {hasInsights && <SmartInsightsCard insights={smartInsights} wide={isWide("insights")} />}
+      {hasBills && <UpcomingBillsCard bills={upcomingBills} wide={isWide("bills")} />}
     </div>
   );
 }
