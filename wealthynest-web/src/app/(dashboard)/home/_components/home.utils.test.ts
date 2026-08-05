@@ -90,6 +90,23 @@ describe("getPaceForecast", () => {
     const result = getPaceForecast(1000, 900, 10, 31, [1000]);
     expect(result?.pctVsAvg).toBeLessThan(0);
   });
+
+  it("hides pctVsAvg (but keeps the amount) when a lumpy one-time transaction blows the % past the sanity cap", () => {
+    // A ~₹2,58,000 net-so-far by day 5 (e.g. a bonus/FD maturity) extrapolated over 31 days
+    // against a modest ₹34,000 prior average is the real production case this regresses —
+    // mathematically "correct" but a meaningless-looking "4606% above average".
+    const result = getPaceForecast(258161, 0, 5, 31, [34014]);
+    expect(result?.amount).toBeCloseTo(1600598, -1);
+    expect(result?.pctVsAvg).toBeNull();
+  });
+
+  it("still surfaces a large but plausible pctVsAvg under the sanity cap", () => {
+    // 400% above average is a big swing but still a meaningful, real comparison — must not be
+    // suppressed by the same guard that hides the truly nonsensical case above.
+    const result = getPaceForecast(2000, 0, 10, 31, [1240]);
+    expect(result?.pctVsAvg).not.toBeNull();
+    expect(result?.pctVsAvg).toBeCloseTo(400, 0);
+  });
 });
 
 describe("getCategoryDeltaInsights", () => {
