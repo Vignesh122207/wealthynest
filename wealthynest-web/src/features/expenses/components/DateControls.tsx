@@ -1,8 +1,12 @@
+import {useLayoutEffect, useRef, useState} from "react";
 import {ChevronLeft, ChevronRight} from "lucide-react";
 import {FormDatePicker} from "@/components/forms/FormDatePicker";
 import {cn} from "@/lib/utils";
 import {monthLabel} from "../utils/filterHelpers";
 import type {DateMode} from "../types/filters.types";
+
+const DATE_MODES: DateMode[] = ["month", "year", "all", "custom"];
+const DATE_MODE_LABEL: Record<DateMode, string> = { month: "Month", year: "Year", all: "All", custom: "Custom" };
 
 export function DateControls({ dateMode, setDateMode, year, setYear, month, setMonth,
   customStart, setCustomStart, customEnd, setCustomEnd }: {
@@ -22,15 +26,30 @@ export function DateControls({ dateMode, setDateMode, year, setYear, month, setM
     setMonth(m); setYear(y);
   };
 
+  // A real sliding pill (measured off the active button, animated with transform) rather than
+  // an instant background-color swap — the segmented control this is modeled on (iOS's) always
+  // slides its selection, it never just recolors in place.
+  const btnRefs = useRef<Partial<Record<DateMode, HTMLButtonElement | null>>>({});
+  const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const btn = btnRefs.current[dateMode];
+    if (btn) setPill({ left: btn.offsetLeft, width: btn.offsetWidth });
+  }, [dateMode]);
+
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex items-center h-9 bg-muted/60 border border-border rounded-xl p-0.5">
-          {(["month", "year", "all", "custom"] as DateMode[]).map(m => (
-            <button key={m} onClick={() => setDateMode(m)} data-testid={`date-mode-${m}`}
-              className={cn("px-2.5 h-7 rounded-lg text-[11px] font-medium transition-all",
-                dateMode === m ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
-              {m === "month" ? "Month" : m === "year" ? "Year" : m === "custom" ? "Custom" : "All"}
+        <div className="relative flex items-center h-9 bg-muted/60 border border-border rounded-xl p-0.5">
+          {pill && (
+            <div aria-hidden className="absolute top-0.5 h-7 rounded-lg bg-card shadow-sm transition-[transform,width] duration-200 ease-out"
+              style={{ transform: `translateX(${pill.left}px)`, width: pill.width }} />
+          )}
+          {DATE_MODES.map(m => (
+            <button key={m} ref={el => { btnRefs.current[m] = el; }} onClick={() => setDateMode(m)} data-testid={`date-mode-${m}`}
+              className={cn("relative z-[1] px-2.5 h-7 rounded-lg text-[11px] font-medium transition-colors",
+                dateMode === m ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
+              {DATE_MODE_LABEL[m]}
             </button>
           ))}
         </div>

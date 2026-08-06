@@ -59,10 +59,6 @@ const TransactionModals = dynamic(
   () => import("./_components/TransactionModals").then(m => m.TransactionModals),
   { ssr: false }
 );
-const ImportStatementModal = dynamic(
-  () => import("@/features/statementimport/components/ImportStatementModal").then(m => m.ImportStatementModal),
-  { ssr: false }
-);
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -116,7 +112,6 @@ export default function TransactionsPage() {
   const [showAddTransfer,   setShowAddTransfer]   = useState(false);
   const [editTransfer,      setEditTransfer]      = useState<AccountTransfer | null>(null);
   const [confirmTransferId, setConfirmTransferId] = useState<string | null>(null);
-  const [showImportStatement, setShowImportStatement] = useState(false);
   const [transferSort,      setTransferSort]      = useState<"newest"|"oldest"|"high"|"low">("newest");
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
 
@@ -843,7 +838,7 @@ export default function TransactionsPage() {
 
   return (
     <div className="flex flex-col flex-1">
-      <Header title="Transactions" subtitle="Track and manage all your money movements" onExport={handleExport} />
+      <Header title="Transactions" subtitle="Track and manage all your money movements" />
 
       {/* Gates the dynamic import itself — TransactionModals is otherwise unconditionally
           mounted (its own internal `{x && <Modal/>}` checks are one level too deep for
@@ -870,19 +865,13 @@ export default function TransactionsPage() {
       <main className="flex-1 p-4 md:p-5 lg:p-6 pb-36 lg:pb-24 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-4">
 
-        {/* Toolbar — search, filters, import — shared across every tab */}
+        {/* Toolbar — search, filters, download — shared across every tab */}
         <Toolbar
           search={search} setSearch={setSearch}
           onOpenFilters={() => setShowFilterPanel(true)}
           activeFilterCount={activeFilterCount}
-          onImportStatement={() => setShowImportStatement(true)}
-          hasAccounts={hasAccounts}
+          onExport={handleExport}
         />
-
-        {showImportStatement && (
-          <ImportStatementModal onClose={() => setShowImportStatement(false)}
-            bankAccounts={sharedFormProps.bankAccounts} cashAccounts={sharedFormProps.cashAccounts} />
-        )}
 
         {/* Shared date controls */}
         <DateControls
