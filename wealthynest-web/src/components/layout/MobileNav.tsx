@@ -54,10 +54,10 @@ export function MobileNav() {
               )}
               <div className={cn(
                 "w-9 h-7 rounded-xl flex items-center justify-center transition-all",
-                active ? "bg-primary/10" : "bg-transparent"
+                active ? "bg-primary/5" : "bg-transparent"
               )}>
-                <PremiumIcon icon={icon} gradient={gradient} size="xs" selected={active}
-                  className={cn("rounded-full transition-transform", active && "scale-110")} />
+                <PremiumIcon icon={icon} gradient={gradient} size="xs"
+                  className="rounded-full" />
               </div>
               <span className={cn(
                 "text-[9px] font-semibold tracking-tight text-center leading-tight",
@@ -90,10 +90,10 @@ export function MobileNav() {
           )}
           <div className={cn(
             "w-9 h-7 rounded-xl flex items-center justify-center transition-all",
-            mobileMenuOpen ? "bg-primary/10" : "bg-transparent"
+            mobileMenuOpen ? "bg-primary/5" : "bg-transparent"
           )}>
-            <PremiumIcon icon={Menu} gradient={MORE_GRADIENT} size="xs" selected={mobileMenuOpen}
-              className={cn("rounded-full transition-transform", mobileMenuOpen && "scale-110")} />
+            <PremiumIcon icon={Menu} gradient={MORE_GRADIENT} size="xs"
+              className="rounded-full" />
           </div>
           <span className={cn(
             "text-[9px] font-semibold tracking-tight text-center leading-tight",

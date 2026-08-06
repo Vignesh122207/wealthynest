@@ -114,7 +114,9 @@ function NavItem({ href, label, icon, gradient, active, badge, collapsed, onClic
 }) {
   // size="xs" is the same badge size nav used before today's redesign — the circular
   // rounded-full override is new (matches the reference), but the size itself reverts.
-  const glyph = <PremiumIcon icon={icon} gradient={gradient} size="xs" interactive selected={active} badge={badge} className="rounded-full" />;
+  // No `selected` glow escalation here — the row's own (now subtler) pill background already
+  // carries the active cue, so the badge doesn't need its own separate ring/scale on top of it.
+  const glyph = <PremiumIcon icon={icon} gradient={gradient} size="xs" badge={badge} className="rounded-full" />;
 
   if (collapsed) {
     return (
@@ -125,7 +127,7 @@ function NavItem({ href, label, icon, gradient, active, badge, collapsed, onClic
         aria-current={active ? "page" : undefined}
         className={cn(
           "flex flex-col items-center justify-center gap-1.5 py-3 px-1 rounded-2xl text-center transition-colors",
-          active ? "bg-primary/10 dark:bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+          active ? "bg-primary/5 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
         )}
       >
         {glyph}
@@ -142,7 +144,7 @@ function NavItem({ href, label, icon, gradient, active, badge, collapsed, onClic
       aria-current={active ? "page" : undefined}
       className={cn(
         "relative flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150",
-        active ? "text-primary bg-primary/10 dark:bg-primary/15" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+        active ? "text-primary bg-primary/5" : "text-muted-foreground hover:text-foreground hover:bg-muted"
       )}
     >
       {active && (
