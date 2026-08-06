@@ -23,15 +23,18 @@ export function Toolbar({
           </button>
         )}
       </div>
+      {/* Tinted, not filled — reads as this pair's "off" state next to Download's solid fill,
+          while still carrying the same sky→indigo hue as this page's own sidebar icon
+          (Sidebar.tsx NAV_GROUPS "/expenses" entry) instead of a flat neutral gray. */}
       <button onClick={onOpenFilters} aria-label={activeFilterCount > 0 ? `Filters, ${activeFilterCount} active` : "Filters"}
-        className="flex items-center gap-1.5 sm:gap-2 h-10 px-3 sm:px-4 rounded-xl text-sm font-medium bg-muted border border-border text-muted-foreground hover:text-foreground transition-all shrink-0">
+        className="flex items-center gap-1.5 sm:gap-2 h-10 px-3 sm:px-4 rounded-xl text-sm font-medium bg-indigo-500/10 border border-indigo-500/25 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/15 hover:border-indigo-500/40 transition-all shrink-0">
         <SlidersHorizontal className="w-4 h-4" /> <span className="hidden sm:inline">Filters</span>
         {activeFilterCount > 0 && (
           <span className="w-4 h-4 rounded-full bg-indigo-600 text-white text-[10px] font-bold flex items-center justify-center">{activeFilterCount}</span>
         )}
       </button>
       <button onClick={onExport} aria-label="Download"
-        className="flex items-center gap-1.5 sm:gap-2 h-10 px-3 sm:px-4 rounded-xl text-sm font-medium bg-muted border border-border text-muted-foreground hover:text-foreground transition-all shrink-0">
+        className="flex items-center gap-2 bg-gradient-to-br from-sky-500 to-indigo-600 shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 hover:-translate-y-0.5 text-white px-4 h-10 rounded-xl text-sm font-medium transition-all whitespace-nowrap shrink-0">
         <Download className="w-4 h-4" /> <span className="hidden sm:inline">Download</span>
       </button>
     </div>
