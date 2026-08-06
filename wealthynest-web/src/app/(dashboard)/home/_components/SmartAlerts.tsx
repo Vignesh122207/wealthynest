@@ -32,7 +32,7 @@ export function SmartInsightsCard({ insights, wide }: SmartInsightsCardProps) {
       wide && "md:col-span-2"
     )}>
       <div className="flex items-center gap-2 mb-1">
-        <PremiumIcon icon={Lightbulb} tone="yellow" size="xs" />
+        <PremiumIcon icon={Lightbulb} tone="yellow" size="xs" className="rounded" />
         <p className="text-xs font-semibold text-foreground">Smart Insights</p>
       </div>
       <div className={
