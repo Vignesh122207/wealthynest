@@ -75,12 +75,12 @@ export default function DebtsPage() {
         {debts.length > 0 && <Summary debts={debts} />}
 
         {/* Tabs — shared TabBar template, same as Investments/Accounts/Transactions. */}
-        <TabBar items={tabs} value={tab} onChange={setTab} testIdPrefix="debt-tab" />
+        <TabBar items={tabs} value={tab} onChange={setTab} testIdPrefix="debt-tab" className="animate-fade-in-up delay-75" />
 
         {/* List */}
         {isLoading ? (
           <div className="space-y-3">
-            {[1, 2, 3].map(i => <div key={i} className="h-32 bg-card border border-border rounded-2xl animate-pulse" />)}
+            {[1, 2, 3].map(i => <div key={i} className="h-32 bg-card border border-border/50 rounded-2xl shimmer" />)}
           </div>
         ) : isError ? (
           <QueryErrorState onRetry={() => refetch()} description="Couldn't load your debts. Check your connection and try again." />
@@ -111,7 +111,7 @@ export default function DebtsPage() {
             }
           />
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 animate-fade-in-up delay-150">
             {filtered.map(debt => (
               <DebtCard
                 key={debt.id}
