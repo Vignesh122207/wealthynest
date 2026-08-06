@@ -29,12 +29,16 @@ import {useAuthStore} from "@/features/auth/store/auth.store";
 import {useLogout} from "@/features/auth/hooks/useAuth";
 import {useUIStore} from "@/store/ui.store";
 import {useMergedNotifications} from "@/features/notifications/hooks/useServerNotifications";
+import {useIsDark} from "@/hooks/useIsDark";
+import {badgeTextColor} from "@/components/icons/PremiumIcon";
 import {BrandMark} from "@/components/icons/BrandMark";
 
-// Flat, single-accent nav — every item shares one icon language (plain stroke glyph, no per-item
-// color) and is told apart by its label and position, not a unique hue. Replaces the previous
-// per-item gradient badge system: quieter chrome that doesn't compete with page content, and one
-// fewer thing (a whole gradient palette) for a new nav item to have to pick.
+// Each item keeps the brand hue it had under the old gradient-badge system (the brighter of the
+// two original gradient stops) — restored per explicit request after a brief stint as flat
+// single-accent icons. The icon itself is a plain glyph (no badge/box), just tinted with its own
+// color via badgeTextColor (same already-verified 4.5:1-in-both-themes helper PremiumIcon/
+// FlatIcon use) — active/inactive is still carried by the row's own pill background and label
+// color, not by recoloring the icon.
 // Labels are short on purpose — the desktop rail is a narrow icon-above-label column (see
 // NavItem's collapsed variant), so "Transactions"/"Investments"/"Support WealthyNest" become
 // "Activity"/"Invest"/"Support" here. The mobile drawer (NavItem's non-collapsed variant) reads
@@ -43,43 +47,45 @@ const NAV_GROUPS = [
   {
     label: "Overview",
     items: [
-      { href: "/home",   label: "Home",         icon: Home },
-      { href: "/accounts",    label: "Accounts",     icon: Wallet },
-      { href: "/expenses",    label: "Activity",     icon: ArrowLeftRight },
+      { href: "/home",   label: "Home",         icon: Home,           hex: "#a855f7" },
+      { href: "/accounts",    label: "Accounts",     icon: Wallet,         hex: "#3b82f6" },
+      { href: "/expenses",    label: "Activity",     icon: ArrowLeftRight, hex: "#0ea5e9" },
     ],
   },
   {
     label: "Planning",
     items: [
-      { href: "/budgets",     label: "Budgets",      icon: PieChart },
-      { href: "/goals",       label: "Goals",        icon: Target },
-      { href: "/debts",       label: "Debts",        icon: Handshake },
+      { href: "/budgets",     label: "Budgets",      icon: PieChart,  hex: "#f59e0b" },
+      { href: "/goals",       label: "Goals",        icon: Target,    hex: "#d946ef" },
+      { href: "/debts",       label: "Debts",        icon: Handshake, hex: "#ef4444" },
     ],
   },
   {
     label: "Growth",
     items: [
-      { href: "/investments", label: "Invest",       icon: TrendingUp },
-      { href: "/assets",      label: "Net Worth",    icon: Gem },
+      { href: "/investments", label: "Invest",       icon: TrendingUp, hex: "#10b981" },
+      { href: "/assets",      label: "Net Worth",    icon: Gem,        hex: "#8b5cf6" },
     ],
   },
   {
     label: "Insights",
     items: [
-      { href: "/analytics",     label: "Analytics",     icon: ChartNoAxesCombined },
-      { href: "/family",        label: "Family",        icon: FamilyGroupIcon },
-      { href: "/reports",       label: "Reports",       icon: FileText },
+      { href: "/analytics",     label: "Analytics",     icon: ChartNoAxesCombined, hex: "#14b8a6" },
+      { href: "/family",        label: "Family",        icon: FamilyGroupIcon,     hex: "#FAA18F" },
+      { href: "/reports",       label: "Reports",       icon: FileText,            hex: "#d98a52" },
     ],
   },
   {
     label: "Account",
     items: [
-      { href: "/settings",           label: "Settings",  icon: Settings },
-      { href: "/vault",              label: "Vault",     icon: KeyRound },
-      { href: "/support-wealthynest", label: "Support",  icon: Heart },
+      { href: "/settings",           label: "Settings",  icon: Settings, hex: "#6b7280" },
+      { href: "/vault",              label: "Vault",     icon: KeyRound, hex: "#f6d776" },
+      { href: "/support-wealthynest", label: "Support",  icon: Heart,    hex: "#fb7185" },
     ],
   },
 ];
+
+const ADMIN_HEX = "#059669";
 
 // Flat item list for the desktop rail — no group headers there (see the screenshot this rail is
 // matching: one continuous column of tiles), so the grouping only matters for the mobile drawer.
@@ -112,10 +118,13 @@ function NavBadge({ badge }: { badge?: number }) {
 // `true` is the persistent desktop rail's icon-above-label tile (labels always visible, so no
 // tooltip needed); `false` is the mobile drawer's icon-left-label-right row. See Sidebar's own
 // comment on why the rail no longer collapses/expands at runtime.
-function NavItem({ href, label, icon: Icon, active, badge, collapsed, onClick }: {
-  href: string; label: string; icon: LucideIcon;
+function NavItem({ href, label, icon: Icon, hex, active, badge, collapsed, onClick }: {
+  href: string; label: string; icon: LucideIcon; hex: string;
   active: boolean; badge?: number; collapsed?: boolean; onClick?: () => void;
 }) {
+  const isDark = useIsDark();
+  const iconColor = badgeTextColor(hex, isDark);
+
   if (collapsed) {
     return (
       <Link
@@ -129,7 +138,7 @@ function NavItem({ href, label, icon: Icon, active, badge, collapsed, onClick }:
         )}
       >
         <span className="relative flex items-center justify-center">
-          <Icon className="w-5 h-5 shrink-0" />
+          <Icon className="w-5 h-5 shrink-0" style={{ color: iconColor }} />
           <NavBadge badge={badge} />
         </span>
         <span className="text-[10px] font-semibold leading-[1.15]">{label}</span>
@@ -152,7 +161,7 @@ function NavItem({ href, label, icon: Icon, active, badge, collapsed, onClick }:
         <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-primary rounded-r-full" />
       )}
       <span className="relative flex items-center">
-        <Icon className="w-[18px] h-[18px] shrink-0" />
+        <Icon className="w-[18px] h-[18px] shrink-0" style={{ color: iconColor }} />
         <NavBadge badge={badge} />
       </span>
       <span>{label}</span>
@@ -220,14 +229,14 @@ export function Sidebar() {
         {/* ── Nav ── */}
         {collapsed ? (
           <nav className="flex-1 px-2.5 py-4 overflow-y-auto space-y-1.5">
-            {ALL_NAV_ITEMS.map(({ href, label, icon }) => (
-              <NavItem key={href} href={href} label={label} icon={icon}
+            {ALL_NAV_ITEMS.map(({ href, label, icon, hex }) => (
+              <NavItem key={href} href={href} label={label} icon={icon} hex={hex}
                 active={isNavActive(pathname, href)}
                 badge={href === "/notifications" ? unreadCount : undefined}
                 collapsed onClick={closeMobileMenu} />
             ))}
             {isAdmin && (
-              <NavItem href="/admin" label="Admin" icon={ShieldCheck}
+              <NavItem href="/admin" label="Admin" icon={ShieldCheck} hex={ADMIN_HEX}
                 active={pathname.startsWith("/admin")} collapsed onClick={closeMobileMenu} />
             )}
           </nav>
@@ -239,8 +248,8 @@ export function Sidebar() {
                   {group.label}
                 </p>
                 <div className="space-y-0.5">
-                  {group.items.map(({ href, label, icon }) => (
-                    <NavItem key={href} href={href} label={label} icon={icon}
+                  {group.items.map(({ href, label, icon, hex }) => (
+                    <NavItem key={href} href={href} label={label} icon={icon} hex={hex}
                       active={isNavActive(pathname, href)}
                       badge={href === "/notifications" ? unreadCount : undefined}
                       onClick={closeMobileMenu} />
@@ -252,7 +261,7 @@ export function Sidebar() {
             {isAdmin && (
               <div>
                 <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-widest px-3 mb-1">Admin</p>
-                <NavItem href="/admin" label="Admin" icon={ShieldCheck}
+                <NavItem href="/admin" label="Admin" icon={ShieldCheck} hex={ADMIN_HEX}
                   active={pathname.startsWith("/admin")} onClick={closeMobileMenu} />
               </div>
             )}

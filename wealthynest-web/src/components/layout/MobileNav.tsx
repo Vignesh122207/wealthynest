@@ -5,6 +5,8 @@ import {usePathname} from "next/navigation";
 import {ArrowLeftRight, Home, Menu, PieChart, TrendingUp, Wallet} from "lucide-react";
 import {cn} from "@/lib/utils";
 import {useUIStore} from "@/store/ui.store";
+import {useIsDark} from "@/hooks/useIsDark";
+import {badgeTextColor} from "@/components/icons/PremiumIcon";
 
 // Net Worth only moves on a monthly snapshot — the least frequently-checked
 // number in the app — while Budgets is one of the most-opened destinations
@@ -12,19 +14,24 @@ import {useUIStore} from "@/store/ui.store";
 // Budgets uses PieChart (not Target) to match the desktop Sidebar, which now
 // uses Target for Goals — same glyph would otherwise mean two different
 // things depending on whether you're on mobile or desktop.
-// Plain, single-accent icons — see Sidebar.tsx's own comment; no per-item color here either,
-// so mobile and desktop stay visually identical without a shared gradient table between them.
+// Same per-item hex as Sidebar.tsx's NAV_GROUPS (the brighter of each item's old gradient
+// stops), so a destination reads as the same color on mobile as it does on desktop.
 const NAV_ITEMS = [
-  { href: "/home",   label: "Home",         icon: Home },
-  { href: "/accounts",    label: "Accounts",     icon: Wallet },
-  { href: "/expenses",    label: "Transactions", icon: ArrowLeftRight },
-  { href: "/investments", label: "Investments",  icon: TrendingUp },
-  { href: "/budgets",     label: "Budgets",      icon: PieChart },
+  { href: "/home",   label: "Home",         icon: Home,           hex: "#a855f7" },
+  { href: "/accounts",    label: "Accounts",     icon: Wallet,         hex: "#3b82f6" },
+  { href: "/expenses",    label: "Transactions", icon: ArrowLeftRight, hex: "#0ea5e9" },
+  { href: "/investments", label: "Investments",  icon: TrendingUp,     hex: "#10b981" },
+  { href: "/budgets",     label: "Budgets",      icon: PieChart,       hex: "#f59e0b" },
 ];
+
+// Same neutral gray the desktop Sidebar uses for Settings — fitting since "More" opens the
+// same full nav that Settings lives in.
+const MORE_HEX = "#6b7280";
 
 export function MobileNav() {
   const pathname = usePathname();
   const { mobileMenuOpen, openMobileMenu } = useUIStore();
+  const isDark = useIsDark();
 
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-[hsl(var(--sidebar-bg))]/95 backdrop-blur-xl border-t border-[hsl(var(--sidebar-border))]">
@@ -32,7 +39,7 @@ export function MobileNav() {
         className="flex items-center justify-around w-full"
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+        {NAV_ITEMS.map(({ href, label, icon: Icon, hex }) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link
@@ -51,7 +58,7 @@ export function MobileNav() {
                 "w-9 h-7 rounded-xl flex items-center justify-center transition-all",
                 active ? "bg-primary/10" : "bg-transparent"
               )}>
-                <Icon className={cn("w-[18px] h-[18px] transition-transform", active && "scale-110")} />
+                <Icon className={cn("w-[18px] h-[18px] transition-transform", active && "scale-110")} style={{ color: badgeTextColor(hex, isDark) }} />
               </div>
               <span className={cn(
                 "text-[9px] font-semibold tracking-tight text-center leading-tight",
@@ -86,7 +93,7 @@ export function MobileNav() {
             "w-9 h-7 rounded-xl flex items-center justify-center transition-all",
             mobileMenuOpen ? "bg-primary/10" : "bg-transparent"
           )}>
-            <Menu className={cn("w-[18px] h-[18px] transition-transform", mobileMenuOpen && "scale-110")} />
+            <Menu className={cn("w-[18px] h-[18px] transition-transform", mobileMenuOpen && "scale-110")} style={{ color: badgeTextColor(MORE_HEX, isDark) }} />
           </div>
           <span className={cn(
             "text-[9px] font-semibold tracking-tight text-center leading-tight",
