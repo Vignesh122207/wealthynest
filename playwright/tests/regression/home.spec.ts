@@ -71,7 +71,7 @@ test.describe("Home dashboard — dynamic reflow", () => {
     await home.expectSpansFullRow(home.smartInsightsCard, home.alertsRow);
   });
 
-  test("an over-budget budget shares the row with Smart Insights @regression", async () => {
+  test("an over-budget budget alone (no debt) and Insights alone each go full-width, not paired @regression", async () => {
     await api.createBudget(accessToken, { categoryId, amount: 1000, budgetType: "MONTHLY" });
 
     await home.gotoHome();
@@ -79,7 +79,11 @@ test.describe("Home dashboard — dynamic reflow", () => {
     await expect(home.overBudgetBanner).toContainText("1 budget over limit");
     await expect(home.debtPulse).not.toBeVisible();
     await expect(home.smartInsightsCard).toBeVisible();
-    await home.expectSharesRow(home.overBudgetBanner, home.smartInsightsCard, home.alertsRow);
+    // Banner has no DebtPulse to pair with, and Insights has no Upcoming Bills to pair with —
+    // a lone leftover on one side never cross-pairs with a lone leftover on the other, so both
+    // render on their own full-width row instead of sharing one.
+    await home.expectSpansFullRow(home.overBudgetBanner, home.alertsRow);
+    await home.expectSpansFullRow(home.smartInsightsCard, home.alertsRow);
   });
 
   test("adding a debt: banner+DebtPulse share a row, Insights alone reclaims the trailing row @regression", async () => {
@@ -92,13 +96,14 @@ test.describe("Home dashboard — dynamic reflow", () => {
     await home.expectSpansFullRow(home.smartInsightsCard, home.alertsRow);
   });
 
-  test("dismissing the over-budget banner leaves DebtPulse sharing the row with Smart Insights @regression", async () => {
+  test("dismissing the over-budget banner leaves DebtPulse and Smart Insights each full-width, not paired @regression", async () => {
     await home.dismissOverBudgetBanner();
 
     await expect(home.overBudgetBanner).not.toBeVisible();
     await expect(home.debtPulse).toBeVisible();
     await expect(home.smartInsightsCard).toBeVisible();
-    await home.expectSharesRow(home.debtPulse, home.smartInsightsCard, home.alertsRow);
+    await home.expectSpansFullRow(home.debtPulse, home.alertsRow);
+    await home.expectSpansFullRow(home.smartInsightsCard, home.alertsRow);
   });
 
   // ── Round 2: Month/Year toggle ──────────────────────────────────────────────
