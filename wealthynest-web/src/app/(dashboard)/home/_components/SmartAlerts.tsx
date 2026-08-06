@@ -58,10 +58,10 @@ interface SmartAlertsRowProps {
   upcomingBills: Expense[];
 }
 
-const MAX_INSIGHTS = 4;
+const MAX_INSIGHTS = 3;
 
 // The Home dashboard's "financial coach" strip — what's happening, why it matters, and what to
-// do next, for up to 4 insights at a time, most urgent first. Built entirely from data the page
+// do next, for up to 3 insights at a time, most urgent first. Built entirely from data the page
 // already computes (spending deltas, the pace forecast, server anomalies, upcoming recurring
 // bills) — no new endpoint, no new field.
 export function SmartAlertsRow({ smartInsights, upcomingBills }: SmartAlertsRowProps) {
@@ -176,7 +176,7 @@ export function SmartAlertsRow({ smartInsights, upcomingBills }: SmartAlertsRowP
     <div data-testid="smart-alerts-row" className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm animate-fade-in-up delay-225">
       <div className="flex items-center gap-2 mb-4">
         <PremiumIcon icon={Lightbulb} tone="yellow" size="sm" />
-        <h2 className="font-bold text-foreground">Financial Insights</h2>
+        <h2 className="font-bold text-foreground text-sm">Financial Insights</h2>
       </div>
 
       {cards.length === 0 ? (

@@ -110,7 +110,7 @@ export function InvestmentPanel({ investments, chart }: InvestmentPanelProps) {
     <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm animate-fade-in-up card-hover">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="font-bold text-foreground">Investment Overview</h2>
+          <h2 className="font-bold text-foreground text-sm">Investment Overview</h2>
           <p className="text-[11px] text-muted-foreground/80 mt-0.5">Portfolio performance</p>
         </div>
         <Link href="/investments"

@@ -34,7 +34,7 @@ export function BudgetSection({ budgetSummaries, viewMode, year, month, isLoadin
     <div data-testid="budget-section" className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm animate-fade-in-up delay-300 h-full flex flex-col card-hover">
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h2 className="font-bold text-foreground">Budget Progress</h2>
+          <h2 className="font-bold text-foreground text-sm">Budget Progress</h2>
           <p className="text-[11px] text-muted-foreground/80 mt-0.5">{label}</p>
         </div>
         <Link href="/budgets"

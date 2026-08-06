@@ -24,7 +24,7 @@ export function GoalsSummary({ goals, isLoading }: GoalsSummaryProps) {
     <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm animate-fade-in-up delay-375 card-hover">
       <div className="flex items-center justify-between px-5 py-4 border-b border-border/40">
         <div className="flex items-center gap-3">
-          <h2 className="font-bold text-foreground">Goals</h2>
+          <h2 className="font-bold text-foreground text-sm">Goals</h2>
           {goals.length > 0 && (
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">

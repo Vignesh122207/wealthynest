@@ -46,19 +46,27 @@ interface TileProps {
   label: string; value: string;
   deltaText?: string; deltaGood?: boolean;
   delay?: string;
+  /** Net Worth alone — a soft primary-tinted card + a step-larger value, so it reads as the
+   * dashboard's headline number at a glance while staying inside the same 6-up grid as every
+   * other tile (same padding/radius/shadow/icon size — only the tint and value size differ). */
+  primary?: boolean;
 }
 
-function StatTile({ icon, tone, label, value, deltaText, deltaGood, delay = "delay-0" }: TileProps) {
+function StatTile({ icon, tone, label, value, deltaText, deltaGood, delay = "delay-0", primary }: TileProps) {
   return (
     <div className={cn(
-      "bg-card rounded-2xl p-4 shadow-sm border border-border/50 card-hover animate-fade-in-up",
+      "rounded-2xl p-4 shadow-sm border card-hover animate-fade-in-up",
+      primary ? "bg-primary/[0.045] dark:bg-primary/[0.07] border-primary/25" : "bg-card border-border/50",
       delay
     )}>
       <div className="flex items-center gap-2 mb-3">
         <PremiumIcon icon={icon} tone={tone} size="sm" />
         <p className="text-xs font-semibold text-muted-foreground/80 truncate">{label}</p>
       </div>
-      <p className="text-xl font-bold text-foreground tabular-nums tracking-tight leading-none mb-2">{value}</p>
+      <p className={cn(
+        "font-bold text-foreground tabular-nums tracking-tight leading-none mb-2",
+        primary ? "text-2xl" : "text-xl"
+      )}>{value}</p>
       {deltaText ? (
         <p className={cn(
           "text-[11px] font-semibold tabular-nums",
@@ -181,13 +189,19 @@ export function StatOverview({
   const budgetOverCount = activeBudgets.filter(b => b.overBudget || b.paceOverBudget).length;
   const budgetOnTrack   = budgetTotal - budgetOverCount;
 
+  // [&>*]:min-w-0 on both grids below — see TwoColRow's identical comment: without it, a large
+  // formatted currency value (grid items default to min-width:auto) can push a tile — and the
+  // row — wider than its track instead of the tile's own truncate/tabular-nums layout containing it.
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 [&>*]:min-w-0">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="bg-card rounded-2xl p-4 shadow-sm border border-border/50 space-y-3">
+          <div key={i} className={cn(
+            "rounded-2xl p-4 shadow-sm border space-y-3",
+            i === 0 ? "bg-primary/[0.045] dark:bg-primary/[0.07] border-primary/25" : "bg-card border-border/50"
+          )}>
             <div className="w-8 h-8 rounded-xl shimmer" />
-            <div className="h-6 w-24 rounded-lg shimmer" />
+            <div className={cn("rounded-lg shimmer", i === 0 ? "h-7 w-28" : "h-6 w-24")} />
             <div className="h-3 w-16 rounded shimmer" />
           </div>
         ))}
@@ -203,13 +217,14 @@ export function StatOverview({
   const savingsRateDeltaPct = isYear ? ytdSavingsRateTrend : srPct;
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 [&>*]:min-w-0">
       <StatTile
         icon={Landmark} tone="blue"
         label="Net Worth" value={netWorth != null ? fmt(netWorth) : "—"}
         deltaText={isYear ? formatTrendDelta(netWorthSinceJanTrend, "since Jan 1") : formatTrendDelta(nwPct)}
         deltaGood={(isYear ? netWorthSinceJanTrend : nwPct) != null ? (isYear ? netWorthSinceJanTrend! : nwPct!) >= 0 : undefined}
         delay="delay-0"
+        primary
       />
       <StatTile
         icon={TrendingUp} tone="purple"
