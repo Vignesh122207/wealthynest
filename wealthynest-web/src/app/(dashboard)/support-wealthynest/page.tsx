@@ -22,7 +22,7 @@ export default function SupportWealthyNestPage() {
 
   return (
     <div className="flex flex-col flex-1">
-      <Header title="Support WealthyNest" subtitle="Your support keeps WealthyNest free and ad-free" />
+      <Header title="Support" subtitle="Your support keeps WealthyNest free and ad-free" />
       <PageWrapper>
         <div className="max-w-md mx-auto space-y-5">
 
@@ -31,7 +31,7 @@ export default function SupportWealthyNestPage() {
             <div className="mx-auto w-fit">
               <PremiumIcon icon={Heart} gradient={["#fb7185", "#db2777"]} size="md" />
             </div>
-            <p className="text-lg font-bold text-foreground">Support WealthyNest</p>
+            <p className="text-lg font-bold text-foreground">Support</p>
             <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">
               WealthyNest is free, open and ad-free. If it has helped your family manage money better,
               your support keeps the servers running and inspires new features.

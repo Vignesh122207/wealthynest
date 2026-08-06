@@ -2,30 +2,24 @@
 
 import Link from "next/link";
 import {usePathname} from "next/navigation";
-import {ArrowLeftRight, Home, Menu, PieChart, TrendingUp, Wallet} from "lucide-react";
+import {ArrowLeftRight, Home, Menu, Wallet} from "lucide-react";
 import {cn} from "@/lib/utils";
 import {PremiumIcon} from "@/components/icons/PremiumIcon";
-import {NAV_GRADIENTS} from "@/components/layout/Sidebar";
 import {useUIStore} from "@/store/ui.store";
 
-// Same neutral gray→slate pair the Sidebar uses for Settings — fitting since "More" opens the
-// same full nav that Settings lives in, and it's the one tab here that isn't a page of its own.
-const MORE_GRADIENT: [string, string] = ["#6b7280", "#475569"];
+// Apple-style tab bar: flat square icon badges (not the app's usual per-item rainbow of
+// gradients), neutral gray by default — the copper brand color (matches --primary, see
+// globals.css) is reserved for whichever single tab is currently selected, so it reads as
+// "this one is active" instead of every icon competing for attention at once.
+const COPPER_GRADIENT: [string, string] = ["#d98a52", "#a85f30"]; // brand-300 → brand-600
 
-// Net Worth only moves on a monthly snapshot — the least frequently-checked
-// number in the app — while Budgets is one of the most-opened destinations
-// (checked mid-month against a limit), so it holds the fifth tab instead.
-// Budgets uses PieChart (not Target) to match the desktop Sidebar, which now
-// uses Target for Goals — same glyph would otherwise mean two different
-// things depending on whether you're on mobile or desktop.
-// Gradients come from NAV_GRADIENTS (Sidebar.tsx) so each icon is the exact
-// same color on mobile as it is on desktop, instead of its own named tone.
+// Only four slots on mobile — the rest of the app (Investments, Budgets, Debts, Net Worth,
+// Family, Analytics, Reports, Settings, Support) lives behind "More", which opens the same
+// full Sidebar overlay used on desktop.
 const NAV_ITEMS = [
-  { href: "/home",   label: "Home",         icon: Home },
-  { href: "/accounts",    label: "Accounts",     icon: Wallet },
-  { href: "/expenses",    label: "Transactions", icon: ArrowLeftRight },
-  { href: "/investments", label: "Investments",  icon: TrendingUp },
-  { href: "/budgets",     label: "Budgets",      icon: PieChart },
+  { href: "/home",     label: "Home",         icon: Home },
+  { href: "/accounts", label: "Accounts",     icon: Wallet },
+  { href: "/expenses", label: "Transactions", icon: ArrowLeftRight },
 ];
 
 export function MobileNav() {
@@ -53,12 +47,14 @@ export function MobileNav() {
               {active && (
                 <span className="absolute top-0 left-1/2 -translate-x-1/2 w-5 h-0.5 bg-primary rounded-full" />
               )}
-              <div className={cn(
-                "w-9 h-7 rounded-xl flex items-center justify-center transition-all",
-                active ? "bg-primary/10" : "bg-transparent"
-              )}>
-                <PremiumIcon icon={icon} gradient={NAV_GRADIENTS[href]} size="xs" className={cn("transition-transform", active && "scale-110")} />
-              </div>
+              <PremiumIcon
+                icon={icon}
+                gradient={active ? COPPER_GRADIENT : undefined}
+                tone={active ? undefined : "gray"}
+                size="xs"
+                selected={active}
+                className="rounded-[7px]"
+              />
               <span className={cn(
                 "text-[9px] font-semibold tracking-tight text-center leading-tight",
                 active ? "text-primary" : "text-muted-foreground/70"
@@ -69,11 +65,11 @@ export function MobileNav() {
           );
         })}
 
-        {/* Debts, Net Worth, Family, Analytics, Reports, Settings, and Support all live behind
-            this — the header hamburger reaches the same full sidebar overlay, but nothing in the
-            bottom bar itself pointed there, so those seven destinations had no affordance a
-            mobile user would necessarily discover. Notifications isn't among them — the header
-            bell (every page) opens that full-screen, same as it always has. */}
+        {/* Investments, Budgets, Debts, Net Worth, Family, Analytics, Reports, Settings, and
+            Support all live behind this — the header hamburger reaches the same full sidebar
+            overlay, but nothing in the bottom bar itself pointed there, so those destinations
+            had no affordance a mobile user would necessarily discover. Notifications isn't
+            among them — the header bell (every page) opens that full-screen, same as always. */}
         <button
           type="button"
           onClick={openMobileMenu}
@@ -88,12 +84,14 @@ export function MobileNav() {
           {mobileMenuOpen && (
             <span className="absolute top-0 left-1/2 -translate-x-1/2 w-5 h-0.5 bg-primary rounded-full" />
           )}
-          <div className={cn(
-            "w-9 h-7 rounded-xl flex items-center justify-center transition-all",
-            mobileMenuOpen ? "bg-primary/10" : "bg-transparent"
-          )}>
-            <PremiumIcon icon={Menu} gradient={MORE_GRADIENT} size="xs" className={cn("transition-transform", mobileMenuOpen && "scale-110")} />
-          </div>
+          <PremiumIcon
+            icon={Menu}
+            gradient={mobileMenuOpen ? COPPER_GRADIENT : undefined}
+            tone={mobileMenuOpen ? undefined : "gray"}
+            size="xs"
+            selected={mobileMenuOpen}
+            className="rounded-[7px]"
+          />
           <span className={cn(
             "text-[9px] font-semibold tracking-tight text-center leading-tight",
             mobileMenuOpen ? "text-primary" : "text-muted-foreground/70"

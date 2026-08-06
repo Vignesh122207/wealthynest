@@ -85,18 +85,12 @@ const NAV_GROUPS = [
       // Gold — matches the redesigned Vault page's own brass/gold identity (VaultHealthCard's
       // "vault door" hero), was navy/graphite before that redesign.
       { href: "/vault",              label: "Vault",                icon: KeyRound, gradient: ["#f6d776", "#a9791a"] as Gradient },
-      { href: "/support-wealthynest", label: "Support WealthyNest", icon: Heart,    gradient: ["#fb7185", "#db2777"] as Gradient },
+      { href: "/support-wealthynest", label: "Support", icon: Heart,    gradient: ["#fb7185", "#db2777"] as Gradient },
     ],
   },
 ];
 
 const ADMIN_GRADIENT: Gradient = ["#059669", "#0d9488"];
-
-// Shared with MobileNav so bottom-tab icons match the desktop sidebar exactly
-// instead of drifting to their own named tones.
-export const NAV_GRADIENTS: Record<string, Gradient> = Object.fromEntries(
-  NAV_GROUPS.flatMap((group) => group.items.map(({ href, gradient }) => [href, gradient]))
-);
 
 // "/settings" would otherwise match every /settings/* sub-route, including Profile
 // (reached via the header avatar, not this nav, and with no back link into Settings)
@@ -140,10 +134,10 @@ function NavItem({ href, label, icon, gradient, active, badge, collapsed, onClic
           deliberate round accent distinct from the icon's own rounded-square shape. */}
       {collapsed ? (
         <span className={cn("flex items-center justify-center rounded-full p-0.5", active && "ring-2 ring-primary")}>
-          <PremiumIcon icon={icon} gradient={gradient} size="xs" interactive selected={active} badge={badge} />
+          <PremiumIcon icon={icon} gradient={gradient} size="xs" interactive selected={active} badge={badge} className="rounded-[7px]" />
         </span>
       ) : (
-        <PremiumIcon icon={icon} gradient={gradient} size="xs" interactive selected={active} badge={badge} />
+        <PremiumIcon icon={icon} gradient={gradient} size="xs" interactive selected={active} badge={badge} className="rounded-[7px]" />
       )}
       {!collapsed && <span>{label}</span>}
     </Link>
@@ -177,7 +171,7 @@ export function Sidebar() {
           collapsed && "justify-center px-0"
         )}
       >
-        <PremiumIcon icon={LogOut} tone="red" size="xs" />
+        <PremiumIcon icon={LogOut} tone="red" size="xs" className="rounded-[7px]" />
         {!collapsed && <span>Sign out</span>}
       </button>
     );
