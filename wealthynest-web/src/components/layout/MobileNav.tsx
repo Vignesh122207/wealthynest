@@ -5,8 +5,7 @@ import {usePathname} from "next/navigation";
 import {ArrowLeftRight, Home, Menu, PieChart, TrendingUp, Wallet} from "lucide-react";
 import {cn} from "@/lib/utils";
 import {useUIStore} from "@/store/ui.store";
-import {useIsDark} from "@/hooks/useIsDark";
-import {badgeTextColor} from "@/components/icons/PremiumIcon";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
 
 // Net Worth only moves on a monthly snapshot — the least frequently-checked
 // number in the app — while Budgets is one of the most-opened destinations
@@ -14,24 +13,23 @@ import {badgeTextColor} from "@/components/icons/PremiumIcon";
 // Budgets uses PieChart (not Target) to match the desktop Sidebar, which now
 // uses Target for Goals — same glyph would otherwise mean two different
 // things depending on whether you're on mobile or desktop.
-// Same per-item hex as Sidebar.tsx's NAV_GROUPS (the brighter of each item's old gradient
-// stops), so a destination reads as the same color on mobile as it does on desktop.
+// Same per-item gradient as Sidebar.tsx's NAV_GROUPS, so a destination reads as the same
+// glossy badge color on mobile as it does on desktop.
 const NAV_ITEMS = [
-  { href: "/home",   label: "Home",         icon: Home,           hex: "#a855f7" },
-  { href: "/accounts",    label: "Accounts",     icon: Wallet,         hex: "#3b82f6" },
-  { href: "/expenses",    label: "Transactions", icon: ArrowLeftRight, hex: "#0ea5e9" },
-  { href: "/investments", label: "Investments",  icon: TrendingUp,     hex: "#10b981" },
-  { href: "/budgets",     label: "Budgets",      icon: PieChart,       hex: "#f59e0b" },
+  { href: "/home",   label: "Home",         icon: Home,           gradient: ["#a855f7", "#6366f1"] as [string, string] },
+  { href: "/accounts",    label: "Accounts",     icon: Wallet,         gradient: ["#3b82f6", "#06b6d4"] as [string, string] },
+  { href: "/expenses",    label: "Transactions", icon: ArrowLeftRight, gradient: ["#0ea5e9", "#4f46e5"] as [string, string] },
+  { href: "/investments", label: "Investments",  icon: TrendingUp,     gradient: ["#10b981", "#16a34a"] as [string, string] },
+  { href: "/budgets",     label: "Budgets",      icon: PieChart,       gradient: ["#f59e0b", "#ea580c"] as [string, string] },
 ];
 
-// Same neutral gray the desktop Sidebar uses for Settings — fitting since "More" opens the
+// Same neutral gray→slate pair the Sidebar uses for Settings — fitting since "More" opens the
 // same full nav that Settings lives in.
-const MORE_HEX = "#6b7280";
+const MORE_GRADIENT: [string, string] = ["#6b7280", "#475569"];
 
 export function MobileNav() {
   const pathname = usePathname();
   const { mobileMenuOpen, openMobileMenu } = useUIStore();
-  const isDark = useIsDark();
 
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-[hsl(var(--sidebar-bg))]/95 backdrop-blur-xl border-t border-[hsl(var(--sidebar-border))]">
@@ -39,7 +37,7 @@ export function MobileNav() {
         className="flex items-center justify-around w-full"
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
-        {NAV_ITEMS.map(({ href, label, icon: Icon, hex }) => {
+        {NAV_ITEMS.map(({ href, label, icon, gradient }) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link
@@ -58,7 +56,8 @@ export function MobileNav() {
                 "w-9 h-7 rounded-xl flex items-center justify-center transition-all",
                 active ? "bg-primary/10" : "bg-transparent"
               )}>
-                <Icon className={cn("w-[18px] h-[18px] transition-transform", active && "scale-110")} style={{ color: badgeTextColor(hex, isDark) }} />
+                <PremiumIcon icon={icon} gradient={gradient} size="xs" selected={active}
+                  className={cn("rounded-full transition-transform", active && "scale-110")} />
               </div>
               <span className={cn(
                 "text-[9px] font-semibold tracking-tight text-center leading-tight",
@@ -93,7 +92,8 @@ export function MobileNav() {
             "w-9 h-7 rounded-xl flex items-center justify-center transition-all",
             mobileMenuOpen ? "bg-primary/10" : "bg-transparent"
           )}>
-            <Menu className={cn("w-[18px] h-[18px] transition-transform", mobileMenuOpen && "scale-110")} style={{ color: badgeTextColor(MORE_HEX, isDark) }} />
+            <PremiumIcon icon={Menu} gradient={MORE_GRADIENT} size="xs" selected={mobileMenuOpen}
+              className={cn("rounded-full transition-transform", mobileMenuOpen && "scale-110")} />
           </div>
           <span className={cn(
             "text-[9px] font-semibold tracking-tight text-center leading-tight",
