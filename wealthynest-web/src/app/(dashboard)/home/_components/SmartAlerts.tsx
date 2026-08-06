@@ -45,7 +45,7 @@ const SEVERITY_STYLE: Record<Severity, { tone: IconTone; bg: string; border: str
   opportunity: { tone: "blue",   bg: "bg-blue-500/[0.06]",    border: "border-l-blue-500/70",    borderHover: "hover:border-l-blue-500" },
 };
 
-interface InsightCard {
+export interface InsightCard {
   severity: Severity;
   icon:     LucideIcon;
   title:    string;
@@ -59,6 +59,23 @@ interface SmartAlertsRowProps {
 }
 
 const MAX_INSIGHTS = 3;
+
+// Pure severity-rank sorting front-loads bad news: any month with an anomaly plus a couple of
+// upcoming bills already fills every slot before a genuine positive card (a savings-pace win, a
+// category actually trending down) ever gets considered, even when one exists in the pool — the
+// panel reads as "only warnings" even though the underlying data has good news too. This keeps the
+// most urgent items first (critical/warning always win the top slots) but reserves the *last*
+// slot for the best available positive/opportunity card when the pure-severity top-N doesn't
+// already include one, so the panel stays the intended mix instead of an all-negative feed.
+// Falls back to plain severity order when no positive/opportunity candidate exists at all — a
+// genuinely all-bad-news month shouldn't have one manufactured.
+export function selectTopInsights(sorted: InsightCard[], max: number): InsightCard[] {
+  if (sorted.length <= max) return sorted;
+  const top = sorted.slice(0, max);
+  if (top.some(c => c.severity === "positive" || c.severity === "opportunity")) return top;
+  const goodNews = sorted.find(c => c.severity === "positive" || c.severity === "opportunity");
+  return goodNews ? [...top.slice(0, max - 1), goodNews] : top;
+}
 
 // The Home dashboard's "financial coach" strip — what's happening, why it matters, and what to
 // do next, for up to 3 insights at a time, most urgent first. Built entirely from data the page
@@ -168,9 +185,9 @@ export function SmartAlertsRow({ smartInsights, upcomingBills }: SmartAlertsRowP
     };
   });
 
-  const cards = [...fromInsights, ...fromBills]
-    .sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity])
-    .slice(0, MAX_INSIGHTS);
+  const sortedCards = [...fromInsights, ...fromBills]
+    .sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]);
+  const cards = selectTopInsights(sortedCards, MAX_INSIGHTS);
 
   return (
     <div data-testid="smart-alerts-row" className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm animate-fade-in-up delay-225">

@@ -252,9 +252,12 @@ describe("buildSmartInsights", () => {
     expect(buildSmartInsights(null, [], null)).toEqual([]);
   });
 
-  it("caps at 3 even when all three sources have candidates", () => {
+  it("does not cap the candidate list — SmartAlertsRow's own selection does that", () => {
     const result = buildSmartInsights(anomaly, deltas, forecast);
-    expect(result).toHaveLength(3);
+    // 1 anomaly + 3 deltas + 1 forecast — all 5 real candidates flow through uncapped, so a
+    // downstream diversity-aware pick (SmartAlertsRow) still has the forecast/positive items to
+    // choose from instead of them being silently dropped before that selection ever runs.
+    expect(result).toHaveLength(5);
   });
 
   it("puts anomaly first, ahead of category deltas and the forecast", () => {
@@ -262,15 +265,15 @@ describe("buildSmartInsights", () => {
     expect(result[0]).toEqual({ kind: "anomaly", title: anomaly.title, message: anomaly.message });
   });
 
-  it("fills remaining slots with category deltas (already ranked by significance) before the forecast", () => {
+  it("orders category deltas (already ranked by significance) before the forecast", () => {
     const result = buildSmartInsights(anomaly, deltas, forecast);
-    // anomaly + 2 deltas fills all 3 slots — the forecast and the 3rd delta both get dropped
     expect(result[1]).toMatchObject({ kind: "delta", category: "Groceries" });
     expect(result[2]).toMatchObject({ kind: "delta", category: "Fuel" });
-    expect(result.some(i => i.kind === "forecast")).toBe(false);
+    expect(result[3]).toMatchObject({ kind: "delta", category: "Shopping" });
+    expect(result[4]).toEqual({ kind: "forecast", amount: forecast.amount, pctVsAvg: forecast.pctVsAvg });
   });
 
-  it("the forecast fills a slot when fewer than 3 deltas/anomaly are present", () => {
+  it("the forecast fills a slot when fewer deltas/anomaly are present", () => {
     const result = buildSmartInsights(null, deltas.slice(0, 1), forecast);
     expect(result).toHaveLength(2);
     expect(result[1]).toEqual({ kind: "forecast", amount: forecast.amount, pctVsAvg: forecast.pctVsAvg });

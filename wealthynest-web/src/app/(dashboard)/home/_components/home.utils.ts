@@ -190,14 +190,19 @@ export function getAnomalyInsight(
   return top ? { title: top.title, message: top.message } : null;
 }
 
-/** Combines the three Smart Insights sources into the capped, priority-ordered list
- * SmartInsightsCard actually renders: anomaly first (rare, server-detected — the single most
- * actionable signal), then category deltas (already ranked by |delta| descending, most
- * significant swings first), then the pace forecast last (the most general of the three, and
- * the one most likely to have already degraded to "amount only" once getPaceForecast's own
- * sanity cap kicks in on a lumpy month). Capped to 3 — matches SmartInsightsCard's own
- * lg:grid-cols-3 layout — so when there are more than 3 real candidates, the least useful ones
- * simply don't make the cut instead of everything piling in and wrapping to a second row. */
+/** Combines the three Smart Insights sources into the ordered candidate list SmartAlertsRow picks
+ * its final (capped, severity-aware) display set from: anomaly first (rare, server-detected — the
+ * single most actionable signal), then category deltas (already ranked by |delta| descending,
+ * most significant swings first), then the pace forecast last (the most general of the three, and
+ * the one most likely to have already degraded to "amount only" once getPaceForecast's own sanity
+ * cap kicks in on a lumpy month).
+ *
+ * Deliberately NOT capped here (used to slice(0, 3), pre-diversity-selection) — category deltas
+ * alone can fill 3 slots on a bad-news month, which silently dropped the pace forecast (the most
+ * likely source of genuine good news, e.g. "Excellent savings pace") before SmartAlertsRow's own
+ * selection ever got a chance to consider it. All real candidates (at most 1 anomaly + 3 deltas +
+ * 1 forecast = 5) flow through; SmartAlertsRow.selectTopInsights does the final, diversity-aware
+ * cap so a mix of severities survives instead of whichever three happened to be pushed first. */
 export function buildSmartInsights(
   anomalyInsight: AnomalyInsight | null,
   categoryDeltaInsights: SmartInsight[],
@@ -207,5 +212,5 @@ export function buildSmartInsights(
   if (anomalyInsight) insights.push({ kind: "anomaly", title: anomalyInsight.title, message: anomalyInsight.message });
   insights.push(...categoryDeltaInsights);
   if (paceForecast) insights.push({ kind: "forecast", amount: paceForecast.amount, pctVsAvg: paceForecast.pctVsAvg });
-  return insights.slice(0, 3);
+  return insights;
 }
