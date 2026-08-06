@@ -691,6 +691,53 @@ class WalletAccountServiceImplTest {
         }
 
         @Test
+        @DisplayName("purpose is cleared when the request carries no purpose — unlike the other optional " +
+                "fields above, a null here is a deliberate 'None' clear, not 'leave unchanged'")
+        void purposeIsClearedWhenRequestOmitsIt() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT)
+                    .purpose(AccountPurpose.GENERAL_SAVINGS).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+            when(accountRepository.save(any())).thenAnswer(a -> a.getArgument(0));
+            // createRequest()'s getPurpose()/getPurposeLabel() default to null — matches what a
+            // "None" pick in the Purpose picker actually submits.
+            CreateAccountRequest req = createRequest(AccountType.BANK_ACCOUNT, null);
+
+            service.updateAccount(accountId, userId, req);
+
+            assertThat(account.getPurpose()).isNull();
+            assertThat(account.getPurposeLabel()).isNull();
+        }
+
+        @Test
+        @DisplayName("purpose is set on update when the request carries one")
+        void purposeIsSetOnUpdate() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+            when(accountRepository.save(any())).thenAnswer(a -> a.getArgument(0));
+            CreateAccountRequest req = createRequest(AccountType.BANK_ACCOUNT, null);
+            when(req.getPurpose()).thenReturn(AccountPurpose.GENERAL_SAVINGS);
+
+            service.updateAccount(accountId, userId, req);
+
+            assertThat(account.getPurpose()).isEqualTo(AccountPurpose.GENERAL_SAVINGS);
+        }
+
+        @Test
+        @DisplayName("purpose on the request is ignored (never touched) for a non-BANK_ACCOUNT type")
+        void purposeIgnoredForNonBankAccount() {
+            WalletAccount account = withId(baseAccount(AccountType.CREDIT_CARD).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+            when(accountRepository.save(any())).thenAnswer(a -> a.getArgument(0));
+            CreateAccountRequest req = createRequest(AccountType.CREDIT_CARD, null);
+            // isCC is true, so the purpose branch (BANK_ACCOUNT-only) never fires regardless.
+            lenient().when(req.getPurpose()).thenReturn(AccountPurpose.GENERAL_SAVINGS);
+
+            service.updateAccount(accountId, userId, req);
+
+            assertThat(account.getPurpose()).isNull();
+        }
+
+        @Test
         @DisplayName("credit-card fields are only applied when the account is actually a credit card")
         void creditCardFieldsIgnoredForNonCreditCardAccount() {
             WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).build());

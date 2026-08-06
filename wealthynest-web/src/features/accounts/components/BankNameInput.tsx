@@ -6,9 +6,10 @@ import {Landmark} from "lucide-react";
 import {BankLogo} from "@/components/icons/BankLogo";
 import {getBankMonogram} from "@/lib/bankLogos";
 import {INDIAN_BANKS} from "@/lib/constants";
+import {cn} from "@/lib/utils";
 
-export function BankNameInput({ value, onChange, label = "Bank / Issuer Name", suggestions = INDIAN_BANKS }: {
-  value: string; onChange: (v: string) => void; label?: string; suggestions?: string[];
+export function BankNameInput({ value, onChange, label = "Bank / Issuer Name", suggestions = INDIAN_BANKS, error }: {
+  value: string; onChange: (v: string) => void; label?: string; suggestions?: string[]; error?: string;
 }) {
   const [open, setOpen]           = useState(false);
   const [query, setQuery]         = useState(value);
@@ -35,7 +36,8 @@ export function BankNameInput({ value, onChange, label = "Bank / Issuer Name", s
         onFocus={() => { setOpen(true); reposition(); }}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         placeholder="Search or type…"
-        className="w-full h-10 px-3 rounded-xl text-sm bg-background border border-border text-foreground placeholder-muted-foreground/50 outline-none focus:border-indigo-500 transition-all" />
+        className={cn("w-full h-10 px-3 rounded-xl text-sm bg-background border text-foreground placeholder-muted-foreground/50 outline-none focus:border-indigo-500 transition-all",
+          error ? "border-red-500/60" : "border-border")} />
       {/* Portaled to <body> — the modal card has animate-scale-in (transform: scale(1) persists
           via fill-mode:both), which becomes the containing block for a plain `position: fixed`
           child, clipping/mispositioning it instead of anchoring to the viewport. Same fix as the
@@ -55,6 +57,7 @@ export function BankNameInput({ value, onChange, label = "Bank / Issuer Name", s
         </div>,
         document.body
       )}
+      {error && <p className="text-xs text-red-500 dark:text-red-400 mt-1.5">{error}</p>}
     </div>
   );
 }

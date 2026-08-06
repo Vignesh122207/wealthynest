@@ -195,7 +195,12 @@ public class WalletAccountServiceImpl implements WalletAccountService {
         if (isCC && req.getPaymentDueDay() != null) account.setPaymentDueDay(req.getPaymentDueDay());
         if ((isCC || isLoan) && req.getApr() != null) account.setApr(req.getApr());
         if (isLoan) applyLoanFields(account, req, userId);
-        if (account.getAccountType() == AccountType.BANK_ACCOUNT && req.getPurpose() != null) {
+        // Unlike the other fields above, purpose is always synced from the request rather than
+        // gated on non-null — the edit form always submits its current value for this field
+        // (never omits it because "the user didn't touch it"), so a null here is a deliberate
+        // clear ("None" in the picker), not "leave unchanged". Gating on != null made clearing an
+        // already-set purpose impossible: the request would carry no purpose either way.
+        if (account.getAccountType() == AccountType.BANK_ACCOUNT) {
             validatePurpose(account.getAccountType(), req.getPurpose(), req.getPurposeLabel());
             account.setPurpose(req.getPurpose());
             account.setPurposeLabel(req.getPurpose() == AccountPurpose.CUSTOM ? req.getPurposeLabel() : null);

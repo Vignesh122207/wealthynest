@@ -34,6 +34,16 @@ export const createAccountSchema = z.object({
   autopayAccountId: z.preprocess(blankToUndef, z.string().optional()),
   loanEndDate:     z.preprocess(blankToUndef, z.string().optional()),
 }).superRefine((data, ctx) => {
+  // bankName stays optional in the shape above (Cash Wallet has no bank concept at all), but is
+  // required for every type that actually shows a bank/lender picker — without this, submitting
+  // the create form untouched silently created an account named "Bank Account"/"Credit
+  // Card"/"Loan" with no bank on file, with no indication that field was ever skipped.
+  if (["BANK_ACCOUNT", "CREDIT_CARD", "LOAN"].includes(data.accountType) && !data.bankName) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom, path: ["bankName"],
+      message: data.accountType === "LOAN" ? "Lender is required" : "Bank name is required",
+    });
+  }
   // loanType stays optional in the shape above (every other account type leaves it undefined),
   // but is required specifically when creating/editing a Loan — the auto-generated name and the
   // Net Worth liability breakdown both depend on it being set.

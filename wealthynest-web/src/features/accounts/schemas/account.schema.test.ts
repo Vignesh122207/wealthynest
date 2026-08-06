@@ -76,11 +76,42 @@ describe("createAccountSchema", () => {
     expect(createAccountSchema.safeParse({ ...baseCashWallet, apr: 101 }).success).toBe(false);
   });
 
+  describe("bankName superRefine: required for every type with a bank/lender picker", () => {
+    const base = { name: "Test", openingBalance: 1000 };
+
+    it("rejects a BANK_ACCOUNT/CREDIT_CARD/LOAN with no bankName", () => {
+      for (const accountType of ["BANK_ACCOUNT", "CREDIT_CARD", "LOAN"] as const) {
+        const result = createAccountSchema.safeParse({ ...base, accountType, loanType: "CAR_LOAN" });
+        expect(result.success, `${accountType} should require bankName`).toBe(false);
+        if (!result.success) {
+          expect(result.error.flatten().fieldErrors.bankName?.[0]).toMatch(/required/i);
+        }
+      }
+    });
+
+    it("accepts a BANK_ACCOUNT/CREDIT_CARD/LOAN once bankName is provided", () => {
+      for (const accountType of ["BANK_ACCOUNT", "CREDIT_CARD", "LOAN"] as const) {
+        const result = createAccountSchema.safeParse({ ...base, accountType, loanType: "CAR_LOAN", bankName: "HDFC" });
+        expect(result.success, `${accountType} should accept a provided bankName`).toBe(true);
+      }
+    });
+
+    it("does not require bankName for a CASH_WALLET", () => {
+      expect(createAccountSchema.safeParse(baseCashWallet).success).toBe(true);
+    });
+
+    it("treats a blanked-out (empty string) bankName the same as missing", () => {
+      const result = createAccountSchema.safeParse({ ...base, accountType: "BANK_ACCOUNT", bankName: "" });
+      expect(result.success).toBe(false);
+    });
+  });
+
   describe("LOAN-specific superRefine: loanType is required only for LOAN accounts", () => {
     const baseLoan = {
       accountType: "LOAN" as const,
       name: "Car Loan",
       openingBalance: 500000,
+      bankName: "Test Lender",
     };
 
     it("rejects a LOAN account with no loanType", () => {
@@ -107,7 +138,7 @@ describe("createAccountSchema", () => {
   });
 
   describe("purpose superRefine", () => {
-    const baseBank = { accountType: "BANK_ACCOUNT" as const, name: "Savings", openingBalance: 1000 };
+    const baseBank = { accountType: "BANK_ACCOUNT" as const, name: "Savings", openingBalance: 1000, bankName: "HDFC" };
 
     it("accepts a purpose on a BANK_ACCOUNT", () => {
       expect(createAccountSchema.safeParse({ ...baseBank, purpose: "EMERGENCY_FUND" }).success).toBe(true);
