@@ -136,3 +136,26 @@ export function UpcomingBillsCard({ bills, wide }: UpcomingBillsCardProps) {
     </div>
   );
 }
+
+interface SmartAlertsRowProps {
+  smartInsights: SmartInsight[];
+  upcomingBills: Expense[];
+}
+
+// The Home dashboard's only alert row now — Smart Insights + Upcoming Bills pair up when both
+// are present; whichever one is alone reclaims the full row instead of leaving the other column
+// empty.
+export function SmartAlertsRow({ smartInsights, upcomingBills }: SmartAlertsRowProps) {
+  const hasInsights = smartInsights.length > 0;
+  const hasBills    = upcomingBills.length > 0;
+  if (!hasInsights && !hasBills) return null;
+
+  const paired = hasInsights && hasBills;
+
+  return (
+    <div data-testid="smart-alerts-row" className={cn("grid items-start gap-3 animate-fade-in-up delay-225", paired && "md:grid-cols-2")}>
+      {hasInsights && <SmartInsightsCard insights={smartInsights} wide={!paired} />}
+      {hasBills && <UpcomingBillsCard bills={upcomingBills} wide={!paired} />}
+    </div>
+  );
+}

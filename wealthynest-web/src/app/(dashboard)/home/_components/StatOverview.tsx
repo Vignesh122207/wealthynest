@@ -38,7 +38,6 @@ interface StatOverviewProps {
   ytdSavingsRateTrend:  number | undefined;
   monthlyBudgets:    BudgetSummary[];
   yearlyBudgets:     BudgetSummary[];
-  alertBannerVisible: boolean;
   isLoading:         boolean;
 }
 
@@ -93,15 +92,11 @@ const TIER_CAPTION: Record<BudgetTier, string> = {
 };
 
 // ── Budget Progress — a ring instead of plain text, showing budgets on track out of total ──
-function BudgetProgressTile({ onTrack, total, emptyLabel, alertBannerVisible, delay = "delay-375" }: {
-  onTrack: number; total: number; emptyLabel: string; alertBannerVisible: boolean; delay?: string;
+function BudgetProgressTile({ onTrack, total, emptyLabel, delay = "delay-375" }: {
+  onTrack: number; total: number; emptyLabel: string; delay?: string;
 }) {
   const overCount = total - onTrack;
   const allOnTrack = total > 0 && overCount === 0;
-  // The SmartAlerts banner already says "You have N budgets over limit" right above
-  // this row when it's visible — don't repeat the same sentence in the same breath.
-  // The ring's color still tells the story on its own either way.
-  const suppressCaption = overCount > 0 && total > 0 && alertBannerVisible;
   const pct = total > 0 ? (onTrack / total) * 100 : 0;
   const tier = budgetTier(pct);
   const ringColor = total === 0 ? "hsl(var(--muted-foreground))" : TIER_HEX[tier];
@@ -140,17 +135,15 @@ function BudgetProgressTile({ onTrack, total, emptyLabel, alertBannerVisible, de
           <p data-testid="budget-progress-caption" className="text-lg font-bold text-foreground tabular-nums tracking-tight leading-none">
             {total > 0 ? `${onTrack} of ${total}` : "—"}
           </p>
-          {!suppressCaption && (
-            <p className={cn(
-              "flex items-center gap-1 text-[11px] font-semibold mt-1.5",
-              total === 0 ? "text-muted-foreground" : TIER_CAPTION[tier]
-            )}>
-              {total > 0 && (allOnTrack
-                ? <CheckCircle2 className="w-3 h-3 shrink-0" />
-                : <AlertTriangle className="w-3 h-3 shrink-0" />)}
-              {total === 0 ? emptyLabel : allOnTrack ? "All on track" : `${overCount} over limit`}
-            </p>
-          )}
+          <p className={cn(
+            "flex items-center gap-1 text-[11px] font-semibold mt-1.5",
+            total === 0 ? "text-muted-foreground" : TIER_CAPTION[tier]
+          )}>
+            {total > 0 && (allOnTrack
+              ? <CheckCircle2 className="w-3 h-3 shrink-0" />
+              : <AlertTriangle className="w-3 h-3 shrink-0" />)}
+            {total === 0 ? emptyLabel : allOnTrack ? "All on track" : `${overCount} over limit`}
+          </p>
         </div>
       </div>
     </div>
@@ -162,7 +155,7 @@ export function StatOverview({
   income, expenses, savingsRate, prevSavingsRate,
   incomeTrend, expenseTrend,
   ytdIncome, ytdExpenses, ytdIncomeTrend, ytdExpenseTrend, ytdSavingsRate, ytdSavingsRateTrend,
-  monthlyBudgets, yearlyBudgets, alertBannerVisible, isLoading,
+  monthlyBudgets, yearlyBudgets, isLoading,
 }: StatOverviewProps) {
   const { fmt } = useAmountFormatter();
   const isYear = viewMode === "year";
@@ -249,7 +242,7 @@ export function StatOverview({
       />
       <BudgetProgressTile onTrack={budgetOnTrack} total={budgetTotal}
         emptyLabel={isYear ? "No yearly budgets set" : "No monthly budgets set"}
-        alertBannerVisible={alertBannerVisible} delay="delay-375" />
+        delay="delay-375" />
     </div>
   );
 }

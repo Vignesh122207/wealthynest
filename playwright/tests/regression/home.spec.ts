@@ -7,8 +7,8 @@ import {HomePage} from "../../pages/HomePage";
 
 // A dedicated, disposable user (not the shared regressionUser other files in this suite mutate)
 // — same rationale as visual-dynamic.spec.ts's own dedicated empty-state user. This file asserts
-// the *absence* of the attention row / a lone reflowing card, which only holds reliably against
-// an account whose budget/debt state this file fully controls.
+// the *absence* of Upcoming Bills / a lone reflowing card, which only holds reliably against
+// an account whose expense state this file fully controls.
 test.describe.configure({ mode: "serial" });
 
 test.describe("Home dashboard — dynamic reflow", () => {
@@ -17,6 +17,7 @@ test.describe("Home dashboard — dynamic reflow", () => {
   let home: HomePage;
   let accessToken: string;
   let categoryId: string;
+  let accountId: string;
 
   test.beforeAll(async ({ browser }) => {
     const user = await provisionE2EUser({ fullName: "Home Reflow Test User" });
@@ -28,6 +29,7 @@ test.describe("Home dashboard — dynamic reflow", () => {
     const account = await api.createAccount(accessToken, {
       accountType: "BANK_ACCOUNT", name: bank.bankName, bankName: bank.bankName, openingBalance: bank.openingBalance,
     });
+    accountId = account.id;
 
     const today = new Date();
     const isoDate = today.toISOString().split("T")[0];
@@ -36,7 +38,8 @@ test.describe("Home dashboard — dynamic reflow", () => {
     // A small prior-month expense + a bigger current-month one in the same category gives
     // `smartInsights` (page.tsx) a real category-delta insight to show — needed for the
     // Insights/Bills reflow assertion below (this is the actual bug scenario: Smart Insights
-    // has content, Upcoming Bills doesn't, so Insights alone must reclaim the row).
+    // has content, Upcoming Bills doesn't, so Insights alone must reclaim the row). It also
+    // doubles as the over-budget expense for the Month/Year toggle test further down.
     await api.createExpense(accessToken, { categoryId, accountId: account.id, amount: 200, expenseDate: prevMonthDate, description: "prior month" });
     await api.createExpense(accessToken, { categoryId, accountId: account.id, amount: 1500, expenseDate: isoDate, description: "this month" });
 
@@ -59,55 +62,39 @@ test.describe("Home dashboard — dynamic reflow", () => {
     await context.close();
   });
 
-  test("no over-budget, no debts: Insights alone reclaims the alerts row @regression", async () => {
+  test("Insights alone reclaims the row when there are no Upcoming Bills @regression", async () => {
     await home.gotoHome();
     await home.expectLoaded();
 
-    await expect(home.alertsRow).toBeVisible();
-    await expect(home.overBudgetBanner).not.toBeVisible();
-    await expect(home.debtPulse).not.toBeVisible();
+    await expect(home.smartAlertsRow).toBeVisible();
     await expect(home.smartInsightsCard).toBeVisible();
     await expect(home.upcomingBillsCard).not.toBeVisible();
-    await home.expectSpansFullRow(home.smartInsightsCard, home.alertsRow);
+    await home.expectSpansFullRow(home.smartInsightsCard, home.smartAlertsRow);
   });
 
-  test("an over-budget budget alone (no debt) and Insights alone each go full-width, not paired @regression", async () => {
-    await api.createBudget(accessToken, { categoryId, amount: 1000, budgetType: "MONTHLY" });
+  test("a recurring bill due this week makes Insights and Upcoming Bills share the row @regression", async () => {
+    // Upcoming Bills queries a startDate/endDate window off the browser's `now` (page.tsx), which
+    // beforeAll pinned to day 15 of the real current month/year — not real wall-clock "now" — so
+    // the seeded bill's date has to land inside that same pinned week (day 15-22), not 3 real days
+    // from whatever today actually is.
+    const today = new Date();
+    const dueDate = new Date(today.getFullYear(), today.getMonth(), 18).toISOString().split("T")[0];
+    await api.createExpense(accessToken, {
+      categoryId, accountId, amount: 649, expenseDate: dueDate, description: "Netflix Subscription", recurring: true,
+    });
 
     await home.gotoHome();
-    await expect(home.overBudgetBanner).toBeVisible();
-    await expect(home.overBudgetBanner).toContainText("1 budget over limit");
-    await expect(home.debtPulse).not.toBeVisible();
     await expect(home.smartInsightsCard).toBeVisible();
-    // Banner has no DebtPulse to pair with, and Insights has no Upcoming Bills to pair with —
-    // a lone leftover on one side never cross-pairs with a lone leftover on the other, so both
-    // render on their own full-width row instead of sharing one.
-    await home.expectSpansFullRow(home.overBudgetBanner, home.alertsRow);
-    await home.expectSpansFullRow(home.smartInsightsCard, home.alertsRow);
-  });
-
-  test("adding a debt: banner+DebtPulse share a row, Insights alone reclaims the trailing row @regression", async () => {
-    await api.createDebt(accessToken, { type: "LENT", contactName: "Reflow Test Contact", amount: 5000 });
-
-    await home.gotoHome();
-    await expect(home.overBudgetBanner).toBeVisible();
-    await expect(home.debtPulse).toBeVisible();
-    await home.expectSharesRow(home.overBudgetBanner, home.debtPulse, home.alertsRow);
-    await home.expectSpansFullRow(home.smartInsightsCard, home.alertsRow);
-  });
-
-  test("dismissing the over-budget banner leaves DebtPulse and Smart Insights each full-width, not paired @regression", async () => {
-    await home.dismissOverBudgetBanner();
-
-    await expect(home.overBudgetBanner).not.toBeVisible();
-    await expect(home.debtPulse).toBeVisible();
-    await expect(home.smartInsightsCard).toBeVisible();
-    await home.expectSpansFullRow(home.debtPulse, home.alertsRow);
-    await home.expectSpansFullRow(home.smartInsightsCard, home.alertsRow);
+    await expect(home.upcomingBillsCard).toBeVisible();
+    await home.expectSharesRow(home.smartInsightsCard, home.upcomingBillsCard, home.smartAlertsRow);
   });
 
   // ── Round 2: Month/Year toggle ──────────────────────────────────────────────
   test("Month/Year toggle swaps the hero label, stat tile labels, and the Budget Progress ring @regression", async () => {
+    // Reuses beforeAll's ₹1,500 this-month expense in the same category to trip this over its
+    // limit — the ring's "0 of 1" below depends on that, not on anything created here.
+    await api.createBudget(accessToken, { categoryId, amount: 1000, budgetType: "MONTHLY" });
+
     await home.gotoHome();
 
     await expect(home.periodNavLabel).toHaveText(/^[A-Za-z]{3} \d{4}$/); // e.g. "Aug 2026"
@@ -131,7 +118,7 @@ test.describe("Home dashboard — dynamic reflow", () => {
     // before the fix it kept showing the seeded MONTHLY budget's row here instead, contradicting
     // the ring right above it.
     await expect(home.budgetSection.getByText("No yearly budgets set")).toBeVisible();
-    // Upcoming Bills is deliberately period-blind — same (absent) either way here.
+    // Upcoming Bills is deliberately period-blind — same (present) either way here.
     expect(await home.upcomingBillsCard.isVisible()).toBe(billsVisibleBefore);
 
     await home.switchToMonthMode();

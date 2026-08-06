@@ -13,20 +13,8 @@ export class HomePage extends BasePage {
     await this.expectHeaderTitle("Home");
   }
 
-  get alertsRow(): Locator {
-    return this.page.getByTestId(TEST_IDS.home.alertsRow);
-  }
-
-  get overBudgetBanner(): Locator {
-    return this.page.getByTestId(TEST_IDS.home.overBudgetBanner);
-  }
-
-  get overBudgetDismissButton(): Locator {
-    return this.page.getByTestId(TEST_IDS.home.overBudgetDismiss);
-  }
-
-  get debtPulse(): Locator {
-    return this.page.getByTestId(TEST_IDS.home.debtPulseWrap);
+  get smartAlertsRow(): Locator {
+    return this.page.getByTestId(TEST_IDS.home.smartAlertsRow);
   }
 
   get smartInsightsCard(): Locator {
@@ -51,10 +39,6 @@ export class HomePage extends BasePage {
 
   periodToggle(mode: "month" | "year"): Locator {
     return this.page.getByTestId(TEST_IDS.home.periodToggle(mode));
-  }
-
-  async dismissOverBudgetBanner(): Promise<void> {
-    await this.overBudgetDismissButton.click();
   }
 
   async switchToYearMode(): Promise<void> {

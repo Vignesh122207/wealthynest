@@ -157,15 +157,6 @@ export const api = {
     return data.data;
   },
 
-  /** Seeds a debt directly — used by home.spec.ts to reach the DebtPulse-visible scenario
-   * without driving the Debts page's own creation form (already covered by debts.spec.ts). */
-  async createDebt(accessToken: string, input: Record<string, unknown>): Promise<{ id: string }> {
-    const { data } = await client().post("/debts", input, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    return data.data;
-  },
-
   /** Closes (deactivates) a test-provisioned user's account directly — for one-off users a spec
    * provisions itself (outside global-setup/global-teardown's own cleanup), e.g. family.spec.ts's
    * second member. */

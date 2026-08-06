@@ -6,7 +6,7 @@ import {useAuthStore} from "@/features/auth/store/auth.store";
 
 /** Capacitor's cold-start entry point (see capacitor.config.ts's server.url) instead of /home
  * directly. /home's own page statically imports ~9 TanStack Query hooks and every dashboard
- * widget (NetWorthTrend, SpendingDonut, SixMonthTrend, InvestmentPanel, DebtPulse, ...) — real
+ * widget (NetWorthTrend, SpendingDonut, SixMonthTrend, InvestmentPanel, SmartAlertsRow, ...) — real
  * download+parse cost even for a visitor about to be redirected to /login by DashboardLayout,
  * since that redirect only fires after React decides not to render, by which point the browser
  * already downloaded and V8 already parsed/compiled the whole bundle to get there. Measured on a

@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect, useMemo, useState} from "react";
+import {useMemo, useState} from "react";
 import dynamic from "next/dynamic";
 import {ArrowLeftRight, Banknote, Receipt, Sparkles} from "lucide-react";
 import Link from "next/link";
@@ -20,7 +20,6 @@ import {useAllTimeExpenses, useCreateExpense, useExpenses} from "@/features/expe
 import {useCreateIncome, useIncome} from "@/features/income/hooks/useIncome";
 import {useInvestments} from "@/features/investments/hooks/useInvestments";
 import {useNetWorthHistory} from "@/features/networth/hooks/useNetWorth";
-import {useDebts} from "@/features/debts/hooks/useDebts";
 import {useAnnualTrend} from "@/features/analytics/hooks/useAnalytics";
 import {useServerNotifications} from "@/features/notifications/hooks/useServerNotifications";
 import {useAuthStore} from "@/features/auth/store/auth.store";
@@ -33,8 +32,7 @@ import {buildUsageCounts, sortByUsage} from "@/lib/mostUsed";
 import {GreetingBanner, type HomeViewMode} from "./_components/GreetingBanner";
 import {SecuritySetupPrompt} from "./_components/SecuritySetupPrompt";
 import {StatOverview} from "./_components/StatOverview";
-import {type SmartInsight} from "./_components/SmartAlerts";
-import {AlertsRow} from "./_components/AlertsRow";
+import {type SmartInsight, SmartAlertsRow} from "./_components/SmartAlerts";
 import {WalletOverview} from "./_components/WalletOverview";
 import {BudgetSection} from "./_components/BudgetSection";
 import {TransactionList} from "./_components/TransactionList";
@@ -76,18 +74,6 @@ export default function DashboardPage() {
   const [viewMode, setViewMode] = useState<HomeViewMode>("month");
   const [quickModal, setQuickModal] = useState<QuickModal>("none");
 
-  // Dismissing the over-budget banner is scoped to whichever budget set is currently showing —
-  // a fresh month, a fresh year, or switching Month/Year all count as a new instance of the
-  // alert, same as the pre-existing per-month key just made reactive to navigation/mode instead
-  // of only ever read once at mount.
-  const overBudgetDismissKey = viewMode === "year"
-    ? `overBudgetDismissedYear_${year}`
-    : `overBudgetDismissed_${year}_${month}`;
-  const [overBudgetDismissed, setOverBudgetDismissed] = useState(false);
-  useEffect(() => {
-    setOverBudgetDismissed(localStorage.getItem(overBudgetDismissKey) === "true");
-  }, [overBudgetDismissKey]);
-
   const prevMonthNum = month === 1 ? 12 : month - 1;
   const prevYearNum  = month === 1 ? year - 1 : year;
 
@@ -106,7 +92,6 @@ export default function DashboardPage() {
   const { data: incomeCategories = [] } = useCategories("INCOME");
   const { data: investments = [] }    = useInvestments();
   const { data: netWorthHistory = [] } = useNetWorthHistory();
-  const { data: debts = [] }          = useDebts();
   const chart                         = useChartTheme();
 
   // Year mode only — gated via `enabled` so Month mode (the common case) fetches nothing extra.
@@ -264,16 +249,14 @@ export default function DashboardPage() {
   const ytdLastSavingsRate = ytdLastYear.income > 0 ? ((ytdLastYear.income - ytdLastYear.expenses) / ytdLastYear.income) * 100 : 0;
   const ytdSavingsRateTrend = pctChange(ytdSavingsRate, ytdLastSavingsRate);
 
-  // Budget Progress and the over-budget banner/count are both period-scoped to whichever of
-  // Month/Year is currently browsed — a monthly budget's on-track status has nothing to say about
-  // the year view and vice versa, so mixing them together (as this used to) made the ring show an
-  // identical number regardless of which toggle was selected, which reads as broken rather than
-  // "combined by design." See StatOverview's matching activeBudgets logic.
+  // Budget Progress is period-scoped to whichever of Month/Year is currently browsed — a
+  // monthly budget's on-track status has nothing to say about the year view and vice versa, so
+  // mixing them together (as this used to) made the ring show an identical number regardless of
+  // which toggle was selected, which reads as broken rather than "combined by design." See
+  // StatOverview's matching activeBudgets logic.
   const budgetSummaries = data?.budgetSummaries ?? [];
   const monthlyBudgets  = budgetSummaries.filter(b => b.budgetType === "MONTHLY");
   const yearlyBudgets   = budgetSummaries.filter(b => b.budgetType === "YEARLY");
-  const overBudgetCount = (viewMode === "year" ? yearlyBudgets : monthlyBudgets)
-    .filter(b => b.overBudget || b.paceOverBudget).length;
 
   // Forecast/anomaly/category-deltas all only make sense for the month actually in progress in
   // their "projected" form — see getCategoryDeltaInsights' own comment for why a past (closed)
@@ -408,21 +391,11 @@ export default function DashboardPage() {
             ytdSavingsRateTrend={ytdSavingsRateTrend}
             monthlyBudgets={monthlyBudgets}
             yearlyBudgets={yearlyBudgets}
-            alertBannerVisible={!overBudgetDismissed && overBudgetCount > 0}
             isLoading={dataLoading}
           />
 
-          {/* ── Alerts row: over-budget banner, debt pulse, Smart Insights, Upcoming Bills —
-              reflowing to fill the row whichever subset is (or isn't) present ── */}
-          <AlertsRow
-            overBudgetCount={overBudgetCount}
-            overBudgetDismissed={overBudgetDismissed}
-            onDismissOverBudget={() => {
-              setOverBudgetDismissed(true);
-              localStorage.setItem(overBudgetDismissKey, "true");
-            }}
-            debts={debts}
-            periodLabel={viewMode}
+          {/* ── Smart insights + upcoming bills ── */}
+          <SmartAlertsRow
             smartInsights={visibleSmartInsights}
             upcomingBills={upcomingBills}
           />
