@@ -28,22 +28,21 @@ export function SmartInsightsCard({ insights, wide }: SmartInsightsCardProps) {
 
   return (
     <div data-testid="smart-insights-card" className={cn(
-      "rounded-2xl border border-border/50 bg-card p-4 shadow-sm space-y-2",
+      "rounded-2xl border border-border/50 bg-card p-4",
       wide && "md:col-span-2"
     )}>
       <div className="flex items-center gap-2 mb-1">
-        <PremiumIcon icon={Lightbulb} tone="yellow" size="xs" className="rounded" />
-        <p className="text-xs font-semibold text-foreground">Smart Insights</p>
+        <PremiumIcon icon={Lightbulb} tone="yellow" size="xs" />
+        <h2 className="font-bold text-foreground text-sm">Smart Insights</h2>
       </div>
-      <div className={
-        wide && insights.length > 1
-          ? "grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
-          : "space-y-2"
-      }>
+      <div className={cn(
+        "divide-y divide-border/40",
+        wide && insights.length > 1 && "sm:divide-y-0 sm:grid sm:gap-x-4 sm:grid-cols-2 lg:grid-cols-3"
+      )}>
         {insights.map((insight, i) => {
           if (insight.kind === "anomaly") {
             return (
-              <div key={i} className="flex items-start gap-2.5 rounded-xl px-3 py-2.5 bg-red-500/8 border border-red-500/15">
+              <div key={i} className="flex items-start gap-2.5 py-2.5 first:pt-1.5 sm:first:pt-2.5">
                 <PremiumIcon icon={AlertTriangle} tone="red" size="xs" />
                 <p className="text-xs text-foreground/90 leading-snug min-w-0">{insight.message}</p>
               </div>
@@ -52,10 +51,7 @@ export function SmartInsightsCard({ insights, wide }: SmartInsightsCardProps) {
           if (insight.kind === "forecast") {
             const good = insight.pctVsAvg == null || insight.pctVsAvg <= 0;
             return (
-              <div key={i} className={cn(
-                "flex items-start gap-2.5 rounded-xl px-3 py-2.5",
-                good ? "bg-emerald-500/8 border border-emerald-500/15" : "bg-amber-500/8 border border-amber-500/15"
-              )}>
+              <div key={i} className="flex items-start gap-2.5 py-2.5 first:pt-1.5 sm:first:pt-2.5">
                 <PremiumIcon icon={Gauge} tone={good ? "green" : "yellow"} size="xs" />
                 <p className="text-xs text-foreground/90 leading-snug min-w-0">
                   You&apos;re on pace to save <span className="font-semibold tabular-nums">{fmt(insight.amount)}</span> this month
@@ -71,10 +67,7 @@ export function SmartInsightsCard({ insights, wide }: SmartInsightsCardProps) {
           const up = insight.delta > 0;
           const verb = insight.projected ? "You're on pace to spend" : "You spent";
           return (
-            <div key={i} className={cn(
-              "flex items-start gap-2.5 rounded-xl px-3 py-2.5",
-              up ? "bg-amber-500/8 border border-amber-500/15" : "bg-emerald-500/8 border border-emerald-500/15"
-            )}>
+            <div key={i} className="flex items-start gap-2.5 py-2.5 first:pt-1.5 sm:first:pt-2.5">
               <PremiumIcon icon={up ? TrendingUp : TrendingDown} tone={up ? "yellow" : "green"} size="xs" />
               <p className="text-xs text-foreground/90 leading-snug min-w-0">
                 {verb} <span className="font-semibold tabular-nums">{fmt(Math.abs(insight.delta))}</span> {up ? "more" : "less"} on{" "}
@@ -99,21 +92,21 @@ export function UpcomingBillsCard({ bills, wide }: UpcomingBillsCardProps) {
 
   return (
     <div data-testid="upcoming-bills-card" className={cn(
-      "bg-card border border-border/50 rounded-2xl p-4 shadow-sm",
+      "bg-card border border-border/50 rounded-2xl p-4",
       wide && "md:col-span-2"
     )}>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-1">
         <PremiumIcon icon={Bell} tone="purple" size="xs" />
-        <p className="text-xs font-semibold text-foreground">Upcoming Bills — Next 7 Days</p>
+        <h2 className="font-bold text-foreground text-sm">Upcoming Bills — Next 7 Days</h2>
       </div>
-      <div className="space-y-2">
+      <div className="divide-y divide-border/40">
         {bills.slice(0, 4).map((bill) => {
           const d = new Date(bill.expenseDate);
           const dayName = d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
           return (
-            <div key={bill.id} className="flex items-center justify-between gap-2 py-0.5">
-              <div className="flex items-center gap-2 min-w-0">
-                <RefreshCw className="w-3 h-3 text-violet-500 dark:text-violet-400 shrink-0" />
+            <div key={bill.id} className="flex items-center justify-between gap-2 py-2 first:pt-2.5">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <PremiumIcon icon={RefreshCw} tone="violet" size="xs" />
                 <span className="text-xs text-foreground truncate">
                   {bill.description || bill.categoryName || "Recurring"}
                 </span>
@@ -128,7 +121,7 @@ export function UpcomingBillsCard({ bills, wide }: UpcomingBillsCardProps) {
           );
         })}
         {bills.length > 4 && (
-          <p className="text-xs text-muted-foreground/80 pt-0.5">
+          <p className="text-xs text-muted-foreground/80 pt-2">
             +{bills.length - 4} more upcoming
           </p>
         )}

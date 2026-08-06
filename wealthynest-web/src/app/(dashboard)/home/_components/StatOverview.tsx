@@ -5,7 +5,6 @@ import {
     AlertTriangle,
     Banknote,
     CheckCircle2,
-    Landmark,
     type LucideIcon,
     PiggyBank,
     Receipt,
@@ -20,9 +19,6 @@ import type {BudgetSummary} from "@/features/dashboard/types/dashboard.types";
 
 interface StatOverviewProps {
   viewMode:          "month" | "year";
-  netWorth:          number | undefined;
-  prevNetWorth:      number | undefined;
-  netWorthSinceJanTrend: number | undefined;
   investments:       Investment[];
   income:            number | undefined;
   expenses:          number | undefined;
@@ -45,29 +41,27 @@ interface TileProps {
   icon: LucideIcon; tone: IconTone;
   label: string; value: string;
   deltaText?: string; deltaGood?: boolean;
-  delay?: string;
 }
 
-function StatTile({ icon, tone, label, value, deltaText, deltaGood, delay = "delay-0" }: TileProps) {
+// A row cell, not a card — this renders inside the hero's shared border/background now (see
+// GreetingBanner.tsx, composed together in page.tsx), so it carries no chrome of its own.
+function StatCell({ icon, tone, label, value, deltaText, deltaGood }: TileProps) {
   return (
-    <div className={cn(
-      "bg-card rounded-2xl p-4 shadow-sm border border-border/50 card-hover animate-fade-in-up",
-      delay
-    )}>
-      <div className="flex items-center gap-2 mb-3">
-        <PremiumIcon icon={icon} tone={tone} size="sm" />
-        <p className="text-xs font-semibold text-muted-foreground/80 truncate">{label}</p>
+    <div className="flex-1 min-w-[112px] px-3.5 py-3.5 sm:px-4">
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <PremiumIcon icon={icon} tone={tone} size="xs" />
+        <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wide truncate">{label}</p>
       </div>
-      <p className="text-xl font-bold text-foreground tabular-nums tracking-tight leading-none mb-2">{value}</p>
+      <p className="text-[15px] sm:text-base font-bold text-foreground tabular-nums tracking-tight leading-none">{value}</p>
       {deltaText ? (
         <p className={cn(
-          "text-[11px] font-semibold tabular-nums",
-          deltaGood ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"
+          "text-[10.5px] font-semibold tabular-nums mt-1.5",
+          deltaGood == null ? "text-muted-foreground" : deltaGood ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"
         )}>
           {deltaText}
         </p>
       ) : (
-        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">New</span>
+        <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary mt-1.5">New</span>
       )}
     </div>
   );
@@ -84,74 +78,45 @@ function budgetTier(pct: number): BudgetTier {
   if (pct >= 50) return "amber";
   return "red";
 }
-const TIER_HEX:    Record<BudgetTier, string> = { green: "#10b981", amber: "#f59e0b", red: "#ef4444" };
 const TIER_CAPTION: Record<BudgetTier, string> = {
   green: "text-emerald-600 dark:text-emerald-400",
   amber: "text-amber-600 dark:text-amber-400",
   red:   "text-red-500 dark:text-red-400",
 };
 
-// ── Budget Progress — a ring instead of plain text, showing budgets on track out of total ──
-function BudgetProgressTile({ onTrack, total, emptyLabel, delay = "delay-375" }: {
-  onTrack: number; total: number; emptyLabel: string; delay?: string;
-}) {
+// Flat row cell — same as StatCell above, but Budget Progress needs its own two-line caption
+// (count + on-track/over-limit wording) instead of a single percentage delta, so it isn't built
+// from StatCell directly.
+function BudgetProgressCell({ onTrack, total, emptyLabel }: { onTrack: number; total: number; emptyLabel: string }) {
   const overCount = total - onTrack;
   const allOnTrack = total > 0 && overCount === 0;
   const pct = total > 0 ? (onTrack / total) * 100 : 0;
   const tier = budgetTier(pct);
-  const ringColor = total === 0 ? "hsl(var(--muted-foreground))" : TIER_HEX[tier];
-  const r = 19, c = 2 * Math.PI * r;
-  const offset = c - (pct / 100) * c;
 
   return (
-    <div className={cn("bg-card rounded-2xl p-4 shadow-sm border border-border/50 card-hover animate-fade-in-up", delay)}>
-      <div className="flex items-center gap-2 mb-3">
-        <PremiumIcon icon={Target} tone="orange" size="sm" />
-        <p className="text-xs font-semibold text-muted-foreground/80 truncate">Budget Progress</p>
+    <div className="flex-1 min-w-[112px] px-3.5 py-3.5 sm:px-4" data-testid="budget-progress-tile">
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <PremiumIcon icon={Target} tone="orange" size="xs" />
+        <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wide truncate">Budget</p>
       </div>
-      <div className="flex items-center gap-3" data-testid="budget-progress-tile">
-        <div className="relative w-14 h-14 shrink-0">
-          {total > 0 && (
-            <div
-              className="absolute inset-0.5 rounded-full blur-sm opacity-25"
-              style={{ backgroundColor: ringColor }}
-              aria-hidden
-            />
-          )}
-          <svg width="56" height="56" viewBox="0 0 56 56" className="relative" style={{ transform: "rotate(-90deg)" }} aria-hidden>
-            <circle cx="28" cy="28" r={r} fill="none" stroke="hsl(var(--muted))" strokeWidth={4.5} />
-            {total > 0 && (
-              <circle cx="28" cy="28" r={r} fill="none" stroke={ringColor} strokeWidth={4.5} strokeLinecap="round"
-                strokeDasharray={c} strokeDashoffset={offset} style={{ transition: "stroke-dashoffset 1s ease" }} />
-            )}
-          </svg>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-xs font-bold text-foreground tabular-nums tracking-tight">
-              {total > 0 ? `${Math.round(pct)}%` : "—"}
-            </span>
-          </div>
-        </div>
-        <div className="min-w-0">
-          <p data-testid="budget-progress-caption" className="text-lg font-bold text-foreground tabular-nums tracking-tight leading-none">
-            {total > 0 ? `${onTrack} of ${total}` : "—"}
-          </p>
-          <p className={cn(
-            "flex items-center gap-1 text-[11px] font-semibold mt-1.5",
-            total === 0 ? "text-muted-foreground" : TIER_CAPTION[tier]
-          )}>
-            {total > 0 && (allOnTrack
-              ? <CheckCircle2 className="w-3 h-3 shrink-0" />
-              : <AlertTriangle className="w-3 h-3 shrink-0" />)}
-            {total === 0 ? emptyLabel : allOnTrack ? "All on track" : `${overCount} over limit`}
-          </p>
-        </div>
-      </div>
+      <p data-testid="budget-progress-caption" className="text-[15px] sm:text-base font-bold text-foreground tabular-nums tracking-tight leading-none">
+        {total > 0 ? `${onTrack} of ${total}` : "—"}
+      </p>
+      <p className={cn(
+        "flex items-center gap-1 text-[10.5px] font-semibold mt-1.5",
+        total === 0 ? "text-muted-foreground" : TIER_CAPTION[tier]
+      )}>
+        {total > 0 && (allOnTrack
+          ? <CheckCircle2 className="w-3 h-3 shrink-0" />
+          : <AlertTriangle className="w-3 h-3 shrink-0" />)}
+        <span className="truncate">{total === 0 ? emptyLabel : allOnTrack ? "All on track" : `${overCount} over limit`}</span>
+      </p>
     </div>
   );
 }
 
 export function StatOverview({
-  viewMode, netWorth, prevNetWorth, netWorthSinceJanTrend, investments,
+  viewMode, investments,
   income, expenses, savingsRate, prevSavingsRate,
   incomeTrend, expenseTrend,
   ytdIncome, ytdExpenses, ytdIncomeTrend, ytdExpenseTrend, ytdSavingsRate, ytdSavingsRateTrend,
@@ -164,7 +129,6 @@ export function StatOverview({
   const current  = useMemo(() => active.reduce((s, i) => s + i.currentValue,   0), [active]);
   const invGainPct = invested > 0 ? ((current - invested) / invested) * 100 : undefined;
 
-  const nwPct = pctChange(netWorth, prevNetWorth);
   const srPct = pctChange(savingsRate, prevSavingsRate);
 
   // Budget Progress follows the Month/Year toggle like every other tile here — Month counts
@@ -183,12 +147,12 @@ export function StatOverview({
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="bg-card rounded-2xl p-4 shadow-sm border border-border/50 space-y-3">
-            <div className="w-8 h-8 rounded-xl shimmer" />
-            <div className="h-6 w-24 rounded-lg shimmer" />
-            <div className="h-3 w-16 rounded shimmer" />
+      <div className="flex overflow-x-auto no-scrollbar border-t border-border/60 divide-x divide-border/60">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="flex-1 min-w-[112px] px-3.5 py-3.5 sm:px-4 space-y-2.5">
+            <div className="w-6 h-6 rounded-lg shimmer" />
+            <div className="h-4 w-16 rounded-lg shimmer" />
+            <div className="h-2.5 w-12 rounded shimmer" />
           </div>
         ))}
       </div>
@@ -203,46 +167,34 @@ export function StatOverview({
   const savingsRateDeltaPct = isYear ? ytdSavingsRateTrend : srPct;
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-      <StatTile
-        icon={Landmark} tone="blue"
-        label="Net Worth" value={netWorth != null ? fmt(netWorth) : "—"}
-        deltaText={isYear ? formatTrendDelta(netWorthSinceJanTrend, "since Jan 1") : formatTrendDelta(nwPct)}
-        deltaGood={(isYear ? netWorthSinceJanTrend : nwPct) != null ? (isYear ? netWorthSinceJanTrend! : nwPct!) >= 0 : undefined}
-        delay="delay-0"
-      />
-      <StatTile
+    <div className="flex overflow-x-auto no-scrollbar border-t border-border/60 divide-x divide-border/60">
+      <StatCell
         icon={TrendingUp} tone="purple"
         label="Investments" value={fmt(current)}
         deltaText={formatTrendDelta(invGainPct, "overall return")}
         deltaGood={invGainPct != null ? invGainPct >= 0 : undefined}
-        delay="delay-75"
       />
-      <StatTile
+      <StatCell
         icon={Banknote} tone="green"
-        label={isYear ? "YTD Income" : "Monthly Income"} value={displayIncome != null ? fmt(displayIncome) : "—"}
-        deltaText={isYear ? formatTrendDelta(incomeDeltaPct, "vs same period last year") : formatTrendDelta(incomeDeltaPct)}
+        label={isYear ? "YTD Income" : "Income"} value={displayIncome != null ? fmt(displayIncome) : "—"}
+        deltaText={isYear ? formatTrendDelta(incomeDeltaPct, "vs last year") : formatTrendDelta(incomeDeltaPct)}
         deltaGood={incomeDeltaPct != null ? incomeDeltaPct >= 0 : undefined}
-        delay="delay-150"
       />
-      <StatTile
+      <StatCell
         icon={Receipt} tone="red"
-        label={isYear ? "YTD Expenses" : "Monthly Expenses"} value={displayExpenses != null ? fmt(displayExpenses) : "—"}
-        deltaText={isYear ? formatTrendDelta(expenseDeltaPct, "vs same period last year") : formatTrendDelta(expenseDeltaPct)}
+        label={isYear ? "YTD Expenses" : "Expenses"} value={displayExpenses != null ? fmt(displayExpenses) : "—"}
+        deltaText={isYear ? formatTrendDelta(expenseDeltaPct, "vs last year") : formatTrendDelta(expenseDeltaPct)}
         deltaGood={expenseDeltaPct != null ? expenseDeltaPct <= 0 : undefined}
-        delay="delay-225"
       />
-      <StatTile
+      <StatCell
         icon={PiggyBank} tone="yellow"
-        label={isYear ? "Savings Rate (YTD)" : "Savings Rate"}
+        label="Savings rate"
         value={displaySavingsRate != null && displayIncome ? `${displaySavingsRate.toFixed(1)}%` : "—"}
         deltaText={isYear ? formatTrendDelta(savingsRateDeltaPct, "vs last year") : formatTrendDelta(savingsRateDeltaPct)}
         deltaGood={savingsRateDeltaPct != null ? savingsRateDeltaPct >= 0 : undefined}
-        delay="delay-300"
       />
-      <BudgetProgressTile onTrack={budgetOnTrack} total={budgetTotal}
-        emptyLabel={isYear ? "No yearly budgets set" : "No monthly budgets set"}
-        delay="delay-375" />
+      <BudgetProgressCell onTrack={budgetOnTrack} total={budgetTotal}
+        emptyLabel={isYear ? "No yearly budgets set" : "No monthly budgets set"} />
     </div>
   );
 }

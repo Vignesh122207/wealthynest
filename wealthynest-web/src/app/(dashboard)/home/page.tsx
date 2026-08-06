@@ -235,6 +235,10 @@ export default function DashboardPage() {
   const netWorthTrend  = pctChange(latestSnapshot?.netWorth, prevSnapshot?.netWorth);
   const firstName      = user?.fullName?.split(" ")[0] ?? "there";
 
+  // Hero sparkline — same history the trend chart below already fetched, just the bare values
+  // in chronological order (oldest→newest, matching netWorthHistory's own order).
+  const netWorthSpark = useMemo(() => netWorthHistory.map(p => p.netWorth), [netWorthHistory]);
+
   // Year mode's "since Jan 1" net worth comparison — data.totalNetWorth is already always
   // today's live figure (see comment above), so it's the right "current" side for this too.
   const netWorthBaseline     = getNetWorthBaseline(netWorthHistory, year);
@@ -309,11 +313,11 @@ export default function DashboardPage() {
       )}
 
       <main className="flex-1 overflow-auto pb-36 lg:pb-24">
-        <div className="max-w-7xl mx-auto p-4 md:p-5 lg:p-6 space-y-4 lg:space-y-5">
+        <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 space-y-6">
 
           {/* ── Onboarding: new user ── */}
           {!dataLoading && walletAccounts.length === 0 && (
-            <div className="rounded-2xl border border-primary/25 bg-primary/5 p-6 space-y-4 animate-fade-in-up">
+            <div className="rounded-2xl border border-border bg-card p-6 space-y-4 animate-fade-in-up">
               <div className="flex items-center gap-3">
                 <PremiumIcon icon={Sparkles} tone="purple" size="md" className="w-10 h-10" />
                 <div>
@@ -328,7 +332,7 @@ export default function DashboardPage() {
                   { step: 3, href: "/budgets",   title: "Set a Budget",  sub: "Stay on top of your limits" },
                 ].map(({ step, href, title, sub }) => (
                   <Link key={step} href={href}
-                    className="flex items-start gap-3 p-4 rounded-xl bg-card border border-border hover:border-primary/30 hover:bg-primary/5 transition-all group">
+                    className="flex items-start gap-3 p-4 rounded-xl bg-muted/40 hover:bg-primary/5 border border-transparent hover:border-primary/20 transition-all group">
                     <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
                       {step}
                     </span>
@@ -342,21 +346,50 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* ── Greeting Banner ── */}
-          <GreetingBanner
-            firstName={firstName}
-            year={year}
-            month={month}
-            isCurrentMonth={isCurrentMonth}
-            isCurrentYear={isCurrentYear}
-            onNavigate={navigate}
-            onNavigateYear={navigateYear}
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
-            income={data?.monthlyIncome}
-            expenses={data?.monthlyExpenses}
-            savingsRate={data?.savingsRate}
-          />
+          {/* ── Hero: greeting + net worth headline (GreetingBanner) sharing one card with the
+              compact stat row (StatOverview) — a single visual block instead of two separately
+              bordered ones stacked with a gap. ── */}
+          <div className="rounded-2xl border border-border/60 bg-card overflow-hidden animate-fade-in-up">
+            <GreetingBanner
+              firstName={firstName}
+              year={year}
+              month={month}
+              isCurrentMonth={isCurrentMonth}
+              isCurrentYear={isCurrentYear}
+              onNavigate={navigate}
+              onNavigateYear={navigateYear}
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+              income={data?.monthlyIncome}
+              expenses={data?.monthlyExpenses}
+              savingsRate={data?.savingsRate}
+              netWorth={data?.totalNetWorth}
+              netWorthDeltaPct={isYearMode ? netWorthSinceJanTrend : netWorthTrend}
+              netWorthSpark={netWorthSpark}
+              isLoading={dataLoading}
+            />
+
+            {/* ── Stat row: Investments, Income, Expenses, Savings Rate, Budget Progress ── */}
+            <StatOverview
+              viewMode={viewMode}
+              investments={investments}
+              income={data?.monthlyIncome}
+              expenses={data?.monthlyExpenses}
+              savingsRate={data?.savingsRate}
+              prevSavingsRate={prevData?.savingsRate}
+              incomeTrend={incomeTrend}
+              expenseTrend={expenseTrend}
+              ytdIncome={ytdThisYear.income}
+              ytdExpenses={ytdThisYear.expenses}
+              ytdIncomeTrend={ytdIncomeTrend}
+              ytdExpenseTrend={ytdExpenseTrend}
+              ytdSavingsRate={ytdSavingsRate}
+              ytdSavingsRateTrend={ytdSavingsRateTrend}
+              monthlyBudgets={monthlyBudgets}
+              yearlyBudgets={yearlyBudgets}
+              isLoading={dataLoading}
+            />
+          </div>
 
           {/* ── Native-only: nudge toward PIN/fingerprint setup until both are configured ── */}
           <SecuritySetupPrompt />
@@ -369,30 +402,6 @@ export default function DashboardPage() {
             <QueryErrorState onRetry={() => refetch()} className="py-8 bg-card border border-border rounded-2xl"
               description="Couldn't load your monthly totals, budgets, or spending trend. Check your connection and try again." />
           )}
-
-          {/* ── Stat Overview: Net Worth, Investments, Income, Expenses, Savings Rate, Budget Progress ── */}
-          <StatOverview
-            viewMode={viewMode}
-            netWorth={data?.totalNetWorth}
-            prevNetWorth={prevData?.totalNetWorth}
-            netWorthSinceJanTrend={netWorthSinceJanTrend}
-            investments={investments}
-            income={data?.monthlyIncome}
-            expenses={data?.monthlyExpenses}
-            savingsRate={data?.savingsRate}
-            prevSavingsRate={prevData?.savingsRate}
-            incomeTrend={incomeTrend}
-            expenseTrend={expenseTrend}
-            ytdIncome={ytdThisYear.income}
-            ytdExpenses={ytdThisYear.expenses}
-            ytdIncomeTrend={ytdIncomeTrend}
-            ytdExpenseTrend={ytdExpenseTrend}
-            ytdSavingsRate={ytdSavingsRate}
-            ytdSavingsRateTrend={ytdSavingsRateTrend}
-            monthlyBudgets={monthlyBudgets}
-            yearlyBudgets={yearlyBudgets}
-            isLoading={dataLoading}
-          />
 
           {/* ── Smart insights + upcoming bills ── */}
           <SmartAlertsRow

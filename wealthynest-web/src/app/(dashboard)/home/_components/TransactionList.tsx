@@ -89,7 +89,7 @@ function TxnIcon({ type, label, categoryIcon, categoryColor }: {
 export function TransactionList({ transactions, isLoading }: TransactionListProps) {
   const { fmt } = useAmountFormatter();
   return (
-    <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm animate-fade-in-up delay-300 flex flex-col h-full card-hover">
+    <div className="bg-card border border-border/50 hover:border-border rounded-2xl overflow-hidden animate-fade-in-up delay-300 flex flex-col h-full transition-colors">
       <div className="flex items-center justify-between px-5 py-4 border-b border-border/40 shrink-0">
         <h2 className="font-bold text-foreground">Recent Transactions</h2>
         <Link href="/expenses" className="text-xs font-semibold text-primary hover:underline transition-colors">

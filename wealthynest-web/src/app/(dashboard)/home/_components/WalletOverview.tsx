@@ -58,18 +58,18 @@ export function WalletOverview({ accounts }: WalletOverviewProps) {
     .filter((g): g is NonNullable<typeof g> => g != null);
 
   return (
-    <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm h-full flex flex-col card-hover">
+    <div className="bg-card border border-border/50 hover:border-border rounded-2xl p-5 h-full flex flex-col transition-colors">
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
           <Wallet className="w-4 h-4 text-primary" />
           <h2 className="font-bold text-foreground text-sm">Accounts Overview</h2>
         </div>
-        <Link href="/accounts" className="text-[11px] font-semibold text-primary hover:underline transition-colors">
+        <Link href="/accounts" className="text-xs font-semibold text-primary hover:underline transition-colors">
           View all →
         </Link>
       </div>
 
-      <div className="mt-2 mb-3 p-3 rounded-xl bg-primary/8 border border-primary/15">
+      <div className="mt-2 mb-3 pb-3 border-b border-border/40">
         <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mb-1">Total Balance</p>
         <p className="text-xl font-bold text-foreground tabular-nums">{fmt(totalBalance)}</p>
         <p className="text-[11px] text-muted-foreground/80 mt-0.5">Cash &amp; bank accounts combined</p>

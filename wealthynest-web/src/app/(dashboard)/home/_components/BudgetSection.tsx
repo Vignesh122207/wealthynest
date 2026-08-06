@@ -31,7 +31,7 @@ export function BudgetSection({ budgetSummaries, viewMode, year, month, isLoadin
   const visible = [...budgetSummaries].sort((a, b) => b.percentUsed - a.percentUsed).slice(0, DISPLAY_COUNT);
 
   return (
-    <div data-testid="budget-section" className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm animate-fade-in-up delay-300 h-full flex flex-col card-hover">
+    <div data-testid="budget-section" className="bg-card border border-border/50 hover:border-border rounded-2xl p-5 animate-fade-in-up delay-300 h-full flex flex-col transition-colors">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h2 className="font-bold text-foreground">Budget Progress</h2>

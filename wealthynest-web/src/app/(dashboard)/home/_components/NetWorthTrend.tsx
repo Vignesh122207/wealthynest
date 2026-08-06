@@ -28,10 +28,10 @@ const GRAD_ID = "dashboardNwGrad";
 export function NetWorthTrend({ history, netWorth, changePct, chart, isLoading }: NetWorthTrendProps) {
   const { fmt } = useAmountFormatter();
   return (
-    <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm h-full flex flex-col card-hover">
+    <div className="bg-card border border-border/50 hover:border-border rounded-2xl p-5 h-full flex flex-col transition-colors">
       <div className="flex items-center justify-between mb-1">
         <h2 className="font-bold text-foreground text-sm">Net Worth Trend</h2>
-        <Link href="/assets" className="text-[11px] font-semibold text-primary hover:underline transition-colors">
+        <Link href="/assets" className="text-xs font-semibold text-primary hover:underline transition-colors">
           View details →
         </Link>
       </div>

@@ -7,9 +7,10 @@ import "./globals.css";
 
 const inter    = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 const jakarta  = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-jakarta", display: "swap", weight: ["400","500","600","700","800"] });
-// Display serif reserved for auth-page headlines (font-serif) — gives the "private bank" register
-// the rest of the app's Jakarta/Inter sans doesn't reach for. Self-hosted via next/font, so no CSP
-// concern from an external font CDN.
+// Display serif (font-serif) — gives the "private bank" register the rest of the app's
+// Jakarta/Inter sans doesn't reach for. Used for auth-page headlines and, since the Home redesign,
+// the dashboard hero's net-worth figure. Self-hosted via next/font, so no CSP concern from an
+// external font CDN.
 const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-fraunces", display: "swap", weight: ["500","600"], style: ["normal"] });
 
 export const viewport: Viewport = {
