@@ -91,7 +91,7 @@ export function StockTransactionModal({ inv, type, onClose, bankAccounts }: {
             </div>
             <FormCurrencyInput label="Price per Share" {...form.register("pricePerShare")}
               error={form.formState.errors.pricePerShare?.message} />
-            <FormCurrencyInput label="Brokerage" placeholder="0" {...form.register("brokerage")} />
+            <FormCurrencyInput label="Brokerage (optional)" placeholder="0" {...form.register("brokerage")} />
           </div>
 
           {/* Summary preview */}

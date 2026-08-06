@@ -26,6 +26,22 @@ describe("liabilitySchema", () => {
     expect(liabilitySchema.safeParse({ ...base, outstandingAmount: -1 }).success).toBe(false);
   });
 
+  it("rejects a blank/zero principalAmount instead of silently coercing to 0", () => {
+    const blank = liabilitySchema.safeParse({ ...base, principalAmount: "" });
+    expect(blank.success).toBe(false);
+    if (!blank.success) expect(blank.error.flatten().fieldErrors.principalAmount).toContain("Original loan amount is required");
+    expect(liabilitySchema.safeParse({ ...base, principalAmount: 0 }).success).toBe(false);
+  });
+
+  it("treats a blank interestRate/emiAmount as unset, not 0", () => {
+    const result = liabilitySchema.safeParse({ ...base, interestRate: "", emiAmount: "" });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.interestRate).toBeUndefined();
+      expect(result.data.emiAmount).toBeUndefined();
+    }
+  });
+
   it("rejects outstandingAmount exceeding principalAmount", () => {
     const result = liabilitySchema.safeParse({ ...base, outstandingAmount: 600000 });
     expect(result.success).toBe(false);

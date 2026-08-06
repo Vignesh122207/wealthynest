@@ -87,7 +87,7 @@ export function BondForm({ defaultValues, onSubmit, onCancel, isPending, bankAcc
         <FormInput label="TDS Rate (%, 0 if N/A)" type="number" step="0.01" min="0" max="30"
           placeholder="e.g. 10"
           {...form.register("tdsRate")} error={form.formState.errors.tdsRate?.message} />
-        <FormInput label="Credit Day of Month (1–31)" type="number" min="1" max="31"
+        <FormInput label="Credit Day of Month (1–31) (optional)" type="number" min="1" max="31"
           placeholder="e.g. 15"
           {...form.register("couponCreditDay")} error={form.formState.errors.couponCreditDay?.message} />
         <Controller control={form.control} name="purchaseDate" render={({ field, fieldState }) => (
@@ -114,7 +114,7 @@ export function BondForm({ defaultValues, onSubmit, onCancel, isPending, bankAcc
         )}
         {bankAccounts.length > 0 && (
           <Controller control={form.control} name="linkedAccountId" render={({ field }) => (
-            <AccountPicker label="Credit Coupons To" allowClear
+            <AccountPicker label="Credit Coupons To (optional)" allowClear
               bankAccounts={bankAccounts} value={field.value ?? ""} onChange={field.onChange} />
           )} />
         )}

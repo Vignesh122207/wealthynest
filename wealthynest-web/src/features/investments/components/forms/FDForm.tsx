@@ -67,7 +67,7 @@ export function FDForm({ defaultValues, onSubmit, onCancel, isPending, bankAccou
         )}
         {bankAccounts.length > 0 && (
           <Controller control={form.control} name="linkedAccountId" render={({ field }) => (
-            <AccountPicker label="Credit Maturity To" allowClear
+            <AccountPicker label="Credit Maturity To (optional)" allowClear
               bankAccounts={bankAccounts} value={field.value ?? ""} onChange={field.onChange} testId="fd-linked-account-picker" />
           )} />
         )}
@@ -78,7 +78,7 @@ export function FDForm({ defaultValues, onSubmit, onCancel, isPending, bankAccou
               value={field.value ?? ""} onChange={field.onChange} testId="fd-debit-account-picker" />
           )} />
         )}
-        <BrokerAndPurposeFields form={form} />
+        <BrokerAndPurposeFields form={form} showBroker={false} />
       </div>
       <FormButtons onCancel={onCancel} isPending={isPending} label="Save FD" color="sky" />
     </form>

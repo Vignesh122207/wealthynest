@@ -125,9 +125,7 @@ export default function AccountsPage() {
     [allTimeIncome]);
   const incomeSourceUsage = useMemo(() => buildUsageCounts(allTimeIncome, i => i.source), [allTimeIncome]);
 
-  const [payLoan,   setPayLoan]   = useState<WalletAccount | null>(null);
-  const [payAmount, setPayAmount] = useState("");
-  const [payFrom,   setPayFrom]   = useState("");
+  const [payLoan, setPayLoan] = useState<WalletAccount | null>(null);
   // Balance reconciliation, folded into the Edit form itself rather than a separate modal —
   // initialized from editAccount.currentBalance when the edit form opens (see openEdit below).
   const [actualBalance, setActualBalance] = useState("");
@@ -200,7 +198,12 @@ export default function AccountsPage() {
     setShowCCDetails(false);
     createForm.reset({
       accountType: type, openingBalance: undefined,
-      name: type === "CASH_WALLET" ? "Cash Wallet" : type === "CREDIT_CARD" ? "Credit Card" : type === "LOAN" ? "Loan" : "",
+      // Every type needs a non-blank default — Bank Account has no dedicated Name field of its
+      // own (it's derived from the bank name once typed), so leaving this "" let a completely
+      // untouched submit fail schema validation with nowhere on screen to show why: BankNameInput
+      // has no error slot, so the blocked submit looked like a dead button. Matches the same
+      // fallback BankNameInput's own onChange already applies once the user *does* type.
+      name: type === "CASH_WALLET" ? "Cash Wallet" : type === "CREDIT_CARD" ? "Credit Card" : type === "LOAN" ? "Loan" : "Bank Account",
     });
     setModal("create");
   };
@@ -238,6 +241,11 @@ export default function AccountsPage() {
       bankName: account.bankName, accountNumber: account.accountNumber,
       openingBalance: account.openingBalance,
       lowBalanceThreshold: account.lowBalanceThreshold,
+      // Purpose was missing here entirely — every edit open silently started from "no purpose"
+      // regardless of what the account actually had, so the picker never showed the real value
+      // and (once the backend's null-means-unchanged guard on this field is fixed) submitting
+      // without touching Purpose would have wiped it on every edit.
+      purpose: account.purpose ?? undefined, purposeLabel: account.purposeLabel ?? undefined,
       creditLimit: account.creditLimit, statementDay: account.statementDay,
       paymentDueDay: account.paymentDueDay, apr: account.apr,
       loanType: account.loanType, principalAmount: account.principalAmount,
@@ -330,7 +338,7 @@ export default function AccountsPage() {
     const paymentMethod = target?.accountType === "CASH_WALLET" ? "CASH"
       : target?.accountType === "CREDIT_CARD" ? "CREDIT_CARD" : target?.accountType ? "BANK_ACCOUNT" : undefined;
     createExpense({ accountId: v.accountId, categoryId: v.categoryId, amount: Number(v.amount),
-      description: v.description, expenseDate: v.expenseDate, paymentMethod }, { onSuccess: close });
+      description: v.description, notes: v.notes, expenseDate: v.expenseDate, paymentMethod }, { onSuccess: close });
   };
 
   const handleAddTransfer = (v: TransferFormValues) => {
@@ -370,7 +378,7 @@ export default function AccountsPage() {
       // visitor's initial /accounts bundle just because one Loan card's icon might get clicked.
       onDownload={() => { void import("@/features/accounts/utils/downloadAccountStatement").then(({ downloadAccountStatement }) => downloadAccountStatement(a)); }}
       onEdit={() => openEdit(a)}
-      onRecordPayment={() => { setPayLoan(a); setPayAmount(a.emiAmount ? String(a.emiAmount) : ""); setPayFrom(a.autopayAccountId ?? ""); }} />
+      onRecordPayment={() => setPayLoan(a)} />
   ) : (
     <AccountCard key={a.id} account={a}
       linkedDebts={debtsByAccountId.get(a.id) ?? NO_DEBTS}
@@ -406,7 +414,6 @@ export default function AccountsPage() {
 
       {payLoan && (
         <LoanPaymentModal payLoan={payLoan} accounts={accounts} fmt={fmt}
-          payAmount={payAmount} setPayAmount={setPayAmount} payFrom={payFrom} setPayFrom={setPayFrom}
           payingLoan={payingLoan} onClose={() => setPayLoan(null)}
           onRecordPayment={(amount, fromAccountId) => recordLoanPayment(
             { id: payLoan.id, amount, fromAccountId },

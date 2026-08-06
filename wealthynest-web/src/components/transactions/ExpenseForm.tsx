@@ -121,6 +121,9 @@ export function ExpenseForm({ title, defaultValues, defaultCategoryId, categoryO
           <FormInput label="Description (optional)" placeholder="e.g. Lunch at Saravana Bhavan"
             {...form.register("description")} />
 
+          <FormInput label="Notes (optional)" placeholder="Any extra detail worth keeping"
+            {...form.register("notes")} />
+
           {lockedAccount ? (
             <div>
               <label className="block text-sm font-medium text-muted-foreground mb-1.5">Paid Via</label>

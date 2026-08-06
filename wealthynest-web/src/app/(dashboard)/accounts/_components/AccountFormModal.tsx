@@ -5,16 +5,22 @@ import {Controller, type UseFormReturn} from "react-hook-form";
 import {PremiumIcon} from "@/components/icons/PremiumIcon";
 import {AccountPicker} from "@/components/transactions/AccountPicker";
 import {BigAmountInput} from "@/components/transactions/BigAmountInput";
+import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
 import {FormCurrencyInput} from "@/components/forms/FormCurrencyInput";
-import {FormSelect} from "@/components/forms/FormSelect";
+import {IconOptionPicker} from "@/components/forms/IconOptionPicker";
 import {PurposePicker} from "@/components/forms/PurposePicker";
 import {BankNameInput} from "@/features/accounts/components/BankNameInput";
 import {ACCOUNT_TYPE_META} from "@/lib/accountTypeMeta";
-import {type CreateAccountForm, LOAN_TYPE_LABELS, LOAN_TYPE_OPTIONS} from "@/features/accounts/schemas/account.schema";
+import {LIABILITY_TYPE_ICON_OPTIONS} from "@/lib/netWorthTypeMeta";
+import {type CreateAccountForm, LOAN_TYPE_LABELS} from "@/features/accounts/schemas/account.schema";
 import {INDIAN_BANKS} from "@/lib/constants";
 import {cn, formatCurrency} from "@/lib/utils";
-import {useSidebarOffsetClass} from "@/hooks/useSidebarOffsetClass";
 import type {AccountType, WalletAccount} from "@/features/accounts/types/account.types";
+
+// account.schema.ts's LOAN_TYPE_OPTIONS is the same set as LIABILITY_TYPE_ICON_OPTIONS minus
+// CREDIT_CARD (a loan you take out is never itself a credit card) — reusing the liability icon
+// map instead of duplicating a second one keeps the icon/color choices in sync automatically.
+const LOAN_TYPE_ICON_OPTIONS = LIABILITY_TYPE_ICON_OPTIONS.filter(o => o.value !== "CREDIT_CARD");
 
 type ModalType = "none" | "create" | "addMoney" | "addExpense" | "transfer" | "edit" | "import";
 
@@ -70,13 +76,12 @@ export function AccountFormModal({
     : (editBalanceIsPositive ? "Income adjustment" : "Expense adjustment");
 
   const creditLimitField = createForm.register("creditLimit");
-  const sidebarOffset = useSidebarOffsetClass();
 
   return (
-    <div data-testid="modal-overlay-backdrop" className={cn("fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4", sidebarOffset)} onClick={onClose}>
+    <TransactionModalOverlay onDismiss={onClose} maxWidth="max-w-md">
       {/* Same rounded-3xl / gradient-bar / p-5 chrome as ExpenseForm and the other shared
           transaction forms, so creating/editing an account matches the rest of the app. */}
-      <div className="rounded-3xl overflow-hidden border border-border shadow-2xl animate-scale-in bg-card w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div className="rounded-3xl overflow-hidden border border-border shadow-2xl animate-scale-in bg-card">
         <div className="h-1.5" style={{ background: `linear-gradient(to right, ${ACCOUNT_TYPE_META[activeType].hex}, ${ACCOUNT_TYPE_META[activeType].hex}99)` }} />
         <div className="p-5">
           <div className="flex items-center gap-3 mb-4">
@@ -132,7 +137,10 @@ export function AccountFormModal({
                         // type was selected before, so it can't silently ride along on submit.
                         createForm.reset({
                           accountType: t,
-                          name: t === "CASH_WALLET" ? "Cash Wallet" : t === "CREDIT_CARD" ? "Credit Card" : t === "LOAN" ? "Loan" : "",
+                          // Bank Account needs the same non-blank fallback as the others — see
+                          // page.tsx's openCreate for why "" here left a blocked submit with no
+                          // visible error anywhere on screen.
+                          name: t === "CASH_WALLET" ? "Cash Wallet" : t === "CREDIT_CARD" ? "Credit Card" : t === "LOAN" ? "Loan" : "Bank Account",
                           openingBalance: createForm.getValues("openingBalance"),
                         });
                         setBankInput("");
@@ -156,7 +164,13 @@ export function AccountFormModal({
                 label={isCCForm ? "Card Issuer (Bank)" : isLoanForm ? "Lender (Bank / NBFC)" : "Bank Name"}
                 suggestions={INDIAN_BANKS}
                 value={bankInput}
+                error={createForm.formState.errors.bankName?.message}
                 onChange={v => { setBankInput(v);
+                  // Mirrored into the RHF form (not just the local bankInput state used for the
+                  // live autocomplete) so the schema's required-bankName rule actually has
+                  // something to validate — previously bankName never reached createForm at all
+                  // on create, so a blank submit couldn't be rejected for it.
+                  createForm.setValue("bankName", v || undefined, { shouldValidate: true });
                   if (isBankForm) createForm.setValue("name", v || "Bank Account");
                   if (isCCForm)   createForm.setValue("name", v ? `${v} Card` : "");
                   if (isLoanForm) {
@@ -182,12 +196,11 @@ export function AccountFormModal({
             )}
 
             {isLoanForm && (
-              <FormSelect label="Loan Type" options={LOAN_TYPE_OPTIONS} placeholder="Select loan type"
+              <IconOptionPicker label="Loan Type" options={LOAN_TYPE_ICON_OPTIONS} placeholder="Select loan type"
                 error={createForm.formState.errors.loanType?.message}
                 value={createForm.watch("loanType") ?? ""}
-                onChange={e => {
-                  const v = e.target.value as CreateAccountForm["loanType"];
-                  createForm.setValue("loanType", v);
+                onChange={v => {
+                  createForm.setValue("loanType", v as CreateAccountForm["loanType"]);
                   const label = LOAN_TYPE_LABELS[v ?? ""];
                   createForm.setValue("name", label ? `${bankInput} ${label}`.trim() : (bankInput || "Loan"));
                 }} />
@@ -217,13 +230,16 @@ export function AccountFormModal({
                     className="w-full h-10 px-3 rounded-xl text-sm bg-background border border-border text-foreground placeholder-muted-foreground/40 outline-none focus:border-indigo-500 transition-all" />
                 </div>
                 <div>
-                  <label className="block text-xs text-muted-foreground mb-1.5 font-medium">Credit Limit</label>
+                  <label className="block text-xs text-muted-foreground mb-1.5 font-medium">
+                    Credit Limit <span className="text-muted-foreground/80">(optional)</span>
+                  </label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground/80">{currSymbol}</span>
                     <input type="text" inputMode="decimal" placeholder="e.g. 100000" {...creditLimitField}
                       onChange={e => { e.target.value = e.target.value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1"); creditLimitField.onChange(e); }}
                       className="w-full h-10 pl-6 pr-3 rounded-xl text-sm bg-background border border-border text-foreground placeholder-muted-foreground/40 outline-none focus:border-indigo-500 transition-all" />
                   </div>
+                  <p className="text-[11px] text-muted-foreground/70 mt-1">Powers the utilization bar on this card — skip it if you&apos;d rather not track one.</p>
                 </div>
               </div>
             )}
@@ -318,7 +334,8 @@ export function AccountFormModal({
             {isLoanForm && (
               <div className="space-y-3 pl-3 border-l-2 border-rose-500/20">
                 <div className="grid grid-cols-2 gap-3">
-                  <FormCurrencyInput label="Original Loan Amount" placeholder="Defaults to outstanding"
+                  <FormCurrencyInput label="Original Loan Amount (optional)" placeholder="0"
+                    hint="Defaults to your outstanding balance if left blank."
                     {...createForm.register("principalAmount")}
                     error={createForm.formState.errors.principalAmount?.message} />
                   <div>
@@ -333,7 +350,7 @@ export function AccountFormModal({
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <FormCurrencyInput label="EMI Amount" placeholder="e.g. 25000"
+                  <FormCurrencyInput label="EMI Amount (optional)" placeholder="e.g. 25000"
                     {...createForm.register("emiAmount")}
                     error={createForm.formState.errors.emiAmount?.message} />
                   <div>
@@ -372,6 +389,6 @@ export function AccountFormModal({
           </form>
         </div>
       </div>
-    </div>
+    </TransactionModalOverlay>
   );
 }

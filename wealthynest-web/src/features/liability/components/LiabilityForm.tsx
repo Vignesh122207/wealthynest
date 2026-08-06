@@ -4,7 +4,7 @@ import {Controller, useForm} from "react-hook-form";
 import {zodResolver} from "@hookform/resolvers/zod";
 import {AlertTriangle, Check} from "lucide-react";
 import {FormInput} from "@/components/forms/FormInput";
-import {FormSelect} from "@/components/forms/FormSelect";
+import {IconOptionPicker} from "@/components/forms/IconOptionPicker";
 import {FormCurrencyInput} from "@/components/forms/FormCurrencyInput";
 import {FormDatePicker} from "@/components/forms/FormDatePicker";
 import {Button} from "@/components/ui/Button";
@@ -12,7 +12,7 @@ import {FormModalShell} from "@/components/ui/FormModalShell";
 import {FormModalHeader} from "@/components/transactions/FormModalHeader";
 import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
 import {BigAmountInput} from "@/components/transactions/BigAmountInput";
-import {LIABILITY_TYPES} from "@/lib/constants";
+import {LIABILITY_TYPE_ICON_OPTIONS} from "@/lib/netWorthTypeMeta";
 import {type LiabilityFormValues, liabilitySchema} from "../schemas/liability.schema";
 
 export function LiabilityForm({ title, defaultValues, onSubmit, onCancel, onDelete, isPending }: {
@@ -35,23 +35,25 @@ export function LiabilityForm({ title, defaultValues, onSubmit, onCancel, onDele
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormInput label="Name" placeholder="e.g. HDFC Home Loan" data-testid="liability-name-input"
               error={form.formState.errors.name?.message} {...form.register("name")} />
-            <FormSelect label="Type" options={LIABILITY_TYPES} placeholder="Select type" data-testid="liability-type-select"
-              error={form.formState.errors.liabilityType?.message} {...form.register("liabilityType")} />
+            <Controller control={form.control} name="liabilityType" render={({ field, fieldState }) => (
+              <IconOptionPicker label="Type" options={LIABILITY_TYPE_ICON_OPTIONS} testId="liability-type-picker"
+                value={field.value ?? ""} onChange={field.onChange} error={fieldState.error?.message} />
+            )} />
             <BigAmountInput label="Outstanding Balance" colorClass="text-red-500 dark:text-red-400" testId="liability-outstanding-input"
               error={form.formState.errors.outstandingAmount?.message} inputProps={form.register("outstandingAmount")} />
             <div className="grid sm:grid-cols-2 gap-4">
-              <FormCurrencyInput label="Original Loan Amount" placeholder="0"
+              <FormCurrencyInput label="Original Loan Amount" placeholder="0" hint="Outstanding Balance can never exceed this."
                 error={form.formState.errors.principalAmount?.message} {...form.register("principalAmount")} />
-              <FormCurrencyInput label="Monthly EMI" placeholder="0"
-                {...form.register("emiAmount")} />
-              <FormInput label="Interest Rate (% p.a.)" type="number" placeholder="8.5"
-                {...form.register("interestRate")} />
-              <FormInput label="Lender / Bank" placeholder="e.g. HDFC Bank" {...form.register("lenderName")} />
+              <FormCurrencyInput label="Monthly EMI (optional)" placeholder="0"
+                error={form.formState.errors.emiAmount?.message} {...form.register("emiAmount")} />
+              <FormInput label="Interest Rate (% p.a.) (optional)" type="number" placeholder="8.5"
+                error={form.formState.errors.interestRate?.message} {...form.register("interestRate")} />
+              <FormInput label="Lender / Bank (optional)" placeholder="e.g. HDFC Bank" {...form.register("lenderName")} />
               <Controller control={form.control} name="startDate" render={({ field }) => (
-                <FormDatePicker label="Start Date" value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} />
+                <FormDatePicker label="Start Date (optional)" value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} />
               )} />
               <Controller control={form.control} name="endDate" render={({ field }) => (
-                <FormDatePicker label="Expected Payoff Date" value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} />
+                <FormDatePicker label="Expected Payoff Date (optional)" value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} />
               )} />
             </div>
             <FormInput label="Notes (optional)" placeholder="Add a note…" {...form.register("notes")} />

@@ -38,7 +38,11 @@ describe("assetSchema", () => {
     if (result.success) expect(result.data.currentValue).toBe(1234);
   });
 
-  it("institution/notes/asOfDate are optional", () => {
+  it("institution/accountNumber/notes/asOfDate are optional", () => {
     expect(assetSchema.safeParse(base).success).toBe(true);
+  });
+
+  it("rejects an accountNumber over 50 chars", () => {
+    expect(assetSchema.safeParse({ ...base, accountNumber: "a".repeat(51) }).success).toBe(false);
   });
 });

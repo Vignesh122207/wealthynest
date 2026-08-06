@@ -6,16 +6,18 @@ import {CURRENCIES, usePrefsStore} from "@/store/preferences.store";
 interface FormCurrencyInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
   label?:    string;
   error?:    string;
+  hint?:     string;
   currency?: string;
 }
 
 export const FormCurrencyInput = forwardRef<HTMLInputElement, FormCurrencyInputProps>(
-  ({ label, error, currency, className, onChange, id, ...props }, ref) => {
+  ({ label, error, hint, currency, className, onChange, id, ...props }, ref) => {
     const { currency: currCode } = usePrefsStore();
     const symbol = currency ?? (CURRENCIES.find(c => c.code === currCode)?.symbol ?? "₹");
     const generatedId = useId();
     const inputId = id ?? generatedId;
     const errorId = `${inputId}-error`;
+    const hintId = `${inputId}-hint`;
 
     // type="text" + inputMode="decimal", not type="number": WebKit (Safari/iOS) auto-selects a
     // number input's entire value on focus, making every amount field in the app pre-highlight
@@ -39,7 +41,7 @@ export const FormCurrencyInput = forwardRef<HTMLInputElement, FormCurrencyInputP
             type="text"
             inputMode="decimal"
             aria-invalid={!!error || undefined}
-            aria-describedby={error ? errorId : undefined}
+            aria-describedby={error ? errorId : hint ? hintId : undefined}
             onChange={handleChange}
             className={cn(
               "w-full h-10 pl-7 pr-3 rounded-xl text-sm transition-all outline-none",
@@ -53,6 +55,7 @@ export const FormCurrencyInput = forwardRef<HTMLInputElement, FormCurrencyInputP
           />
         </div>
         {error && <p id={errorId} className="text-xs text-red-500 dark:text-red-400">{error}</p>}
+        {hint && !error && <p id={hintId} className="text-xs text-muted-foreground">{hint}</p>}
       </div>
     );
   }

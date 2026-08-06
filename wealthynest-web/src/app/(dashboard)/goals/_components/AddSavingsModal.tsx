@@ -1,9 +1,11 @@
 "use client";
 
 import {useState} from "react";
-import {Minus, Plus} from "lucide-react";
 import {useForm} from "react-hook-form";
+import {zodResolver} from "@hookform/resolvers/zod";
+import {Minus, Plus} from "lucide-react";
 import {FormCurrencyInput} from "@/components/forms/FormCurrencyInput";
+import {positiveAmountSchema, type PositiveAmountFormValues} from "@/components/forms/positiveAmountSchema";
 import {FormModalHeader} from "@/components/transactions/FormModalHeader";
 import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
 import {FormModalShell} from "@/components/ui/FormModalShell";
@@ -15,28 +17,19 @@ import {cn, formatCurrency} from "@/lib/utils";
 export function AddSavingsModal({ goal, goalColor, onClose }: { goal: Goal; goalColor: string; onClose: () => void }) {
   const { mutate: updateGoal, isPending } = useUpdateGoal();
   const [mode, setMode] = useState<"add" | "withdraw">("add");
-  const [error, setError] = useState("");
   const remaining = Math.max(0, goal.targetAmount - goal.savedAmount);
 
-  const form = useForm<{ amount: number | undefined }>({ defaultValues: { amount: undefined } });
+  // Rebuilt fresh each render against the current mode's cap — same "resolver reads whichever
+  // schema was most recently passed at validate time" pattern as GoalForm's own goalSchema(isLinked).
+  const form = useForm<PositiveAmountFormValues>({
+    resolver: zodResolver(mode === "withdraw"
+      ? positiveAmountSchema(goal.savedAmount, `Cannot withdraw more than ${formatCurrency(goal.savedAmount)} saved.`)
+      : positiveAmountSchema(remaining, `This goal only needs ${formatCurrency(remaining)} more to reach its target.`)),
+    defaultValues: { amount: undefined },
+  });
 
-  const handleSubmit = ({ amount }: { amount: number | undefined }) => {
+  const handleSubmit = ({ amount }: PositiveAmountFormValues) => {
     const n = Number(amount);
-    if (!n || n <= 0) { setError("Enter an amount greater than zero."); return; }
-    if (mode === "withdraw" && n > goal.savedAmount) {
-      setError(`Cannot withdraw more than ${formatCurrency(goal.savedAmount)} saved.`);
-      return;
-    }
-    // Reject rather than silently cap at the target — this used to clamp newSaved to
-    // goal.targetAmount with no feedback, so entering more than what's actually needed just
-    // dropped the excess with no indication only part of it was applied. The "Full" quick-fill
-    // button above already covers "add exactly what's left", so this only fires when someone
-    // types more than that on purpose.
-    if (mode === "add" && n > remaining) {
-      setError(`This goal only needs ${formatCurrency(remaining)} more to reach its target.`);
-      return;
-    }
-    setError("");
     const newSaved = mode === "add" ? goal.savedAmount + n : Math.max(0, goal.savedAmount - n);
     updateGoal({ id: goal.id, payload: { savedAmount: newSaved } }, { onSuccess: onClose });
   };
@@ -51,12 +44,12 @@ export function AddSavingsModal({ goal, goalColor, onClose }: { goal: Goal; goal
 
         {/* Mode toggle */}
         <div className="flex gap-1.5 p-1 bg-muted/60 rounded-xl mb-4">
-          <button type="button" data-testid="goal-savings-mode-add" onClick={() => { setMode("add"); setError(""); form.reset(); }}
+          <button type="button" data-testid="goal-savings-mode-add" onClick={() => { setMode("add"); form.reset(); }}
             className={cn("flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg text-xs font-medium transition-all",
               mode === "add" ? "bg-emerald-700 text-white shadow-sm" : "text-muted-foreground hover:text-foreground")}>
             <Plus className="w-3.5 h-3.5" /> Add
           </button>
-          <button type="button" data-testid="goal-savings-mode-withdraw" onClick={() => { setMode("withdraw"); setError(""); form.reset(); }}
+          <button type="button" data-testid="goal-savings-mode-withdraw" onClick={() => { setMode("withdraw"); form.reset(); }}
             className={cn("flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg text-xs font-medium transition-all",
               mode === "withdraw" ? "bg-red-600 text-white shadow-sm" : "text-muted-foreground hover:text-foreground")}>
             <Minus className="w-3.5 h-3.5" /> Withdraw
@@ -76,11 +69,10 @@ export function AddSavingsModal({ goal, goalColor, onClose }: { goal: Goal; goal
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-3">
           <FormCurrencyInput label={mode === "add" ? "Amount to add" : "Amount to withdraw"} placeholder="0"
             data-testid="goal-savings-amount-input"
-            {...form.register("amount", { valueAsNumber: true })} />
-          {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+            error={form.formState.errors.amount?.message} {...form.register("amount")} />
           <div className="flex gap-2 pt-1">
             {mode === "add" && remaining > 0 && (
-              <button type="button" onClick={() => form.setValue("amount", remaining)}
+              <button type="button" onClick={() => form.setValue("amount", remaining, { shouldValidate: true })}
                 className="h-9 px-3 rounded-xl text-xs font-medium bg-muted hover:bg-muted/80 text-muted-foreground transition-all whitespace-nowrap">
                 Full ({formatCurrency(remaining)})
               </button>

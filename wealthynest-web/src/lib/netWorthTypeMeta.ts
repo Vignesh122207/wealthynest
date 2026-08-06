@@ -16,6 +16,7 @@ import {
     TrendingUp,
     Wallet,
 } from "lucide-react";
+import {ASSET_TYPES, LIABILITY_TYPES} from "./constants";
 
 export interface NetWorthTypeMetaEntry {
   icon: LucideIcon;
@@ -63,6 +64,12 @@ export function getAssetTypeMeta(type: string): NetWorthTypeMetaEntry {
 export function getLiabilityTypeMeta(type: string): NetWorthTypeMetaEntry {
   return LIABILITY_TYPE_META[type] ?? DEFAULT_META;
 }
+
+// Combines each feature's own { value, label } list (ASSET_TYPES/LIABILITY_TYPES) with this
+// file's icon+color map, for IconOptionPicker call sites — a single source of truth instead of
+// each form separately zipping the two lists together (and risking them drifting out of order).
+export const ASSET_TYPE_ICON_OPTIONS = ASSET_TYPES.map(t => ({ ...t, ...getAssetTypeMeta(t.value) }));
+export const LIABILITY_TYPE_ICON_OPTIONS = LIABILITY_TYPES.map(t => ({ ...t, ...getLiabilityTypeMeta(t.value) }));
 
 /** Resolves a raw type value (e.g. "HOME_LOAN") to its display label via an { value, label } option list. */
 export function typeLabel(types: { value: string; label: string }[], val: string): string {

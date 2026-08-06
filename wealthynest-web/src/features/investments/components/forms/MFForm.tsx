@@ -75,13 +75,13 @@ export function MFForm({ defaultValues, onSubmit, onCancel, isPending, bankAccou
           )} />
           {bankAccounts.length > 0 && (
             <Controller control={form.control} name="linkedAccountId" render={({ field }) => (
-              <AccountPicker label="Link Account (SIP tracking)" allowClear
+              <AccountPicker label="Link Account (SIP tracking, optional)" allowClear
                 bankAccounts={bankAccounts} value={field.value ?? ""} onChange={field.onChange} />
             )} />
           )}
           <FormCurrencyInput label="Monthly SIP Amount (optional)" data-testid="mf-sip-amount-input"
             {...form.register("sipAmount")} error={form.formState.errors.sipAmount?.message} />
-          <FormInput label="SIP Day of Month (1–31)" type="number" min="1" max="31" placeholder="e.g. 5"
+          <FormInput label="SIP Day of Month (1–31) (optional)" type="number" min="1" max="31" placeholder="e.g. 5"
             data-testid="mf-sip-day-input"
             {...form.register("sipDay")} error={form.formState.errors.sipDay?.message} />
           {!isEditing && bankAccounts.length > 0 && (

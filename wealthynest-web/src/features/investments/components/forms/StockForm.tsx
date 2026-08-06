@@ -106,7 +106,7 @@ export function StockForm({ defaultValues, onSubmit, onCancel, isPending, bankAc
           )} />
           {bankAccounts.length > 0 && (
             <Controller control={form.control} name="linkedAccountId" render={({ field }) => (
-              <AccountPicker label="Auto-credit Dividends To" allowClear
+              <AccountPicker label="Auto-credit Dividends To (optional)" allowClear
                 bankAccounts={bankAccounts} value={field.value ?? ""} onChange={field.onChange} />
             )} />
           )}

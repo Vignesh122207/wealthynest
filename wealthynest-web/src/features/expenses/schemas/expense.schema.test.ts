@@ -59,4 +59,9 @@ describe("expenseSchema", () => {
     const result = expenseSchema.safeParse({ ...valid, description: "x".repeat(256) });
     expect(result.success).toBe(false);
   });
+
+  it("treats notes as optional", () => {
+    expect(expenseSchema.safeParse(valid).success).toBe(true);
+    expect(expenseSchema.safeParse({ ...valid, notes: "Paid in two installments" }).success).toBe(true);
+  });
 });
