@@ -136,32 +136,32 @@ export default function GoalsPage() {
 
         {/* Summary banner */}
         {goals.length > 0 && (
-          <div className="bg-gradient-to-br from-fuchsia-500/15 to-purple-500/10 border border-fuchsia-500/20 rounded-2xl p-5">
-            <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Total Saved</p>
-                <p className="text-2xl font-bold text-foreground tabular-nums">{fmt(totalSaved)}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  of {fmt(totalTarget)} across {goals.length} {goals.length === 1 ? "goal" : "goals"}
+          <div className="bg-gradient-to-br from-fuchsia-500/10 to-purple-500/[0.06] border border-fuchsia-500/15 rounded-2xl p-4 sm:p-5 animate-fade-in-up">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-3 sm:gap-x-4 gap-y-3 mb-3.5">
+              <div className="min-w-0 col-span-2 sm:col-span-1">
+                <p className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Total Saved</p>
+                <p className="text-2xl sm:text-[28px] leading-none font-bold text-foreground tabular-nums tracking-tight truncate">{fmt(totalSaved)}</p>
+                <p className="text-xs text-muted-foreground mt-1.5 truncate">
+                  of {fmt(totalTarget)} · {goals.length} {goals.length === 1 ? "goal" : "goals"}
                 </p>
               </div>
-              {totalRemaining > 0 && (
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Still Needed</p>
-                  <p className="text-2xl font-bold text-fuchsia-600 dark:text-fuchsia-400 tabular-nums">{fmt(totalRemaining)}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    across {activeGoals.length} active {activeGoals.length === 1 ? "goal" : "goals"}
+              {totalRemaining > 0 ? (
+                <div className="min-w-0">
+                  <p className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Still Needed</p>
+                  <p className="text-lg sm:text-xl leading-none font-bold text-fuchsia-600 dark:text-fuchsia-400 tabular-nums tracking-tight truncate">{fmt(totalRemaining)}</p>
+                  <p className="text-xs text-muted-foreground mt-1.5 truncate">
+                    {activeGoals.length} active {activeGoals.length === 1 ? "goal" : "goals"}
                   </p>
                 </div>
-              )}
-              <div className="text-right shrink-0">
-                <p className="text-xs text-muted-foreground mb-1">Progress</p>
-                <p className="text-2xl font-bold text-fuchsia-600 dark:text-fuchsia-400 tabular-nums">{overallPct.toFixed(0)}%</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{completedGoals.length} of {goals.length} complete</p>
+              ) : <div />}
+              <div className="text-right min-w-0">
+                <p className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Progress</p>
+                <p className="text-lg sm:text-xl leading-none font-bold text-fuchsia-600 dark:text-fuchsia-400 tabular-nums tracking-tight">{overallPct.toFixed(0)}%</p>
+                <p className="text-xs text-muted-foreground mt-1.5 truncate">{completedGoals.length} of {goals.length} complete</p>
               </div>
             </div>
-            <div className="h-2 bg-muted/60 rounded-full overflow-hidden">
-              <div className="h-full bg-fuchsia-500 rounded-full transition-all duration-500"
+            <div className="h-2 bg-muted/50 rounded-full overflow-hidden shadow-[inset_0_1px_2px_rgba(0,0,0,0.08)]">
+              <div className="h-full bg-gradient-to-r from-fuchsia-500 to-purple-500 rounded-full transition-[width] duration-700 ease-out"
                 style={{ width: `${overallPct}%` }} />
             </div>
           </div>
@@ -180,7 +180,7 @@ export default function GoalsPage() {
             description="Set a financial goal — buying a house, emergency fund, or a dream vacation — and track your progress."
             action={
               <button onClick={() => setShowCreate(true)}
-                className="flex items-center gap-2 bg-gradient-to-br from-fuchsia-600 to-fuchsia-500 shadow-lg shadow-fuchsia-500/30 hover:shadow-xl hover:shadow-fuchsia-500/40 hover:-translate-y-0.5 text-white px-5 h-10 rounded-xl text-sm font-semibold transition-all">
+                className="flex items-center gap-2 bg-gradient-to-br from-fuchsia-600 to-fuchsia-500 shadow-lg shadow-fuchsia-500/30 hover:shadow-xl hover:shadow-fuchsia-500/40 hover:-translate-y-0.5 active:translate-y-0 active:shadow-md text-white px-5 h-10 rounded-xl text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background">
                 <Plus className="w-4 h-4" /> Create First Goal
               </button>
             } />
@@ -188,7 +188,7 @@ export default function GoalsPage() {
           <>
             {/* Urgency legend */}
             {(activeGoals.length > 0 || pausedGoals.length > 0) && (
-              <div className="flex items-center gap-4 text-[11px] text-muted-foreground flex-wrap">
+              <div className="flex items-center gap-4 text-[11px] text-muted-foreground flex-wrap animate-fade-in-up">
                 <span className="font-medium text-foreground/50 uppercase tracking-wide text-xs">Urgency:</span>
                 <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500 shrink-0" /> Overdue / &lt;30 days</span>
                 <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" /> &lt;3 months</span>
@@ -197,8 +197,8 @@ export default function GoalsPage() {
               </div>
             )}
             {activeGoals.length > 0 && (
-              <section>
-                <div className="flex items-center gap-2 mb-3">
+              <section className="animate-fade-in-up delay-75">
+                <div className="flex items-center gap-2 mb-3.5">
                   <PremiumIcon icon={Target} tone="purple" size="xs" />
                   <h2 className="text-sm font-semibold text-foreground">Active Goals</h2>
                   <span className="text-xs text-muted-foreground">{activeGoals.length}</span>
@@ -214,9 +214,9 @@ export default function GoalsPage() {
             )}
 
             {pausedGoals.length > 0 && (
-              <section>
+              <section className="animate-fade-in-up delay-150">
                 <button onClick={() => setShowPaused(v => !v)}
-                  className="flex items-center gap-2 mb-3 group w-full">
+                  className="flex items-center gap-2 mb-3.5 group w-full rounded-lg -mx-1 px-1 py-0.5 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/40">
                   <Pause className="w-4 h-4 text-muted-foreground" />
                   <h2 className="text-sm font-semibold text-foreground group-hover:text-foreground/80 transition-colors">
                     Paused Goals
@@ -224,8 +224,8 @@ export default function GoalsPage() {
                   <span className="text-xs text-muted-foreground">{pausedGoals.length}</span>
                   <div className="ml-auto">
                     {showPaused
-                      ? <ChevronUp   className="w-3.5 h-3.5 text-muted-foreground" />
-                      : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
+                      ? <ChevronUp   className="w-3.5 h-3.5 text-muted-foreground transition-transform" />
+                      : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground transition-transform" />}
                   </div>
                 </button>
                 {showPaused && (
@@ -241,9 +241,9 @@ export default function GoalsPage() {
             )}
 
             {completedGoals.length > 0 && (
-              <section>
+              <section className="animate-fade-in-up delay-225">
                 <button onClick={() => setShowDone(v => !v)}
-                  className="flex items-center gap-2 mb-3 group w-full">
+                  className="flex items-center gap-2 mb-3.5 group w-full rounded-lg -mx-1 px-1 py-0.5 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/40">
                   <Trophy className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                   <h2 className="text-sm font-semibold text-foreground group-hover:text-foreground/80 transition-colors">
                     Completed Goals
@@ -251,8 +251,8 @@ export default function GoalsPage() {
                   <span className="text-xs text-muted-foreground">{completedGoals.length}</span>
                   <div className="ml-auto">
                     {showDone
-                      ? <ChevronUp   className="w-3.5 h-3.5 text-muted-foreground" />
-                      : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
+                      ? <ChevronUp   className="w-3.5 h-3.5 text-muted-foreground transition-transform" />
+                      : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground transition-transform" />}
                   </div>
                 </button>
                 {showDone && (
