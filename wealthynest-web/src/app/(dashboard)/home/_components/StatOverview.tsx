@@ -2,9 +2,7 @@
 
 import {useMemo} from "react";
 import {
-    AlertTriangle,
     Banknote,
-    CheckCircle2,
     type LucideIcon,
     PiggyBank,
     Receipt,
@@ -13,7 +11,8 @@ import {
 } from "lucide-react";
 import {cn, formatTrendDelta, pctChange} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
-import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
+import {type IconTone} from "@/components/icons/PremiumIcon";
+import {FlatIcon} from "@/components/icons/FlatIcon";
 import type {Investment} from "@/features/investments/types/investment.types";
 import type {BudgetSummary} from "@/features/dashboard/types/dashboard.types";
 
@@ -49,7 +48,7 @@ function StatCell({ icon, tone, label, value, deltaText, deltaGood }: TileProps)
   return (
     <div className="flex-1 min-w-[112px] px-3.5 py-3.5 sm:px-4">
       <div className="flex items-center gap-1.5 mb-1.5">
-        <PremiumIcon icon={icon} tone={tone} size="xs" />
+        <FlatIcon icon={icon} tone={tone} size="xs" />
         <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wide truncate">{label}</p>
       </div>
       <p className="text-[15px] sm:text-base font-bold text-foreground tabular-nums tracking-tight leading-none">{value}</p>
@@ -67,16 +66,14 @@ function StatCell({ icon, tone, label, value, deltaText, deltaGood }: TileProps)
   );
 }
 
-// Graded, not pass/fail — a single over-limit budget out of twenty used to flip this ring fully
-// red even though 95% of budgets were fine, which reads as "something's broken" rather than
-// "mostly healthy." Red is reserved for when more budgets have failed than not (<50% on track,
-// the "majority" line); 80% matches the threshold BudgetSection.tsx already uses per-category, so
-// the ring stays on the same scale as the rest of the page instead of inventing a second one.
+// Graded on total spend as a share of total budget — matches the 80%/100% thresholds
+// BudgetSection.tsx already uses per-category (percentUsed > 80 → amber, overBudget → red), so
+// this stays on the same scale as the rest of the page instead of inventing a second one.
 type BudgetTier = "green" | "amber" | "red";
-function budgetTier(pct: number): BudgetTier {
-  if (pct >= 80) return "green";
-  if (pct >= 50) return "amber";
-  return "red";
+function spendTier(pct: number): BudgetTier {
+  if (pct > 100) return "red";
+  if (pct > 80)  return "amber";
+  return "green";
 }
 const TIER_CAPTION: Record<BudgetTier, string> = {
   green: "text-emerald-600 dark:text-emerald-400",
@@ -84,32 +81,30 @@ const TIER_CAPTION: Record<BudgetTier, string> = {
   red:   "text-red-500 dark:text-red-400",
 };
 
-// Flat row cell — same as StatCell above, but Budget Progress needs its own two-line caption
-// (count + on-track/over-limit wording) instead of a single percentage delta, so it isn't built
-// from StatCell directly.
-function BudgetProgressCell({ onTrack, total, emptyLabel }: { onTrack: number; total: number; emptyLabel: string }) {
-  const overCount = total - onTrack;
-  const allOnTrack = total > 0 && overCount === 0;
-  const pct = total > 0 ? (onTrack / total) * 100 : 0;
-  const tier = budgetTier(pct);
+// Flat row cell — same shape as StatCell above, but shows total spend as a % of total budget
+// (with the underlying amounts as its caption) rather than a single trend delta, so it isn't
+// built from StatCell directly.
+function BudgetProgressCell({ spent, budgeted, total, emptyLabel }: {
+  spent: number; budgeted: number; total: number; emptyLabel: string;
+}) {
+  const { fmt } = useAmountFormatter();
+  const pct = total > 0 && budgeted > 0 ? (spent / budgeted) * 100 : 0;
+  const tier = spendTier(pct);
 
   return (
     <div className="flex-1 min-w-[112px] px-3.5 py-3.5 sm:px-4" data-testid="budget-progress-tile">
       <div className="flex items-center gap-1.5 mb-1.5">
-        <PremiumIcon icon={Target} tone="orange" size="xs" />
-        <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wide truncate">Budget</p>
+        <FlatIcon icon={Target} tone="orange" size="xs" />
+        <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wide truncate">Budget used</p>
       </div>
-      <p data-testid="budget-progress-caption" className="text-[15px] sm:text-base font-bold text-foreground tabular-nums tracking-tight leading-none">
-        {total > 0 ? `${onTrack} of ${total}` : "—"}
-      </p>
-      <p className={cn(
-        "flex items-center gap-1 text-[10.5px] font-semibold mt-1.5",
-        total === 0 ? "text-muted-foreground" : TIER_CAPTION[tier]
+      <p data-testid="budget-progress-caption" className={cn(
+        "text-[15px] sm:text-base font-bold tabular-nums tracking-tight leading-none",
+        total > 0 ? TIER_CAPTION[tier] : "text-foreground"
       )}>
-        {total > 0 && (allOnTrack
-          ? <CheckCircle2 className="w-3 h-3 shrink-0" />
-          : <AlertTriangle className="w-3 h-3 shrink-0" />)}
-        <span className="truncate">{total === 0 ? emptyLabel : allOnTrack ? "All on track" : `${overCount} over limit`}</span>
+        {total > 0 ? `${Math.round(pct)}%` : "—"}
+      </p>
+      <p className="text-[10.5px] font-semibold text-muted-foreground mt-1.5 truncate">
+        {total > 0 ? `${fmt(spent)} of ${fmt(budgeted)}` : emptyLabel}
       </p>
     </div>
   );
@@ -131,19 +126,13 @@ export function StatOverview({
 
   const srPct = pctChange(savingsRate, prevSavingsRate);
 
-  // Budget Progress follows the Month/Year toggle like every other tile here — Month counts
-  // only monthly budgets, Year counts only yearly ones, so switching the toggle visibly changes
-  // the ring instead of showing an identical number regardless of which period is selected. A
-  // budget counts as over if it's over its own current period (overBudget — e.g. blew this
-  // month's limit) OR over its annual pace (paceOverBudget — e.g. running over across the year
-  // even though this one month looks fine on its own). Pace alone would miss "over this month"
-  // whenever prior months had enough slack to keep the YTD total under the pro-rated cap;
-  // overBudget alone would miss a bad multi-month trend that never quite breaches any single
-  // month. See AnalyticsServiceImpl#getDashboard's comment.
-  const activeBudgets   = isYear ? yearlyBudgets : monthlyBudgets;
-  const budgetTotal     = activeBudgets.length;
-  const budgetOverCount = activeBudgets.filter(b => b.overBudget || b.paceOverBudget).length;
-  const budgetOnTrack   = budgetTotal - budgetOverCount;
+  // Budget Progress follows the Month/Year toggle like every other tile here — Month sums only
+  // monthly budgets, Year sums only yearly ones, so switching the toggle visibly changes the
+  // figure instead of showing an identical number regardless of which period is selected.
+  const activeBudgets = isYear ? yearlyBudgets : monthlyBudgets;
+  const budgetTotal    = activeBudgets.length;
+  const budgetSpent    = activeBudgets.reduce((s, b) => s + b.spent, 0);
+  const budgetBudgeted = activeBudgets.reduce((s, b) => s + b.budgeted, 0);
 
   if (isLoading) {
     return (
@@ -193,7 +182,7 @@ export function StatOverview({
         deltaText={isYear ? formatTrendDelta(savingsRateDeltaPct, "vs last year") : formatTrendDelta(savingsRateDeltaPct)}
         deltaGood={savingsRateDeltaPct != null ? savingsRateDeltaPct >= 0 : undefined}
       />
-      <BudgetProgressCell onTrack={budgetOnTrack} total={budgetTotal}
+      <BudgetProgressCell spent={budgetSpent} budgeted={budgetBudgeted} total={budgetTotal}
         emptyLabel={isYear ? "No yearly budgets set" : "No monthly budgets set"} />
     </div>
   );

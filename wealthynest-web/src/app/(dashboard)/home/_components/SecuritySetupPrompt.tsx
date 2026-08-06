@@ -4,7 +4,7 @@ import {useState} from "react";
 import Link from "next/link";
 import {Capacitor} from "@capacitor/core";
 import {Fingerprint, KeyRound, Lock, X} from "lucide-react";
-import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {FlatIcon} from "@/components/icons/FlatIcon";
 import {useAuthStore} from "@/features/auth/store/auth.store";
 import {useNativeBiometricStatus} from "@/features/auth/hooks/useNativeBiometric";
 
@@ -39,7 +39,7 @@ export function SecuritySetupPrompt() {
     <div data-testid="security-setup-prompt" className="animate-fade-in-up rounded-2xl border border-border/50 bg-card p-4">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-2.5">
-          <PremiumIcon icon={Lock} tone="indigo" size="xs" />
+          <FlatIcon icon={Lock} tone="indigo" size="xs" />
           <div>
             <p className="text-sm font-semibold text-foreground">Secure this device</p>
             <p className="text-xs text-muted-foreground mt-0.5">Skip typing your password every time you open the app.</p>

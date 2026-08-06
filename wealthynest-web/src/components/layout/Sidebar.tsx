@@ -32,71 +32,53 @@ import {useAuthStore} from "@/features/auth/store/auth.store";
 import {useLogout} from "@/features/auth/hooks/useAuth";
 import {useUIStore} from "@/store/ui.store";
 import {useMergedNotifications} from "@/features/notifications/hooks/useServerNotifications";
-import {PremiumIcon} from "@/components/icons/PremiumIcon";
 import {BrandMark} from "@/components/icons/BrandMark";
 
-type Gradient = [string, string];
-
-// Every gradient below is a unique pair — no two nav items share the same two
-// stops (previously Family/Budgets were both flat "pink" and Accounts/Reports
-// were both flat "blue"; Family/Support WealthyNest later collided again once
-// Support WealthyNest moved to a warm rose→pink gradient of its own — Family
-// settled on a warm coral/terracotta, reading as "home/hearth", a hue no other
-// item touches). Reports/Settings both end on slate, which is deliberate: Reports
-// keeps a brand-colored starting stop so it reads as "data" (a lightened copper,
-// distinct from the header bell's own full-strength brand pair), Settings stays
-// fully neutral since it's pure utility.
+// Flat, single-accent nav — every item shares one icon language (plain stroke glyph, no per-item
+// color) and is told apart by its label and position, not a unique hue. Replaces the previous
+// per-item gradient badge system: quieter chrome that doesn't compete with page content, and one
+// fewer thing (a whole gradient palette) for a new nav item to have to pick.
 const NAV_GROUPS = [
   {
     label: "Overview",
     items: [
-      { href: "/home",   label: "Home",         icon: Home,            gradient: ["#a855f7", "#6366f1"] as Gradient },
-      { href: "/accounts",    label: "Accounts",     icon: Wallet,          gradient: ["#3b82f6", "#06b6d4"] as Gradient },
-      { href: "/expenses",    label: "Transactions", icon: ArrowLeftRight,  gradient: ["#0ea5e9", "#4f46e5"] as Gradient },
+      { href: "/home",   label: "Home",         icon: Home },
+      { href: "/accounts",    label: "Accounts",     icon: Wallet },
+      { href: "/expenses",    label: "Transactions", icon: ArrowLeftRight },
     ],
   },
   {
     label: "Planning",
     items: [
-      { href: "/budgets",     label: "Budgets",      icon: PieChart,   gradient: ["#f59e0b", "#ea580c"] as Gradient },
-      { href: "/goals",       label: "Goals",        icon: Target,     gradient: ["#d946ef", "#9333ea"] as Gradient },
-      { href: "/debts",       label: "Debts",        icon: Handshake,  gradient: ["#ef4444", "#e11d48"] as Gradient },
+      { href: "/budgets",     label: "Budgets",      icon: PieChart },
+      { href: "/goals",       label: "Goals",        icon: Target },
+      { href: "/debts",       label: "Debts",        icon: Handshake },
     ],
   },
   {
     label: "Growth",
     items: [
-      { href: "/investments", label: "Investments",  icon: TrendingUp, gradient: ["#10b981", "#16a34a"] as Gradient },
-      { href: "/assets",      label: "Net Worth",    icon: Gem,        gradient: ["#8b5cf6", "#c026d3"] as Gradient },
+      { href: "/investments", label: "Investments",  icon: TrendingUp },
+      { href: "/assets",      label: "Net Worth",    icon: Gem },
     ],
   },
   {
     label: "Insights",
     items: [
-      { href: "/analytics",     label: "Analytics",     icon: ChartNoAxesCombined, gradient: ["#14b8a6", "#06b6d4"] as Gradient },
-      { href: "/family",        label: "Family",        icon: FamilyGroupIcon, gradient: ["#FAA18F", "#D9714E"] as Gradient },
-      { href: "/reports",       label: "Reports",       icon: FileText,  gradient: ["#d98a52", "#64748b"] as Gradient },
+      { href: "/analytics",     label: "Analytics",     icon: ChartNoAxesCombined },
+      { href: "/family",        label: "Family",        icon: FamilyGroupIcon },
+      { href: "/reports",       label: "Reports",       icon: FileText },
     ],
   },
   {
     label: "Account",
     items: [
-      { href: "/settings",           label: "Settings",            icon: Settings, gradient: ["#6b7280", "#475569"] as Gradient },
-      // Gold — matches the redesigned Vault page's own brass/gold identity (VaultHealthCard's
-      // "vault door" hero), was navy/graphite before that redesign.
-      { href: "/vault",              label: "Vault",                icon: KeyRound, gradient: ["#f6d776", "#a9791a"] as Gradient },
-      { href: "/support-wealthynest", label: "Support WealthyNest", icon: Heart,    gradient: ["#fb7185", "#db2777"] as Gradient },
+      { href: "/settings",           label: "Settings",            icon: Settings },
+      { href: "/vault",              label: "Vault",                icon: KeyRound },
+      { href: "/support-wealthynest", label: "Support WealthyNest", icon: Heart },
     ],
   },
 ];
-
-const ADMIN_GRADIENT: Gradient = ["#059669", "#0d9488"];
-
-// Shared with MobileNav so bottom-tab icons match the desktop sidebar exactly
-// instead of drifting to their own named tones.
-export const NAV_GRADIENTS: Record<string, Gradient> = Object.fromEntries(
-  NAV_GROUPS.flatMap((group) => group.items.map(({ href, gradient }) => [href, gradient]))
-);
 
 // "/settings" would otherwise match every /settings/* sub-route, including Profile
 // (reached via the header avatar, not this nav, and with no back link into Settings)
@@ -112,10 +94,14 @@ function isNavActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-function NavItem({ href, label, icon, gradient, active, badge, collapsed, onClick }: {
-  href: string; label: string; icon: LucideIcon; gradient: Gradient;
+function NavItem({ href, label, icon: Icon, active, badge, collapsed, onClick }: {
+  href: string; label: string; icon: LucideIcon;
   active: boolean; badge?: number; collapsed?: boolean; onClick?: () => void;
 }) {
+  // Plain stroke glyph, no per-item color — it inherits the row's own text color below, so
+  // active/inactive is the only state an icon here ever needs to express.
+  const glyph = <Icon className="w-[18px] h-[18px] shrink-0" />;
+
   const link = (
     <Link
       href={href}
@@ -134,16 +120,26 @@ function NavItem({ href, label, icon, gradient, active, badge, collapsed, onClic
       {active && !collapsed && (
         <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-primary rounded-r-full" />
       )}
-      {/* Collapsed rows have no room for the left accent bar above. A ring on the row itself
-          (tried first) traced the row's own rounded-xl edge and read as a highlighted rectangle
-          — this scopes a circular copper ring tightly to the icon instead, so the cue is a
-          deliberate round accent distinct from the icon's own rounded-square shape. */}
+      {/* Collapsed rows have no room for the left accent bar above — the icon's own tinted
+          background pill carries the active cue instead, same as the expanded row's pill. */}
       {collapsed ? (
-        <span className={cn("flex items-center justify-center rounded-full p-0.5", active && "ring-2 ring-primary")}>
-          <PremiumIcon icon={icon} gradient={gradient} size="xs" interactive selected={active} badge={badge} />
+        <span className={cn("relative flex items-center justify-center w-9 h-9 rounded-xl transition-colors", active && "bg-primary/10 dark:bg-primary/15")}>
+          {glyph}
+          {typeof badge === "number" && badge > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold leading-none flex items-center justify-center ring-2 ring-[hsl(var(--sidebar-bg))]">
+              {badge > 9 ? "9+" : badge}
+            </span>
+          )}
         </span>
       ) : (
-        <PremiumIcon icon={icon} gradient={gradient} size="xs" interactive selected={active} badge={badge} />
+        <span className="relative flex items-center">
+          {glyph}
+          {typeof badge === "number" && badge > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold leading-none flex items-center justify-center ring-2 ring-[hsl(var(--sidebar-bg))]">
+              {badge > 9 ? "9+" : badge}
+            </span>
+          )}
+        </span>
       )}
       {!collapsed && <span>{label}</span>}
     </Link>
@@ -177,7 +173,7 @@ export function Sidebar() {
           collapsed && "justify-center px-0"
         )}
       >
-        <PremiumIcon icon={LogOut} tone="red" size="xs" />
+        <LogOut className="w-[18px] h-[18px] shrink-0" />
         {!collapsed && <span>Sign out</span>}
       </button>
     );
@@ -213,11 +209,11 @@ export function Sidebar() {
                 </p>
               )}
               <div className="space-y-0.5">
-                {group.items.map(({ href, label, icon, gradient }) => {
+                {group.items.map(({ href, label, icon }) => {
                   const active = isNavActive(pathname, href);
                   const badge = href === "/notifications" ? unreadCount : undefined;
                   return (
-                    <NavItem key={href} href={href} label={label} icon={icon} gradient={gradient}
+                    <NavItem key={href} href={href} label={label} icon={icon}
                       active={active} badge={badge} collapsed={collapsed} onClick={closeMobileMenu} />
                   );
                 })}
@@ -228,7 +224,7 @@ export function Sidebar() {
           {isAdmin && (
             <div>
               {!collapsed && <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-widest px-3 mb-1">Admin</p>}
-              <NavItem href="/admin" label="Admin" icon={ShieldCheck} gradient={ADMIN_GRADIENT}
+              <NavItem href="/admin" label="Admin" icon={ShieldCheck}
                 active={pathname.startsWith("/admin")} collapsed={collapsed} onClick={closeMobileMenu} />
             </div>
           )}

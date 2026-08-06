@@ -95,20 +95,20 @@ export function GreetingBanner({
           {isLoading ? (
             <div className="h-9 w-48 rounded-xl shimmer mt-2.5" />
           ) : (
-            <div className="flex items-end gap-3 mt-1.5 flex-wrap">
+            <div className="flex items-center gap-3 mt-1.5 flex-wrap">
               <span data-testid="hero-net-worth"
-                className="font-serif text-[32px] sm:text-[40px] leading-none font-semibold tracking-tight tabular-nums text-foreground">
+                className="font-serif text-[32px] sm:text-[40px] leading-[1.15] font-semibold tabular-nums text-foreground">
                 {netWorth != null ? fmt(netWorth) : "—"}
               </span>
               {deltaGood != null && (
                 <span className={cn(
-                  "inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full mb-1",
+                  "inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full",
                   deltaGood ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-red-500/10 text-red-500 dark:text-red-400"
                 )}>
                   {deltaGood ? "↑" : "↓"} {Math.abs(netWorthDeltaPct!).toFixed(1)}%
                 </span>
               )}
-              <Sparkline data={netWorthSpark} className="mb-1.5 hidden sm:block text-primary" />
+              <Sparkline data={netWorthSpark} className="hidden sm:block text-primary" />
             </div>
           )}
 
@@ -120,8 +120,9 @@ export function GreetingBanner({
           )}
         </div>
 
-        <div className="flex flex-col items-end gap-2 shrink-0">
-          {/* Month/Year switch */}
+        {/* Month/Year switch + navigator share one row — a single compact control cluster
+            instead of two stacked ones. */}
+        <div className="flex items-center gap-2 shrink-0">
           <div className="flex items-center gap-0.5 bg-muted/60 rounded-xl p-1 shrink-0">
             {(["month", "year"] as const).map((mode) => (
               <button
@@ -138,7 +139,6 @@ export function GreetingBanner({
             ))}
           </div>
 
-          {/* Month/Year navigator */}
           <div className="flex items-center gap-1 bg-muted/60 rounded-xl p-1 shrink-0">
             <button
               onClick={() => (isYear ? onNavigateYear(-1) : onNavigate(-1))}

@@ -5,7 +5,7 @@ import {Target} from "lucide-react";
 import {cn, monthLabel} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {getCategoryColor, getCategoryIcon} from "@/lib/categoryMeta";
-import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {FlatIcon} from "@/components/icons/FlatIcon";
 import {EmptyState} from "@/components/shared/EmptyState";
 import type {BudgetSummary} from "@/features/dashboard/types/dashboard.types";
 
@@ -66,7 +66,7 @@ export function BudgetSection({ budgetSummaries, viewMode, year, month, isLoadin
               <div key={b.categoryId}>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <PremiumIcon icon={icon} hex={color} size="xs" />
+                    <FlatIcon icon={icon} hex={color} size="xs" />
                     <span className="text-sm font-medium text-foreground truncate">{b.categoryName}</span>
                     {b.overBudget && (
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-500 shrink-0">

@@ -4,13 +4,7 @@ import Link from "next/link";
 import {usePathname} from "next/navigation";
 import {ArrowLeftRight, Home, Menu, PieChart, TrendingUp, Wallet} from "lucide-react";
 import {cn} from "@/lib/utils";
-import {PremiumIcon} from "@/components/icons/PremiumIcon";
-import {NAV_GRADIENTS} from "@/components/layout/Sidebar";
 import {useUIStore} from "@/store/ui.store";
-
-// Same neutral gray→slate pair the Sidebar uses for Settings — fitting since "More" opens the
-// same full nav that Settings lives in, and it's the one tab here that isn't a page of its own.
-const MORE_GRADIENT: [string, string] = ["#6b7280", "#475569"];
 
 // Net Worth only moves on a monthly snapshot — the least frequently-checked
 // number in the app — while Budgets is one of the most-opened destinations
@@ -18,8 +12,8 @@ const MORE_GRADIENT: [string, string] = ["#6b7280", "#475569"];
 // Budgets uses PieChart (not Target) to match the desktop Sidebar, which now
 // uses Target for Goals — same glyph would otherwise mean two different
 // things depending on whether you're on mobile or desktop.
-// Gradients come from NAV_GRADIENTS (Sidebar.tsx) so each icon is the exact
-// same color on mobile as it is on desktop, instead of its own named tone.
+// Plain, single-accent icons — see Sidebar.tsx's own comment; no per-item color here either,
+// so mobile and desktop stay visually identical without a shared gradient table between them.
 const NAV_ITEMS = [
   { href: "/home",   label: "Home",         icon: Home },
   { href: "/accounts",    label: "Accounts",     icon: Wallet },
@@ -38,7 +32,7 @@ export function MobileNav() {
         className="flex items-center justify-around w-full"
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
-        {NAV_ITEMS.map(({ href, label, icon }) => {
+        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link
@@ -57,7 +51,7 @@ export function MobileNav() {
                 "w-9 h-7 rounded-xl flex items-center justify-center transition-all",
                 active ? "bg-primary/10" : "bg-transparent"
               )}>
-                <PremiumIcon icon={icon} gradient={NAV_GRADIENTS[href]} size="xs" className={cn("transition-transform", active && "scale-110")} />
+                <Icon className={cn("w-[18px] h-[18px] transition-transform", active && "scale-110")} />
               </div>
               <span className={cn(
                 "text-[9px] font-semibold tracking-tight text-center leading-tight",
@@ -92,7 +86,7 @@ export function MobileNav() {
             "w-9 h-7 rounded-xl flex items-center justify-center transition-all",
             mobileMenuOpen ? "bg-primary/10" : "bg-transparent"
           )}>
-            <PremiumIcon icon={Menu} gradient={MORE_GRADIENT} size="xs" className={cn("transition-transform", mobileMenuOpen && "scale-110")} />
+            <Menu className={cn("w-[18px] h-[18px] transition-transform", mobileMenuOpen && "scale-110")} />
           </div>
           <span className={cn(
             "text-[9px] font-semibold tracking-tight text-center leading-tight",

@@ -90,16 +90,18 @@ test.describe("Home dashboard — dynamic reflow", () => {
   });
 
   // ── Round 2: Month/Year toggle ──────────────────────────────────────────────
-  test("Month/Year toggle swaps the hero label, stat tile labels, and the Budget Progress ring @regression", async () => {
+  test("Month/Year toggle swaps the hero label, stat tile labels, and the Budget Progress figure @regression", async () => {
     // Reuses beforeAll's ₹1,500 this-month expense in the same category to trip this over its
-    // limit — the ring's "0 of 1" below depends on that, not on anything created here.
+    // ₹1,000 limit — the 150% (₹1,500 spent of ₹1,000 budgeted) below depends on that, not on
+    // anything created here.
     await api.createBudget(accessToken, { categoryId, amount: 1000, budgetType: "MONTHLY" });
 
     await home.gotoHome();
 
     await expect(home.periodNavLabel).toHaveText(/^[A-Za-z]{3} \d{4}$/); // e.g. "Aug 2026"
-    // Month mode: the one MONTHLY budget seeded above (over its limit) is the only budget counted.
-    await expect(home.budgetProgressCaption).toHaveText("0 of 1");
+    // Month mode: the one MONTHLY budget seeded above is the only budget counted — ₹1,500 spent
+    // of a ₹1,000 limit is 150% of budget used.
+    await expect(home.budgetProgressCaption).toHaveText("150%");
     // The detail panel below the ring must agree with it — it used to always receive every
     // budget unfiltered regardless of the toggle, so it never actually hit this empty state.
     await expect(home.budgetSection.getByText("No budgets set for this month")).not.toBeVisible();
@@ -123,7 +125,7 @@ test.describe("Home dashboard — dynamic reflow", () => {
 
     await home.switchToMonthMode();
     await expect(home.periodNavLabel).toHaveText(monthLabel!);
-    await expect(home.budgetProgressCaption).toHaveText("0 of 1");
+    await expect(home.budgetProgressCaption).toHaveText("150%");
     await expect(home.budgetSection.getByText("No budgets set for this month")).not.toBeVisible();
   });
 

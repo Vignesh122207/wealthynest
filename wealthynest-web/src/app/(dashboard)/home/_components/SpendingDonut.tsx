@@ -6,7 +6,7 @@ import {Receipt} from "lucide-react";
 import {chartValueToNumber, monthLabel} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {getCategoryColor, getCategoryIcon} from "@/lib/categoryMeta";
-import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {FlatIcon} from "@/components/icons/FlatIcon";
 import {EmptyState} from "@/components/shared/EmptyState";
 import type {CategorySpending} from "@/features/dashboard/types/dashboard.types";
 
@@ -79,7 +79,7 @@ export function SpendingDonut({ categoryBreakdown, year, month, chart, onAddExpe
               return (
               <div key={c.categoryId} className="flex items-center justify-between">
                 <div className="flex items-center gap-2 min-w-0">
-                  <PremiumIcon icon={icon} hex={color} size="xs" />
+                  <FlatIcon icon={icon} hex={color} size="xs" />
                   <span className="text-xs text-muted-foreground truncate">{c.categoryName}</span>
                 </div>
                 <div className="flex items-center gap-2 shrink-0 ml-2">

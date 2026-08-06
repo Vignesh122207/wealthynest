@@ -4,7 +4,6 @@ import Link from "next/link";
 import {Target, Trophy} from "lucide-react";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {GOAL_COLORS, resolveGoalIcon} from "@/lib/categoryMeta";
-import {PremiumIcon} from "@/components/icons/PremiumIcon";
 import {EmptyState} from "@/components/shared/EmptyState";
 import type {Goal} from "@/features/goals/types/goal.types";
 
@@ -107,7 +106,9 @@ export function GoalsSummary({ goals, isLoading }: GoalsSummaryProps) {
                         strokeDasharray={c} strokeDashoffset={offset}
                         style={{ transition: "stroke-dashoffset 1s ease" }} />
                     </svg>
-                    <PremiumIcon icon={IconComp} hex={color} size="xs" className="absolute" />
+                    {/* Plain glyph, not FlatIcon's boxed treatment — a tinted box would fight the
+                        ring itself for "container" duty; the ring already is one. */}
+                    <IconComp className="absolute w-4 h-4" style={{ color }} />
                   </div>
 
                   <div className="flex-1 min-w-0">

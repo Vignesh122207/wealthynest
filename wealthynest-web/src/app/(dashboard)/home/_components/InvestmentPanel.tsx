@@ -7,7 +7,8 @@ import {ArrowDownRight, ArrowUpRight, TrendingUp, Wallet} from "lucide-react";
 import {chartValueToNumber, cn} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {CHART_COLORS} from "@/lib/chartColors";
-import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
+import {type IconTone} from "@/components/icons/PremiumIcon";
+import {FlatIcon} from "@/components/icons/FlatIcon";
 import {StockLogo} from "@/components/icons/StockLogo";
 import {FundLogo} from "@/components/icons/FundLogo";
 import {BankLogo} from "@/components/icons/BankLogo";
@@ -165,7 +166,7 @@ export function InvestmentPanel({ investments, chart }: InvestmentPanelProps) {
                 ) : (h.investmentType === "BOND" || h.investmentType === "FD") ? (
                   <BankLogo name={h.bankName} fallbackIcon={INVESTMENT_TYPE_META[h.investmentType].icon} fallbackHex={INVESTMENT_TYPE_META[h.investmentType].hex} size="xs" className="shrink-0" />
                 ) : (
-                  <PremiumIcon icon={INVESTMENT_TYPE_META[h.investmentType].icon} hex={INVESTMENT_TYPE_META[h.investmentType].hex} size="xs" className="shrink-0" />
+                  <FlatIcon icon={INVESTMENT_TYPE_META[h.investmentType].icon} hex={INVESTMENT_TYPE_META[h.investmentType].hex} size="xs" className="shrink-0" />
                 )}
                 <span className="text-foreground font-medium truncate min-w-0 flex-1">{holdingName(h)}</span>
                 <span className={cn(
@@ -185,7 +186,7 @@ export function InvestmentPanel({ investments, chart }: InvestmentPanelProps) {
         <div className="sm:hidden rounded-2xl border border-border/30 divide-y divide-border/40 overflow-hidden">
           {summaryStats.map((s) => (
             <div key={s.key} className="flex items-center gap-3 px-4 py-3.5">
-              <PremiumIcon icon={s.icon} tone={s.tone} size="sm" className="w-9 h-9" />
+              <FlatIcon icon={s.icon} tone={s.tone} size="sm" />
               <p className="text-xs text-muted-foreground font-medium flex-1">{s.label}</p>
               <div className="text-right shrink-0">
                 <p className={cn("text-sm font-bold tabular-nums", s.valueColor)}>{s.value}</p>
@@ -200,7 +201,7 @@ export function InvestmentPanel({ investments, chart }: InvestmentPanelProps) {
           {summaryStats.map((s) => (
             <div key={s.key} className={cn("rounded-2xl p-4 border border-border/30", s.cardBg)}>
               <div className="flex items-center gap-2 mb-2">
-                <PremiumIcon icon={s.icon} tone={s.tone} size="xs" />
+                <FlatIcon icon={s.icon} tone={s.tone} size="xs" />
                 <p className="text-xs text-muted-foreground/80 font-medium">{s.label}</p>
               </div>
               <div className={cn("text-base font-bold tabular-nums", s.valueColor)}>{s.value}</div>

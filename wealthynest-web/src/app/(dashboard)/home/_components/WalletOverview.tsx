@@ -5,7 +5,7 @@ import {Wallet} from "lucide-react";
 import {cn} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {ACCOUNT_TYPE_META} from "@/lib/accountTypeMeta";
-import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {FlatIcon} from "@/components/icons/FlatIcon";
 import type {AccountType, WalletAccount} from "@/features/accounts/types/account.types";
 
 interface WalletOverviewProps {
@@ -81,7 +81,7 @@ export function WalletOverview({ accounts }: WalletOverviewProps) {
 
           return (
             <Link key={g.type} href="/accounts" className="flex items-center gap-3 py-3 first:pt-0 last:pb-0 group">
-              <PremiumIcon icon={g.meta.icon} hex={g.meta.hex} size="sm" className="w-9 h-9" />
+              <FlatIcon icon={g.meta.icon} hex={g.meta.hex} size="sm" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors truncate">
                   {GROUP_LABEL[g.type]}

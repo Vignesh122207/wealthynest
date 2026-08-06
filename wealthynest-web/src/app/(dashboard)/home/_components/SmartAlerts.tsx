@@ -3,7 +3,7 @@
 import {AlertTriangle, Bell, Gauge, Lightbulb, RefreshCw, TrendingDown, TrendingUp} from "lucide-react";
 import {cn} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
-import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {FlatIcon} from "@/components/icons/FlatIcon";
 import type {Expense} from "@/features/expenses/types/expense.types";
 
 // Category-delta insights work for any browsed month; the other two (forecast/anomaly) are
@@ -32,7 +32,7 @@ export function SmartInsightsCard({ insights, wide }: SmartInsightsCardProps) {
       wide && "md:col-span-2"
     )}>
       <div className="flex items-center gap-2 mb-1">
-        <PremiumIcon icon={Lightbulb} tone="yellow" size="xs" />
+        <FlatIcon icon={Lightbulb} tone="yellow" size="xs" />
         <h2 className="font-bold text-foreground text-sm">Smart Insights</h2>
       </div>
       <div className={cn(
@@ -43,7 +43,7 @@ export function SmartInsightsCard({ insights, wide }: SmartInsightsCardProps) {
           if (insight.kind === "anomaly") {
             return (
               <div key={i} className="flex items-start gap-2.5 py-2.5 first:pt-1.5 sm:first:pt-2.5">
-                <PremiumIcon icon={AlertTriangle} tone="red" size="xs" />
+                <FlatIcon icon={AlertTriangle} tone="red" size="xs" />
                 <p className="text-xs text-foreground/90 leading-snug min-w-0">{insight.message}</p>
               </div>
             );
@@ -52,7 +52,7 @@ export function SmartInsightsCard({ insights, wide }: SmartInsightsCardProps) {
             const good = insight.pctVsAvg == null || insight.pctVsAvg <= 0;
             return (
               <div key={i} className="flex items-start gap-2.5 py-2.5 first:pt-1.5 sm:first:pt-2.5">
-                <PremiumIcon icon={Gauge} tone={good ? "green" : "yellow"} size="xs" />
+                <FlatIcon icon={Gauge} tone={good ? "green" : "yellow"} size="xs" />
                 <p className="text-xs text-foreground/90 leading-snug min-w-0">
                   You&apos;re on pace to save <span className="font-semibold tabular-nums">{fmt(insight.amount)}</span> this month
                   {insight.pctVsAvg != null && (
@@ -68,7 +68,7 @@ export function SmartInsightsCard({ insights, wide }: SmartInsightsCardProps) {
           const verb = insight.projected ? "You're on pace to spend" : "You spent";
           return (
             <div key={i} className="flex items-start gap-2.5 py-2.5 first:pt-1.5 sm:first:pt-2.5">
-              <PremiumIcon icon={up ? TrendingUp : TrendingDown} tone={up ? "yellow" : "green"} size="xs" />
+              <FlatIcon icon={up ? TrendingUp : TrendingDown} tone={up ? "yellow" : "green"} size="xs" />
               <p className="text-xs text-foreground/90 leading-snug min-w-0">
                 {verb} <span className="font-semibold tabular-nums">{fmt(Math.abs(insight.delta))}</span> {up ? "more" : "less"} on{" "}
                 <span className="font-semibold">{insight.category}</span> than last month.
@@ -96,7 +96,7 @@ export function UpcomingBillsCard({ bills, wide }: UpcomingBillsCardProps) {
       wide && "md:col-span-2"
     )}>
       <div className="flex items-center gap-2 mb-1">
-        <PremiumIcon icon={Bell} tone="purple" size="xs" />
+        <FlatIcon icon={Bell} tone="purple" size="xs" />
         <h2 className="font-bold text-foreground text-sm">Upcoming Bills — Next 7 Days</h2>
       </div>
       <div className="divide-y divide-border/40">
@@ -106,7 +106,7 @@ export function UpcomingBillsCard({ bills, wide }: UpcomingBillsCardProps) {
           return (
             <div key={bill.id} className="flex items-center justify-between gap-2 py-2 first:pt-2.5">
               <div className="flex items-center gap-2.5 min-w-0">
-                <PremiumIcon icon={RefreshCw} tone="violet" size="xs" />
+                <FlatIcon icon={RefreshCw} tone="violet" size="xs" />
                 <span className="text-xs text-foreground truncate">
                   {bill.description || bill.categoryName || "Recurring"}
                 </span>

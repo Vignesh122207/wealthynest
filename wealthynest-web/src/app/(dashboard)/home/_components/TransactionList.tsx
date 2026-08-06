@@ -5,7 +5,7 @@ import {ArrowDownLeft, ArrowUpRight, CreditCard, HandCoins, type LucideIcon, Rec
 import {cn, formatDate} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {getCategoryColor, getCategoryIcon, INCOME_ICON_MAP} from "@/lib/categoryMeta";
-import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {FlatIcon} from "@/components/icons/FlatIcon";
 import {EmptyState} from "@/components/shared/EmptyState";
 import type {AccountTransactionItem} from "@/features/accounts/types/account.types";
 import {INCOME_SOURCES} from "@/lib/constants";
@@ -53,7 +53,7 @@ function txnLabel(type: string, label: string, description?: string): string {
 function TxnSkeleton() {
   return (
     <div className="flex items-center gap-3 px-5 py-3.5">
-      <div className="w-9 h-9 rounded-xl shimmer shrink-0" />
+      <div className="w-7 h-7 rounded-lg shimmer shrink-0" />
       <div className="flex-1 space-y-1.5">
         <div className="h-3.5 w-40 rounded-lg shimmer" />
         <div className="h-3 w-24 rounded shimmer" />
@@ -69,21 +69,21 @@ function TxnIcon({ type, label, categoryIcon, categoryColor }: {
   // INCOME — mapped Lucide icon per source
   if (type === "INCOME") {
     const src = INCOME_ICON_MAP[label] ?? INCOME_ICON_MAP.OTHER;
-    return <PremiumIcon icon={src.icon} hex={src.color} size="sm" className="w-9 h-9" />;
+    return <FlatIcon icon={src.icon} hex={src.color} size="sm" />;
   }
 
   // EXPENSE — the category's own icon/color first, name-keyword match as fallback
   if (type === "EXPENSE") {
     const icon  = getCategoryIcon({ name: label, icon: categoryIcon });
     const color = getCategoryColor(label, categoryColor ?? undefined);
-    return <PremiumIcon icon={icon} hex={color} size="sm" className="w-9 h-9" />;
+    return <FlatIcon icon={icon} hex={color} size="sm" />;
   }
 
   // TRANSFER / DEBT / ADJUSTMENT
   const t    = TXN_TRANSFER[type];
   const Icon = t ? t.icon : RefreshCw;
   const clr  = t ? t.color : "#94a3b8";
-  return <PremiumIcon icon={Icon} hex={clr} size="sm" className="w-9 h-9" />;
+  return <FlatIcon icon={Icon} hex={clr} size="sm" />;
 }
 
 export function TransactionList({ transactions, isLoading }: TransactionListProps) {

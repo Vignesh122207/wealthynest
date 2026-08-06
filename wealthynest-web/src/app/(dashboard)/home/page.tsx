@@ -6,7 +6,7 @@ import {ArrowLeftRight, Banknote, Receipt, Sparkles} from "lucide-react";
 import Link from "next/link";
 import {type ExpenseFormValues} from "@/features/expenses/schemas/expense.schema";
 import {Header} from "@/components/layout/Header";
-import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {FlatIcon} from "@/components/icons/FlatIcon";
 import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
 import {QueryErrorState} from "@/components/shared/QueryErrorState";
 import {type IncomeFormValues, type IncomeSourceValue} from "@/components/transactions/IncomeForm";
@@ -319,7 +319,7 @@ export default function DashboardPage() {
           {!dataLoading && walletAccounts.length === 0 && (
             <div className="rounded-2xl border border-border bg-card p-6 space-y-4 animate-fade-in-up">
               <div className="flex items-center gap-3">
-                <PremiumIcon icon={Sparkles} tone="purple" size="md" className="w-10 h-10" />
+                <FlatIcon icon={Sparkles} tone="purple" size="md" />
                 <div>
                   <p className="font-bold text-foreground">Welcome to WealthyNest!</p>
                   <p className="text-sm text-muted-foreground mt-0.5">Get started in 3 simple steps to track your finances.</p>
