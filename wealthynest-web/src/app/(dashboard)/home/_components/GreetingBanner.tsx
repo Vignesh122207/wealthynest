@@ -84,8 +84,8 @@ export function GreetingBanner({
   const deltaGood = netWorthDeltaPct != null ? netWorthDeltaPct >= 0 : undefined;
 
   return (
-    <div data-testid="greeting-banner" className="p-5 md:p-7">
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+    <div data-testid="greeting-banner" className="px-5 pt-4 pb-3 md:px-6 md:pt-5 md:pb-3">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-medium text-muted-foreground/90">
             Good {getGreeting()}, <span className="text-foreground font-semibold">{firstName}</span>
@@ -93,11 +93,11 @@ export function GreetingBanner({
           </p>
 
           {isLoading ? (
-            <div className="h-9 w-48 rounded-xl shimmer mt-2.5" />
+            <div className="h-8 w-44 rounded-xl shimmer mt-2" />
           ) : (
-            <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+            <div className="flex items-center gap-3 mt-1 flex-wrap">
               <span data-testid="hero-net-worth"
-                className="font-serif text-[32px] sm:text-[40px] leading-[1.15] font-semibold tabular-nums text-foreground">
+                className="font-serif text-[28px] sm:text-[34px] leading-[1.15] font-semibold tabular-nums text-foreground">
                 {netWorth != null ? fmt(netWorth) : "—"}
               </span>
               {deltaGood != null && (
@@ -113,7 +113,7 @@ export function GreetingBanner({
           )}
 
           {insight && (
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground/90 mt-2 max-w-md">
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground/90 mt-1.5 max-w-md">
               <Zap className="w-3 h-3 text-primary shrink-0" />
               <span className="truncate">{insight}</span>
             </p>

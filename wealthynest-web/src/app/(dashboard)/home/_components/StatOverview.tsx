@@ -46,7 +46,7 @@ interface TileProps {
 // GreetingBanner.tsx, composed together in page.tsx), so it carries no chrome of its own.
 function StatCell({ icon, tone, label, value, deltaText, deltaGood }: TileProps) {
   return (
-    <div className="flex-1 min-w-[112px] px-3.5 py-3.5 sm:px-4">
+    <div className="flex-1 min-w-[112px] px-3.5 py-2.5 sm:px-4">
       <div className="flex items-center gap-1.5 mb-1.5">
         <FlatIcon icon={icon} tone={tone} size="xs" />
         <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wide truncate">{label}</p>
@@ -92,7 +92,7 @@ function BudgetProgressCell({ spent, budgeted, total, emptyLabel }: {
   const tier = spendTier(pct);
 
   return (
-    <div className="flex-1 min-w-[112px] px-3.5 py-3.5 sm:px-4" data-testid="budget-progress-tile">
+    <div className="flex-1 min-w-[112px] px-3.5 py-2.5 sm:px-4" data-testid="budget-progress-tile">
       <div className="flex items-center gap-1.5 mb-1.5">
         <FlatIcon icon={Target} tone="orange" size="xs" />
         <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wide truncate">Budget used</p>
@@ -138,7 +138,7 @@ export function StatOverview({
     return (
       <div className="flex overflow-x-auto no-scrollbar border-t border-border/60 divide-x divide-border/60">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="flex-1 min-w-[112px] px-3.5 py-3.5 sm:px-4 space-y-2.5">
+          <div key={i} className="flex-1 min-w-[112px] px-3.5 py-2.5 sm:px-4 space-y-2.5">
             <div className="w-6 h-6 rounded-lg shimmer" />
             <div className="h-4 w-16 rounded-lg shimmer" />
             <div className="h-2.5 w-12 rounded shimmer" />

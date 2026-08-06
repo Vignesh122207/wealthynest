@@ -62,17 +62,16 @@ test.describe("Home dashboard — dynamic reflow", () => {
     await context.close();
   });
 
-  test("Insights alone reclaims the row when there are no Upcoming Bills @regression", async () => {
+  test("Insights alone renders with no bill cards when there are no Upcoming Bills @regression", async () => {
     await home.gotoHome();
     await home.expectLoaded();
 
     await expect(home.smartAlertsRow).toBeVisible();
-    await expect(home.smartInsightsCard).toBeVisible();
-    await expect(home.upcomingBillsCard).not.toBeVisible();
-    await home.expectSpansFullRow(home.smartInsightsCard, home.smartAlertsRow);
+    await expect(home.smartInsightCards.first()).toBeVisible();
+    await expect(home.smartBillCards).toHaveCount(0);
   });
 
-  test("a recurring bill due this week makes Insights and Upcoming Bills share the row @regression", async () => {
+  test("a recurring bill due this week makes an insight card and a bill card share the rail @regression", async () => {
     // Upcoming Bills queries a startDate/endDate window off the browser's `now` (page.tsx), which
     // beforeAll pinned to day 15 of the real current month/year — not real wall-clock "now" — so
     // the seeded bill's date has to land inside that same pinned week (day 15-22), not 3 real days
@@ -84,9 +83,8 @@ test.describe("Home dashboard — dynamic reflow", () => {
     });
 
     await home.gotoHome();
-    await expect(home.smartInsightsCard).toBeVisible();
-    await expect(home.upcomingBillsCard).toBeVisible();
-    await home.expectSharesRow(home.smartInsightsCard, home.upcomingBillsCard, home.smartAlertsRow);
+    await expect(home.smartInsightCards.first()).toBeVisible();
+    await expect(home.smartBillCards.first()).toBeVisible();
   });
 
   // ── Round 2: Month/Year toggle ──────────────────────────────────────────────
@@ -106,7 +104,7 @@ test.describe("Home dashboard — dynamic reflow", () => {
     // budget unfiltered regardless of the toggle, so it never actually hit this empty state.
     await expect(home.budgetSection.getByText("No budgets set for this month")).not.toBeVisible();
     const monthLabel = await home.periodNavLabel.textContent();
-    const billsVisibleBefore = await home.upcomingBillsCard.isVisible();
+    const billsPresentBefore = (await home.smartBillCards.count()) > 0;
 
     await home.switchToYearMode();
     await expect(home.periodNavLabel).toHaveText(/^\d{4}$/); // just the year, no month
@@ -121,7 +119,7 @@ test.describe("Home dashboard — dynamic reflow", () => {
     // the ring right above it.
     await expect(home.budgetSection.getByText("No yearly budgets set")).toBeVisible();
     // Upcoming Bills is deliberately period-blind — same (present) either way here.
-    expect(await home.upcomingBillsCard.isVisible()).toBe(billsVisibleBefore);
+    expect((await home.smartBillCards.count()) > 0).toBe(billsPresentBefore);
 
     await home.switchToMonthMode();
     await expect(home.periodNavLabel).toHaveText(monthLabel!);

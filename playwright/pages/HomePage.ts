@@ -17,12 +17,15 @@ export class HomePage extends BasePage {
     return this.page.getByTestId(TEST_IDS.home.smartAlertsRow);
   }
 
-  get smartInsightsCard(): Locator {
-    return this.page.getByTestId(TEST_IDS.home.smartInsightsCard);
+  /** One element per insight — the rail renders an individual bordered card per insight now,
+   * not one shared "Smart Insights" box. Use `.first()`/`.count()` accordingly. */
+  get smartInsightCards(): Locator {
+    return this.page.getByTestId(TEST_IDS.home.smartInsightCard);
   }
 
-  get upcomingBillsCard(): Locator {
-    return this.page.getByTestId(TEST_IDS.home.upcomingBillsCard);
+  /** Same shape as smartInsightCards, one per upcoming bill. */
+  get smartBillCards(): Locator {
+    return this.page.getByTestId(TEST_IDS.home.smartBillCard);
   }
 
   get periodNavLabel(): Locator {
@@ -47,31 +50,5 @@ export class HomePage extends BasePage {
 
   async switchToMonthMode(): Promise<void> {
     await this.periodToggle("month").click();
-  }
-
-  /** True when `locator` spans (approximately) the full width of `row` — i.e. it's alone in
-   * the reflowing row — vs. roughly half when it's sharing the row with a sibling. A few px of
-   * slack covers the row's own padding/border box rounding.
-   *
-   * Polls rather than taking one `boundingBox()` snapshot: Smart Insights' card can mount as
-   * soon as the dashboard's own data resolves (via the pace-forecast insight) and then re-render
-   * again moments later once the separate prev-month query resolves and adds the category-delta
-   * insight — a real, brief window where a single unretried boundingBox() read can catch the
-   * element mid-transition and see `null`. expect.poll retries until the layout settles instead
-   * of failing on that first read. */
-  async expectSpansFullRow(locator: Locator, row: Locator): Promise<void> {
-    await expect.poll(async () => {
-      const [itemBox, rowBox] = await Promise.all([locator.boundingBox(), row.boundingBox()]);
-      if (!itemBox || !rowBox) return null;
-      return itemBox.width / rowBox.width;
-    }).toBeGreaterThan(0.9);
-  }
-
-  async expectSharesRow(locatorA: Locator, locatorB: Locator, row: Locator): Promise<void> {
-    await expect.poll(async () => {
-      const [boxA, boxB, rowBox] = await Promise.all([locatorA.boundingBox(), locatorB.boundingBox(), row.boundingBox()]);
-      if (!boxA || !boxB || !rowBox) return null;
-      return Math.max(boxA.width, boxB.width) / rowBox.width;
-    }).toBeLessThan(0.65);
   }
 }

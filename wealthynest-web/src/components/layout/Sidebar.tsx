@@ -6,8 +6,6 @@ import {usePathname} from "next/navigation";
 import {
     ArrowLeftRight,
     ChartNoAxesCombined,
-    ChevronLeft,
-    ChevronRight,
     FileText,
     Gem,
     Handshake,
@@ -26,7 +24,6 @@ import {
 } from "lucide-react";
 import {FamilyGroupIcon} from "@/components/icons/FamilyGroupIcon";
 import {ConfirmDialog} from "@/components/shared/ConfirmDialog";
-import {Tooltip} from "@/components/ui/Tooltip";
 import {cn} from "@/lib/utils";
 import {useAuthStore} from "@/features/auth/store/auth.store";
 import {useLogout} from "@/features/auth/hooks/useAuth";
@@ -38,13 +35,17 @@ import {BrandMark} from "@/components/icons/BrandMark";
 // color) and is told apart by its label and position, not a unique hue. Replaces the previous
 // per-item gradient badge system: quieter chrome that doesn't compete with page content, and one
 // fewer thing (a whole gradient palette) for a new nav item to have to pick.
+// Labels are short on purpose — the desktop rail is a narrow icon-above-label column (see
+// NavItem's collapsed variant), so "Transactions"/"Investments"/"Support WealthyNest" become
+// "Activity"/"Invest"/"Support" here. The mobile drawer (NavItem's non-collapsed variant) reads
+// these same short labels too, for one consistent nav vocabulary everywhere.
 const NAV_GROUPS = [
   {
     label: "Overview",
     items: [
       { href: "/home",   label: "Home",         icon: Home },
       { href: "/accounts",    label: "Accounts",     icon: Wallet },
-      { href: "/expenses",    label: "Transactions", icon: ArrowLeftRight },
+      { href: "/expenses",    label: "Activity",     icon: ArrowLeftRight },
     ],
   },
   {
@@ -58,7 +59,7 @@ const NAV_GROUPS = [
   {
     label: "Growth",
     items: [
-      { href: "/investments", label: "Investments",  icon: TrendingUp },
+      { href: "/investments", label: "Invest",       icon: TrendingUp },
       { href: "/assets",      label: "Net Worth",    icon: Gem },
     ],
   },
@@ -73,12 +74,16 @@ const NAV_GROUPS = [
   {
     label: "Account",
     items: [
-      { href: "/settings",           label: "Settings",            icon: Settings },
-      { href: "/vault",              label: "Vault",                icon: KeyRound },
-      { href: "/support-wealthynest", label: "Support WealthyNest", icon: Heart },
+      { href: "/settings",           label: "Settings",  icon: Settings },
+      { href: "/vault",              label: "Vault",     icon: KeyRound },
+      { href: "/support-wealthynest", label: "Support",  icon: Heart },
     ],
   },
 ];
+
+// Flat item list for the desktop rail — no group headers there (see the screenshot this rail is
+// matching: one continuous column of tiles), so the grouping only matters for the mobile drawer.
+const ALL_NAV_ITEMS = NAV_GROUPS.flatMap((group) => group.items);
 
 // "/settings" would otherwise match every /settings/* sub-route, including Profile
 // (reached via the header avatar, not this nav, and with no back link into Settings)
@@ -94,87 +99,98 @@ function isNavActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
+function NavBadge({ badge }: { badge?: number }) {
+  if (typeof badge !== "number" || badge <= 0) return null;
+  return (
+    <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold leading-none flex items-center justify-center ring-2 ring-[hsl(var(--sidebar-bg))]">
+      {badge > 9 ? "9+" : badge}
+    </span>
+  );
+}
+
+// `collapsed` now names two genuinely different layouts, not a width toggle on the same one:
+// `true` is the persistent desktop rail's icon-above-label tile (labels always visible, so no
+// tooltip needed); `false` is the mobile drawer's icon-left-label-right row. See Sidebar's own
+// comment on why the rail no longer collapses/expands at runtime.
 function NavItem({ href, label, icon: Icon, active, badge, collapsed, onClick }: {
   href: string; label: string; icon: LucideIcon;
   active: boolean; badge?: number; collapsed?: boolean; onClick?: () => void;
 }) {
-  // Plain stroke glyph, no per-item color — it inherits the row's own text color below, so
-  // active/inactive is the only state an icon here ever needs to express.
-  const glyph = <Icon className="w-[18px] h-[18px] shrink-0" />;
+  if (collapsed) {
+    return (
+      <Link
+        href={href}
+        data-testid={`nav-link-${href.replace(/^\//, "")}`}
+        onClick={onClick}
+        aria-current={active ? "page" : undefined}
+        className={cn(
+          "flex flex-col items-center justify-center gap-1.5 py-3 px-1 rounded-2xl text-center transition-colors",
+          active ? "bg-primary/10 dark:bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+        )}
+      >
+        <span className="relative flex items-center justify-center">
+          <Icon className="w-5 h-5 shrink-0" />
+          <NavBadge badge={badge} />
+        </span>
+        <span className="text-[10px] font-semibold leading-[1.15]">{label}</span>
+      </Link>
+    );
+  }
 
-  const link = (
+  return (
     <Link
       href={href}
       data-testid={`nav-link-${href.replace(/^\//, "")}`}
       onClick={onClick}
       aria-current={active ? "page" : undefined}
-      aria-label={collapsed ? label : undefined}
       className={cn(
-        "relative flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 group",
-        collapsed && "justify-center px-0",
-        active && "text-primary",
-        active && !collapsed && "bg-primary/10 dark:bg-primary/15",
-        !active && "text-muted-foreground hover:text-foreground hover:bg-muted"
+        "relative flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150",
+        active ? "text-primary bg-primary/10 dark:bg-primary/15" : "text-muted-foreground hover:text-foreground hover:bg-muted"
       )}
     >
-      {active && !collapsed && (
+      {active && (
         <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-primary rounded-r-full" />
       )}
-      {/* Collapsed rows have no room for the left accent bar above — the icon's own tinted
-          background pill carries the active cue instead, same as the expanded row's pill. */}
-      {collapsed ? (
-        <span className={cn("relative flex items-center justify-center w-9 h-9 rounded-xl transition-colors", active && "bg-primary/10 dark:bg-primary/15")}>
-          {glyph}
-          {typeof badge === "number" && badge > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold leading-none flex items-center justify-center ring-2 ring-[hsl(var(--sidebar-bg))]">
-              {badge > 9 ? "9+" : badge}
-            </span>
-          )}
-        </span>
-      ) : (
-        <span className="relative flex items-center">
-          {glyph}
-          {typeof badge === "number" && badge > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold leading-none flex items-center justify-center ring-2 ring-[hsl(var(--sidebar-bg))]">
-              {badge > 9 ? "9+" : badge}
-            </span>
-          )}
-        </span>
-      )}
-      {!collapsed && <span>{label}</span>}
+      <span className="relative flex items-center">
+        <Icon className="w-[18px] h-[18px] shrink-0" />
+        <NavBadge badge={badge} />
+      </span>
+      <span>{label}</span>
     </Link>
   );
-
-  return collapsed
-    ? <Tooltip content={label} side="right" className="flex w-full">{link}</Tooltip>
-    : link;
 }
 
 export function Sidebar() {
   const pathname = usePathname();
   const { user }  = useAuthStore();
   const isAdmin   = user?.role === "ADMIN";
-  const { mobileMenuOpen, closeMobileMenu, sidebarCollapsed, toggleSidebar } = useUIStore();
+  const { mobileMenuOpen, closeMobileMenu } = useUIStore();
   const { mutate: logout } = useLogout();
   const { unreadCount }    = useMergedNotifications();
   const [confirmLogout, setConfirmLogout] = useState(false);
 
-  // Mobile's overlay drawer always renders expanded (collapsing a drawer you open on demand just
-  // to close it again isn't useful) — only the persistent desktop rail collapses, so this takes
-  // `collapsed` as a param instead of reading sidebarCollapsed directly.
+  // The desktop rail is a fixed-width icon-above-label column now (no collapse/expand toggle —
+  // see the outer <aside> below), while the mobile drawer stays the wider icon-left-label-right
+  // list it always was. `collapsed` still names that distinction since the two render paths
+  // below are genuinely different layouts, not a width animated between two states.
   function renderNav(collapsed: boolean) {
-    const signOutButton = (
+    const signOutButton = collapsed ? (
       <button
         data-testid="nav-logout"
         onClick={() => setConfirmLogout(true)}
-        aria-label={collapsed ? "Sign out" : undefined}
-        className={cn(
-          "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-500/10 transition-all",
-          collapsed && "justify-center px-0"
-        )}
+        className="w-full flex flex-col items-center justify-center gap-1.5 py-3 rounded-2xl text-[10px] font-semibold text-red-500 hover:bg-red-500/10 transition-colors"
+      >
+        <LogOut className="w-5 h-5 shrink-0" />
+        Sign out
+      </button>
+    ) : (
+      <button
+        data-testid="nav-logout"
+        onClick={() => setConfirmLogout(true)}
+        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-500/10 transition-all"
       >
         <LogOut className="w-[18px] h-[18px] shrink-0" />
-        {!collapsed && <span>Sign out</span>}
+        <span>Sign out</span>
       </button>
     );
 
@@ -182,15 +198,17 @@ export function Sidebar() {
       <div className="flex flex-col h-full">
         {/* ── Logo ── */}
         <div className={cn("flex items-center h-16 border-b border-[hsl(var(--sidebar-border))] shrink-0", collapsed ? "justify-center px-2" : "justify-between px-4")}>
-          <div className="flex items-center gap-3 min-w-0">
-            <BrandMark boxClassName="w-8 h-8" iconClassName="w-6 h-6" />
-            {!collapsed && (
+          {collapsed ? (
+            <BrandMark boxClassName="w-9 h-9" iconClassName="w-6 h-6" />
+          ) : (
+            <div className="flex items-center gap-3 min-w-0">
+              <BrandMark boxClassName="w-8 h-8" iconClassName="w-6 h-6" />
               <div className="min-w-0">
                 <span className="text-sm font-bold tracking-tight text-foreground leading-none">WealthyNest</span>
                 <p className="text-[10px] text-muted-foreground leading-none mt-0.5">Personal Finance</p>
               </div>
-            )}
-          </div>
+            </div>
+          )}
           <button
             onClick={closeMobileMenu}
             className="lg:hidden text-muted-foreground hover:text-foreground transition-colors p-1 rounded-lg hover:bg-muted"
@@ -199,42 +217,51 @@ export function Sidebar() {
           </button>
         </div>
 
-        {/* ── Nav groups ── */}
-        <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-4">
-          {NAV_GROUPS.map((group) => (
-            <div key={group.label}>
-              {!collapsed && (
+        {/* ── Nav ── */}
+        {collapsed ? (
+          <nav className="flex-1 px-2.5 py-4 overflow-y-auto space-y-1.5">
+            {ALL_NAV_ITEMS.map(({ href, label, icon }) => (
+              <NavItem key={href} href={href} label={label} icon={icon}
+                active={isNavActive(pathname, href)}
+                badge={href === "/notifications" ? unreadCount : undefined}
+                collapsed onClick={closeMobileMenu} />
+            ))}
+            {isAdmin && (
+              <NavItem href="/admin" label="Admin" icon={ShieldCheck}
+                active={pathname.startsWith("/admin")} collapsed onClick={closeMobileMenu} />
+            )}
+          </nav>
+        ) : (
+          <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-4">
+            {NAV_GROUPS.map((group) => (
+              <div key={group.label}>
                 <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-widest px-3 mb-1">
                   {group.label}
                 </p>
-              )}
-              <div className="space-y-0.5">
-                {group.items.map(({ href, label, icon }) => {
-                  const active = isNavActive(pathname, href);
-                  const badge = href === "/notifications" ? unreadCount : undefined;
-                  return (
+                <div className="space-y-0.5">
+                  {group.items.map(({ href, label, icon }) => (
                     <NavItem key={href} href={href} label={label} icon={icon}
-                      active={active} badge={badge} collapsed={collapsed} onClick={closeMobileMenu} />
-                  );
-                })}
+                      active={isNavActive(pathname, href)}
+                      badge={href === "/notifications" ? unreadCount : undefined}
+                      onClick={closeMobileMenu} />
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
 
-          {isAdmin && (
-            <div>
-              {!collapsed && <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-widest px-3 mb-1">Admin</p>}
-              <NavItem href="/admin" label="Admin" icon={ShieldCheck}
-                active={pathname.startsWith("/admin")} collapsed={collapsed} onClick={closeMobileMenu} />
-            </div>
-          )}
-        </nav>
+            {isAdmin && (
+              <div>
+                <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-widest px-3 mb-1">Admin</p>
+                <NavItem href="/admin" label="Admin" icon={ShieldCheck}
+                  active={pathname.startsWith("/admin")} onClick={closeMobileMenu} />
+              </div>
+            )}
+          </nav>
+        )}
 
         {/* ── Sign out ── */}
-        <div className="px-3 pb-4 pt-3 border-t border-[hsl(var(--sidebar-border))] shrink-0">
-          {collapsed
-            ? <Tooltip content="Sign out" side="right" className="flex w-full">{signOutButton}</Tooltip>
-            : signOutButton}
+        <div className={cn("pb-4 pt-3 border-t border-[hsl(var(--sidebar-border))] shrink-0", collapsed ? "px-2.5" : "px-3")}>
+          {signOutButton}
         </div>
       </div>
     );
@@ -242,22 +269,10 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Desktop sidebar */}
-      <aside className={cn(
-        "relative shrink-0 hidden lg:flex flex-col h-screen sticky top-0 bg-[hsl(var(--sidebar-bg))] border-r border-[hsl(var(--sidebar-border))] transition-[width] duration-200 ease-out",
-        sidebarCollapsed ? "w-[68px]" : "w-60"
-      )}>
-        {renderNav(sidebarCollapsed)}
-
-        {/* Straddles the sidebar/content border so its position doesn't depend on collapsed
-            state — same "rail toggle" pattern as VS Code's explorer / Notion's sidebar. */}
-        <button
-          onClick={toggleSidebar}
-          aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className="absolute -right-3 top-[27px] w-6 h-6 rounded-full border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-bg))] text-muted-foreground hover:text-foreground hover:border-primary/40 flex items-center justify-center shadow-sm z-20 transition-colors"
-        >
-          {sidebarCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
-        </button>
+      {/* Desktop sidebar — fixed-width icon rail, no collapse/expand toggle (see NavItem/
+          renderNav's own comments on why "collapsed" is now two fixed layouts, not a state). */}
+      <aside className="relative shrink-0 hidden lg:flex flex-col w-24 h-screen sticky top-0 bg-[hsl(var(--sidebar-bg))] border-r border-[hsl(var(--sidebar-border))]">
+        {renderNav(true)}
       </aside>
 
       {/* Mobile sidebar overlay — `fixed`, so (unlike ordinary flowed content) it needs its own

@@ -132,8 +132,8 @@ export const TEST_IDS = {
   },
   home: {
     smartAlertsRow:     "smart-alerts-row",
-    smartInsightsCard:  "smart-insights-card",
-    upcomingBillsCard:  "upcoming-bills-card",
+    smartInsightCard:   "smart-insight-card",
+    smartBillCard:      "smart-bill-card",
     periodToggle: (mode: "month" | "year") => `period-toggle-${mode}`,
     periodNavLabel:     "period-nav-label",
     budgetProgressTile:    "budget-progress-tile",
