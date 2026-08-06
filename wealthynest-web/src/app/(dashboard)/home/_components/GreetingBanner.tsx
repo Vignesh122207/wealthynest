@@ -1,6 +1,6 @@
 "use client";
 
-import {ChevronLeft, ChevronRight, Zap} from "lucide-react";
+import {Calendar, CalendarRange, ChevronLeft, ChevronRight, Zap} from "lucide-react";
 import {cn, formatCurrency, getGreeting, monthLabel} from "@/lib/utils";
 
 export type HomeViewMode = "month" | "year";
@@ -52,19 +52,24 @@ export function GreetingBanner({
   const insight = getSavingsInsight(income, expenses, savingsRate);
 
   return (
-    <div data-testid="greeting-banner" className="animate-fade-in-up flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-      <div className="min-w-0">
+    // Always a single row, even on mobile (previously flex-col below sm, which pushed the
+    // period controls onto their own line) — the greeting gets flex-1/min-w-0 so it's first in
+    // line for the row's space and only truncates as a last resort; the controls on the right
+    // are shrink-0 and, below sm, collapse into one compact icon-driven pill (see the mobile-only
+    // block further down) specifically so they never need to squeeze the greeting to fit.
+    <div data-testid="greeting-banner" className="animate-fade-in-up flex flex-row items-center sm:items-start justify-between gap-2 sm:gap-3">
+      <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-xl" aria-hidden>
+          <span className="text-xl shrink-0" aria-hidden>
             {{ morning: "🌤️", afternoon: "☀️", evening: "🌙" }[getGreeting()] ?? "👋"}
           </span>
-          <p className="text-lg lg:text-xl font-bold text-foreground tracking-tight truncate">
+          <p className="text-base sm:text-lg lg:text-xl font-bold text-foreground tracking-tight truncate">
             Good {getGreeting()}, {firstName}
           </p>
         </div>
       </div>
 
-      <div className="flex items-center gap-3 shrink-0">
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {insight && (
           <div className="hidden md:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/8 border border-primary/15">
             <Zap className="w-3.5 h-3.5 text-primary shrink-0" />
@@ -72,8 +77,8 @@ export function GreetingBanner({
           </div>
         )}
 
-        {/* Month/Year switch */}
-        <div className="flex items-center gap-0.5 bg-card border border-border/50 rounded-xl p-1 shrink-0">
+        {/* Month/Year switch — sm and up only; mobile gets the single combined pill below */}
+        <div className="hidden sm:flex items-center gap-0.5 bg-card border border-border/50 rounded-xl p-1 shrink-0">
           {(["month", "year"] as const).map((mode) => (
             <button
               key={mode}
@@ -89,8 +94,8 @@ export function GreetingBanner({
           ))}
         </div>
 
-        {/* Month/Year navigator */}
-        <div className="flex items-center gap-1 bg-card border border-border/50 rounded-xl p-1 shrink-0">
+        {/* Month/Year navigator — sm and up only; mobile gets the single combined pill below */}
+        <div className="hidden sm:flex items-center gap-1 bg-card border border-border/50 rounded-xl p-1 shrink-0">
           <button
             onClick={() => (isYear ? onNavigateYear(-1) : onNavigate(-1))}
             className="w-7 h-7 rounded-lg bg-muted hover:bg-muted/60 flex items-center justify-center transition-colors"
@@ -108,6 +113,42 @@ export function GreetingBanner({
             aria-label={isYear ? "Next year" : "Next month"}
           >
             <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+          </button>
+        </div>
+
+        {/* Mobile-only: the two pills above collapse into one lean pill — the Month/Year
+            segmented control (two text buttons) and its icon merge into a single tap-to-cycle
+            "icon + label" button (no separate button chrome for the icon, no fixed-width label
+            reservation), and prev/next shrink to 20px. Every px here is deliberately fought for:
+            this is what keeps "Good morning, {name}" from ever needing to truncate on a mainstream
+            phone width (measured against real devices, not just guessed) while still sharing the
+            row with full period navigation instead of wrapping to a second line. */}
+        <div className="flex sm:hidden items-center gap-1 bg-card border border-border/50 rounded-xl pl-1.5 pr-1 py-1 shrink-0">
+          <button
+            data-testid="period-toggle-mobile"
+            onClick={() => onViewModeChange(isYear ? "month" : "year")}
+            aria-label={`${isYear ? "Switch to month view" : "Switch to year view"} — currently showing ${label}`}
+            className="flex items-center gap-1 text-primary"
+          >
+            {isYear ? <CalendarRange className="w-3.5 h-3.5 shrink-0" /> : <Calendar className="w-3.5 h-3.5 shrink-0" />}
+            <span data-testid="period-nav-label-mobile" className="text-[11px] font-semibold text-foreground tabular-nums whitespace-nowrap">
+              {label}
+            </span>
+          </button>
+          <button
+            onClick={() => (isYear ? onNavigateYear(-1) : onNavigate(-1))}
+            className="w-5 h-5 rounded-md hover:bg-muted/60 flex items-center justify-center transition-colors"
+            aria-label={isYear ? "Previous year" : "Previous month"}
+          >
+            <ChevronLeft className="w-3 h-3 text-muted-foreground" />
+          </button>
+          <button
+            onClick={() => (isYear ? onNavigateYear(1) : onNavigate(1))}
+            disabled={isYear ? isCurrentYear : isCurrentMonth}
+            className="w-5 h-5 rounded-md hover:bg-muted/60 flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            aria-label={isYear ? "Next year" : "Next month"}
+          >
+            <ChevronRight className="w-3 h-3 text-muted-foreground" />
           </button>
         </div>
       </div>
