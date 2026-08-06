@@ -112,9 +112,9 @@ function NavItem({ href, label, icon, gradient, active, badge, collapsed, onClic
   href: string; label: string; icon: LucideIcon; gradient: Gradient;
   active: boolean; badge?: number; collapsed?: boolean; onClick?: () => void;
 }) {
-  // rounded-full overrides PremiumIcon's default rounded-square badge shape — the circular
-  // badge is specific to nav (matches the reference), not a change to PremiumIcon itself.
-  const glyph = <PremiumIcon icon={icon} gradient={gradient} size="sm" interactive selected={active} badge={badge} className="rounded-full" />;
+  // size="xs" is the same badge size nav used before today's redesign — the circular
+  // rounded-full override is new (matches the reference), but the size itself reverts.
+  const glyph = <PremiumIcon icon={icon} gradient={gradient} size="xs" interactive selected={active} badge={badge} className="rounded-full" />;
 
   if (collapsed) {
     return (
