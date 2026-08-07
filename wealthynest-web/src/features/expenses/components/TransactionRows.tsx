@@ -24,10 +24,12 @@ export function DebtBadge({ debtLabel, debtContactName }: { debtLabel?: string; 
   );
 }
 
-export const ExpenseRow = memo(function ExpenseRow({ expense, accountName, onEdit }: {
+export const ExpenseRow = memo(function ExpenseRow({ expense, accountName, onEdit, balance }: {
   expense:     Expense;
   accountName: string | undefined;
   onEdit:      () => void;
+  /** Running account balance after this transaction — shown only by the "All" tab's merged feed. */
+  balance?:    number;
 }) {
   const { fmt } = useAmountFormatter();
   const isDark = useIsDark();
@@ -55,15 +57,22 @@ export const ExpenseRow = memo(function ExpenseRow({ expense, accountName, onEdi
           )}
         </div>
       </div>
-      <p className="text-sm font-bold text-red-500 dark:text-red-400 tabular-nums shrink-0">−{fmt(expense.amount)}</p>
+      <div className="text-right shrink-0">
+        <p className="text-sm font-bold text-red-500 dark:text-red-400 tabular-nums">−{fmt(expense.amount)}</p>
+        {balance !== undefined && (
+          <p className="text-[11px] text-muted-foreground/80 tabular-nums mt-0.5">Bal {fmt(balance)}</p>
+        )}
+      </div>
     </button>
   );
 });
 
-export const IncomeRow = memo(function IncomeRow({ entry, accountName, onEdit }: {
+export const IncomeRow = memo(function IncomeRow({ entry, accountName, onEdit, balance }: {
   entry:       IncomeEntry;
   accountName: string | undefined;
   onEdit:      () => void;
+  /** Running account balance after this transaction — shown only by the "All" tab's merged feed. */
+  balance?:    number;
 }) {
   const { fmt } = useAmountFormatter();
   const isDark = useIsDark();
@@ -85,14 +94,21 @@ export const IncomeRow = memo(function IncomeRow({ entry, accountName, onEdit }:
           {accountName && <span className="text-xs text-muted-foreground/80">{accountName}</span>}
         </div>
       </div>
-      <p className="text-sm font-bold text-emerald-500 dark:text-emerald-400 tabular-nums shrink-0">+{fmt(entry.amount)}</p>
+      <div className="text-right shrink-0">
+        <p className="text-sm font-bold text-emerald-500 dark:text-emerald-400 tabular-nums">+{fmt(entry.amount)}</p>
+        {balance !== undefined && (
+          <p className="text-[11px] text-muted-foreground/80 tabular-nums mt-0.5">Bal {fmt(balance)}</p>
+        )}
+      </div>
     </button>
   );
 });
 
-export const TransferRow = memo(function TransferRow({ transfer, onEdit }: {
+export const TransferRow = memo(function TransferRow({ transfer, onEdit, balance }: {
   transfer: AccountTransfer;
   onEdit:   () => void;
+  /** Running account balance after this transaction — shown only by the "All" tab's merged feed. */
+  balance?: number;
 }) {
   const { fmt } = useAmountFormatter();
   const isAdj  = transfer.adjustment;
@@ -120,11 +136,16 @@ export const TransferRow = memo(function TransferRow({ transfer, onEdit }: {
           </p>
         )}
       </div>
-      <p className={cn("text-sm font-bold tabular-nums shrink-0",
-        isDebt ? (isIn ? "text-teal-500 dark:text-teal-400" : "text-rose-500 dark:text-rose-400")
-          : isAdj ? "text-muted-foreground" : "text-indigo-500 dark:text-indigo-400")}>
-        {sign}{fmt(transfer.amount)}
-      </p>
+      <div className="text-right shrink-0">
+        <p className={cn("text-sm font-bold tabular-nums",
+          isDebt ? (isIn ? "text-teal-500 dark:text-teal-400" : "text-rose-500 dark:text-rose-400")
+            : isAdj ? "text-muted-foreground" : "text-indigo-500 dark:text-indigo-400")}>
+          {sign}{fmt(transfer.amount)}
+        </p>
+        {balance !== undefined && (
+          <p className="text-[11px] text-muted-foreground/80 tabular-nums mt-0.5">Bal {fmt(balance)}</p>
+        )}
+      </div>
     </button>
   );
 });

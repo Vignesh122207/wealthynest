@@ -9,8 +9,8 @@ export const expensesApi = {
     if (filters.startDate)   params.append("startDate",  filters.startDate);
     if (filters.endDate)     params.append("endDate",    filters.endDate);
     if (filters.search)      params.append("search",     filters.search);
-    if (filters.minAmount)   params.append("minAmount",  String(filters.minAmount));
-    if (filters.maxAmount)   params.append("maxAmount",  String(filters.maxAmount));
+    if (filters.minAmount   != null) params.append("minAmount",  String(filters.minAmount));
+    if (filters.maxAmount   != null) params.append("maxAmount",  String(filters.maxAmount));
     if (filters.recurring   != null) params.append("recurring",   String(filters.recurring));
     if (filters.includeDebt != null) params.append("includeDebt", String(filters.includeDebt));
     if (filters.sortBy)      params.append("sortBy",     filters.sortBy);

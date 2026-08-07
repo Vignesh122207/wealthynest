@@ -17,6 +17,8 @@ interface TransfersTabContentProps {
   searchedTransfers: AccountTransfer[];
   hasTwoAccounts: boolean;
   addAccountCta: React.ReactNode;
+  search: string;
+  onClearFiltersAndSearch: () => void;
   onAddTransfer: () => void;
   transferSortedDates: string[];
   transferGrouped: Record<string, AccountTransfer[]>;
@@ -25,9 +27,14 @@ interface TransfersTabContentProps {
 }
 
 export function TransfersTabContent({
-  chips, transfersLoading, transfersError, onRetryTransfers, searchedTransfers, hasTwoAccounts, addAccountCta, onAddTransfer,
+  chips, transfersLoading, transfersError, onRetryTransfers, searchedTransfers, hasTwoAccounts, addAccountCta,
+  search, onClearFiltersAndSearch, onAddTransfer,
   transferSortedDates, transferGrouped, fmt, onEditTransfer,
 }: TransfersTabContentProps) {
+  // A search term causes an empty result just as much as a filter chip does — without also
+  // checking it here, a search matching nothing said "No transfers this period" (implying there's
+  // genuinely none) with no clear/reset action at all, a dead end.
+  const showClear = chips.length > 0 || search.trim() !== "";
   return (
     <div className="space-y-3">
       {chips.length > 0 && (
@@ -52,13 +59,13 @@ export function TransfersTabContent({
           <QueryErrorState onRetry={() => onRetryTransfers?.()} description="Couldn't load your transfers. Check your connection and try again." />
         ) : searchedTransfers.length === 0 ? (
           <EmptyState icon={ArrowLeftRight}
-            title={!hasTwoAccounts ? "Need at least 2 accounts" : chips.length > 0 ? "No transfers match your filters" : "No transfers this period"}
+            title={!hasTwoAccounts ? "Need at least 2 accounts" : showClear ? "No transfers match your filters" : "No transfers this period"}
             description={!hasTwoAccounts ? "Transfers move money between two of your own accounts — add another account first."
-              : chips.length > 0 ? "Try clearing the filters to see everything again." : "Move money between your accounts."}
+              : showClear ? "Try clearing the search or filters to see everything again." : "Move money between your accounts."}
             action={
               !hasTwoAccounts ? addAccountCta
-                : chips.length > 0
-                ? <button onClick={() => chips.forEach(c => c.clear())} className="text-sm text-indigo-500 hover:text-indigo-600 font-medium transition-colors">Clear filters</button>
+                : showClear
+                ? <button onClick={onClearFiltersAndSearch} className="text-sm text-indigo-500 hover:text-indigo-600 font-medium transition-colors">Clear filters</button>
                 : <button onClick={onAddTransfer}
                 className="flex items-center gap-2 bg-gradient-to-br from-indigo-600 to-indigo-500 shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 hover:-translate-y-0.5 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
                 <Plus className="w-4 h-4" /> New Transfer

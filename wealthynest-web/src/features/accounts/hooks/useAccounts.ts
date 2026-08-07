@@ -4,6 +4,7 @@ import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {toast} from "sonner";
 import {QUERY_KEYS} from "@/lib/constants";
 import {apiErrorMessage, formatCurrency} from "@/lib/utils";
+import {fetchAllPages} from "@/lib/pagination";
 import {accountsApi} from "../api/accounts.api";
 import type {CreateAccountPayload, TransferPayload} from "../types/account.types";
 
@@ -125,6 +126,18 @@ export function useTransfers(page = 0, size = 20) {
   return useQuery({
     queryKey: [...QUERY_KEYS.TRANSFERS, page, size],
     queryFn:  () => accountsApi.getTransfers(page, size),
+  });
+}
+
+/** Every transfer ever recorded, for callers that need the full history (the Transactions page's
+ * running-balance ledger and its "All"/Transfers tabs) rather than one page of it. A single
+ * `size=500` request — the server's own @Max cap — silently dropped anything past the 500th
+ * transfer once an account had that much history; pages through in full instead, same pattern as
+ * useAllTimeExpenses. */
+export function useAllTransfers() {
+  return useQuery({
+    queryKey: [...QUERY_KEYS.TRANSFERS, "all-time"],
+    queryFn: () => fetchAllPages(page => accountsApi.getTransfers(page, 500)),
   });
 }
 

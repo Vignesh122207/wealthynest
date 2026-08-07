@@ -5,6 +5,7 @@ import com.wealthynest.domain.budget.entity.BudgetType;
 import com.wealthynest.domain.category.entity.Category;
 import com.wealthynest.domain.category.entity.CategoryType;
 import com.wealthynest.domain.expense.entity.Expense;
+import com.wealthynest.domain.expense.service.ExpenseSpecifications;
 import com.wealthynest.domain.family.entity.Family;
 import com.wealthynest.domain.user.entity.User;
 import com.wealthynest.testsupport.AbstractRepositoryTest;
@@ -14,6 +15,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -230,6 +234,62 @@ class ExpenseRepositoryTest extends AbstractRepositoryTest {
 
             assertThat(entityManager.find(Expense.class, unassigned.getId()).getFamilyId()).isEqualTo(family.getId());
             assertThat(entityManager.find(Expense.class, alreadyAssigned.getId()).getFamilyId()).isEqualTo(otherFamily.getId()); // untouched
+        }
+    }
+
+    // ─── ExpenseSpecifications.filter search clause ─────────────────────────────
+    // Regression coverage for the search predicate matching description-only: the Transactions
+    // page's "All" tab already matched description/amount/category client-side, while this
+    // server-scoped search (used by the paginated Expenses tab) silently didn't — same search box,
+    // different results depending on which tab was open.
+
+    @Nested
+    @DisplayName("ExpenseSpecifications.filter — search matches description, amount, or category name")
+    class SearchSpecificationTests {
+
+        private Page<Expense> search(String term) {
+            Specification<Expense> spec = ExpenseSpecifications.filter(
+                    userId, null, null, null, term, null, null, null, null, null);
+            return expenseRepository.findAll(spec, PageRequest.of(0, 10));
+        }
+
+        @Test
+        @DisplayName("matches the expense description, case-insensitively")
+        void matchesDescription() {
+            Expense e = persistExpense(new BigDecimal("100"), LocalDate.of(2026, 6, 5), false);
+            e.setDescription("Uber ride home");
+            entityManager.flush();
+
+            assertThat(search("uber").getContent()).extracting(Expense::getId).containsExactly(e.getId());
+        }
+
+        @Test
+        @DisplayName("matches the amount rendered as text")
+        void matchesAmount() {
+            persistExpense(new BigDecimal("100.00"), LocalDate.of(2026, 6, 5), false);
+            Expense target = persistExpense(new BigDecimal("4250.00"), LocalDate.of(2026, 6, 6), false);
+            entityManager.flush();
+
+            assertThat(search("4250").getContent()).extracting(Expense::getId).containsExactly(target.getId());
+        }
+
+        @Test
+        @DisplayName("matches the name of the expense's own category")
+        void matchesCategoryName() {
+            // categoryId (seeded in @BeforeEach) points at a category named "Groceries".
+            Expense target = persistExpense(new BigDecimal("300"), LocalDate.of(2026, 6, 5), false);
+            entityManager.flush();
+
+            assertThat(search("grocer").getContent()).extracting(Expense::getId).containsExactly(target.getId());
+        }
+
+        @Test
+        @DisplayName("excludes rows matching none of description, amount, or category name")
+        void excludesNonMatches() {
+            persistExpense(new BigDecimal("100"), LocalDate.of(2026, 6, 5), false);
+            entityManager.flush();
+
+            assertThat(search("no-such-term").getContent()).isEmpty();
         }
     }
 

@@ -127,24 +127,8 @@ public class ExpenseServiceImpl implements ExpenseService {
                                               BigDecimal minAmount, BigDecimal maxAmount,
                                               Boolean recurring, Boolean includeDebt,
                                               Pageable pageable) {
-        String searchLike = (search != null && !search.isBlank())
-                ? "%" + search.toLowerCase() + "%" : null;
-
-        Specification<Expense> spec = (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            // Always scope to the current user — combined family view is in /families/{id}/expenses
-            predicates.add(cb.equal(root.get("userId"), userId));
-            if (categoryId != null) predicates.add(cb.equal(root.get("categoryId"), categoryId));
-            if (startDate  != null) predicates.add(cb.greaterThanOrEqualTo(root.get("expenseDate"), startDate));
-            if (endDate    != null) predicates.add(cb.lessThanOrEqualTo(root.get("expenseDate"), endDate));
-            if (searchLike != null) predicates.add(cb.like(cb.lower(root.get("description")), searchLike));
-            if (accountIds != null && !accountIds.isEmpty()) predicates.add(root.get("accountId").in(accountIds));
-            if (minAmount  != null) predicates.add(cb.greaterThanOrEqualTo(root.get("amount"), minAmount));
-            if (maxAmount  != null) predicates.add(cb.lessThanOrEqualTo(root.get("amount"), maxAmount));
-            if (recurring  != null) predicates.add(cb.equal(root.get("recurring"), recurring));
-            if (!Boolean.TRUE.equals(includeDebt)) predicates.add(cb.equal(root.get("debt"), false));
-            return cb.and(predicates.toArray(new Predicate[0]));
-        };
+        Specification<Expense> spec = ExpenseSpecifications.filter(
+                userId, categoryId, startDate, endDate, search, accountIds, minAmount, maxAmount, recurring, includeDebt);
 
         Page<Expense> page = expenseRepository.findAll(spec, pageable);
 

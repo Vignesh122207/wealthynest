@@ -18,7 +18,8 @@ interface ExpensesTabContentProps {
   hasAccounts: boolean;
   activeFilterCount: number;
   addAccountCta: React.ReactNode;
-  clearAllFilters: () => void;
+  search: string;
+  onClearFiltersAndSearch: () => void;
   onAddExpense: () => void;
   expenseTabTotal: number;
   expenseTabRowCount: number;
@@ -37,10 +38,15 @@ interface ExpensesTabContentProps {
 // The Transactions page's Expenses tab — all list rendering, pulled out of the page purely to
 // cut its size. Every value here is already computed/filtered by the page; this just renders it.
 export function ExpensesTabContent({
-  chips, expensesLoading, expensesError, onRetryExpenses, expenses, hasAccounts, activeFilterCount, addAccountCta, clearAllFilters,
+  chips, expensesLoading, expensesError, onRetryExpenses, expenses, hasAccounts, activeFilterCount, addAccountCta,
+  search, onClearFiltersAndSearch,
   onAddExpense, expenseTabTotal, expenseTabRowCount, sortedDates, grouped, fmt, accountMap,
   onEditExpense, totalPages, listPage, setListPage, serverTotal, pageSize,
 }: ExpensesTabContentProps) {
+  // A search term causes an empty result just as much as a filter chip does — without also
+  // checking it here, searching for something that matches nothing showed "Track your spending by
+  // adding your first expense" (implying there's genuinely none) with no way back to "everything".
+  const showClear = activeFilterCount > 0 || search.trim() !== "";
   return (
     <div className="space-y-3">
       {chips.length > 0 && (
@@ -63,12 +69,12 @@ export function ExpensesTabContent({
           <EmptyState icon={Receipt} title={!hasAccounts ? "No accounts yet" : "No expenses found"}
             description={
               !hasAccounts ? "Add a bank, cash, or credit account before logging expenses."
-                : activeFilterCount > 0 ? "No expenses match the active filters." : "Track your spending by adding your first expense."
+                : showClear ? "No expenses match your search or filters." : "Track your spending by adding your first expense."
             }
             action={
               !hasAccounts ? addAccountCta
-                : activeFilterCount > 0
-                ? <button onClick={clearAllFilters} className="text-sm text-indigo-500 hover:text-indigo-600 font-medium transition-colors">Clear filters</button>
+                : showClear
+                ? <button onClick={onClearFiltersAndSearch} className="text-sm text-indigo-500 hover:text-indigo-600 font-medium transition-colors">Clear filters</button>
                 : <button onClick={onAddExpense}
                     className="flex items-center gap-2 bg-gradient-to-br from-red-600 to-red-500 shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40 hover:-translate-y-0.5 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
                     <Plus className="w-4 h-4" /> Add Expense

@@ -91,7 +91,7 @@ export function AllTabContent({
                 </div>
                 <div className="divide-y divide-border/50">
                   {allGrouped[date].map(row => (
-                    <AllTransactionRow key={`${row.kind}-${row.data.id}`} row={row} fmt={fmt} accountMap={accountMap} balanceMap={balanceMap}
+                    <AllTransactionRow key={`${row.kind}-${row.data.id}`} row={row} accountMap={accountMap} balanceMap={balanceMap}
                       onEditExpense={onEditExpense} onEditIncome={onEditIncome} onEditTransfer={onEditTransfer} />
                   ))}
                 </div>

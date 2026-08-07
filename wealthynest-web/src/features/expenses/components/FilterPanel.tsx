@@ -172,7 +172,11 @@ export function FilterPanel({
             </>
           )}
 
-          {txType === "transfers" && allAccounts.length > 0 && (
+          {/* Account filter applies to every tab (selectedAccountIds is shared page state, and its
+              chip shows up on Expenses/Income/All too — see page.tsx's accountChips) — used to only
+              render here when txType === "transfers", so it was only ever reachable by round-
+              tripping through the Transfers tab even though it filtered every other tab too. */}
+          {allAccounts.length > 0 && (
             <div className="bg-card border border-border rounded-xl p-3">
               {sectionLabel(Wallet, "Accounts", "cyan")}
               <div className="flex flex-wrap gap-1.5">

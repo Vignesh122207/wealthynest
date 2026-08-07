@@ -19,9 +19,9 @@ import {
 import {useCategories} from "@/features/categories/hooks/useCategories";
 import {
     useAccounts,
+    useAllTransfers,
     useDeleteTransfer,
     useTransfer,
-    useTransfers,
     useUpdateTransfer,
 } from "@/features/accounts/hooks/useAccounts";
 import {useCreateIncome, useDeleteIncome, useIncome, useUpdateIncome,} from "@/features/income/hooks/useIncome";
@@ -31,7 +31,7 @@ import {useFamilyMembers} from "@/features/family/hooks/useFamily";
 import {type ExpenseFormValues} from "@/features/expenses/schemas/expense.schema";
 import type {Expense, SplitParticipant} from "@/features/expenses/types/expense.types";
 import {exportAllCsv, exportCsv, exportIncomeCsv, exportTransfersCsv} from "@/features/expenses/utils/csvExport";
-import {pad} from "@/features/expenses/utils/filterHelpers";
+import {pad, resolveEffectiveAccountIds} from "@/features/expenses/utils/filterHelpers";
 import {TypeTabs} from "@/features/expenses/components/TypeTabs";
 import {DateControls} from "@/features/expenses/components/DateControls";
 import {StatCards} from "@/features/expenses/components/StatCards";
@@ -162,14 +162,19 @@ export default function TransactionsPage() {
   const [sortBy, sortDir] = sortKey.split("-") as ["expenseDate" | "amount", "asc" | "desc"];
   const PAGE_SIZE = 25;
 
-  // An explicit account selection (from the "view transactions for this account" entry point,
-  // or the filter panel's account picker) takes priority over the payment-channel-derived list.
-  const effectiveAccountIds = selectedAccountIds.length > 0 ? selectedAccountIds : accountIds;
+  // An explicit account selection (from the "view transactions for this account" entry point, or
+  // the filter panel's account picker) is ANDed with an active payment-channel filter rather than
+  // one overriding the other — matches filteredMergedRows' own client-side filter below, which
+  // already ANDs both independently.
+  const effectiveAccountIds = useMemo(
+    () => resolveEffectiveAccountIds(payChannel, selectedAccountIds, accountIds),
+    [payChannel, selectedAccountIds, accountIds]
+  );
 
-  // A payment-channel filter that matches zero accounts (e.g. "Card" with no credit-card account
-  // on file) must return no rows — not fall through to "no accountIds filter" and show everything,
-  // which is what an empty `effectiveAccountIds` array collapses to below.
-  const channelMatchesNoAccounts = payChannel !== "" && selectedAccountIds.length === 0 && accountIds.length === 0;
+  // A payment-channel filter (optionally narrowed further by an explicit account selection) that
+  // matches zero accounts must return no rows — not fall through to "no accountIds filter" and
+  // show everything, which is what an empty `effectiveAccountIds` array collapses to below.
+  const channelMatchesNoAccounts = payChannel !== "" && effectiveAccountIds.length === 0;
 
   const expenseFilters = {
     startDate:  startDate as string | undefined,
@@ -205,8 +210,10 @@ export default function TransactionsPage() {
   const { data: allIncomeRaw = [] } = useIncome(incomeYear, incomeMonth, true);
 
   // ─── Transfer data ─────────────────────────────────────────────────────────
-  const { data: transfersPage, isLoading: transfersLoading, isError: transfersError, refetch: refetchTransfers } = useTransfers(0, 500);
-  const allTransfers = useMemo(() => transfersPage?.data ?? [], [transfersPage]);
+  // Every transfer ever recorded (not one capped page) — needed unscoped by the running-balance
+  // ledger and the Transfers/All tabs' own client-side date filtering below.
+  const { data: allTransfersData, isLoading: transfersLoading, isError: transfersError, refetch: refetchTransfers } = useAllTransfers();
+  const allTransfers = useMemo(() => allTransfersData ?? [], [allTransfersData]);
 
   // ─── All-time data, unscoped by the selected date range ────────────────────
   // Powers two things that a date-scoped fetch can't answer correctly: the running
@@ -280,11 +287,16 @@ export default function TransactionsPage() {
   }, [filteredTransfers, debouncedSearch, selectedAccountIds]);
 
   // ─── "All" merged rows ─────────────────────────────────────────────────────
-  const { data: allExpensesRaw } = useExpenses({
-    startDate: startDate as string | undefined,
-    endDate:   endDate as string | undefined,
-    page: 0, size: 300, sortDir: "desc", includeDebt: true,
-  });
+  // Derived from the already-fetched, unbounded allTimeExpenses (not a second, size-capped
+  // useExpenses call) — a separate `size: 300` fetch here used to silently drop any period with
+  // more than 300 expenses from the All tab, the "Transactions" stat count, and the CSV export,
+  // despite exportAllCsv's own comment claiming nothing gets dropped. allTimeExpenses is already a
+  // superset of any date range, so filtering it client-side (same pattern as filteredTransfers/
+  // filteredIncome below) is both correct and one fewer network round-trip.
+  const expensesInRange = useMemo(() => {
+    const inRange = (d: string) => (!startDate || d >= startDate) && (!endDate || d <= endDate);
+    return allTimeExpenses.filter(e => inRange(e.expenseDate));
+  }, [allTimeExpenses, startDate, endDate]);
 
   const filteredAllIncome = useMemo(() => {
     if (dateMode !== "custom") return allIncomeRaw;
@@ -298,12 +310,12 @@ export default function TransactionsPage() {
   // Computed regardless of active tab — the stat cards need these totals everywhere, not just on "All".
   const mergedRows = useMemo<TxRow[]>(() => {
     const rows: TxRow[] = [
-      ...(allExpensesRaw?.data ?? []).map(e => ({ kind: "expense" as const, date: e.expenseDate, data: e })),
+      ...expensesInRange.map(e => ({ kind: "expense" as const, date: e.expenseDate, data: e })),
       ...filteredAllIncome.map(i => ({ kind: "income" as const, date: i.incomeDate, data: i })),
       ...filteredTransfers.map(t => ({ kind: "transfer" as const, date: t.transferDate, data: t })),
     ];
     return rows.sort((a, b) => b.date.localeCompare(a.date) || b.data.createdAt.localeCompare(a.data.createdAt));
-  }, [allExpensesRaw, filteredAllIncome, filteredTransfers]);
+  }, [expensesInRange, filteredAllIncome, filteredTransfers]);
 
   const txTypeCounts = useMemo<Record<TxType, number>>(() => ({
     all:       mergedRows.length,
@@ -605,6 +617,11 @@ export default function TransactionsPage() {
     setYear(now.getFullYear()); setMonth(now.getMonth() + 1);
     setCustomStart(""); setCustomEnd(""); setListPage(0);
   };
+
+  // Shared by every tab's empty state — clears filters AND the search box together, since a
+  // dead-end empty state (search matches nothing, no filter chips active) needs a way back to
+  // "everything" that a filters-only clear wouldn't provide.
+  const clearFiltersAndSearch = () => { clearAllFilters(); setSearch(""); };
 
   // Read URL params on mount and apply tab + account filter + selected period — without this,
   // navigating to July and refreshing the page dropped straight back to the current month, since
@@ -912,7 +929,7 @@ export default function TransactionsPage() {
           <ExpensesTabContent
             chips={chips} expensesLoading={expensesLoading} expensesError={expensesError} onRetryExpenses={refetchExpenses} expenses={expenses}
             hasAccounts={hasAccounts} activeFilterCount={activeFilterCount} addAccountCta={addAccountCta}
-            clearAllFilters={clearAllFilters} onAddExpense={() => setShowCreate(true)}
+            search={search} onClearFiltersAndSearch={clearFiltersAndSearch} onAddExpense={() => setShowCreate(true)}
             expenseTabTotal={expenseTabTotal} expenseTabRowCount={expenseTabRows.length}
             sortedDates={sortedDates} grouped={grouped} fmt={fmt} accountMap={accountMap}
             onEditExpense={(expense) => { setShowCreate(false); setEditExpense(expense); }}
@@ -926,6 +943,7 @@ export default function TransactionsPage() {
           <IncomeTabContent
             chips={incomeTabChips} incomeLoading={incomeLoading} incomeError={incomeError} onRetryIncome={refetchIncome} searchedIncome={searchedIncome}
             hasIncomeAccounts={hasIncomeAccounts} addAccountCta={addAccountCta}
+            search={search} onClearFiltersAndSearch={clearFiltersAndSearch}
             onAddIncome={() => setShowAddIncome(true)}
             incomeSortedDates={incomeSortedDates} incomeGrouped={incomeGrouped} fmt={fmt} accountMap={accountMap}
             onEditIncome={(entry) => { setShowAddIncome(false); setEditIncome(entry); }}
@@ -937,6 +955,7 @@ export default function TransactionsPage() {
           <TransfersTabContent
             chips={transferTabChips} transfersLoading={transfersLoading} transfersError={transfersError} onRetryTransfers={refetchTransfers} searchedTransfers={searchedTransfers}
             hasTwoAccounts={allAccounts.length >= 2} addAccountCta={addAccountCta}
+            search={search} onClearFiltersAndSearch={clearFiltersAndSearch}
             onAddTransfer={() => setShowAddTransfer(true)}
             transferSortedDates={transferSortedDates} transferGrouped={transferGrouped} fmt={fmt}
             onEditTransfer={(transfer) => { setShowAddTransfer(false); setEditTransfer(transfer); }}
@@ -952,7 +971,7 @@ export default function TransactionsPage() {
             filteredMergedRows={filteredMergedRows} mergedRowsLength={mergedRows.length} allTabNet={allTabNet}
             fmt={fmt} accountMap={accountMap} balanceMap={balanceMap}
             activeFilterCount={activeFilterCount} search={search}
-            onClearFiltersAndSearch={() => { clearAllFilters(); setSearch(""); }}
+            onClearFiltersAndSearch={clearFiltersAndSearch}
             allSortedDates={allSortedDates} allGrouped={allGrouped}
             onEditExpense={(e) => { setShowCreate(false); setEditExpense(e); }}
             onEditIncome={(i) => setEditIncome(i)}

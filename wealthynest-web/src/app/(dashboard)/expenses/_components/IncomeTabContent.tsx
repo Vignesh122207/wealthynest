@@ -17,6 +17,8 @@ interface IncomeTabContentProps {
   searchedIncome: IncomeEntry[];
   hasIncomeAccounts: boolean;
   addAccountCta: React.ReactNode;
+  search: string;
+  onClearFiltersAndSearch: () => void;
   onAddIncome: () => void;
   incomeSortedDates: string[];
   incomeGrouped: Record<string, IncomeEntry[]>;
@@ -26,9 +28,14 @@ interface IncomeTabContentProps {
 }
 
 export function IncomeTabContent({
-  chips, incomeLoading, incomeError, onRetryIncome, searchedIncome, hasIncomeAccounts, addAccountCta, onAddIncome,
+  chips, incomeLoading, incomeError, onRetryIncome, searchedIncome, hasIncomeAccounts, addAccountCta,
+  search, onClearFiltersAndSearch, onAddIncome,
   incomeSortedDates, incomeGrouped, fmt, accountMap, onEditIncome,
 }: IncomeTabContentProps) {
+  // A search term causes an empty result just as much as a filter chip does — without also
+  // checking it here, a search matching nothing said "No income this period" (implying there's
+  // genuinely none) with no clear/reset action at all, a dead end.
+  const showClear = chips.length > 0 || search.trim() !== "";
   return (
     <div className="space-y-3">
       {chips.length > 0 && (
@@ -53,13 +60,13 @@ export function IncomeTabContent({
           <QueryErrorState onRetry={() => onRetryIncome?.()} description="Couldn't load your income. Check your connection and try again." />
         ) : searchedIncome.length === 0 ? (
           <EmptyState icon={ArrowUpRight}
-            title={!hasIncomeAccounts ? "No accounts yet" : chips.length > 0 ? "No income matches your filters" : "No income this period"}
+            title={!hasIncomeAccounts ? "No accounts yet" : showClear ? "No income matches your filters" : "No income this period"}
             description={!hasIncomeAccounts ? "Add a bank or cash account before recording income."
-              : chips.length > 0 ? "Try clearing the filters to see everything again." : "Record income to track what's coming in."}
+              : showClear ? "Try clearing the search or filters to see everything again." : "Record income to track what's coming in."}
             action={
               !hasIncomeAccounts ? addAccountCta
-                : chips.length > 0
-                ? <button onClick={() => chips.forEach(c => c.clear())} className="text-sm text-indigo-500 hover:text-indigo-600 font-medium transition-colors">Clear filters</button>
+                : showClear
+                ? <button onClick={onClearFiltersAndSearch} className="text-sm text-indigo-500 hover:text-indigo-600 font-medium transition-colors">Clear filters</button>
                 : <button onClick={onAddIncome}
                 className="flex items-center gap-2 bg-gradient-to-br from-emerald-700 to-emerald-600 shadow-lg shadow-emerald-600/30 hover:shadow-xl hover:shadow-emerald-600/40 hover:-translate-y-0.5 text-white px-4 h-9 rounded-xl text-sm font-medium transition-all">
                 <Plus className="w-4 h-4" /> Add Income
