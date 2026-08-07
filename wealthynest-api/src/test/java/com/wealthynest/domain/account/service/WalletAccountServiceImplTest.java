@@ -674,10 +674,10 @@ class WalletAccountServiceImplTest {
 
         @Test
         @DisplayName("null optional fields on the request leave the existing values untouched, " +
-                "except accountNumber (see its own tests below — a null there is a deliberate clear)")
+                "except accountNumber/lowBalanceThreshold (see their own tests below — a null there " +
+                "is a deliberate clear)")
         void nullFieldsLeaveExistingValuesUntouched() {
-            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT)
-                    .bankName("HDFC").lowBalanceThreshold(new BigDecimal("500")).build());
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).bankName("HDFC").build());
             when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
             when(accountRepository.save(any())).thenAnswer(a -> a.getArgument(0));
             CreateAccountRequest req = createRequest(AccountType.BANK_ACCOUNT, null);
@@ -687,7 +687,6 @@ class WalletAccountServiceImplTest {
 
             assertThat(response.getName()).isEqualTo("Renamed");
             assertThat(account.getBankName()).isEqualTo("HDFC");
-            assertThat(account.getLowBalanceThreshold()).isEqualByComparingTo("500");
         }
 
         @Test
@@ -723,6 +722,39 @@ class WalletAccountServiceImplTest {
 
             assertThat(account.getAccountNumber()).isNull();
             assertThat(response.getAccountNumber()).isNull();
+        }
+
+        @Test
+        @DisplayName("a non-null lowBalanceThreshold on the request overwrites the existing value")
+        void lowBalanceThresholdIsUpdatedWhenRequestCarriesANewValue() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT)
+                    .lowBalanceThreshold(new BigDecimal("500")).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+            when(accountRepository.save(any())).thenAnswer(a -> a.getArgument(0));
+            CreateAccountRequest req = createRequest(AccountType.BANK_ACCOUNT, null);
+            when(req.getLowBalanceThreshold()).thenReturn(new BigDecimal("1000"));
+
+            service.updateAccount(accountId, userId, req);
+
+            assertThat(account.getLowBalanceThreshold()).isEqualByComparingTo("1000");
+        }
+
+        @Test
+        @DisplayName("lowBalanceThreshold is cleared (alert turned off) when the request omits it — the edit " +
+                "form always submits its current value for this optional field, so a null here is a " +
+                "deliberate clear, not 'leave unchanged'")
+        void lowBalanceThresholdIsClearedWhenRequestOmitsIt() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT)
+                    .lowBalanceThreshold(new BigDecimal("500")).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+            when(accountRepository.save(any())).thenAnswer(a -> a.getArgument(0));
+            // createRequest()'s getLowBalanceThreshold() defaults to null — matches what submitting
+            // the edit form with the alert field cleared out actually sends.
+            CreateAccountRequest req = createRequest(AccountType.BANK_ACCOUNT, null);
+
+            service.updateAccount(accountId, userId, req);
+
+            assertThat(account.getLowBalanceThreshold()).isNull();
         }
 
         @Test

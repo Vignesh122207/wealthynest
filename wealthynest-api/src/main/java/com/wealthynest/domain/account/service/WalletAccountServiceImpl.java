@@ -194,7 +194,11 @@ public class WalletAccountServiceImpl implements WalletAccountService {
         // to ever remove an account number once set. Same fix as purpose below.
         account.setAccountNumber(req.getAccountNumber());
         if (req.getOpeningBalance() != null) account.setOpeningBalance(req.getOpeningBalance());
-        if (req.getLowBalanceThreshold() != null) account.setLowBalanceThreshold(req.getLowBalanceThreshold());
+        // Same reasoning as accountNumber above — the edit form always renders and submits this
+        // field for the types it applies to (Bank/Cash), so a null here is a deliberate "turn the
+        // alert off", not "leave unchanged". Gated on != null this made it impossible to ever
+        // clear an already-set threshold.
+        account.setLowBalanceThreshold(req.getLowBalanceThreshold());
         if (isCC && req.getCreditLimit()   != null) account.setCreditLimit(req.getCreditLimit());
         if (isCC && req.getStatementDay()  != null) account.setStatementDay(req.getStatementDay());
         if (isCC && req.getPaymentDueDay() != null) account.setPaymentDueDay(req.getPaymentDueDay());
