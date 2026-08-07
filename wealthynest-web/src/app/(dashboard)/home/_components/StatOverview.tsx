@@ -2,9 +2,7 @@
 
 import {useMemo} from "react";
 import {
-    AlertTriangle,
     Banknote,
-    CheckCircle2,
     Landmark,
     type LucideIcon,
     PiggyBank,
@@ -81,38 +79,12 @@ function StatTile({ icon, tone, label, value, deltaText, deltaGood, delay = "del
   );
 }
 
-// Graded, not pass/fail — a single over-limit budget out of twenty used to flip this ring fully
-// red even though 95% of budgets were fine, which reads as "something's broken" rather than
-// "mostly healthy." Red is reserved for when more budgets have failed than not (<50% on track,
-// the "majority" line); 80% matches the threshold BudgetSection.tsx already uses per-category, so
-// the ring stays on the same scale as the rest of the page instead of inventing a second one.
-// Unlike BudgetSection.tsx's per-category bars, this tile's pct is USED (spent/budgeted), not
-// on-track — so the scale is inverted from a plain progress bar: higher is worse, matching
-// BudgetSection.tsx's own >80% amber / overBudget red thresholds.
-type BudgetTier = "green" | "amber" | "red";
-function usedTier(pct: number): BudgetTier {
-  if (pct > 100) return "red";
-  if (pct > 80) return "amber";
-  return "green";
-}
-const TIER_HEX:    Record<BudgetTier, string> = { green: "#10b981", amber: "#f59e0b", red: "#ef4444" };
-const TIER_CAPTION: Record<BudgetTier, string> = {
-  green: "text-emerald-600 dark:text-emerald-400",
-  amber: "text-amber-600 dark:text-amber-400",
-  red:   "text-red-500 dark:text-red-400",
-};
-
-// ── Budget Used — a ring showing total spend against total budgeted, in currency ──
-function BudgetUsedTile({ spent, budgeted, total, overCount, emptyLabel, fmt, delay = "delay-375" }: {
-  spent: number; budgeted: number; total: number; overCount: number; emptyLabel: string;
+// ── Budget Used — flat StatTile layout: label, big used%, then spent-of-budgeted caption ──
+function BudgetUsedTile({ spent, budgeted, total, emptyLabel, fmt, delay = "delay-375" }: {
+  spent: number; budgeted: number; total: number; emptyLabel: string;
   fmt: (amount: number) => string; delay?: string;
 }) {
-  const allOnTrack = total > 0 && overCount === 0;
   const pct = budgeted > 0 ? (spent / budgeted) * 100 : 0;
-  const tier = usedTier(pct);
-  const ringColor = total === 0 ? "hsl(var(--muted-foreground))" : TIER_HEX[tier];
-  const r = 19, c = 2 * Math.PI * r;
-  const offset = c - (Math.min(pct, 100) / 100) * c;
 
   return (
     <div className={cn("bg-card rounded-2xl p-4 shadow-sm border border-border/50 card-hover animate-fade-in-up", delay)}>
@@ -120,43 +92,12 @@ function BudgetUsedTile({ spent, budgeted, total, overCount, emptyLabel, fmt, de
         <PremiumIcon icon={Target} tone="orange" size="sm" />
         <p className="text-xs font-semibold text-muted-foreground/80 truncate">Budget Used</p>
       </div>
-      <div className="flex items-center gap-3" data-testid="budget-progress-tile">
-        <div className="relative w-14 h-14 shrink-0">
-          {total > 0 && (
-            <div
-              className="absolute inset-0.5 rounded-full blur-sm opacity-25"
-              style={{ backgroundColor: ringColor }}
-              aria-hidden
-            />
-          )}
-          <svg width="56" height="56" viewBox="0 0 56 56" className="relative" style={{ transform: "rotate(-90deg)" }} aria-hidden>
-            <circle cx="28" cy="28" r={r} fill="none" stroke="hsl(var(--muted))" strokeWidth={4.5} />
-            {total > 0 && (
-              <circle cx="28" cy="28" r={r} fill="none" stroke={ringColor} strokeWidth={4.5} strokeLinecap="round"
-                strokeDasharray={c} strokeDashoffset={offset} style={{ transition: "stroke-dashoffset 1s ease" }} />
-            )}
-          </svg>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-xs font-bold text-foreground tabular-nums tracking-tight">
-              {total > 0 ? `${Math.round(pct)}%` : "—"}
-            </span>
-          </div>
-        </div>
-        <div className="min-w-0">
-          <p data-testid="budget-progress-caption" className="text-lg font-bold text-foreground tabular-nums tracking-tight leading-none truncate">
-            {total > 0 ? `${fmt(spent)} of ${fmt(budgeted)}` : "—"}
-          </p>
-          <p className={cn(
-            "flex items-center gap-1 text-[11px] font-semibold mt-1.5",
-            total === 0 ? "text-muted-foreground" : TIER_CAPTION[tier]
-          )}>
-            {total > 0 && (allOnTrack
-              ? <CheckCircle2 className="w-3 h-3 shrink-0" />
-              : <AlertTriangle className="w-3 h-3 shrink-0" />)}
-            {total === 0 ? emptyLabel : allOnTrack ? "All on track" : `${overCount} over limit`}
-          </p>
-        </div>
-      </div>
+      <p data-testid="budget-progress-tile" className="text-xl font-bold text-foreground tabular-nums tracking-tight leading-none mb-2">
+        {total > 0 ? `${Math.round(pct)}%` : "—"}
+      </p>
+      <p data-testid="budget-progress-caption" className="text-[11px] font-semibold text-muted-foreground tabular-nums truncate">
+        {total > 0 ? `${fmt(spent)} of ${fmt(budgeted)}` : emptyLabel}
+      </p>
     </div>
   );
 }
@@ -178,20 +119,13 @@ export function StatOverview({
   const nwPct = pctChange(netWorth, prevNetWorth);
   const srPct = pctChange(savingsRate, prevSavingsRate);
 
-  // Budget Progress follows the Month/Year toggle like every other tile here — Month counts
-  // only monthly budgets, Year counts only yearly ones, so switching the toggle visibly changes
-  // the ring instead of showing an identical number regardless of which period is selected. A
-  // budget counts as over if it's over its own current period (overBudget — e.g. blew this
-  // month's limit) OR over its annual pace (paceOverBudget — e.g. running over across the year
-  // even though this one month looks fine on its own). Pace alone would miss "over this month"
-  // whenever prior months had enough slack to keep the YTD total under the pro-rated cap;
-  // overBudget alone would miss a bad multi-month trend that never quite breaches any single
-  // month. See AnalyticsServiceImpl#getDashboard's comment.
-  const activeBudgets   = isYear ? yearlyBudgets : monthlyBudgets;
-  const budgetTotal     = activeBudgets.length;
-  const budgetOverCount = activeBudgets.filter(b => b.overBudget || b.paceOverBudget).length;
-  const budgetSpent     = activeBudgets.reduce((s, b) => s + b.spent, 0);
-  const budgetBudgeted  = activeBudgets.reduce((s, b) => s + b.budgeted, 0);
+  // Budget Used follows the Month/Year toggle like every other tile here — Month sums only
+  // monthly budgets, Year sums only yearly ones, so switching the toggle visibly changes the
+  // spent/budgeted totals instead of showing identical figures regardless of which period is selected.
+  const activeBudgets  = isYear ? yearlyBudgets : monthlyBudgets;
+  const budgetTotal    = activeBudgets.length;
+  const budgetSpent    = activeBudgets.reduce((s, b) => s + b.spent, 0);
+  const budgetBudgeted = activeBudgets.reduce((s, b) => s + b.budgeted, 0);
 
   // [&>*]:min-w-0 on both grids below — see TwoColRow's identical comment: without it, a large
   // formatted currency value (grid items default to min-width:auto) can push a tile — and the
@@ -259,7 +193,7 @@ export function StatOverview({
         deltaGood={savingsRateDeltaPct != null ? savingsRateDeltaPct >= 0 : undefined}
         delay="delay-300"
       />
-      <BudgetUsedTile spent={budgetSpent} budgeted={budgetBudgeted} total={budgetTotal} overCount={budgetOverCount}
+      <BudgetUsedTile spent={budgetSpent} budgeted={budgetBudgeted} total={budgetTotal}
         emptyLabel={isYear ? "No yearly budgets set" : "No monthly budgets set"}
         fmt={fmt} delay="delay-375" />
     </div>
