@@ -92,13 +92,10 @@ function AccountActionsMenu({ account, moneyActions, onImportStatement, dark = f
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div role="menu" style={menuStyle} className="bg-card border border-border rounded-xl shadow-xl overflow-hidden py-1">
-            <Link href={`/expenses?accountId=${account.id}&tab=all`} role="menuitem" onClick={() => setOpen(false)} className={rowClass}>
-              <List className="w-4 h-4 text-sky-500" /> View Transactions
-            </Link>
-            <button role="menuitem" onClick={downloadStatement} className={rowClass}>
-              <Download className="w-4 h-4 text-violet-500" /> Download Statement
-            </button>
-            <div className="my-1 border-t border-border/60" />
+            {/* Write actions first (single-entry adds, then bulk-add via import) — reaching for
+                this menu is almost always to log something against this account, not to browse
+                it. Read/export actions (view, download) are look-but-don't-touch and rarer, so
+                they sit below the divider instead of leading the menu. */}
             {moneyActions.map(a => {
               const ActionIcon = a.icon;
               return (
@@ -108,13 +105,17 @@ function AccountActionsMenu({ account, moneyActions, onImportStatement, dark = f
               );
             })}
             {onImportStatement && (
-              <>
-                <div className="my-1 border-t border-border/60" />
-                <button role="menuitem" onClick={() => { onImportStatement(); setOpen(false); }} className={rowClass}>
-                  <Upload className="w-4 h-4 text-teal-500" /> Import Statement
-                </button>
-              </>
+              <button role="menuitem" onClick={() => { onImportStatement(); setOpen(false); }} className={rowClass}>
+                <Upload className="w-4 h-4 text-teal-500" /> Import Statement
+              </button>
             )}
+            <div className="my-1 border-t border-border/60" />
+            <Link href={`/expenses?accountId=${account.id}&tab=all`} role="menuitem" onClick={() => setOpen(false)} className={rowClass}>
+              <List className="w-4 h-4 text-sky-500" /> View Transactions
+            </Link>
+            <button role="menuitem" onClick={downloadStatement} className={rowClass}>
+              <Download className="w-4 h-4 text-violet-500" /> Download Statement
+            </button>
           </div>
         </>,
         document.body
