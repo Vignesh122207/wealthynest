@@ -187,7 +187,12 @@ public class WalletAccountServiceImpl implements WalletAccountService {
         boolean isLoan = account.getAccountType() == AccountType.LOAN;
         account.setName(req.getName());
         if (req.getBankName()      != null) account.setBankName(req.getBankName());
-        if (req.getAccountNumber() != null) account.setAccountNumber(req.getAccountNumber());
+        // Unlike bankName above (required, so it can never legitimately arrive blank),
+        // accountNumber is optional and the edit form always submits its current value —
+        // never omits it because "the user didn't touch it". A null here is a deliberate clear
+        // (the user backspaced it), not "leave unchanged"; gating on != null made it impossible
+        // to ever remove an account number once set. Same fix as purpose below.
+        account.setAccountNumber(req.getAccountNumber());
         if (req.getOpeningBalance() != null) account.setOpeningBalance(req.getOpeningBalance());
         if (req.getLowBalanceThreshold() != null) account.setLowBalanceThreshold(req.getLowBalanceThreshold());
         if (isCC && req.getCreditLimit()   != null) account.setCreditLimit(req.getCreditLimit());

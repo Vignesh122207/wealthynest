@@ -673,10 +673,11 @@ class WalletAccountServiceImplTest {
     class UpdateAccountTests {
 
         @Test
-        @DisplayName("null optional fields on the request leave the existing values untouched")
+        @DisplayName("null optional fields on the request leave the existing values untouched, " +
+                "except accountNumber (see its own tests below — a null there is a deliberate clear)")
         void nullFieldsLeaveExistingValuesUntouched() {
             WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT)
-                    .bankName("HDFC").accountNumber("1234").lowBalanceThreshold(new BigDecimal("500")).build());
+                    .bankName("HDFC").lowBalanceThreshold(new BigDecimal("500")).build());
             when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
             when(accountRepository.save(any())).thenAnswer(a -> a.getArgument(0));
             CreateAccountRequest req = createRequest(AccountType.BANK_ACCOUNT, null);
@@ -686,8 +687,42 @@ class WalletAccountServiceImplTest {
 
             assertThat(response.getName()).isEqualTo("Renamed");
             assertThat(account.getBankName()).isEqualTo("HDFC");
-            assertThat(account.getAccountNumber()).isEqualTo("1234");
             assertThat(account.getLowBalanceThreshold()).isEqualByComparingTo("500");
+        }
+
+        @Test
+        @DisplayName("a non-null accountNumber on the request overwrites the existing value")
+        void accountNumberIsUpdatedWhenRequestCarriesANewValue() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT)
+                    .bankName("HDFC").accountNumber("1234").build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+            when(accountRepository.save(any())).thenAnswer(a -> a.getArgument(0));
+            CreateAccountRequest req = createRequest(AccountType.BANK_ACCOUNT, null);
+            when(req.getAccountNumber()).thenReturn("5678");
+
+            AccountResponse response = service.updateAccount(accountId, userId, req);
+
+            assertThat(account.getAccountNumber()).isEqualTo("5678");
+            assertThat(response.getAccountNumber()).isEqualTo("5678");
+        }
+
+        @Test
+        @DisplayName("accountNumber is cleared when the request omits it — unlike bankName (required, so it " +
+                "can never legitimately arrive blank), the edit form always submits its current value for " +
+                "this optional field, so a null here is a deliberate clear, not 'leave unchanged'")
+        void accountNumberIsClearedWhenRequestOmitsIt() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT)
+                    .bankName("HDFC").accountNumber("1234").build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+            when(accountRepository.save(any())).thenAnswer(a -> a.getArgument(0));
+            // createRequest()'s getAccountNumber() defaults to null — matches what submitting the
+            // edit form with the account number field cleared out actually sends.
+            CreateAccountRequest req = createRequest(AccountType.BANK_ACCOUNT, null);
+
+            AccountResponse response = service.updateAccount(accountId, userId, req);
+
+            assertThat(account.getAccountNumber()).isNull();
+            assertThat(response.getAccountNumber()).isNull();
         }
 
         @Test
