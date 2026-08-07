@@ -93,10 +93,10 @@ function AccountActionsMenu({ account, moneyActions, onImportStatement, dark = f
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div role="menu" style={menuStyle} className="bg-card border border-border rounded-xl shadow-xl overflow-hidden py-1">
             <Link href={`/expenses?accountId=${account.id}&tab=all`} role="menuitem" onClick={() => setOpen(false)} className={rowClass}>
-              <List className="w-4 h-4 text-muted-foreground" /> View Transactions
+              <List className="w-4 h-4 text-sky-500" /> View Transactions
             </Link>
             <button role="menuitem" onClick={downloadStatement} className={rowClass}>
-              <Download className="w-4 h-4 text-muted-foreground" /> Download Statement
+              <Download className="w-4 h-4 text-violet-500" /> Download Statement
             </button>
             <div className="my-1 border-t border-border/60" />
             {moneyActions.map(a => {
@@ -111,7 +111,7 @@ function AccountActionsMenu({ account, moneyActions, onImportStatement, dark = f
               <>
                 <div className="my-1 border-t border-border/60" />
                 <button role="menuitem" onClick={() => { onImportStatement(); setOpen(false); }} className={rowClass}>
-                  <Upload className="w-4 h-4 text-muted-foreground" /> Import Statement
+                  <Upload className="w-4 h-4 text-teal-500" /> Import Statement
                 </button>
               </>
             )}
