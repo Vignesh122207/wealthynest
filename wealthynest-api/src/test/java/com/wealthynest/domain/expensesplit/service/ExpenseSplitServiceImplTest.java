@@ -441,6 +441,125 @@ class ExpenseSplitServiceImplTest {
         verify(splitRepository).settleBetween(eq(payerId), eq(counterpartId), any());
     }
 
+    // ─── getSplitsForExpense ─────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("getSplitsForExpense")
+    class GetSplitsForExpenseTests {
+
+        @Test
+        @DisplayName("throws ResourceNotFoundException when the expense does not exist")
+        void throwsWhenExpenseNotFound() {
+            when(expenseRepository.findById(expenseId)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.getSplitsForExpense(expenseId, payerId))
+                    .isInstanceOf(ResourceNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("throws AccessDeniedException for another user's expense")
+        void throwsWhenNotOwner() {
+            Expense expense = expenseOf(UUID.randomUUID(), familyId, new BigDecimal("100"));
+            when(expenseRepository.findById(expenseId)).thenReturn(Optional.of(expense));
+
+            assertThatThrownBy(() -> service.getSplitsForExpense(expenseId, payerId))
+                    .isInstanceOf(AccessDeniedException.class);
+        }
+
+        @Test
+        @DisplayName("returns an empty list when the expense has no splits, without touching category/user lookups")
+        void emptyWhenNoSplits() {
+            Expense expense = expenseOf(payerId, familyId, new BigDecimal("100"));
+            when(expenseRepository.findById(expenseId)).thenReturn(Optional.of(expense));
+            when(splitRepository.findByExpenseId(expenseId)).thenReturn(List.of());
+
+            List<com.wealthynest.domain.expensesplit.dto.response.ExpenseSplitResponse> result =
+                    service.getSplitsForExpense(expenseId, payerId);
+
+            assertThat(result).isEmpty();
+            verifyNoInteractions(categoryRepository, userRepository);
+        }
+
+        @Test
+        @DisplayName("resolves category name and participant/payer names for each split on the expense")
+        void resolvesDetailsForEachSplit() {
+            UUID catId = UUID.randomUUID();
+            Expense expense = Expense.builder().userId(payerId).familyId(familyId).categoryId(catId)
+                    .amount(new BigDecimal("100")).description("Dinner").expenseDate(LocalDate.now()).build();
+            ReflectionTestUtils.setField(expense, "id", expenseId);
+            Category cat = Category.builder().name("Food").type(CategoryType.EXPENSE).build();
+            ReflectionTestUtils.setField(cat, "id", catId);
+            ExpenseSplit split = ExpenseSplit.builder().expenseId(expenseId).payerUserId(payerId)
+                    .participantUserId(friendId).shareAmount(new BigDecimal("40")).status(SplitStatus.PENDING).build();
+
+            when(expenseRepository.findById(expenseId)).thenReturn(Optional.of(expense));
+            when(splitRepository.findByExpenseId(expenseId)).thenReturn(List.of(split));
+            when(categoryRepository.findById(catId)).thenReturn(Optional.of(cat));
+            when(userRepository.findAllById(any())).thenReturn(List.of(userOf(payerId, "Payer"), userOf(friendId, "Friend")));
+
+            var result = service.getSplitsForExpense(expenseId, payerId);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getCategoryName()).isEqualTo("Food");
+            assertThat(result.get(0).getParticipantName()).isEqualTo("Friend");
+            assertThat(result.get(0).getShareAmount()).isEqualByComparingTo("40");
+        }
+    }
+
+    // ─── addSplits ───────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("addSplits")
+    class AddSplitsTests {
+
+        @Test
+        @DisplayName("no-op when splitWith is null or empty")
+        void noOpWhenEmpty() {
+            service.addSplits(expenseId, payerId, null);
+            service.addSplits(expenseId, payerId, List.of());
+
+            verifyNoInteractions(expenseRepository);
+        }
+
+        @Test
+        @DisplayName("throws AccessDeniedException for another user's expense")
+        void throwsWhenNotOwner() {
+            Expense expense = expenseOf(UUID.randomUUID(), familyId, new BigDecimal("100"));
+            when(expenseRepository.findById(expenseId)).thenReturn(Optional.of(expense));
+            List<SplitParticipantRequest> splits = List.of(participant(friendId, new BigDecimal("20")));
+
+            assertThatThrownBy(() -> service.addSplits(expenseId, payerId, splits))
+                    .isInstanceOf(AccessDeniedException.class);
+        }
+
+        @Test
+        @DisplayName("throws when the new batch, ADDED TO what's already split, would exceed the expense amount")
+        void throwsWhenCombinedSharesExceedAmount() {
+            Expense expense = expenseOf(payerId, familyId, new BigDecimal("100"));
+            when(expenseRepository.findById(expenseId)).thenReturn(Optional.of(expense));
+            when(splitRepository.sumSharesByExpenseId(expenseId)).thenReturn(new BigDecimal("70"));
+            List<SplitParticipantRequest> splits = List.of(participant(friendId, new BigDecimal("40"))); // 70+40 > 100
+
+            assertThatThrownBy(() -> service.addSplits(expenseId, payerId, splits))
+                    .isInstanceOf(BusinessException.class);
+            verify(splitRepository, never()).saveAll(any());
+        }
+
+        @Test
+        @DisplayName("allows a new batch that exactly fills the remaining unsplit amount")
+        void allowsBatchFillingRemainder() {
+            Expense expense = expenseOf(payerId, familyId, new BigDecimal("100"));
+            when(expenseRepository.findById(expenseId)).thenReturn(Optional.of(expense));
+            when(splitRepository.sumSharesByExpenseId(expenseId)).thenReturn(new BigDecimal("70"));
+            when(userRepository.findByFamilyId(familyId)).thenReturn(List.of(userOf(payerId, "Payer"), userOf(friendId, "Friend")));
+            List<SplitParticipantRequest> splits = List.of(participant(friendId, new BigDecimal("30")));
+
+            service.addSplits(expenseId, payerId, splits);
+
+            verify(splitRepository).saveAll(any());
+        }
+    }
+
     // ─── validateAmountCoversSplits ──────────────────────────────────────────────
 
     @Nested

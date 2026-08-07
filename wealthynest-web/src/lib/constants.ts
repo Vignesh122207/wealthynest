@@ -16,6 +16,7 @@ export const QUERY_KEYS = {
   GOALS:          ["goals"]                  as const,
   VAULT:          ["vault", "items"]         as const,
   VAULT_HEALTH:   ["vault", "health"]        as const,
+  CURRENCY_RATES: ["currency", "rates"]      as const,
 } as const;
 
 // Every RBI-scheduled commercial bank (public + private), small finance bank, and payments

@@ -139,6 +139,53 @@ public class ExpenseSplitServiceImpl implements ExpenseSplitService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<ExpenseSplitResponse> getSplitsForExpense(UUID expenseId, UUID userId) {
+        Expense expense = findAndValidateOwner(expenseId, userId);
+        List<ExpenseSplit> splits = splitRepository.findByExpenseId(expenseId);
+        if (splits.isEmpty()) return List.of();
+
+        Map<UUID, Expense> expenseMap = Map.of(expenseId, expense);
+        Category category = categoryRepository.findById(expense.getCategoryId()).orElse(null);
+        Map<UUID, Category> catMap = category != null ? Map.of(expense.getCategoryId(), category) : Map.of();
+        Set<UUID> userIds = Stream.concat(
+                splits.stream().map(ExpenseSplit::getPayerUserId),
+                splits.stream().map(ExpenseSplit::getParticipantUserId)
+        ).collect(Collectors.toSet());
+        Map<UUID, String> nameMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, User::getFullName));
+
+        return splits.stream().map(s -> toResponse(s, expenseMap, catMap, nameMap)).toList();
+    }
+
+    @Override
+    @Transactional
+    public void addSplits(UUID expenseId, UUID userId, List<SplitParticipantRequest> splitWith) {
+        if (splitWith == null || splitWith.isEmpty()) return;
+        Expense expense = findAndValidateOwner(expenseId, userId);
+
+        // Unlike createSplits' own check (which only looks at this one batch against the full
+        // amount), splitting an ALREADY-split expense further needs to account for shares it
+        // already carries — otherwise two separate "add a split" calls could each pass their own
+        // check while together promising more than the expense is actually worth.
+        BigDecimal existing = splitRepository.sumSharesByExpenseId(expenseId);
+        BigDecimal newTotal = splitWith.stream().map(SplitParticipantRequest::getShareAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (existing.add(newTotal).compareTo(expense.getAmount()) > 0) {
+            throw new BusinessException(
+                    "Split shares can't add up to more than the expense amount.", HttpStatus.BAD_REQUEST);
+        }
+        createSplits(expense, splitWith);
+    }
+
+    private Expense findAndValidateOwner(UUID expenseId, UUID userId) {
+        Expense expense = expenseRepository.findById(expenseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Expense", "id", expenseId));
+        if (!expense.getUserId().equals(userId)) throw new AccessDeniedException();
+        return expense;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public void validateAmountCoversSplits(UUID expenseId, BigDecimal newAmount) {
         BigDecimal totalShares = splitRepository.sumSharesByExpenseId(expenseId);
         if (totalShares.compareTo(newAmount) > 0) {

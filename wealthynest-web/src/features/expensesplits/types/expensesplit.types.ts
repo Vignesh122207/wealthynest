@@ -24,3 +24,8 @@ export interface MySplits {
   balances: SplitBalance[];
   pending:  ExpenseSplit[];
 }
+
+export interface SplitParticipantPayload {
+  userId:      string;
+  shareAmount: number;
+}

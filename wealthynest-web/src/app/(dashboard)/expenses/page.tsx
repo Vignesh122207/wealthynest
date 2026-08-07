@@ -32,13 +32,16 @@ import {type ExpenseFormValues} from "@/features/expenses/schemas/expense.schema
 import type {Expense, SplitParticipant} from "@/features/expenses/types/expense.types";
 import {exportAllCsv, exportCsv, exportIncomeCsv, exportTransfersCsv} from "@/features/expenses/utils/csvExport";
 import {pad, resolveEffectiveAccountIds} from "@/features/expenses/utils/filterHelpers";
+import {resolveGranularityRange} from "@/features/expenses/utils/granularity";
 import {TypeTabs} from "@/features/expenses/components/TypeTabs";
 import {DateControls} from "@/features/expenses/components/DateControls";
 import {StatCards} from "@/features/expenses/components/StatCards";
 import {Toolbar} from "@/features/expenses/components/Toolbar";
 import {FilterPanel} from "@/features/expenses/components/FilterPanel";
+import {GranularityControl} from "@/features/expenses/components/GranularityControl";
+import {CommandBar} from "@/features/expenses/components/CommandBar";
 import type {Channel, DateMode, SortKey, TxType} from "@/features/expenses/types/filters.types";
-import {pctChange} from "@/lib/utils";
+import {formatCurrency, pctChange} from "@/lib/utils";
 import {buildUsageCounts, pickSmartDefault, sortByUsage} from "@/lib/mostUsed";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {CURRENCIES, usePrefsStore} from "@/store/preferences.store";
@@ -46,11 +49,16 @@ import {useDebounce} from "@/hooks/useDebounce";
 import {INCOME_SOURCES} from "@/lib/constants";
 import type {IncomeEntry} from "@/features/income/types/income.types";
 import type {AccountTransfer} from "@/features/accounts/types/account.types";
+import {CurrencyToggle} from "@/features/currency/components/CurrencyToggle";
+import {useCurrencyRates} from "@/features/currency/hooks/useCurrencyRates";
+import {convertAmount} from "@/features/currency/utils/convert";
+import type {ConvertibleCurrency} from "@/features/currency/types/currency.types";
 import type {TxRow} from "./_components/types";
 import {ExpensesTabContent} from "./_components/ExpensesTabContent";
 import {IncomeTabContent} from "./_components/IncomeTabContent";
 import {TransfersTabContent} from "./_components/TransfersTabContent";
 import {AllTabContent} from "./_components/AllTabContent";
+import {TransactionDetailDrawer} from "./_components/TransactionDetailDrawer";
 
 // Lazy-loaded: both are large forms only ever needed after a user opens them, never on first
 // paint — keeping them out of the page's initial bundle noticeably shrinks it on a page that's
@@ -95,8 +103,17 @@ export default function TransactionsPage() {
   const [recurringOnly,    setRecurringOnly]    = useState(false);
   const [showCreate,       setShowCreate]       = useState(false);
   const [editExpense,      setEditExpense]      = useState<Expense | null>(null);
+  const [viewExpense,      setViewExpense]      = useState<Expense | null>(null);
   const [confirmId,        setConfirmId]        = useState<string | null>(null);
   const [listPage,         setListPage]         = useState(0);
+
+  // Transactions-page-local currency display toggle — deliberately separate from the app-wide
+  // currency preference (which only relabels amounts with a different symbol, never converts
+  // them); this one does real conversion via live rates (see features/currency).
+  const [displayCurrency, setDisplayCurrency] = useState<ConvertibleCurrency>("INR");
+  const { data: currencyRates } = useCurrencyRates();
+  const fmtConverted = (amount: number) =>
+    formatCurrency(convertAmount(amount, displayCurrency, "INR", currencyRates?.rates), displayCurrency);
 
   // Shared toolbar — search, filters drawer
   const [search,           setSearch]           = useState("");
@@ -879,8 +896,39 @@ export default function TransactionsPage() {
         />
       )}
 
+      {/* Expense detail drawer — merchant summary, location placeholder, receipt attachment,
+          split utility, and category trend. Income/transfer rows still open the edit modal
+          directly (via TransactionModals above); this is expense-specific. */}
+      {viewExpense && (
+        <TransactionDetailDrawer
+          expense={viewExpense}
+          accountName={viewExpense.accountId ? accountMap[viewExpense.accountId] : undefined}
+          familyMembers={familyMembers}
+          allTimeExpenses={allTimeExpenses}
+          fmt={fmtConverted}
+          onClose={() => setViewExpense(null)}
+          onEdit={() => { setViewExpense(null); setShowCreate(false); setEditExpense(viewExpense); }}
+        />
+      )}
+
       <main className="flex-1 p-4 md:p-5 lg:p-6 pb-36 lg:pb-24 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-4">
+
+        {/* Lightweight natural-language command bar — client-side keyword matching against the
+            filters already below, not a real LLM-backed query engine (see commandParser.ts). */}
+        <CommandBar categories={categories} onApply={(result) => {
+          if (result.granularity) {
+            if (result.granularity === "ALL") {
+              setDateMode("all");
+            } else {
+              const range = resolveGranularityRange(result.granularity, new Date());
+              setDateMode("custom"); setCustomStart(range.customStart); setCustomEnd(range.customEnd);
+            }
+          }
+          if (result.categoryId) setCategoryId(result.categoryId);
+          if (result.txType) setTxType(result.txType);
+          if (result.recurringOnly) setRecurringOnly(true);
+        }} />
 
         {/* Toolbar — search, filters, download — shared across every tab */}
         <Toolbar
@@ -890,14 +938,25 @@ export default function TransactionsPage() {
           onExport={handleExport}
         />
 
-        {/* Shared date controls */}
-        <DateControls
-          dateMode={dateMode} setDateMode={setDateMode}
-          year={year} setYear={setYear}
-          month={month} setMonth={setMonth}
-          customStart={customStart} setCustomStart={setCustomStart}
-          customEnd={customEnd} setCustomEnd={setCustomEnd}
-        />
+        {/* Shared date controls + quick rolling-window granularity + currency display toggle */}
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <DateControls
+            dateMode={dateMode} setDateMode={setDateMode}
+            year={year} setYear={setYear}
+            month={month} setMonth={setMonth}
+            customStart={customStart} setCustomStart={setCustomStart}
+            customEnd={customEnd} setCustomEnd={setCustomEnd}
+          />
+          <div className="flex items-center gap-2 flex-wrap">
+            <GranularityControl dateMode={dateMode} customStart={customStart} customEnd={customEnd}
+              onSelect={(patch) => {
+                setDateMode(patch.dateMode);
+                if (patch.customStart !== undefined) setCustomStart(patch.customStart);
+                if (patch.customEnd !== undefined) setCustomEnd(patch.customEnd);
+              }} />
+            <CurrencyToggle value={displayCurrency} onChange={setDisplayCurrency} />
+          </div>
+        </div>
 
         {/* Stat cards — always visible, reflect the selected date range regardless of tab */}
         <StatCards
@@ -932,7 +991,7 @@ export default function TransactionsPage() {
             search={search} onClearFiltersAndSearch={clearFiltersAndSearch} onAddExpense={() => setShowCreate(true)}
             expenseTabTotal={expenseTabTotal} expenseTabRowCount={expenseTabRows.length}
             sortedDates={sortedDates} grouped={grouped} fmt={fmt} accountMap={accountMap}
-            onEditExpense={(expense) => { setShowCreate(false); setEditExpense(expense); }}
+            onEditExpense={(expense) => setViewExpense(expense)}
             totalPages={totalPages} listPage={listPage} setListPage={setListPage}
             serverTotal={serverTotal} pageSize={PAGE_SIZE}
           />
@@ -973,7 +1032,7 @@ export default function TransactionsPage() {
             activeFilterCount={activeFilterCount} search={search}
             onClearFiltersAndSearch={clearFiltersAndSearch}
             allSortedDates={allSortedDates} allGrouped={allGrouped}
-            onEditExpense={(e) => { setShowCreate(false); setEditExpense(e); }}
+            onEditExpense={(e) => setViewExpense(e)}
             onEditIncome={(i) => setEditIncome(i)}
             onEditTransfer={(t) => setEditTransfer(t)}
             allTotalPages={allTotalPages} allPage={allPage} setAllPage={setAllPage} allPageSize={ALL_PAGE_SIZE}
