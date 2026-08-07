@@ -14,17 +14,29 @@ export class DebtsPage extends BasePage {
     return this.page.getByTestId(`debt-tab-${id}`);
   }
 
-  /** Every card in the list shares the same data-testid — scope to one contact via .filter().
-   * A SETTLED debt lives inside the collapsed "Settled Debts" section (SettledDebtsSection.tsx,
-   * same pattern as Accounts' Closed section) and isn't in the DOM until that section is
-   * expanded — call settledDebtsToggle.click() first when asserting on a debt you expect to have
-   * just settled. */
+  /** Every transaction card in the list shares the same data-testid — scope to one contact via
+   * .filter(). Repeat transactions with the same person are grouped onto one ledger card
+   * (ContactLedgerCard.tsx, groupByContact.ts) — if that contact has more than one active
+   * transaction, this can match more than one element; most flows in this suite only ever give a
+   * contact a single transaction, so this stays their entry point. A SETTLED transaction lives
+   * inside that contact's own collapsed "Settled Debts" section (SettledDebtsSection.tsx, same
+   * pattern as Accounts' Closed section) and isn't in the DOM until expanded — call
+   * settledToggleFor(contactName).click() first when asserting on one you expect to have just
+   * settled. */
   card(contactName: string): Locator {
     return this.page.getByTestId("debt-card").filter({ hasText: contactName });
   }
 
-  get settledDebtsToggle(): Locator {
-    return this.page.getByText(/Settled Debts/);
+  /** The per-person ledger card (ContactLedgerCard.tsx) — one per contact, wrapping that
+   * person's active + settled transactions. Scope contact-level actions (add another
+   * transaction, expand their settled section) through this rather than the page globally, since
+   * multiple contacts' cards coexist in this suite's shared debt list. */
+  contactCard(contactName: string): Locator {
+    return this.page.getByTestId("contact-ledger-card").filter({ hasText: contactName });
+  }
+
+  settledToggleFor(contactName: string): Locator {
+    return this.contactCard(contactName).getByText(/Settled Debts/);
   }
 
   private async openCreateModal(type: "LENT" | "BORROWED"): Promise<void> {
@@ -43,6 +55,36 @@ export class DebtsPage extends BasePage {
     await Promise.all([
       waitForApiResponse(this.page, "/debts", "POST"),
       this.page.getByTestId("debt-form-submit").click(),
+    ]);
+    await waitForDialogClosed(this.page);
+  }
+
+  /** Opens the create modal from an existing contact's own ledger card ("+ Add"), pre-filled
+   * with their name/phone (DebtFormModal's prefillContact) — the multi-transaction-per-person
+   * flow, as opposed to createDebt's FAB entry point for a brand-new contact. */
+  async addTransactionToContact(contactName: string, input: {
+    type: "LENT" | "BORROWED"; amount: number; note?: string;
+  }): Promise<void> {
+    await this.contactCard(contactName).getByTestId("contact-add-transaction").click();
+    if (input.type === "BORROWED") await this.page.getByTestId("debt-type-borrowed").click();
+    await this.page.getByTestId("debt-amount-input").fill(String(input.amount));
+    if (input.note) await this.page.getByTestId("debt-note-input").fill(input.note);
+    await Promise.all([
+      waitForApiResponse(this.page, "/debts", "POST"),
+      this.page.getByTestId("debt-form-submit").click(),
+    ]);
+    await waitForDialogClosed(this.page);
+  }
+
+  /** Expands the payment-history chip on a contact's (single-transaction) card and deletes its
+   * one logged payment. Assumes exactly one payment exists — this suite never needs to
+   * disambiguate between several on the same transaction. */
+  async deleteOnlyPayment(contactName: string): Promise<void> {
+    await this.card(contactName).getByTestId("debt-payment-history-toggle").click();
+    await this.card(contactName).getByTestId("debt-payment-delete").click();
+    await Promise.all([
+      waitForApiResponse(this.page, "/payments", "DELETE"),
+      this.page.getByTestId(TEST_IDS.confirmDialog.confirm).click(),
     ]);
     await waitForDialogClosed(this.page);
   }
@@ -110,6 +152,10 @@ export class DebtsPage extends BasePage {
 
   async expectStatus(contactName: string, status: "Active" | "Partial" | "Settled"): Promise<void> {
     await expect(this.card(contactName).getByText(status, { exact: true })).toBeVisible();
+  }
+
+  async expectNetPosition(contactName: string, text: string | RegExp): Promise<void> {
+    await expect(this.contactCard(contactName).getByTestId("contact-net-position")).toHaveText(text);
   }
 
   async expectValidationError(text: string | RegExp): Promise<void> {

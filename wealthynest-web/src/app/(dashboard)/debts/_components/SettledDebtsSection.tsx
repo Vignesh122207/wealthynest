@@ -2,7 +2,7 @@
 
 import {CheckCircle2, ChevronDown} from "lucide-react";
 import {cn} from "@/lib/utils";
-import type {DebtRecord} from "@/features/debts/types/debt.types";
+import type {DebtPayment, DebtRecord} from "@/features/debts/types/debt.types";
 import {DebtCard} from "./DebtCard";
 
 interface SettledDebtsSectionProps {
@@ -10,6 +10,7 @@ interface SettledDebtsSectionProps {
   showSettled: boolean;
   setShowSettled: (updater: (v: boolean) => boolean) => void;
   onEdit: (debt: DebtRecord) => void;
+  onDeletePayment?: (debt: DebtRecord, payment: DebtPayment) => void;
 }
 
 // SETTLED debts are pulled out of the main list into their own collapsed section, same pattern
@@ -19,7 +20,7 @@ interface SettledDebtsSectionProps {
 // Partial/Active — see debts.spec.ts), so this reuses DebtCard as-is (still editable) rather than
 // a stripped-down, history-only row.
 export function SettledDebtsSection({
-  filteredSettled, showSettled, setShowSettled, onEdit,
+  filteredSettled, showSettled, setShowSettled, onEdit, onDeletePayment,
 }: SettledDebtsSectionProps) {
   if (filteredSettled.length === 0) return null;
 
@@ -37,7 +38,8 @@ export function SettledDebtsSection({
       {showSettled && (
         <div className="space-y-3">
           {filteredSettled.map(debt => (
-            <DebtCard key={debt.id} debt={debt} onEdit={() => onEdit(debt)} onPayment={() => {}} />
+            <DebtCard key={debt.id} debt={debt} onEdit={() => onEdit(debt)} onPayment={() => {}}
+              onDeletePayment={onDeletePayment ? p => onDeletePayment(debt, p) : undefined} />
           ))}
         </div>
       )}

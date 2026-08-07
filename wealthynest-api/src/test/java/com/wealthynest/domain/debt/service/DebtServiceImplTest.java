@@ -492,6 +492,104 @@ class DebtServiceImplTest {
         }
     }
 
+    // ─── deletePayment ───────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("deletePayment")
+    class DeletePaymentTests {
+
+        private final UUID paymentId = UUID.randomUUID();
+
+        @Test
+        @DisplayName("throws when the debt does not exist or isn't owned")
+        void throwsWhenDebtNotFound() {
+            when(debtRecordRepository.findByIdAndUserId(debtId, userId)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.deletePayment(debtId, paymentId, userId))
+                    .isInstanceOf(ResourceNotFoundException.class);
+            verify(debtPaymentRepository, never()).delete(any());
+        }
+
+        @Test
+        @DisplayName("throws when the payment does not exist")
+        void throwsWhenPaymentNotFound() {
+            DebtRecord record = withId(baseRecord().build());
+            when(debtRecordRepository.findByIdAndUserId(debtId, userId)).thenReturn(Optional.of(record));
+            when(debtPaymentRepository.findById(paymentId)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.deletePayment(debtId, paymentId, userId))
+                    .isInstanceOf(ResourceNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("throws when the payment belongs to a different debt")
+        void throwsWhenPaymentBelongsToAnotherDebt() {
+            DebtRecord record = withId(baseRecord().build());
+            when(debtRecordRepository.findByIdAndUserId(debtId, userId)).thenReturn(Optional.of(record));
+            DebtPayment payment = DebtPayment.builder().debtId(UUID.randomUUID()).amount(new BigDecimal("100")).build();
+            when(debtPaymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
+
+            assertThatThrownBy(() -> service.deletePayment(debtId, paymentId, userId))
+                    .isInstanceOf(ResourceNotFoundException.class);
+            verify(debtPaymentRepository, never()).delete(any());
+        }
+
+        @Test
+        @DisplayName("reverses the payment's linked transfer, subtracts it from amountSettled, and deletes it")
+        void reversesTransferAndSubtractsAmount() {
+            UUID transferId = UUID.randomUUID();
+            DebtRecord record = withId(baseRecord().amount(new BigDecimal("1000")).amountSettled(new BigDecimal("500"))
+                    .status(DebtStatus.PARTIAL).build());
+            when(debtRecordRepository.findByIdAndUserId(debtId, userId)).thenReturn(Optional.of(record));
+            DebtPayment payment = DebtPayment.builder().debtId(debtId).amount(new BigDecimal("200")).linkedEntryId(transferId).build();
+            when(debtPaymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
+            stubSaveEcho();
+            stubEmptyPaymentsAndTransfer();
+
+            DebtRecordResponse response = service.deletePayment(debtId, paymentId, userId);
+
+            verify(transferRepository).deleteById(transferId);
+            verify(debtPaymentRepository).delete(payment);
+            assertThat(record.getAmountSettled()).isEqualByComparingTo("300");
+            assertThat(record.getStatus()).isEqualTo(DebtStatus.PARTIAL);
+            assertThat(response.getAmountSettled()).isEqualByComparingTo("300");
+        }
+
+        @Test
+        @DisplayName("skips transfer reversal when the payment has no linked transfer")
+        void skipsTransferReversalWhenAbsent() {
+            DebtRecord record = withId(baseRecord().amount(new BigDecimal("1000")).amountSettled(new BigDecimal("200"))
+                    .status(DebtStatus.PARTIAL).build());
+            when(debtRecordRepository.findByIdAndUserId(debtId, userId)).thenReturn(Optional.of(record));
+            DebtPayment payment = DebtPayment.builder().debtId(debtId).amount(new BigDecimal("200")).linkedEntryId(null).build();
+            when(debtPaymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
+            stubSaveEcho();
+            stubEmptyPaymentsAndTransfer();
+
+            service.deletePayment(debtId, paymentId, userId);
+
+            verify(transferRepository, never()).deleteById(any());
+            assertThat(record.getAmountSettled()).isEqualByComparingTo("0");
+        }
+
+        @Test
+        @DisplayName("removing the payment that fully settled a debt reverts its status to PARTIAL/ACTIVE")
+        void revertingLastPaymentUnsettlesDebt() {
+            DebtRecord record = withId(baseRecord().amount(new BigDecimal("1000")).amountSettled(new BigDecimal("1000"))
+                    .status(DebtStatus.SETTLED).build());
+            when(debtRecordRepository.findByIdAndUserId(debtId, userId)).thenReturn(Optional.of(record));
+            DebtPayment payment = DebtPayment.builder().debtId(debtId).amount(new BigDecimal("1000")).linkedEntryId(null).build();
+            when(debtPaymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
+            stubSaveEcho();
+            stubEmptyPaymentsAndTransfer();
+
+            DebtRecordResponse response = service.deletePayment(debtId, paymentId, userId);
+
+            assertThat(record.getStatus()).isEqualTo(DebtStatus.ACTIVE);
+            assertThat(response.getStatus()).isEqualTo("ACTIVE");
+        }
+    }
+
     // ─── settle ──────────────────────────────────────────────────────────────────
 
     @Nested

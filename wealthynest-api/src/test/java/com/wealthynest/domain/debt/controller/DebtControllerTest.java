@@ -144,6 +144,21 @@ class DebtControllerTest {
         }
 
         @Test
+        @DisplayName("DELETE /debts/{id}/payments/{paymentId} delegates the authenticated userId")
+        void deletePaymentDelegatesUserId() throws Exception {
+            SecurityTestUtils.authenticateAs(userId, null);
+            UUID debtId = UUID.randomUUID();
+            UUID paymentId = UUID.randomUUID();
+            when(debtService.deletePayment(debtId, paymentId, userId))
+                    .thenReturn(DebtRecordResponse.builder().id(debtId).build());
+
+            mockMvc.perform(delete("/api/v1/debts/{id}/payments/{paymentId}", debtId, paymentId))
+                    .andExpect(status().isOk());
+
+            verify(debtService).deletePayment(debtId, paymentId, userId);
+        }
+
+        @Test
         @DisplayName("PATCH /debts/{id}/settle delegates the authenticated userId")
         void settleDelegatesUserId() throws Exception {
             SecurityTestUtils.authenticateAs(userId, null);

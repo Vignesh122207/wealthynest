@@ -1,6 +1,6 @@
 "use client";
 
-import {useState} from "react";
+import {useMemo, useState} from "react";
 import {Header} from "@/components/layout/Header";
 import {PageWrapper} from "@/components/layout/PageWrapper";
 import {FloatingActionButton} from "@/components/shared/FloatingActionButton";
@@ -15,16 +15,17 @@ import {
     useCreateDebt,
     useDebts,
     useDeleteDebt,
+    useDeleteDebtPayment,
     useRecordDebtPayment,
     useUpdateDebt,
 } from "@/features/debts/hooks/useDebts";
-import type {DebtRecord, DebtType} from "@/features/debts/types/debt.types";
+import {groupDebtsByContact} from "@/features/debts/utils/groupByContact";
+import type {DebtPayment, DebtRecord, DebtType} from "@/features/debts/types/debt.types";
 import {useAccounts} from "@/features/accounts/hooks/useAccounts";
 import {DebtFormModal} from "./_components/DebtFormModal";
 import {PaymentModal} from "./_components/PaymentModal";
-import {DebtCard} from "./_components/DebtCard";
+import {ContactLedgerCard} from "./_components/ContactLedgerCard";
 import {Summary} from "./_components/Summary";
-import {SettledDebtsSection} from "./_components/SettledDebtsSection";
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -39,7 +40,7 @@ const TAB_COLOR: Record<Tab, string> = {
   BORROWED: "#e11d48",
 };
 type Modal = null
-  | { mode: "create"; defaultType: DebtType }
+  | { mode: "create"; defaultType: DebtType; prefillContact?: { contactName: string; contactPhone?: string } }
   | { mode: "edit";   debt: DebtRecord };
 
 export default function DebtsPage() {
@@ -48,22 +49,26 @@ export default function DebtsPage() {
   const [modal,     setModal]     = useState<Modal>(null);
   const [deleteId,  setDeleteId]  = useState<string | null>(null);
   const [paymentId, setPaymentId] = useState<string | null>(null);
-  const [showSettled, setShowSettled] = useState(false);
+  const [deletePaymentTarget, setDeletePaymentTarget] = useState<{ debt: DebtRecord; payment: DebtPayment } | null>(null);
 
   const { data: debts = [], isLoading, isError, refetch } = useDebts();
   const { data: accountsData }            = useAccounts();
   const accounts = (accountsData ?? []).filter(a => a.status !== "ARCHIVED" && a.accountType !== "CREDIT_CARD");
 
-  const { mutate: createDebt, isPending: creating } = useCreateDebt();
-  const { mutate: updateDebt, isPending: updating } = useUpdateDebt();
-  const { mutate: recordPay,  isPending: paying    } = useRecordDebtPayment();
-  const { mutate: deleteDebt, isPending: deleting }  = useDeleteDebt();
+  const { mutate: createDebt, isPending: creating }         = useCreateDebt();
+  const { mutate: updateDebt, isPending: updating }         = useUpdateDebt();
+  const { mutate: recordPay,  isPending: paying    }        = useRecordDebtPayment();
+  const { mutate: deleteDebt, isPending: deleting }         = useDeleteDebt();
+  const { mutate: deleteDebtPayment, isPending: deletingPayment } = useDeleteDebtPayment();
 
   const filtered = tab === "ALL" ? debts : debts.filter(d => d.type === tab);
-  // SETTLED debts move to their own collapsed section below (SettledDebtsSection) instead of
-  // staying mixed into the active list — same split as Accounts' active-grid vs. Closed section.
-  const activeFiltered  = filtered.filter(d => d.status !== "SETTLED");
-  const settledFiltered = filtered.filter(d => d.status === "SETTLED");
+  // Repeat transactions with the same person land on one ledger card (see groupByContact.ts)
+  // instead of N disconnected ones — grouped from the tab-filtered list, so a LENT/BORROWED tab
+  // still hides a contact entirely when none of their records match.
+  const contactGroups = useMemo(() => groupDebtsByContact(filtered), [filtered]);
+  // Suggestions come from the FULL debt list (not tab-filtered) so the autocomplete works the
+  // same regardless of which tab you're adding a transaction from.
+  const contactSuggestions = useMemo(() => groupDebtsByContact(debts).map(g => g.contactName), [debts]);
   const payDebt  = debts.find(d => d.id === paymentId);
   const delDebt  = debts.find(d => d.id === deleteId);
 
@@ -90,7 +95,7 @@ export default function DebtsPage() {
           </div>
         ) : isError ? (
           <QueryErrorState onRetry={() => refetch()} description="Couldn't load your debts. Check your connection and try again." />
-        ) : activeFiltered.length === 0 ? (
+        ) : contactGroups.length === 0 ? (
           <EmptyState
             icon={Handshake}
             title="No debts here"
@@ -117,25 +122,19 @@ export default function DebtsPage() {
             }
           />
         ) : (
-          <div className="space-y-3">
-            {activeFiltered.map(debt => (
-              <DebtCard
-                key={debt.id}
-                debt={debt}
-                onEdit={() => setModal({ mode: "edit", debt })}
-                onPayment={() => setPaymentId(debt.id)}
+          <div className="space-y-5">
+            {contactGroups.map(group => (
+              <ContactLedgerCard
+                key={group.key}
+                group={group}
+                onEdit={debt => setModal({ mode: "edit", debt })}
+                onPayment={debt => setPaymentId(debt.id)}
+                onDeletePayment={(debt, payment) => setDeletePaymentTarget({ debt, payment })}
+                onAddTransaction={(contactName, contactPhone) =>
+                  setModal({ mode: "create", defaultType: "LENT", prefillContact: { contactName, contactPhone } })}
               />
             ))}
           </div>
-        )}
-
-        {!isLoading && !isError && (
-          <SettledDebtsSection
-            filteredSettled={settledFiltered}
-            showSettled={showSettled}
-            setShowSettled={setShowSettled}
-            onEdit={debt => setModal({ mode: "edit", debt })}
-          />
         )}
       </PageWrapper>
 
@@ -144,6 +143,8 @@ export default function DebtsPage() {
         <DebtFormModal
           initial={modal.mode === "edit" ? modal.debt : undefined}
           defaultType={modal.mode === "create" ? modal.defaultType : undefined}
+          prefillContact={modal.mode === "create" ? modal.prefillContact : undefined}
+          contactSuggestions={contactSuggestions}
           accounts={accounts}
           saving={modal.mode === "edit" ? updating : creating}
           onClose={() => setModal(null)}
@@ -203,6 +204,33 @@ export default function DebtsPage() {
           loading={deleting}
           onConfirm={() => deleteDebt(delDebt.id, { onSuccess: () => setDeleteId(null) })}
           onCancel={() => setDeleteId(null)}
+        />
+      )}
+
+      {/* Remove-payment confirm */}
+      {deletePaymentTarget && (
+        <ConfirmDialog
+          open
+          title="Remove this payment?"
+          description={
+            <>
+              Removing this {fmt(deletePaymentTarget.payment.amount)} payment
+              {deletePaymentTarget.debt.type === "LENT" ? " received from " : " paid to "}
+              <strong className="text-foreground">{deletePaymentTarget.debt.contactName}</strong> puts it back on the balance still owed.
+              {deletePaymentTarget.debt.accountName && (
+                <span className="block text-muted-foreground/80 mt-1">
+                  Account balance will be reversed for this payment.
+                </span>
+              )}
+            </>
+          }
+          confirmLabel="Remove"
+          danger
+          loading={deletingPayment}
+          onConfirm={() => deleteDebtPayment(
+            { id: deletePaymentTarget.debt.id, paymentId: deletePaymentTarget.payment.id },
+            { onSuccess: () => setDeletePaymentTarget(null) })}
+          onCancel={() => setDeletePaymentTarget(null)}
         />
       )}
 

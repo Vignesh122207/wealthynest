@@ -2,12 +2,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QUERY_KEYS } from "@/lib/constants";
 import { createQueryClientWrapper } from "@/test-utils/queryClientWrapper";
-import { useDebts, useCreateDebt, useUpdateDebt, useRecordDebtPayment, useSettleDebt, useDeleteDebt } from "./useDebts";
+import { useDebts, useCreateDebt, useUpdateDebt, useRecordDebtPayment, useDeleteDebtPayment, useSettleDebt, useDeleteDebt } from "./useDebts";
 import { debtsApi } from "../api/debts.api";
 import { toast } from "sonner";
 
 vi.mock("../api/debts.api", () => ({
-  debtsApi: { getAll: vi.fn(), create: vi.fn(), update: vi.fn(), recordPayment: vi.fn(), settle: vi.fn(), delete: vi.fn() },
+  debtsApi: { getAll: vi.fn(), create: vi.fn(), update: vi.fn(), recordPayment: vi.fn(), deletePayment: vi.fn(), settle: vi.fn(), delete: vi.fn() },
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -88,6 +88,35 @@ describe("useRecordDebtPayment", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(toast.success).toHaveBeenCalledWith("Payment recorded");
+  });
+});
+
+describe("useDeleteDebtPayment", () => {
+  it("passes id/paymentId through, invalidates debts/ACCOUNTS/DASHBOARD/EXPENSES, and toasts on success", async () => {
+    mockedApi.deletePayment.mockResolvedValue({} as never);
+    const { Wrapper, queryClient } = createQueryClientWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const { result } = renderHook(() => useDeleteDebtPayment(), { wrapper: Wrapper });
+    result.current.mutate({ id: "d1", paymentId: "p1" });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedApi.deletePayment).toHaveBeenCalledWith("d1", "p1");
+    for (const key of ALL_INVALIDATED_KEYS) expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: key });
+    expect(toast.success).toHaveBeenCalledWith("Payment removed");
+  });
+
+  it("invalidates nothing and shows the backend's error message on failure", async () => {
+    mockedApi.deletePayment.mockRejectedValue({ response: { data: { message: "Payment not found" } } });
+    const { Wrapper, queryClient } = createQueryClientWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const { result } = renderHook(() => useDeleteDebtPayment(), { wrapper: Wrapper });
+    result.current.mutate({ id: "d1", paymentId: "p1" });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(invalidateSpy).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith("Payment not found");
   });
 });
 

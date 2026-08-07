@@ -42,6 +42,9 @@ export const debtsApi = {
   recordPayment: async (id: string, payload: RecordPaymentPayload): Promise<DebtRecord> =>
     (await apiClient.post<ApiResponse<DebtRecord>>(`/debts/${id}/payments`, payload)).data.data,
 
+  deletePayment: async (id: string, paymentId: string): Promise<DebtRecord> =>
+    (await apiClient.delete<ApiResponse<DebtRecord>>(`/debts/${id}/payments/${paymentId}`)).data.data,
+
   settle: async (id: string): Promise<DebtRecord> =>
     (await apiClient.patch<ApiResponse<DebtRecord>>(`/debts/${id}/settle`)).data.data,
 

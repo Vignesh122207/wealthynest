@@ -1,4 +1,4 @@
-import {test} from "../../fixtures";
+import {expect, test} from "../../fixtures";
 import {faker} from "@faker-js/faker";
 
 // debtsPage is backed by `authedPage`, a fresh context using this worker's own dedicated user
@@ -22,8 +22,8 @@ test.describe("Debts", () => {
     await debtsPage.expectStatus(name, "Active");
 
     await debtsPage.recordPayment(name, 5000);
-    // Settling moves the card into the collapsed "Settled Debts" section — expand it first.
-    await debtsPage.settledDebtsToggle.click();
+    // Settling moves the card into the contact's own collapsed "Settled Debts" section — expand it first.
+    await debtsPage.settledToggleFor(name).click();
     await debtsPage.expectStatus(name, "Settled");
   });
 
@@ -80,8 +80,8 @@ test.describe("Debts", () => {
 
     await debtsPage.editDebtAmount(name, 500);
 
-    // Settling moves the card into the collapsed "Settled Debts" section — expand it first.
-    await debtsPage.settledDebtsToggle.click();
+    // Settling moves the card into the contact's own collapsed "Settled Debts" section — expand it first.
+    await debtsPage.settledToggleFor(name).click();
     await debtsPage.expectStatus(name, "Settled");
   });
 
@@ -117,5 +117,60 @@ test.describe("Debts", () => {
     await debtsPage.tab("ALL").click();
     await debtsPage.expectDebtVisible(lentName);
     await debtsPage.expectDebtVisible(borrowedName);
+  });
+
+  // ─── Contact ledger grouping (multiple transactions with the same person) ────
+
+  test("a second transaction with an existing contact lands on their ledger card, netted against the first @regression", async ({ debtsPage }) => {
+    const name = faker.person.fullName();
+    await debtsPage.gotoDebts();
+    await debtsPage.createDebt({ type: "LENT", contactName: name, amount: 5000 });
+    await debtsPage.expectNetPosition(name, "Owes you ₹5,000");
+
+    await debtsPage.addTransactionToContact(name, { type: "BORROWED", amount: 2000 });
+
+    // Both transactions live under the one ledger card, netted: 5000 owed to you - 2000 you owe.
+    await expect(debtsPage.contactCard(name).getByTestId("debt-card")).toHaveCount(2);
+    await debtsPage.expectNetPosition(name, "Owes you ₹3,000");
+  });
+
+  test("a contact settled up on net shows \"Settled up\" instead of a directional amount @regression", async ({ debtsPage }) => {
+    const name = faker.person.fullName();
+    await debtsPage.gotoDebts();
+    await debtsPage.createDebt({ type: "LENT", contactName: name, amount: 4000 });
+    await debtsPage.addTransactionToContact(name, { type: "BORROWED", amount: 4000 });
+
+    await debtsPage.expectNetPosition(name, "Settled up");
+  });
+
+  // ─── Removing a logged payment ─────────────────────────────────────────────
+
+  test("removing a payment that fully settled a debt reverts it to Active with the balance restored @regression", async ({ debtsPage }) => {
+    const name = faker.person.fullName();
+    await debtsPage.gotoDebts();
+    await debtsPage.createDebt({ type: "LENT", contactName: name, amount: 3000 });
+    await debtsPage.recordPayment(name, 3000);
+    await debtsPage.settledToggleFor(name).click();
+    await debtsPage.expectStatus(name, "Settled");
+
+    await debtsPage.deleteOnlyPayment(name);
+
+    // Removed from the settled section — it's active again, so it's back on the main card.
+    await debtsPage.expectStatus(name, "Active");
+    await debtsPage.expectNetPosition(name, "Owes you ₹3,000");
+  });
+
+  test("removing a partial payment lowers amount paid without deleting the debt itself @regression", async ({ debtsPage }) => {
+    const name = faker.person.fullName();
+    await debtsPage.gotoDebts();
+    await debtsPage.createDebt({ type: "BORROWED", contactName: name, amount: 1000 });
+    await debtsPage.recordPayment(name, 400);
+    await debtsPage.expectStatus(name, "Partial");
+
+    await debtsPage.deleteOnlyPayment(name);
+
+    await debtsPage.expectDebtVisible(name);
+    await debtsPage.expectStatus(name, "Active");
+    await debtsPage.expectNetPosition(name, "You owe ₹1,000");
   });
 });

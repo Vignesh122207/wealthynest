@@ -62,6 +62,15 @@ public class DebtController {
                 debtService.recordPayment(id, SecurityUtils.requireCurrentUserId(), request)));
     }
 
+    @DeleteMapping("/{id}/payments/{paymentId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<DebtRecordResponse>> deletePayment(
+            @PathVariable UUID id,
+            @PathVariable UUID paymentId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                debtService.deletePayment(id, paymentId, SecurityUtils.requireCurrentUserId())));
+    }
+
     @PatchMapping("/{id}/settle")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<DebtRecordResponse>> settle(@PathVariable UUID id) {

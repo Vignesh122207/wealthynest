@@ -59,6 +59,16 @@ export function useRecordDebtPayment() {
   });
 }
 
+export function useDeleteDebtPayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, paymentId }: { id: string; paymentId: string }) =>
+      debtsApi.deletePayment(id, paymentId),
+    onSuccess: () => { invalidateBoth(qc); toast.success("Payment removed"); },
+    onError:   (e: unknown) => toast.error(apiErrorMessage(e, "Failed to remove payment")),
+  });
+}
+
 export function useSettleDebt() {
   const qc = useQueryClient();
   return useMutation({

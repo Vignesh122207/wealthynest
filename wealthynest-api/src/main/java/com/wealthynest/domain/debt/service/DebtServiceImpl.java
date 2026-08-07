@@ -205,6 +205,28 @@ public class DebtServiceImpl implements DebtService {
         return toResponse(debtRecordRepository.save(record));
     }
 
+    @Override
+    @Transactional
+    @CacheEvict(value = "dashboard", allEntries = true)
+    public DebtRecordResponse deletePayment(UUID id, UUID paymentId, UUID userId) {
+        DebtRecord record = findOwned(id, userId);
+        DebtPayment payment = debtPaymentRepository.findById(paymentId)
+                .filter(p -> p.getDebtId().equals(id))
+                .orElseThrow(() -> new ResourceNotFoundException("DebtPayment", "id", paymentId));
+
+        // Reverse the payment's own account entry before removing it, same as delete()'s
+        // per-payment reversal — a mis-logged payment shouldn't leave a stray transfer behind.
+        if (payment.getLinkedEntryId() != null) transferRepository.deleteById(payment.getLinkedEntryId());
+        debtPaymentRepository.delete(payment);
+
+        BigDecimal settled = record.getAmountSettled().subtract(payment.getAmount()).max(BigDecimal.ZERO);
+        record.setAmountSettled(settled);
+        // Removing a payment can un-settle a SETTLED debt back to PARTIAL/ACTIVE — same boundary
+        // recordPayment/update already cross in the other direction.
+        record.setStatus(computeStatus(record.getAmount(), settled));
+        return toResponse(debtRecordRepository.save(record));
+    }
+
     /** Same ACTIVE/PARTIAL/SETTLED boundary recordPayment already applies after a payment —
      * factored out so update() can re-derive it after an amount edit too, since that can move
      * a debt across the same boundary in either direction. */

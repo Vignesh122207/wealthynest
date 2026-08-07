@@ -14,6 +14,7 @@ public interface DebtService {
     DebtRecordResponse       create(UUID userId, CreateDebtRequest request);
     DebtRecordResponse       update(UUID id, UUID userId, UpdateDebtRequest request);
     DebtRecordResponse       recordPayment(UUID id, UUID userId, RecordPaymentRequest request);
+    DebtRecordResponse       deletePayment(UUID id, UUID paymentId, UUID userId);
     DebtRecordResponse       settle(UUID id, UUID userId);
     void                     delete(UUID id, UUID userId);
 }

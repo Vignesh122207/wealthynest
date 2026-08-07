@@ -1,10 +1,10 @@
 "use client";
 
 import {useState} from "react";
-import {AlertCircle, Banknote, CheckCircle2, ChevronDown, ChevronUp, Clock, Wallet} from "lucide-react";
+import {AlertCircle, Banknote, CheckCircle2, ChevronDown, ChevronUp, Clock, Trash2, Wallet} from "lucide-react";
 import {cn} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
-import type {DebtRecord} from "@/features/debts/types/debt.types";
+import type {DebtPayment, DebtRecord} from "@/features/debts/types/debt.types";
 import {ContactAvatar} from "./ContactAvatar";
 
 // ── Status badge ──────────────────────────────────────────────────────────────
@@ -19,10 +19,11 @@ function StatusBadge({ status }: { status: DebtRecord["status"] }) {
 
 // ── Debt Card — whole row clickable to edit; Pay Back / history stay distinct ──
 
-export function DebtCard({ debt, onEdit, onPayment }: {
-  debt:      DebtRecord;
-  onEdit:    () => void;
-  onPayment: () => void;
+export function DebtCard({ debt, onEdit, onPayment, onDeletePayment }: {
+  debt:            DebtRecord;
+  onEdit:          () => void;
+  onPayment:       () => void;
+  onDeletePayment?: (payment: DebtPayment) => void;
 }) {
   const { fmt } = useAmountFormatter();
   const [expanded, setExpanded] = useState(false);
@@ -92,7 +93,7 @@ export function DebtCard({ debt, onEdit, onPayment }: {
         )}
 
         {debt.payments.length > 0 ? (
-          <button onClick={() => setExpanded(v => !v)}
+          <button data-testid="debt-payment-history-toggle" onClick={() => setExpanded(v => !v)}
             className="flex-1 min-w-0 flex items-center justify-between gap-2 text-muted-foreground hover:text-foreground transition-colors bg-muted/40 rounded-2xl px-3.5 py-1.5">
             {/* Two lines, not one truncating string: on a narrow mobile card next to the fixed-width
                 Pay back/Log payment button, cramming "N payments · paid · left" onto one line meant
@@ -118,14 +119,23 @@ export function DebtCard({ debt, onEdit, onPayment }: {
         <div className="px-4 pb-4 -mt-2 space-y-1.5 border-t border-border/50 pt-3">
           {debt.payments.map(p => (
             <div key={p.id} className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2 text-muted-foreground">
+              <div className="flex items-center gap-2 text-muted-foreground min-w-0">
                 <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
                 <span className="truncate">{p.note || "Payment"}</span>
                 <span className="text-muted-foreground/80 shrink-0">
                   {new Date(p.paidAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
                 </span>
               </div>
-              <span className="font-semibold text-foreground shrink-0 ml-2">{fmt(p.amount)}</span>
+              <div className="flex items-center gap-2 shrink-0 ml-2">
+                <span className="font-semibold text-foreground">{fmt(p.amount)}</span>
+                {onDeletePayment && (
+                  <button type="button" data-testid="debt-payment-delete" aria-label={`Remove payment of ${fmt(p.amount)}`}
+                    onClick={() => onDeletePayment(p)}
+                    className="text-muted-foreground/40 hover:text-red-500 transition-colors">
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>

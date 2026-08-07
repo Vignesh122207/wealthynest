@@ -18,14 +18,18 @@ import type {DebtRecord, DebtType} from "@/features/debts/types/debt.types";
 
 // ── Debt Form Modal ───────────────────────────────────────────────────────────
 
-export function DebtFormModal({ initial, defaultType, accounts, onSave, onDelete, onClose, saving }: {
-  initial?:     DebtRecord;
-  defaultType?: DebtType;
-  accounts:     { id: string; name: string; bankName?: string; currentBalance: number; primary?: boolean; accountType: string }[];
-  onSave:       (v: DebtFormValues & { type?: DebtType; accountId?: string }) => void;
-  onDelete?:    () => void;
-  onClose:      () => void;
-  saving:       boolean;
+export function DebtFormModal({ initial, defaultType, prefillContact, contactSuggestions, accounts, onSave, onDelete, onClose, saving }: {
+  initial?:            DebtRecord;
+  defaultType?:        DebtType;
+  /** Pre-fills contact name/phone on create (e.g. "+ Add" from an existing contact's ledger card)
+   * — ignored once editing, since `initial` already owns those fields there. */
+  prefillContact?:     { contactName: string; contactPhone?: string };
+  contactSuggestions?: string[];
+  accounts:            { id: string; name: string; bankName?: string; currentBalance: number; primary?: boolean; accountType: string }[];
+  onSave:              (v: DebtFormValues & { type?: DebtType; accountId?: string }) => void;
+  onDelete?:           () => void;
+  onClose:             () => void;
+  saving:              boolean;
 }) {
   const today = todayLocalISO();
   const isEdit = !!initial?.id;
@@ -38,8 +42,8 @@ export function DebtFormModal({ initial, defaultType, accounts, onSave, onDelete
   const form = useForm<DebtFormValues>({
     resolver: zodResolver(debtSchema),
     defaultValues: {
-      contactName:  initial?.contactName  ?? "",
-      contactPhone: initial?.contactPhone ?? "",
+      contactName:  initial?.contactName  ?? prefillContact?.contactName  ?? "",
+      contactPhone: initial?.contactPhone ?? prefillContact?.contactPhone ?? "",
       amount:       initial?.amount ?? undefined,
       description:  initial?.description  ?? "",
       debtDate:     initial?.debtDate?.slice(0, 10) ?? today,
@@ -87,9 +91,17 @@ export function DebtFormModal({ initial, defaultType, accounts, onSave, onDelete
                 {isLent ? "Who did you lend to?" : "Who did you borrow from?"}
               </label>
               <input placeholder="Name" data-testid="debt-contact-name-input"
+                list={!isEdit && contactSuggestions?.length ? "debt-contact-suggestions" : undefined}
                 className={cn("w-full h-11 px-3 rounded-xl text-sm bg-background border border-border text-foreground placeholder-muted-foreground/40 outline-none transition-all",
                   isLent ? "focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/40" : "focus:border-red-500 focus:ring-2 focus:ring-red-500/40")}
                 {...form.register("contactName")} />
+              {/* Existing contacts, so re-transacting with someone doesn't mean re-typing their
+                  name from scratch — browser-native, no custom dropdown component needed. */}
+              {!isEdit && contactSuggestions && contactSuggestions.length > 0 && (
+                <datalist id="debt-contact-suggestions">
+                  {contactSuggestions.map(name => <option key={name} value={name} />)}
+                </datalist>
+              )}
               {form.formState.errors.contactName && (
                 <p className="text-xs text-red-500 mt-1">{form.formState.errors.contactName.message}</p>
               )}
