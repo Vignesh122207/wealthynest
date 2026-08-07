@@ -35,13 +35,20 @@ export function GreetingBanner({
     // a second "financial coach" one-liner competing with SmartAlertsRow's own pace-forecast card
     // a section below. One coach voice on the page, not two saying different things about the
     // same month.
+    //
+    // Text sizes below only step up from sm: onward, not at the base (mobile) tier — the chip that
+    // used to sit here was already `hidden md:inline-flex`, so it never occupied mobile space in
+    // the first place, meaning there's no room actually freed up below the md breakpoint to spend
+    // on bigger type. Below sm specifically, this row keeps its original sizes on purpose: that's
+    // the one tier the mobile-pill comment further down says was measured against real devices to
+    // keep "Good morning, {name}" from ever truncating on a mainstream phone width.
     <div data-testid="greeting-banner" className="animate-fade-in-up flex flex-row items-center justify-between gap-2 sm:gap-3">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="text-2xl shrink-0" aria-hidden>
+          <span className="text-xl sm:text-2xl shrink-0" aria-hidden>
             {{ morning: "🌤️", afternoon: "☀️", evening: "🌙" }[getGreeting()] ?? "👋"}
           </span>
-          <p className="text-lg sm:text-xl lg:text-2xl font-bold text-foreground tracking-tight truncate">
+          <p className="text-base sm:text-xl lg:text-2xl font-bold text-foreground tracking-tight truncate">
             Good {getGreeting()}, {firstName}
           </p>
         </div>
@@ -102,7 +109,10 @@ export function GreetingBanner({
             className="flex items-center gap-1 text-primary"
           >
             {isYear ? <CalendarRange className="w-3.5 h-3.5 shrink-0" /> : <Calendar className="w-3.5 h-3.5 shrink-0" />}
-            <span data-testid="period-nav-label-mobile" className="text-xs font-semibold text-foreground tabular-nums whitespace-nowrap">
+            {/* Deliberately kept at 11px rather than the rest of the app's 12px caption floor —
+                this is the one label inside the row whose real-device-measured no-truncate budget
+                the top-of-file comment is about; every other caption on Home has room to spare. */}
+            <span data-testid="period-nav-label-mobile" className="text-[11px] font-semibold text-foreground tabular-nums whitespace-nowrap">
               {label}
             </span>
           </button>

@@ -53,14 +53,16 @@ interface TileProps {
   bgTintClass?: string;
   valueTestId?: string; deltaTestId?: string;
   delay?: string;
+  /** Grid-span override — Budget Used only, see its own call site for why. */
+  className?: string;
 }
 
-function StatTile({ icon, tone, label, value, deltaText, deltaGood, valueColorClass, bgTintClass, valueTestId, deltaTestId, delay = "delay-0" }: TileProps) {
+function StatTile({ icon, tone, label, value, deltaText, deltaGood, valueColorClass, bgTintClass, valueTestId, deltaTestId, delay = "delay-0", className }: TileProps) {
   return (
     <div className={cn(
       "rounded-2xl p-3.5 card-hover animate-fade-in-up",
       bgTintClass ?? "bg-card", "border border-slate-100/80 dark:border-border/50 shadow-soft dark:shadow-none",
-      delay
+      delay, className
     )}>
       <div className="flex items-center gap-2 mb-3">
         <PremiumIcon icon={icon} tone={tone} size="sm" />
@@ -125,6 +127,11 @@ function BudgetUsedTile({ spent, budgeted, total, emptyLabel, fmt, delay = "dela
       bgTintClass={total > 0 ? TIER_BG[tier] : undefined}
       valueTestId="budget-progress-tile" deltaTestId="budget-progress-caption"
       delay={delay}
+      // 5 tiles on a 2-column mobile grid otherwise strands this one alone in a 3rd row with an
+      // empty cell beside it — full-width here instead reads as a deliberate "last row" rather
+      // than a layout accident. Reverts to a normal 1-of-5 cell from sm: up, where the grid moves
+      // to 3/5 columns and has room to spare.
+      className="col-span-2 sm:col-span-1"
     />
   );
 }
@@ -160,7 +167,12 @@ export function StatOverview({
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 [&>*]:min-w-0">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="rounded-2xl p-3.5 space-y-3 bg-card border border-slate-100/80 dark:border-border/50 shadow-soft dark:shadow-none">
+          <div key={i} className={cn(
+            "rounded-2xl p-3.5 space-y-3 bg-card border border-slate-100/80 dark:border-border/50 shadow-soft dark:shadow-none",
+            // Matches the real grid's own last-tile span (see BudgetUsedTile's call site below) so
+            // the skeleton's shape doesn't shift once real content swaps in.
+            i === 4 && "col-span-2 sm:col-span-1"
+          )}>
             <div className="w-8 h-8 rounded-xl shimmer" />
             <div className="h-6 w-24 rounded-lg shimmer" />
             <div className="h-3 w-16 rounded shimmer" />

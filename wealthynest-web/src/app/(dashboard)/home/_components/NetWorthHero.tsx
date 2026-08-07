@@ -63,12 +63,18 @@ export function NetWorthHero({ netWorth, changePct, changeLabel, history, chart,
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
         <div className="min-w-0">
-          <p data-testid="net-worth-hero-value" className="text-4xl sm:text-5xl font-extrabold text-foreground tabular-nums tracking-tight leading-none">
+          {/* break-words: a large formatted currency figure (lakhs/crores in INR) is one unbroken
+              token with no spaces to wrap on — at this size, on a narrow phone, that can overflow
+              the card horizontally with nothing to fall back on. break-words lets it wrap onto a
+              second line as a last resort instead, the same safety net `truncate` gives every
+              other value on the page (this one can't use truncate — cutting off digits of the
+              actual net worth would misreport it, unlike ellipsizing a label). */}
+          <p data-testid="net-worth-hero-value" className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-foreground tabular-nums tracking-tight leading-none break-words">
             {netWorth != null ? fmt(netWorth) : "—"}
           </p>
           {changePct != null && (
             <div className={cn(
-              "inline-flex items-center mt-3 px-2.5 py-1 rounded-full text-xs font-semibold tabular-nums",
+              "inline-flex items-center mt-3 px-2.5 py-1 rounded-full text-xs font-semibold tabular-nums whitespace-nowrap",
               isPositive ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-red-500/10 text-red-500 dark:text-red-400"
             )}>
               {formatTrendDelta(changePct, changeLabel)}
