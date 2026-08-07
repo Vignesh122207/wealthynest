@@ -222,8 +222,10 @@ export function InvestmentPanel({ investments, chart, isLoading }: InvestmentPan
               <PremiumIcon icon={s.icon} tone={s.tone} size="xs" />
               <p className="text-[11px] text-muted-foreground font-medium truncate">{s.label}</p>
             </div>
-            <p className={cn("text-sm sm:text-base font-bold tabular-nums truncate", s.valueColor)}>{s.value}</p>
-            {s.sub && <p className="text-[11px] text-muted-foreground/80 mt-0.5">{s.sub}</p>}
+            <div className="flex items-baseline gap-1.5 min-w-0">
+              <p className={cn("text-sm sm:text-base font-bold tabular-nums truncate", s.valueColor)}>{s.value}</p>
+              {s.sub && <p className="text-[11px] text-muted-foreground/80 shrink-0">{s.sub}</p>}
+            </div>
           </div>
         ))}
       </div>
