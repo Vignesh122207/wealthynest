@@ -322,11 +322,6 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
                   {statusMeta.label}
                 </span>
               )}
-              {purpose && (
-                <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide", PURPOSE_CHIP_CLASS)}>
-                  {purpose}
-                </span>
-              )}
               {account.accountType === "BANK_ACCOUNT" && (
                 account.primary ? (
                   <span title="Primary account"
@@ -343,6 +338,11 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
             </div>
             <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
               {account.bankName && account.bankName !== account.name && <p className="text-xs text-muted-foreground">{account.bankName}</p>}
+              {purpose && (
+                <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide", PURPOSE_CHIP_CLASS)}>
+                  {purpose}
+                </span>
+              )}
               {account.accountNumber && (
                 <div className="flex items-center gap-1">
                   <p className="text-xs text-muted-foreground/80 font-mono">
