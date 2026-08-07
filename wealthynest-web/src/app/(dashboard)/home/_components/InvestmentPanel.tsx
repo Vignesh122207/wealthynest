@@ -73,7 +73,7 @@ export function InvestmentPanel({ investments, chart, isLoading }: InvestmentPan
   }, [active]);
 
   const topHoldings = useMemo(
-    () => [...active].sort((a, b) => b.currentValue - a.currentValue).slice(0, 4),
+    () => [...active].sort((a, b) => b.currentValue - a.currentValue).slice(0, 3),
     [active]
   );
 
@@ -173,23 +173,32 @@ export function InvestmentPanel({ investments, chart, isLoading }: InvestmentPan
             <p className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wide">Top Holdings</p>
             <div className="divide-y divide-slate-100/80 dark:divide-border/40">
               {topHoldings.map((h) => (
-                <div key={h.id} className="flex items-center gap-2.5 py-2 first:pt-0 last:pb-0 text-xs">
+                <div key={h.id} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0 text-xs">
                   {h.investmentType === "STOCK" ? (
-                    <StockLogo symbol={h.symbol} fallbackIcon={INVESTMENT_TYPE_META[h.investmentType].icon} fallbackHex={INVESTMENT_TYPE_META[h.investmentType].hex} size="xs" className="shrink-0" />
+                    <StockLogo symbol={h.symbol} fallbackIcon={INVESTMENT_TYPE_META[h.investmentType].icon} fallbackHex={INVESTMENT_TYPE_META[h.investmentType].hex} size="sm" className="shrink-0" />
                   ) : h.investmentType === "MUTUAL_FUND" ? (
-                    <FundLogo companyName={h.companyName} fallbackIcon={INVESTMENT_TYPE_META[h.investmentType].icon} fallbackHex={INVESTMENT_TYPE_META[h.investmentType].hex} size="xs" className="shrink-0" />
+                    <FundLogo companyName={h.companyName} fallbackIcon={INVESTMENT_TYPE_META[h.investmentType].icon} fallbackHex={INVESTMENT_TYPE_META[h.investmentType].hex} size="sm" className="shrink-0" />
                   ) : (h.investmentType === "BOND" || h.investmentType === "FD") ? (
-                    <BankLogo name={h.bankName} fallbackIcon={INVESTMENT_TYPE_META[h.investmentType].icon} fallbackHex={INVESTMENT_TYPE_META[h.investmentType].hex} size="xs" className="shrink-0" />
+                    <BankLogo name={h.bankName} fallbackIcon={INVESTMENT_TYPE_META[h.investmentType].icon} fallbackHex={INVESTMENT_TYPE_META[h.investmentType].hex} size="sm" className="shrink-0" />
                   ) : (
-                    <PremiumIcon icon={INVESTMENT_TYPE_META[h.investmentType].icon} hex={INVESTMENT_TYPE_META[h.investmentType].hex} size="xs" className="shrink-0" />
+                    <PremiumIcon icon={INVESTMENT_TYPE_META[h.investmentType].icon} hex={INVESTMENT_TYPE_META[h.investmentType].hex} size="sm" className="shrink-0" />
                   )}
-                  <span className="text-foreground font-semibold truncate min-w-0 flex-1">{holdingName(h)}</span>
+                  {/* Name + asset-class label — Top Holdings ranks by value across every
+                      investment type, so a bank-logo row (FD/Bond) needs its type spelled out
+                      to read distinctly from a stock/MF row using the same layout. */}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-foreground font-semibold truncate">{holdingName(h)}</p>
+                    <p className="text-[11px] text-muted-foreground/70 truncate mt-0.5">{INVESTMENT_TYPE_META[h.investmentType].label}</p>
+                  </div>
                   <span className={cn(
-                    "font-semibold tabular-nums shrink-0 px-2 py-0.5 rounded-full text-[11px]",
+                    "inline-flex items-center gap-0.5 font-semibold tabular-nums shrink-0 pl-1.5 pr-2 py-1 rounded-full text-[11px]",
                     h.gainLossPct >= 0
                       ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                       : "bg-red-500/10 text-red-500 dark:text-red-400"
                   )}>
+                    {h.gainLossPct >= 0
+                      ? <ArrowUpRight className="w-3 h-3" strokeWidth={2.5} />
+                      : <ArrowDownRight className="w-3 h-3" strokeWidth={2.5} />}
                     {h.gainLossPct >= 0 ? "+" : ""}{h.gainLossPct.toFixed(1)}%
                   </span>
                 </div>
