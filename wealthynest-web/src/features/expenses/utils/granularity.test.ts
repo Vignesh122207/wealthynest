@@ -1,5 +1,5 @@
 import {describe, it, expect} from "vitest";
-import {resolveGranularityRange, detectRollingGranularity, formatRangeLabel} from "./granularity";
+import {resolveGranularityRange, detectRollingGranularity, formatRangeLabel, rollingGranularityLabel} from "./granularity";
 
 const today = new Date(2026, 7, 7); // Aug 7, 2026 (month is 0-indexed)
 
@@ -75,5 +75,15 @@ describe("formatRangeLabel", () => {
     expect(formatRangeLabel("", "2026-08-07")).toBe("");
     expect(formatRangeLabel("2026-08-07", "")).toBe("");
     expect(formatRangeLabel("", "")).toBe("");
+  });
+});
+
+describe("rollingGranularityLabel", () => {
+  it("names every rolling preset in prose", () => {
+    expect(rollingGranularityLabel("1W")).toBe("Last 7 days");
+    expect(rollingGranularityLabel("1M")).toBe("Last 1 month");
+    expect(rollingGranularityLabel("3M")).toBe("Last 3 months");
+    expect(rollingGranularityLabel("6M")).toBe("Last 6 months");
+    expect(rollingGranularityLabel("YTD")).toBe("Year to date");
   });
 });

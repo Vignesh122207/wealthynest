@@ -6,9 +6,14 @@ import {createPortal} from "react-dom";
 // ─── Dropdown Panel — portals to <body> so it's never clipped by a scrolling
 // modal, and always fits on screen no matter where its trigger sits ─────────
 
-export function DropdownPanel({ anchorRef, open, onClose, children }: {
+export function DropdownPanel({ anchorRef, open, onClose, minWidth, children }: {
   anchorRef: React.RefObject<HTMLElement | null>;
-  open: boolean; onClose: () => void; children: React.ReactNode;
+  open: boolean; onClose: () => void;
+  // Widens the panel beyond the anchor's own width (e.g. a compact pill button opening a much
+  // wider calendar) — `left` is then clamped so a panel wider than its anchor can't render
+  // partly off-screen when the anchor sits near the viewport's right edge.
+  minWidth?: number;
+  children: React.ReactNode;
 }) {
   const [rect, setRect] = useState<{ top?: number; bottom?: number; left: number; width: number; maxHeight: number } | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -20,14 +25,16 @@ export function DropdownPanel({ anchorRef, open, onClose, children }: {
     const spaceAbove = anchor.top - 12;
     const openUpward = spaceBelow < 200 && spaceAbove > spaceBelow;
     const maxHeight = Math.min(320, Math.max(160, openUpward ? spaceAbove : spaceBelow));
+    const width = Math.min(minWidth ? Math.max(anchor.width, minWidth) : anchor.width, window.innerWidth - 16);
+    const left = Math.min(Math.max(8, anchor.left), window.innerWidth - width - 8);
     // Anchor by the edge touching the trigger and let the panel's real (content-driven) height
     // do the rest — pinning both edges (e.g. a "top" computed from the maxHeight cap) leaves a
     // gap above the trigger whenever the list is shorter than maxHeight, since the panel then
     // renders shorter than assumed and floats away from the button instead of hugging it.
     setRect(openUpward
-      ? { bottom: window.innerHeight - anchor.top + 6, left: anchor.left, width: anchor.width, maxHeight }
-      : { top: anchor.bottom + 6, left: anchor.left, width: anchor.width, maxHeight });
-  }, [open, anchorRef]);
+      ? { bottom: window.innerHeight - anchor.top + 6, left, width, maxHeight }
+      : { top: anchor.bottom + 6, left, width, maxHeight });
+  }, [open, anchorRef, minWidth]);
 
   useEffect(() => {
     if (!open) return;
@@ -61,6 +68,17 @@ export function DropdownPanel({ anchorRef, open, onClose, children }: {
     };
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [open, onClose, anchorRef]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      onClose();
+      (anchorRef.current as HTMLElement | null)?.focus?.();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
   }, [open, onClose, anchorRef]);
 
   if (!open || !rect || typeof document === "undefined") return null;

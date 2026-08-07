@@ -20,34 +20,49 @@ export class TransactionsPage extends BasePage {
   }
 
   get searchInput(): Locator {
-    return this.page.getByPlaceholder("Search transactions, merchants, accounts…");
+    return this.page.getByPlaceholder("Search description, category, amount…");
   }
 
-  /** Defaults to "Month" (the current month only) — switch to this before asserting on a
-   * transaction whose date isn't guaranteed to fall in the current month (e.g. a statement
-   * import's fixed-date rows). */
-  async showAllDates(): Promise<void> {
-    await this.page.getByTestId("date-mode-all").click();
-  }
-
-  /** Drives FormDatePicker's own calendar popup (year view -> month view -> day view) to land on
-   * an exact ISO date, regardless of the picker's current cursor month/year. */
-  private async pickCalendarDate(testId: string, isoDate: string): Promise<void> {
-    const [y, m] = isoDate.split("-");
-    await this.page.getByTestId(testId).click();
-    await this.page.getByTestId("calendar-month-year-header").click(); // day view -> month view
-    await this.page.getByTestId("calendar-year-header").click();       // month view -> year view
-    await this.page.getByTestId(`calendar-year-${y}`).click();         // year view -> month view
-    await this.page.getByTestId(`calendar-month-${y}-${m}`).click();   // month view -> day view, selects
-    await this.page.getByTestId(`calendar-day-${isoDate}`).click();
-  }
-
-  /** Switches to Custom date mode and picks an exact from/to range via the calendar pickers —
-   * for a period whose year differs from whatever Month/Year mode last left `year` state at. */
-  async setCustomDateRange(fromISO: string, toISO: string): Promise<void> {
+  /** The rolling-range pills (1W/1M/3M/6M/YTD) and the Custom option live in DateRangeCapsule,
+   * always visible in the toolbar (no trigger to open first, unlike the old collapsed popover).
+   * Clicking "Custom" opens DualCalendarRangePicker's floating panel. */
+  async openCustomRangePicker(): Promise<void> {
     await this.page.getByTestId("date-mode-custom").click();
-    await this.pickCalendarDate("date-range-from", fromISO);
-    await this.pickCalendarDate("date-range-to", toISO);
+  }
+
+  /** "All time" is DualCalendarRangePicker's Clear action (dateMode="custom" with both dates
+   * empty) — page.tsx already resolves that to an unbounded query, same as the old dedicated
+   * "All" pill did. Switch to this before asserting on a transaction whose date isn't guaranteed
+   * to fall in the current month (e.g. a statement import's fixed-date rows). */
+  async showAllDates(): Promise<void> {
+    await this.openCustomRangePicker();
+    await this.page.getByTestId("range-clear").click();
+  }
+
+  /** Clicks range-nav-prev/next enough times to bring the target ISO month into one of
+   * DualCalendarRangePicker's two visible month panels (left = cursor, right = cursor + 1). */
+  private async navigateRangePickerTo(isoDate: string): Promise<void> {
+    const [targetYear, targetMonth] = isoDate.split("-").map(Number);
+    const targetIndex = targetYear * 12 + targetMonth;
+    const cursorLabel = await this.page.getByTestId("range-cursor-label").textContent();
+    const cursor = new Date(`1 ${cursorLabel}`);
+    const cursorIndex = cursor.getFullYear() * 12 + (cursor.getMonth() + 1);
+    if (targetIndex < cursorIndex) {
+      for (let i = 0; i < cursorIndex - targetIndex; i++) await this.page.getByTestId("range-nav-prev").click();
+    } else if (targetIndex > cursorIndex + 1) {
+      for (let i = 0; i < targetIndex - (cursorIndex + 1); i++) await this.page.getByTestId("range-nav-next").click();
+    }
+  }
+
+  /** Picks an exact from/to range via DualCalendarRangePicker — for a period whose year differs
+   * from whatever the month scrubber last left `year` state at. */
+  async setCustomDateRange(fromISO: string, toISO: string): Promise<void> {
+    await this.openCustomRangePicker();
+    await this.navigateRangePickerTo(fromISO);
+    await this.page.getByTestId(`range-day-${fromISO}`).click();
+    await this.navigateRangePickerTo(toISO);
+    await this.page.getByTestId(`range-day-${toISO}`).click();
+    await this.page.getByTestId("range-apply").click();
   }
 
   // ── Add Expense ──────────────────────────────────────────────────────────

@@ -45,6 +45,21 @@ export function detectRollingGranularity(
   return null;
 }
 
+const ROLLING_LABELS: Record<RollingGranularity, string> = {
+  "1W":  "Last 7 days",
+  "1M":  "Last 1 month",
+  "3M":  "Last 3 months",
+  "6M":  "Last 6 months",
+  "YTD": "Year to date",
+};
+
+/** "Last 7 days", "Year to date", etc. — the human-readable name for a rolling preset, shown
+ * wherever the applied date filter is described in prose (an active-filter chip, a tooltip). The
+ * capsule's own pill still shows the short "1W"/"YTD" code — this is for everywhere else. */
+export function rollingGranularityLabel(granularity: RollingGranularity): string {
+  return ROLLING_LABELS[granularity];
+}
+
 /** "31 Jul – 07 Aug 2026" (or "1 Jan – 07 Aug" within the same year) — the read-only label shown
  * next to a rolling-window pill so 1W/1M/3M/6M/YTD show what they actually resolved to, without
  * opening the editable Custom range fields (those stay reserved for a genuine custom pick). */

@@ -32,8 +32,8 @@ import {type ExpenseFormValues} from "@/features/expenses/schemas/expense.schema
 import type {Expense, SplitParticipant} from "@/features/expenses/types/expense.types";
 import {exportAllCsv, exportCsv, exportIncomeCsv, exportTransfersCsv} from "@/features/expenses/utils/csvExport";
 import {pad, resolveEffectiveAccountIds} from "@/features/expenses/utils/filterHelpers";
+import {detectRollingGranularity, formatRangeLabel, rollingGranularityLabel} from "@/features/expenses/utils/granularity";
 import {TypeTabs} from "@/features/expenses/components/TypeTabs";
-import {DateControls} from "@/features/expenses/components/DateControls";
 import {StatCards} from "@/features/expenses/components/StatCards";
 import {Toolbar} from "@/features/expenses/components/Toolbar";
 import {FilterPanel} from "@/features/expenses/components/FilterPanel";
@@ -745,10 +745,21 @@ export default function TransactionsPage() {
   // expense side (Expenses tab, and expense rows within All), so they're kept separate and only
   // shown where they actually do something — otherwise a chip could sit there doing nothing on
   // the Income/Transfers tabs, which is more confusing than no chip at all.
+  // "custom" also covers the DateRangeCapsule rolling presets (1W/1M/3M/6M/YTD are dateMode=
+  // "custom" with a computed range under the hood — see DateRangeCapsule's selectRolling) and its
+  // "all time" fold-in (dateMode="custom" with both dates cleared) — a flat "Custom range" label
+  // here used to show for all three regardless of which was actually picked. Resolving the actual
+  // dates (or "All time") instead means the chip always names the filter that's really applied.
+  const rollingGranularity = detectRollingGranularity(dateMode, customStart, customEnd, new Date());
   const dateChips: { label: string; clear: () => void }[] = [];
-  if (dateMode === "year")      dateChips.push({ label: `Year ${year}`,   clear: () => setDateMode("month") });
-  if (dateMode === "custom")    dateChips.push({ label: "Custom range",   clear: () => setDateMode("month") });
-  if (dateMode === "all")       dateChips.push({ label: "All time",       clear: () => setDateMode("month") });
+  if (dateMode === "year")   dateChips.push({ label: `Year ${year}`, clear: () => setDateMode("month") });
+  if (dateMode === "custom") {
+    const label = rollingGranularity ? rollingGranularityLabel(rollingGranularity)
+      : (customStart || customEnd) ? (formatRangeLabel(customStart, customEnd) || "Custom range")
+      : "All time";
+    dateChips.push({ label, clear: () => setDateMode("month") });
+  }
+  if (dateMode === "all")    dateChips.push({ label: "All time", clear: () => setDateMode("month") });
 
   const expenseChips: { label: string; clear: () => void }[] = [];
   if (payChannel === "CASH")    expenseChips.push({ label: "Cash only",    clear: () => setPayChannel("") });
@@ -899,16 +910,12 @@ export default function TransactionsPage() {
       <main className="flex-1 p-4 md:p-5 lg:p-6 pb-36 lg:pb-24 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-4">
 
-        {/* Toolbar — search, filters, download — shared across every tab */}
+        {/* Toolbar — search, date range, filters, download — shared across every tab */}
         <Toolbar
           search={search} setSearch={setSearch}
           onOpenFilters={() => setShowFilterPanel(true)}
           activeFilterCount={activeFilterCount}
           onExport={handleExport}
-        />
-
-        {/* Unified date-range control — Month/Year/rolling-window/All/Custom in one row */}
-        <DateControls
           dateMode={dateMode} setDateMode={setDateMode}
           year={year} setYear={setYear}
           month={month} setMonth={setMonth}
