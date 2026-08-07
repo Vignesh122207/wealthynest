@@ -14,7 +14,7 @@ import {
   Eye,
   EyeOff,
   List,
-  Plus,
+  MoreVertical,
   Receipt,
   Repeat,
   Star,
@@ -30,58 +30,91 @@ import {BankLogo} from "@/components/icons/BankLogo";
 import {lighten} from "@/components/icons/PremiumIcon";
 import {getBankMonogram} from "@/lib/bankLogos";
 import {cn, formatDate} from "@/lib/utils";
-import {getYears} from "@/lib/printReport";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import type {WalletAccount} from "../types/account.types";
 import type {DebtRecord} from "@/features/debts/types/debt.types";
 
-// Shared by both the credit-card and regular card faces below — a small year-scoped menu on the
-// download button instead of always dumping every transaction on record. Its own local component
-// (not inlined twice) since the portal/positioning logic is identical in both call sites.
-function DownloadStatementButton({ account, dark }: { account: WalletAccount; dark?: boolean }) {
+type CardAction = { key: string; label: string; icon: React.ElementType; color: string; onClick: () => void };
+
+// Shared by both the credit-card and regular card faces below — a single "⋮" trigger replacing
+// what used to be a row of up to 4 separate icon buttons (View Transactions, Download Statement,
+// per-type money actions, Import Statement). Grouped into one dropdown with dividers between
+// sections instead of nested submenus, so every action is reachable in exactly one click after
+// opening the menu. Its own local component (not inlined twice) since the portal/positioning
+// logic is identical in both call sites.
+function AccountActionsMenu({ account, moneyActions, onImportStatement, dark = false }: {
+  account: WalletAccount;
+  moneyActions: CardAction[];
+  onImportStatement?: () => void;
+  dark?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
   const btnRef = useRef<HTMLButtonElement>(null);
-  const years = getYears();
 
+  // Fixed-position + viewport-clamped like BankNameInput's autocomplete — a plain `absolute`
+  // menu can run off-screen for cards near the right edge with no way to reposition itself.
   const toggle = () => {
     if (!open && btnRef.current) {
       const r = btnRef.current.getBoundingClientRect();
-      const menuWidth = 140;
+      const menuWidth = 208;
       const left = Math.min(r.right - menuWidth, window.innerWidth - menuWidth - 8);
       setMenuStyle({ position: "fixed", top: r.bottom + 4, left: Math.max(8, left), width: menuWidth, zIndex: 9999 });
     }
     setOpen(v => !v);
   };
 
-  const pick = (year: number | "all") => {
+  const downloadStatement = () => {
     setOpen(false);
     // Dynamic import — downloadAccountStatement pulls in jsPDF + jspdf-autotable (lib/pdf/
     // reportPdf.ts), a genuinely heavy dependency that has no reason to sit in every visitor's
-    // initial /accounts bundle just because one AccountCard menu item might eventually need it.
+    // initial /accounts bundle just because one menu item might eventually need it. Always the
+    // all-time statement — the per-year picker this replaced added a second click for a range
+    // most people never needed; Reports' own Export tab already covers year-scoped exports.
     void import("../utils/downloadAccountStatement").then(({ downloadAccountStatement }) =>
-      downloadAccountStatement(account, year));
+      downloadAccountStatement(account, "all"));
   };
+
+  const rowClass = "w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-foreground hover:bg-muted/60 transition-colors";
 
   return (
     <div className="relative" onClick={e => e.stopPropagation()}>
-      <button ref={btnRef} title="Download statement" onClick={toggle}
+      <button ref={btnRef} onClick={toggle} title="Account actions" aria-label="Account actions" aria-haspopup="menu" aria-expanded={open}
         className={cn("w-7 h-7 rounded-lg flex items-center justify-center transition-all",
-          dark ? "bg-white/14 hover:bg-white/22 text-white" : "text-indigo-500/70 hover:text-indigo-500 hover:bg-indigo-500/10")}>
-        <Download className="w-3.5 h-3.5" />
+          dark ? "bg-white/14 hover:bg-white/22 text-white" : "text-muted-foreground/70 hover:text-foreground hover:bg-muted")}>
+        <MoreVertical className="w-3.5 h-3.5" />
       </button>
+      {/* Portaled to <body> — the card is itself a click target (opens Edit) and has a
+          hover:-translate-y transform, which becomes the containing block for a plain
+          `position: fixed` child, clipping/mispositioning it instead of anchoring to the
+          viewport. */}
       {open && typeof document !== "undefined" && createPortal(
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div style={menuStyle} className="bg-card border border-border rounded-xl shadow-xl overflow-hidden">
-            <button onClick={() => pick("all")} className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted/60 transition-colors">
-              All time
+          <div role="menu" style={menuStyle} className="bg-card border border-border rounded-xl shadow-xl overflow-hidden py-1">
+            <Link href={`/expenses?accountId=${account.id}&tab=all`} role="menuitem" onClick={() => setOpen(false)} className={rowClass}>
+              <List className="w-4 h-4 text-muted-foreground" /> View Transactions
+            </Link>
+            <button role="menuitem" onClick={downloadStatement} className={rowClass}>
+              <Download className="w-4 h-4 text-muted-foreground" /> Download Statement
             </button>
-            {years.map(y => (
-              <button key={y} onClick={() => pick(y)} className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted/60 transition-colors">
-                {y}
-              </button>
-            ))}
+            <div className="my-1 border-t border-border/60" />
+            {moneyActions.map(a => {
+              const ActionIcon = a.icon;
+              return (
+                <button key={a.key} role="menuitem" onClick={() => { a.onClick(); setOpen(false); }} className={rowClass}>
+                  <ActionIcon className={cn("w-4 h-4", a.color)} /> {a.label}
+                </button>
+              );
+            })}
+            {onImportStatement && (
+              <>
+                <div className="my-1 border-t border-border/60" />
+                <button role="menuitem" onClick={() => { onImportStatement(); setOpen(false); }} className={rowClass}>
+                  <Upload className="w-4 h-4 text-muted-foreground" /> Import Statement
+                </button>
+              </>
+            )}
           </div>
         </>,
         document.body
@@ -107,68 +140,6 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
   const statusMeta = getLifecycleStatusMeta(account.status);
   const purpose = resolvePurposeLabel(account.purpose, account.purposeLabel);
   const [revealAcctNum, setRevealAcctNum] = useState(false);
-  const [showActionMenu, setShowActionMenu] = useState(false);
-  const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
-  const actionBtnRef = useRef<HTMLButtonElement>(null);
-
-  type CardAction = { key: string; label: string; icon: typeof Plus; color: string; onClick: () => void };
-
-  // One icon per card, always — a single action fires directly, multiple actions open a small menu.
-  // Keeps the card footer to one control instead of stacking a button per action.
-  const renderActions = (actions: CardAction[], dark = false) => {
-    if (actions.length === 1) {
-      const a = actions[0];
-      const ActionIcon = a.icon;
-      return (
-        <button onClick={a.onClick} title={a.label}
-          className={cn("w-7 h-7 rounded-lg flex items-center justify-center transition-all",
-            dark ? "bg-white/14 hover:bg-white/22 text-white" : cn(a.color, "bg-current/10 hover:bg-current/20"))}>
-          <ActionIcon className="w-3.5 h-3.5" />
-        </button>
-      );
-    }
-    // Fixed-position + viewport-clamped like BankNameInput's autocomplete — a plain `absolute`
-    // menu can run off-screen for cards near the right edge with no way to reposition itself.
-    const toggleMenu = () => {
-      if (!showActionMenu && actionBtnRef.current) {
-        const r = actionBtnRef.current.getBoundingClientRect();
-        const menuWidth = 160;
-        const left = Math.min(r.right - menuWidth, window.innerWidth - menuWidth - 8);
-        setMenuStyle({ position: "fixed", top: r.bottom + 4, left: Math.max(8, left), width: menuWidth, zIndex: 9999 });
-      }
-      setShowActionMenu(v => !v);
-    };
-    return (
-      <div className="relative">
-        <button ref={actionBtnRef} onClick={toggleMenu} title="Actions"
-          className={cn("w-7 h-7 rounded-lg flex items-center justify-center transition-all",
-            dark ? "bg-white/14 hover:bg-white/22 text-white" : "bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400")}>
-          <Plus className="w-3.5 h-3.5" />
-        </button>
-        {/* Portaled to <body> — the card is now a click target itself (opens Edit) and has a
-            hover:-translate-y transform, which becomes the containing block for a plain
-            `position: fixed` child, clipping/mispositioning it instead of anchoring to the
-            viewport. Same fix as the account-card edit menu needed. */}
-        {showActionMenu && typeof document !== "undefined" && createPortal(
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => setShowActionMenu(false)} />
-            <div style={menuStyle} className="bg-card border border-border rounded-xl shadow-xl overflow-hidden">
-              {actions.map(a => {
-                const ActionIcon = a.icon;
-                return (
-                  <button key={a.key} onClick={() => { a.onClick(); setShowActionMenu(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-foreground hover:bg-muted/60 transition-colors">
-                    <ActionIcon className={cn("w-4 h-4", a.color)} /> {a.label}
-                  </button>
-                );
-              })}
-            </div>
-          </>,
-          document.body
-        )}
-      </div>
-    );
-  };
 
   const pct = isCreditCard
     ? (account.creditLimit && account.creditLimit > 0
@@ -192,8 +163,8 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
       <div onClick={onEdit}
         className="relative rounded-2xl shadow-sm hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 animate-fade-in-up cursor-pointer">
         {/* Real, separately-focusable control for the same action the card's plain onClick above
-            already does — a role="button" here would nest the View-transactions/Download/Actions
-            controls below inside another interactive widget (axe's nested-interactive rule), so
+            already does — a role="button" here would nest the Account Actions menu control below
+            inside another interactive widget (axe's nested-interactive rule), so
             the card itself stays a non-widget div and this sr-only-until-focused button is the
             keyboard/screen-reader path to Edit instead. */}
         <button type="button" onClick={onEdit}
@@ -241,14 +212,11 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
                   {daysUntilDue < 0 ? "Overdue" : daysUntilDue === 0 ? "Due today" : `Due in ${daysUntilDue}d`}
                 </span>
               )}
-              <Link href={`/expenses?accountId=${account.id}&tab=all`} title="View transactions" className="w-7 h-7 rounded-lg text-white/60 hover:text-white hover:bg-white/15 flex items-center justify-center transition-all">
-                <List className="w-3.5 h-3.5" />
-              </Link>
-              <DownloadStatementButton account={account} dark />
-              {renderActions([
-                { key: "charge",  label: "Charge",   icon: Receipt,         color: "text-rose-500",   onClick: onAddExpense },
-                { key: "paybill", label: "Pay Bill", icon: ArrowLeftRight,  color: "text-indigo-500", onClick: onTransfer },
-              ], true)}
+              <AccountActionsMenu account={account} dark
+                moneyActions={[
+                  { key: "charge",  label: "Charge",   icon: Receipt,        color: "text-rose-500",   onClick: onAddExpense },
+                  { key: "paybill", label: "Pay Bill", icon: ArrowLeftRight, color: "text-indigo-500", onClick: onTransfer },
+                ]} />
             </div>
           </div>
 
@@ -328,8 +296,8 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
     <div onClick={onEdit}
       className="relative bg-card border border-border/50 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 animate-fade-in-up flex flex-col cursor-pointer overflow-hidden">
       {/* Real, separately-focusable control for the same action the card's plain onClick above
-          already does — a role="button" here would nest the View-transactions/Download/Actions
-          controls below inside another interactive widget (axe's nested-interactive rule), so
+          already does — a role="button" here would nest the Account Actions menu control below
+          inside another interactive widget (axe's nested-interactive rule), so
           the card itself stays a non-widget div and this sr-only-until-focused button is the
           keyboard/screen-reader path to Edit instead. */}
       <button type="button" onClick={onEdit}
@@ -395,26 +363,13 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
               {daysUntilEmi < 0 ? "EMI overdue" : daysUntilEmi === 0 ? "EMI due today" : `EMI in ${daysUntilEmi}d`}
             </span>
           )}
-          <Link
-            href={`/expenses?accountId=${account.id}&tab=all`}
-            title="View transactions"
-            className="w-7 h-7 rounded-lg text-indigo-500/70 hover:text-indigo-500 hover:bg-indigo-500/10 flex items-center justify-center transition-all">
-            <List className="w-3.5 h-3.5" />
-          </Link>
-          <DownloadStatementButton account={account} />
-          {onImportStatement && (
-            <button
-              title="Import statement"
-              onClick={onImportStatement}
-              className="w-7 h-7 rounded-lg text-indigo-500/70 hover:text-indigo-500 hover:bg-indigo-500/10 flex items-center justify-center transition-all">
-              <Upload className="w-3.5 h-3.5" />
-            </button>
-          )}
-          {renderActions([
-            { key: "expense", label: "Add Expense", icon: Receipt,        color: "text-red-500",     onClick: onAddExpense },
-            { key: "income",  label: "Add Income",  icon: Banknote,       color: "text-emerald-500", onClick: onAddMoney },
-            { key: "transfer", label: "Transfer",   icon: ArrowLeftRight, color: "text-indigo-500",  onClick: onTransfer },
-          ])}
+          <AccountActionsMenu account={account}
+            moneyActions={[
+              { key: "expense",  label: "Add Expense", icon: Receipt,        color: "text-red-500",     onClick: onAddExpense },
+              { key: "income",   label: "Add Income",  icon: Banknote,       color: "text-emerald-500", onClick: onAddMoney },
+              { key: "transfer", label: "Transfer",    icon: ArrowLeftRight, color: "text-indigo-500",  onClick: onTransfer },
+            ]}
+            onImportStatement={onImportStatement} />
         </div>
       </div>
 
