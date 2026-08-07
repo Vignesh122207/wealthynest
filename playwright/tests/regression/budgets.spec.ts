@@ -112,12 +112,7 @@ test.describe("Budgets", () => {
     await budgetsPage.createMonthlyBudget({ categoryName: category.name, amount: 10000 });
     await budgetsPage.createYearlyBudget({ categoryName: category.name, amount: 20000 });
 
-    // The summary strip is tab-scoped now (Monthly tab shows this month's own spend, not the
-    // annual figure this regression is actually about) — a fresh gotoBudgets() lands back on
-    // the default Monthly tab, so the Yearly tab has to be selected explicitly to exercise the
-    // annualSpent dedup path at all.
     await budgetsPage.gotoBudgets();
-    await budgetsPage.selectBudgetTypeTab("YEARLY");
     await budgetsPage.expectAnnualSpent("₹555");
   });
 });

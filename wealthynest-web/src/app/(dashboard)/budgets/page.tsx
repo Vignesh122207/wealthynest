@@ -1,7 +1,6 @@
 "use client";
 
 import {useState} from "react";
-import Link from "next/link";
 import {
     AlertTriangle,
     ArrowUpDown,
@@ -11,7 +10,6 @@ import {
     Check,
     ChevronLeft,
     ChevronRight,
-    Landmark,
     PieChart,
     Plus,
     Repeat,
@@ -42,12 +40,10 @@ import {BigAmountInput} from "@/components/transactions/BigAmountInput";
 import {getCategoryColor, getCategoryIcon} from "@/lib/categoryMeta";
 import {CATEGORY_COLOR_PALETTE, CATEGORY_ICON_LIST, suggestUnusedCombo} from "@/lib/categoryIcons";
 import {useBudgets, useCreateBudget, useDeleteBudget,} from "@/features/budgets/hooks/useBudgets";
-import {useLiabilities} from "@/features/liability/hooks/useLiabilities";
 import {useCategories, useCreateCategory} from "@/features/categories/hooks/useCategories";
 import {type BudgetFormValues, budgetSchema} from "@/features/budgets/schemas/budget.schema";
 import {BudgetDetailModal} from "@/features/budgets/components/BudgetDetailModal";
 import {BudgetTypeTabs} from "./_components/BudgetTypeTabs";
-import {getMonthsElapsedInYear} from "./_components/budgets.utils";
 import type {Budget, BudgetType} from "@/features/budgets/types/budget.types";
 import {cn} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
@@ -145,10 +141,6 @@ export default function BudgetsPage() {
   const { mutate: deleteBudget }                         = useDeleteBudget();
   const { data: categories = [] }                        = useCategories("EXPENSE");
   const { mutate: createCategory, isPending: creatingCat } = useCreateCategory();
-  // Liabilities' own EMI figures — read-only here, never a Budget line item. Surfacing them
-  // (see monthlyEmiTotal below) is about giving the Monthly summary honest context for what
-  // "Remaining" really means, not about tracking EMIs a second time in a second system.
-  const { data: liabilities = [] }                       = useLiabilities();
 
   const form = useForm<BudgetFormValues>({
     resolver: zodResolver(budgetSchema),
@@ -244,17 +236,10 @@ export default function BudgetsPage() {
 
   // Monthly and yearly budgets live on different time bases (a monthly amount recurs
   // every month, a yearly amount doesn't) — summing them raw would understate the true
-  // annual commitment. Annualize monthly before combining with yearly (as-is).
-  //
-  // Prorated by monthsElapsedInYear, not a flat ×12 — a flat ×12 projects a full year's
-  // budget from whatever the *current* month's amount happens to be, which overstates
-  // "Budgeted" for anyone who only started budgeting partway through the year (e.g. set up
-  // in October: ×12 claims a full ₹2.4L/yr commitment against 10 months of mostly-unbudgeted
-  // real spend). Prorating to "how many months of this year have actually happened" pairs
-  // honestly against annualSpent below, which is real spend-to-date, not a projection either.
-  // A fully-elapsed past year still gets the full 12 months, same as before.
-  const monthsElapsedInYear = getMonthsElapsedInYear(year, now);
-  const annualBudgeted   = monthlyBudgeted * monthsElapsedInYear + yearlyBudgeted;
+  // annual commitment. Annualize monthly (×12) before combining with yearly (as-is).
+  // annualSpent (from the API) is the actual full-calendar-year spend in each budget's
+  // category regardless of type, so it pairs honestly with annualBudgeted — no extrapolation.
+  const annualBudgeted   = monthlyBudgeted * 12 + yearlyBudgeted;
   // Deduped by categoryId, not a plain sum over `budgets` — a category can have both a
   // MONTHLY and a YEARLY budget at once (see the picker's existingCategoryIds comment above),
   // and BudgetServiceImpl puts the *same* category-level annualSpent figure on both rows, so
@@ -263,23 +248,6 @@ export default function BudgetsPage() {
   const annualSpent      = [...annualSpentByCategory.values()].reduce((s, v) => s + v, 0);
   const annualRemaining  = Math.max(0, annualBudgeted - annualSpent);
   const overBudgetCount  = budgets.filter(b => b.overBudget).length;
-
-  // Tab-scoped summary — the hero cards used to always show annual figures even while
-  // browsing Monthly, so the page never directly answered "how much can I still spend this
-  // month" without scrolling into the list below. Monthly tab now shows this month's own
-  // numbers; Yearly tab keeps the annual (now correctly prorated) view.
-  const isMonthlyTab       = activeType === "MONTHLY";
-  const summaryBudgeted    = isMonthlyTab ? monthlyBudgeted : annualBudgeted;
-  const summarySpent       = isMonthlyTab ? monthlySpent : annualSpent;
-  const summaryRemaining   = isMonthlyTab ? Math.max(0, monthlyBudgeted - monthlySpent) : annualRemaining;
-  const summaryPeriodLabel = isMonthlyTab ? "This Month" : "This Year";
-
-  // Read-only awareness, not a duplicate budget line — EMIs already live in Liabilities
-  // (principal/outstanding/lender, sometimes derived straight from a loan Account) with their
-  // own emiAmount field, always a monthly figure by definition. Without this, "Remaining This
-  // Month" can read as spare cash when a large fixed EMI debit is still coming and never
-  // touched the Budget/Expense ledger at all.
-  const monthlyEmiTotal = liabilities.reduce((s, l) => s + (l.emiAmount ?? 0), 0);
 
   return (
     <div className="flex flex-col flex-1">
@@ -453,20 +421,18 @@ export default function BudgetsPage() {
           </div>
         </div>
 
-        {/* Summary — tab-scoped: Monthly shows this month's own numbers, Yearly keeps the
-            (correctly prorated, see monthsElapsedInYear above) combined annual view. */}
+        {/* Summary */}
         {budgets.length > 0 && (
-          <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Card className="p-4">
               <PremiumIcon icon={Wallet} tone="orange" size="xs" className="mb-2" />
-              <p className="text-xs text-muted-foreground mb-1">Budgeted {summaryPeriodLabel}</p>
-              <p className="text-lg font-bold text-foreground tabular-nums">{fmt(summaryBudgeted)}</p>
-              {!isMonthlyTab && (monthlyBudgeted > 0 || yearlyBudgeted > 0) && (
+              <p className="text-xs text-muted-foreground mb-1">Budgeted This Year</p>
+              <p className="text-lg font-bold text-foreground tabular-nums">{fmt(annualBudgeted)}</p>
+              {(monthlyBudgeted > 0 || yearlyBudgeted > 0) && (
                 <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                   {monthlyBudgeted > 0 && (
                     <span className="inline-flex items-center gap-1 pl-1 pr-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-medium tabular-nums">
-                      <Calendar className="w-2.5 h-2.5" /> {fmt(monthlyBudgeted)}/mo×{monthsElapsedInYear}
+                      <Calendar className="w-2.5 h-2.5" /> {fmt(monthlyBudgeted)}/mo×12
                     </span>
                   )}
                   {yearlyBudgeted > 0 && (
@@ -479,16 +445,16 @@ export default function BudgetsPage() {
             </Card>
             <Card className="p-4">
               <PremiumIcon icon={Target} tone="red" size="xs" className="mb-2" />
-              <p className="text-xs text-muted-foreground mb-1">Spent {summaryPeriodLabel}</p>
-              <p data-testid="budget-annual-spent" className="text-lg font-bold text-red-600 dark:text-red-400 tabular-nums">{fmt(summarySpent)}</p>
+              <p className="text-xs text-muted-foreground mb-1">Spent This Year</p>
+              <p data-testid="budget-annual-spent" className="text-lg font-bold text-red-600 dark:text-red-400 tabular-nums">{fmt(annualSpent)}</p>
               <span className="inline-flex items-center gap-1 mt-1.5 pl-1 pr-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-medium">
-                <BadgeCheck className="w-2.5 h-2.5" /> Actual · {isMonthlyTab ? monthLabel(year, month) : `Jan–Dec ${year}`}
+                <BadgeCheck className="w-2.5 h-2.5" /> Actual · Jan–Dec {year}
               </span>
             </Card>
             <Card className="p-4">
               <PremiumIcon icon={Check} tone="green" size="xs" className="mb-2" />
-              <p className="text-xs text-muted-foreground mb-1">Remaining {summaryPeriodLabel}</p>
-              <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{fmt(summaryRemaining)}</p>
+              <p className="text-xs text-muted-foreground mb-1">Remaining This Year</p>
+              <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{fmt(annualRemaining)}</p>
             </Card>
             <Card className={cn("p-4", overBudgetCount > 0 && "border-red-500/30")}>
               <PremiumIcon icon={AlertTriangle} tone={overBudgetCount > 0 ? "red" : "gray"} size="xs" className="mb-2" />
@@ -499,27 +465,6 @@ export default function BudgetsPage() {
               </p>
             </Card>
           </div>
-
-          {/* Read-only EMI awareness — Monthly tab only, and only once there's something to
-              show. Deliberately not a Card in the grid above: visually distinct from a budget
-              line so it never reads as "a 5th budget," since it isn't one — it's a pointer to
-              Liabilities, the actual source of truth for these figures. */}
-          {isMonthlyTab && monthlyEmiTotal > 0 && (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-muted/40 border border-border/60">
-              <PremiumIcon icon={Landmark} tone="gray" size="xs" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground">
-                  Fixed commitments this month <span className="text-muted-foreground font-normal">· not counted above</span>
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">EMIs from your tracked loans — manage them in Liabilities.</p>
-              </div>
-              <div className="text-right shrink-0">
-                <p className="text-sm font-bold text-foreground tabular-nums">{fmt(monthlyEmiTotal)}</p>
-                <Link href="/assets" className="text-xs text-primary hover:underline">View liabilities →</Link>
-              </div>
-            </div>
-          )}
-          </>
         )}
 
         {/* Budget lists */}
