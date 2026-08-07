@@ -7,6 +7,11 @@ const config: Config = {
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/features/**/*.{js,ts,jsx,tsx,mdx}",
+    // Class-name string constants (PURPOSE_CHIP_CLASS, LIFECYCLE_STATUS_META's chipClass, etc.)
+    // live here too — Tailwind only scans raw file text for class names, it doesn't resolve JS
+    // imports, so any file outside these globs silently produces unstyled classes no matter how
+    // many components import the constant.
+    "./src/lib/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {
