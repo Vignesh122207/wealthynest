@@ -18,7 +18,7 @@ export const LoanCard = memo(function LoanCard({ account: a, onDownload, onEdit,
   const closed      = outstanding <= 0;
   return (
     <div onClick={onEdit}
-      className="relative bg-card border border-border rounded-2xl p-5 space-y-4 cursor-pointer">
+      className="relative bg-card rounded-md border border-slate-100/80 dark:border-border/50 shadow-soft dark:shadow-none card-hover p-5 space-y-4 cursor-pointer">
       {/* Real, separately-focusable control for the same action the card's plain onClick above
           already does — a role="button" here would nest the Download/Record Payment controls
           below inside another interactive widget (axe's nested-interactive rule), so the card
@@ -40,7 +40,7 @@ export const LoanCard = memo(function LoanCard({ account: a, onDownload, onEdit,
                 <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500">Paid off</span>
               )}
             </div>
-            <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest mt-0.5">Outstanding</p>
+            <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-0.5">Outstanding</p>
           </div>
         </div>
         <button title="Download statement" onClick={e => { e.stopPropagation(); onDownload(); }}
@@ -49,11 +49,11 @@ export const LoanCard = memo(function LoanCard({ account: a, onDownload, onEdit,
         </button>
       </div>
 
-      <p className="text-2xl font-bold text-foreground tabular-nums">{fmt(outstanding)}</p>
+      <p className="text-2xl font-extrabold text-foreground tabular-nums">{fmt(outstanding)}</p>
 
       <div>
-        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-          <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${paidPct}%` }} />
+        <div className="h-1 rounded-full progress-track overflow-hidden">
+          <div className="h-full rounded-full bg-emerald-500 transition-all duration-700" style={{ width: `${paidPct}%` }} />
         </div>
         <p className="text-[11px] text-muted-foreground/70 mt-1 tabular-nums">
           {paidPct.toFixed(0)}% of {fmt(principal)} repaid

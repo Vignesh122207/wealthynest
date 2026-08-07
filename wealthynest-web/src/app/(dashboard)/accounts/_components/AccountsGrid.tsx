@@ -36,7 +36,7 @@ export function AccountsGrid({
   if (isLoading) {
     return (
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {[1, 2, 3].map(i => <div key={i} className="h-52 bg-muted rounded-2xl animate-pulse" />)}
+        {[1, 2, 3].map(i => <div key={i} className="h-52 bg-muted rounded-md animate-pulse" />)}
       </div>
     );
   }
@@ -101,7 +101,7 @@ export function AccountsGrid({
               )}
             </div>
           ) : (
-            <div className="bg-card border border-dashed border-border rounded-2xl p-5 text-center">
+            <div className="bg-card border border-dashed border-border rounded-md p-5 text-center">
               <p className="text-sm text-muted-foreground">No bank accounts added</p>
               <button onClick={() => onCreate("BANK_ACCOUNT")} className="mt-2 text-xs text-indigo-500 dark:text-indigo-400 hover:underline transition-colors">+ Add Bank Account</button>
             </div>
@@ -124,7 +124,7 @@ export function AccountsGrid({
           </div>
           {cashAccounts.length > 0
             ? <div className="grid gap-4 lg:grid-cols-2">{cashAccounts.map(a => renderAccountCard(a))}</div>
-            : <div className="bg-card border border-dashed border-border rounded-2xl p-5 text-center">
+            : <div className="bg-card border border-dashed border-border rounded-md p-5 text-center">
                 <p className="text-sm text-muted-foreground">No cash wallet</p>
                 <button onClick={() => onCreate("CASH_WALLET")} className="mt-2 text-xs text-emerald-500 dark:text-emerald-400 hover:underline transition-colors">+ Set up</button>
               </div>
@@ -152,7 +152,7 @@ export function AccountsGrid({
               )}
             </div>
           ) : (
-            <div className="bg-card border border-dashed border-border rounded-2xl p-5 text-center">
+            <div className="bg-card border border-dashed border-border rounded-md p-5 text-center">
               <p className="text-sm text-muted-foreground">No credit cards added</p>
               <button onClick={() => onCreate("CREDIT_CARD")} className="mt-2 text-xs text-rose-500 dark:text-rose-400 hover:underline transition-colors">+ Add Credit Card</button>
             </div>
@@ -180,7 +180,7 @@ export function AccountsGrid({
               )}
             </div>
           ) : (
-            <div className="bg-card border border-dashed border-border rounded-2xl p-5 text-center">
+            <div className="bg-card border border-dashed border-border rounded-md p-5 text-center">
               <p className="text-sm text-muted-foreground">No loans tracked</p>
               <p className="text-xs text-muted-foreground/80 mt-1">Track EMIs and see loans reflected in your net worth automatically.</p>
               <button onClick={() => onCreate("LOAN")} className="mt-2 text-xs text-rose-500 dark:text-rose-400 hover:underline transition-colors">+ Add Loan</button>

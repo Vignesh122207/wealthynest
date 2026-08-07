@@ -18,8 +18,6 @@ import {
   Receipt,
   Repeat,
   Star,
-  TrendingDown,
-  TrendingUp,
   Upload,
   Wifi,
 } from "lucide-react";
@@ -162,7 +160,7 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
     // ── Credit card: premium card design ──────────────────────────────────────
     return (
       <div onClick={onEdit}
-        className="relative rounded-2xl shadow-sm hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 animate-fade-in-up cursor-pointer">
+        className="relative rounded-md shadow-sm card-hover animate-fade-in-up cursor-pointer">
         {/* Real, separately-focusable control for the same action the card's plain onClick above
             already does — a role="button" here would nest the Account Actions menu control below
             inside another interactive widget (axe's nested-interactive rule), so
@@ -174,7 +172,7 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
         </button>
         {/* Background layer — clipped to the rounded corners on its own, so content (like the
             action menu below) isn't also clipped when it needs to overflow the card bounds. */}
-        <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
+        <div className="absolute inset-0 rounded-md overflow-hidden pointer-events-none">
           <div className="absolute inset-0 bg-gradient-to-br from-slate-600 via-slate-700 to-zinc-800 dark:from-slate-700 dark:via-slate-800 dark:to-zinc-900" />
           <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-white/10" />
           <div className="absolute -bottom-10 -right-2 w-40 h-40 rounded-full bg-white/5" />
@@ -233,8 +231,8 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
 
           {/* Outstanding balance */}
           <div className="mb-1">
-            <p className="text-xs text-white/60 uppercase tracking-widest mb-0.5">Outstanding</p>
-            <p className="text-2xl font-bold text-white tabular-nums">{fmt(account.currentBalance)}</p>
+            <p className="text-xs text-white/60 uppercase tracking-wide mb-0.5">Outstanding</p>
+            <p className="text-2xl font-extrabold text-white tabular-nums">{fmt(account.currentBalance)}</p>
           </div>
 
           {/* Limit + available */}
@@ -248,8 +246,8 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
           {/* Utilisation bar */}
           {account.creditLimit && (
             <div className="mt-3">
-              <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
-                <div className={cn("h-full rounded-full transition-all",
+              <div className="h-1 bg-white/20 rounded-full overflow-hidden">
+                <div className={cn("h-full rounded-full transition-all duration-700",
                   pct > 90 ? "bg-red-300" : pct > 70 ? "bg-amber-300" : "bg-white/70")}
                   style={{ width: `${pct}%` }} />
               </div>
@@ -293,9 +291,11 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
   // ── Regular account card ──────────────────────────────────────────────────
   const meta = ACCOUNT_TYPE_META[account.accountType];
 
+  const isPrimary = account.accountType === "BANK_ACCOUNT" && account.primary;
+
   return (
     <div onClick={onEdit}
-      className="relative bg-card border border-border/50 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 animate-fade-in-up flex flex-col cursor-pointer overflow-hidden">
+      className="relative bg-card rounded-md border border-slate-100/80 dark:border-border/50 shadow-soft dark:shadow-none card-hover animate-fade-in-up flex flex-col cursor-pointer overflow-hidden">
       {/* Real, separately-focusable control for the same action the card's plain onClick above
           already does — a role="button" here would nest the Account Actions menu control below
           inside another interactive widget (axe's nested-interactive rule), so
@@ -305,6 +305,10 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-20 focus:px-3 focus:py-1.5 focus:rounded-lg focus:bg-primary focus:text-primary-foreground focus:text-xs focus:font-medium">
         Edit {account.name}
       </button>
+      {/* Quiet selection signal for the default account — a left rail rather than a border/ring
+          around the whole card, so it reads at a glance without competing with the card's own
+          type-color gradient edge just below it. */}
+      {isPrimary && <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-400 dark:bg-amber-500" aria-hidden />}
       {/* Same premium gradient-edge treatment as the form modal headers, tinted to this account
           type's own Apple system color — a lighter touch than the credit card's full "physical
           card" face, but still gives every type its own visible identity rather than just a
@@ -376,7 +380,7 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
 
       <div className="mb-4">
         <div className="flex items-center gap-1.5 mb-0.5">
-          <p className="text-[10px] text-muted-foreground/70 uppercase tracking-widest">
+          <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">
             {account.accountType === "LOAN" ? "Outstanding" : "Balance"}
           </p>
           {account.belowLowBalanceThreshold && (
@@ -386,7 +390,7 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
             </span>
           )}
         </div>
-        <p className={cn("text-2xl font-bold tabular-nums",
+        <p className={cn("text-2xl font-extrabold tabular-nums",
           account.currentBalance < 0 ? "text-red-500 dark:text-red-400" : "text-foreground")}>
           {fmt(account.currentBalance)}
         </p>
@@ -415,25 +419,13 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2 mb-3">
-        <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl px-3 py-2">
-          <div className="flex items-center gap-1 mb-0.5">
-            <TrendingUp className="w-3 h-3 text-emerald-500" />
-            <p className="text-[10px] text-muted-foreground/80 uppercase tracking-wide">In</p>
-          </div>
-          <p className="text-sm font-bold text-emerald-500 dark:text-emerald-400 tabular-nums">
-            {fmt(account.totalMoneyIn)}
-          </p>
-        </div>
-        <div className="bg-red-500/5 border border-red-500/10 rounded-xl px-3 py-2">
-          <div className="flex items-center gap-1 mb-0.5">
-            <TrendingDown className="w-3 h-3 text-red-500" />
-            <p className="text-[10px] text-muted-foreground/80 uppercase tracking-wide">Out</p>
-          </div>
-          <p className="text-sm font-bold text-red-500 dark:text-red-400 tabular-nums">
-            {fmt(account.totalMoneyOut)}
-          </p>
-        </div>
+      <div className="flex items-center gap-4 mb-3 text-xs font-bold tabular-nums">
+        <span className="text-emerald-600 dark:text-emerald-400">
+          ↑ {fmt(account.totalMoneyIn)} <span className="font-medium text-muted-foreground/70">in</span>
+        </span>
+        <span className="text-rose-500 dark:text-rose-400">
+          ↓ {fmt(account.totalMoneyOut)} <span className="font-medium text-muted-foreground/70">out</span>
+        </span>
       </div>
 
       {linkedDebts.filter(d => d.status !== "SETTLED").length > 0 && (
@@ -469,7 +461,7 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
               {pct.toFixed(0)}%
             </span>
           </div>
-          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+          <div className="h-1 progress-track rounded-full overflow-hidden">
             <div className={cn("h-full rounded-full transition-all duration-700",
               pct > 90 ? "bg-red-500/70" : pct > 70 ? "bg-amber-500/70" : "bg-indigo-500/60")}
               style={{ width: `${pct}%` }} />

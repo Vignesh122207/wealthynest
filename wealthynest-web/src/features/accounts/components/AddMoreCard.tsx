@@ -10,7 +10,7 @@ export function AddMoreCard({ label, type, onClick }: { label: string; type: Acc
   const meta = ACCOUNT_TYPE_META[type];
   return (
     <button type="button" onClick={onClick}
-      className="flex flex-col items-center justify-center gap-2 min-h-[168px] rounded-2xl border-2 border-dashed border-border text-muted-foreground/70 transition-all hover:bg-muted/30"
+      className="flex flex-col items-center justify-center gap-2 min-h-[168px] rounded-md border-2 border-dashed border-border text-muted-foreground/70 transition-all hover:bg-muted/30"
       onMouseEnter={e => { e.currentTarget.style.borderColor = meta.hex + "60"; e.currentTarget.style.color = meta.hex; }}
       onMouseLeave={e => { e.currentTarget.style.borderColor = ""; e.currentTarget.style.color = ""; }}>
       <PremiumIcon icon={meta.icon} hex={meta.hex} size="sm" />
