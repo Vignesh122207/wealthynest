@@ -43,6 +43,10 @@ interface TileProps {
   icon: LucideIcon; tone: IconTone;
   label: string; value: string;
   deltaText?: string; deltaGood?: boolean;
+  /** Overrides the deltaGood-derived green/red color — for tiles with a third (amber) state,
+   * e.g. Budget Used's spent/budgeted line. */
+  deltaColorClass?: string;
+  valueTestId?: string; deltaTestId?: string;
   delay?: string;
   /** Net Worth alone — a soft primary-tinted card + a step-larger value, so it reads as the
    * dashboard's headline number at a glance while staying inside the same 6-up grid as every
@@ -50,7 +54,7 @@ interface TileProps {
   primary?: boolean;
 }
 
-function StatTile({ icon, tone, label, value, deltaText, deltaGood, delay = "delay-0", primary }: TileProps) {
+function StatTile({ icon, tone, label, value, deltaText, deltaGood, deltaColorClass, valueTestId, deltaTestId, delay = "delay-0", primary }: TileProps) {
   return (
     <div className={cn(
       "rounded-2xl p-4 shadow-sm border card-hover animate-fade-in-up",
@@ -61,14 +65,14 @@ function StatTile({ icon, tone, label, value, deltaText, deltaGood, delay = "del
         <PremiumIcon icon={icon} tone={tone} size="sm" />
         <p className="text-xs font-semibold text-muted-foreground/80 truncate">{label}</p>
       </div>
-      <p className={cn(
+      <p data-testid={valueTestId} className={cn(
         "font-bold text-foreground tabular-nums tracking-tight leading-none mb-2",
         primary ? "text-2xl" : "text-xl"
       )}>{value}</p>
       {deltaText ? (
-        <p className={cn(
-          "text-[11px] font-semibold tabular-nums",
-          deltaGood ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"
+        <p data-testid={deltaTestId} className={cn(
+          "text-[11px] font-semibold tabular-nums truncate",
+          deltaColorClass ?? (deltaGood ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400")
         )}>
           {deltaText}
         </p>
@@ -79,7 +83,21 @@ function StatTile({ icon, tone, label, value, deltaText, deltaGood, delay = "del
   );
 }
 
-// ── Budget Used — flat StatTile layout: label, big used%, then spent-of-budgeted caption ──
+// Same tier scale BudgetSection.tsx uses per-category (>80% amber, over budget red) — pct here
+// is USED (spent/budgeted), so unlike a plain progress bar, higher is worse.
+type BudgetTier = "green" | "amber" | "red";
+function usedTier(pct: number): BudgetTier {
+  if (pct > 100) return "red";
+  if (pct > 80) return "amber";
+  return "green";
+}
+const TIER_CAPTION: Record<BudgetTier, string> = {
+  green: "text-emerald-600 dark:text-emerald-400",
+  amber: "text-amber-600 dark:text-amber-400",
+  red:   "text-red-500 dark:text-red-400",
+};
+
+// ── Budget Used — reuses StatTile so it stays pixel-aligned with every other hero tile ──
 function BudgetUsedTile({ spent, budgeted, total, emptyLabel, fmt, delay = "delay-375" }: {
   spent: number; budgeted: number; total: number; emptyLabel: string;
   fmt: (amount: number) => string; delay?: string;
@@ -87,18 +105,14 @@ function BudgetUsedTile({ spent, budgeted, total, emptyLabel, fmt, delay = "dela
   const pct = budgeted > 0 ? (spent / budgeted) * 100 : 0;
 
   return (
-    <div className={cn("bg-card rounded-2xl p-4 shadow-sm border border-border/50 card-hover animate-fade-in-up", delay)}>
-      <div className="flex items-center gap-2 mb-3">
-        <PremiumIcon icon={Target} tone="orange" size="sm" />
-        <p className="text-xs font-semibold text-muted-foreground/80 truncate">Budget Used</p>
-      </div>
-      <p data-testid="budget-progress-tile" className="text-xl font-bold text-foreground tabular-nums tracking-tight leading-none mb-2">
-        {total > 0 ? `${Math.round(pct)}%` : "—"}
-      </p>
-      <p data-testid="budget-progress-caption" className="text-[11px] font-semibold text-muted-foreground tabular-nums truncate">
-        {total > 0 ? `${fmt(spent)} of ${fmt(budgeted)}` : emptyLabel}
-      </p>
-    </div>
+    <StatTile
+      icon={Target} tone="orange" label="Budget Used"
+      value={total > 0 ? `${Math.round(pct)}%` : "—"}
+      deltaText={total > 0 ? `${fmt(spent)} of ${fmt(budgeted)}` : emptyLabel}
+      deltaColorClass={total > 0 ? TIER_CAPTION[usedTier(pct)] : "text-muted-foreground"}
+      valueTestId="budget-progress-tile" deltaTestId="budget-progress-caption"
+      delay={delay}
+    />
   );
 }
 
