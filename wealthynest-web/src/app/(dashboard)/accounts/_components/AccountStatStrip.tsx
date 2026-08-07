@@ -35,7 +35,7 @@ export function AccountStatStrip({
         <PremiumIcon icon={Wallet} tone="blue" size="xs" className="mb-2" />
         <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">Total Balance</p>
         <p className="text-base font-extrabold tabular-nums text-foreground">{fmt(totalAssetsAcrossAccounts)}</p>
-        <p className="text-[10px] text-muted-foreground/80">Cash &amp; bank, purpose tags included</p>
+        <p className="text-[10px] text-muted-foreground">Cash &amp; bank, purpose tags included</p>
       </div>
 
       {bankAccounts.length > 0 && (
@@ -43,7 +43,7 @@ export function AccountStatStrip({
           <PremiumIcon icon={Landmark} hex={ACCOUNT_TYPE_META.BANK_ACCOUNT.hex} size="xs" className="mb-2" />
           <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">Bank</p>
           <p className="text-base font-extrabold tabular-nums text-foreground">{fmt(bankBalance)}</p>
-          <p className="text-[10px] text-muted-foreground/80">{bankAccounts.length} account{bankAccounts.length === 1 ? "" : "s"}</p>
+          <p className="text-[10px] text-muted-foreground">{bankAccounts.length} account{bankAccounts.length === 1 ? "" : "s"}</p>
         </div>
       )}
 
@@ -52,7 +52,7 @@ export function AccountStatStrip({
           <PremiumIcon icon={Wallet} hex={ACCOUNT_TYPE_META.CASH_WALLET.hex} size="xs" className="mb-2" />
           <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">Cash Wallet</p>
           <p className="text-base font-extrabold tabular-nums text-foreground">{fmt(cashBalance)}</p>
-          <p className="text-[10px] text-muted-foreground/80">{cashAccounts.length} account{cashAccounts.length === 1 ? "" : "s"}</p>
+          <p className="text-[10px] text-muted-foreground">{cashAccounts.length} account{cashAccounts.length === 1 ? "" : "s"}</p>
         </div>
       )}
 
@@ -63,7 +63,7 @@ export function AccountStatStrip({
           <PremiumIcon icon={CreditCard} hex={ACCOUNT_TYPE_META.CREDIT_CARD.hex} size="xs" className="mb-2" />
           <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">Credit Cards</p>
           <p className="text-base font-extrabold tabular-nums text-foreground">{fmt(creditCardDebt)}</p>
-          <p className={cn("text-[10px]", creditCardDebt > 0 ? "text-rose-500 dark:text-rose-400" : "text-muted-foreground/80")}>
+          <p className={cn("text-[10px]", creditCardDebt > 0 ? "text-rose-500 dark:text-rose-400" : "text-muted-foreground")}>
             {creditCards.length} card{creditCards.length === 1 ? "" : "s"}{creditCardDebt > 0 ? " · dues" : ""}
           </p>
         </div>
@@ -74,7 +74,7 @@ export function AccountStatStrip({
           <PremiumIcon icon={HandCoins} hex={ACCOUNT_TYPE_META.LOAN.hex} size="xs" className="mb-2" />
           <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">Loans</p>
           <p className="text-base font-extrabold tabular-nums text-foreground">{fmt(loanDebt)}</p>
-          <p className={cn("text-[10px]", loanDebt > 0 ? "text-rose-500 dark:text-rose-400" : "text-muted-foreground/80")}>
+          <p className={cn("text-[10px]", loanDebt > 0 ? "text-rose-500 dark:text-rose-400" : "text-muted-foreground")}>
             {loanAccounts.length} active
           </p>
         </div>

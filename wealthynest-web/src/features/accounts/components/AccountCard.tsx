@@ -295,7 +295,16 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
 
   return (
     <div onClick={onEdit}
-      className="relative bg-card rounded-md border border-slate-100/80 dark:border-border/50 shadow-soft dark:shadow-none card-hover animate-fade-in-up flex flex-col cursor-pointer overflow-hidden">
+      className={cn(
+        "relative rounded-md card-hover animate-fade-in-up flex flex-col cursor-pointer overflow-hidden",
+        // Material You "tonal container" selection state — a full-block tint of the app's own
+        // primary token (same pattern AccountStatStrip's Total Balance tile already uses) rather
+        // than a border/ring/accent stripe competing for attention. Unselected cards stay a plain
+        // near-borderless surface so the primary account reads as the one elevated block.
+        isPrimary
+          ? "bg-primary/8 dark:bg-primary/10 border border-primary/10 dark:border-primary/25 shadow-soft dark:shadow-none"
+          : "bg-card border border-slate-200/50 dark:border-border/50 shadow-soft dark:shadow-none",
+      )}>
       {/* Real, separately-focusable control for the same action the card's plain onClick above
           already does — a role="button" here would nest the Account Actions menu control below
           inside another interactive widget (axe's nested-interactive rule), so
@@ -305,10 +314,6 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-20 focus:px-3 focus:py-1.5 focus:rounded-lg focus:bg-primary focus:text-primary-foreground focus:text-xs focus:font-medium">
         Edit {account.name}
       </button>
-      {/* Quiet selection signal for the default account — a left rail rather than a border/ring
-          around the whole card, so it reads at a glance without competing with the card's own
-          type-color gradient edge just below it. */}
-      {isPrimary && <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-400 dark:bg-amber-500" aria-hidden />}
       {/* Same premium gradient-edge treatment as the form modal headers, tinted to this account
           type's own Apple system color — a lighter touch than the credit card's full "physical
           card" face, but still gives every type its own visible identity rather than just a
@@ -419,12 +424,12 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
         </div>
       )}
 
-      <div className="flex items-center gap-4 mb-3 text-xs font-bold tabular-nums">
+      <div className="flex items-center gap-4 mb-3 text-xs font-medium tabular-nums">
         <span className="text-emerald-600 dark:text-emerald-400">
-          ↑ {fmt(account.totalMoneyIn)} <span className="font-medium text-muted-foreground/70">in</span>
+          ↑ {fmt(account.totalMoneyIn)} <span className="text-muted-foreground/70">in</span>
         </span>
-        <span className="text-rose-500 dark:text-rose-400">
-          ↓ {fmt(account.totalMoneyOut)} <span className="font-medium text-muted-foreground/70">out</span>
+        <span className="text-red-500 dark:text-red-400">
+          ↓ {fmt(account.totalMoneyOut)} <span className="text-muted-foreground/70">out</span>
         </span>
       </div>
 
@@ -452,7 +457,9 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
         </div>
       )}
 
-      {account.totalMoneyIn > 0 && (
+      {/* Compresses the card's vertical space when there's nothing to show — a 0% rail (unfunded
+          account, or funded but nothing spent yet) carries no information worth a whole row. */}
+      {pct > 0 && (
         <div className="mb-3">
           <div className="flex items-center justify-between mb-1">
             <span className="text-[10px] text-muted-foreground/80 uppercase tracking-wide">Spending</span>

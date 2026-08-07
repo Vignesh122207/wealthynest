@@ -108,11 +108,14 @@ export function FloatingActionButton({ actions }: FloatingActionButtonProps) {
           onClick={() => setOpen(v => !v)}
           aria-label={open ? "Close menu" : "Quick add"}
           className={cn(
-            "w-14 h-14 rounded-2xl flex items-center justify-center select-none",
+            "w-14 h-14 rounded-full flex items-center justify-center select-none",
             "transition-all duration-200",
+            // Soft ambient elevation tinted to the button's own color (same "colored shadow"
+            // convention this app already uses on its gradient CTA buttons), rather than a flat
+            // neutral shadow — reads as a true Material FAB regardless of what's behind it.
             open
-              ? "bg-slate-700/90 dark:bg-slate-600/90 backdrop-blur-sm"
-              : "bg-gradient-to-br from-[#c2703d] to-[#27272a] hover:scale-105 active:scale-95"
+              ? "bg-slate-700/90 dark:bg-slate-600/90 backdrop-blur-sm shadow-lg shadow-black/20"
+              : "bg-gradient-to-br from-[#c2703d] to-[#27272a] shadow-lg shadow-[#c2703d]/30 hover:shadow-xl hover:shadow-[#c2703d]/40 hover:scale-105 active:scale-95"
           )}>
           {open
             ? <X    className="w-6 h-6 text-white transition-transform duration-200" />
