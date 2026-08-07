@@ -11,8 +11,11 @@ import { PURPOSE_LABELS } from "@/features/accounts/schemas/account.schema";
 // The Purpose *picker* is a different context (choosing among 16 options up front, same job the
 // bank/broker picker's per-row logos do) — each purpose gets its own icon/tone there so the list
 // is scannable, without changing how a chosen purpose reads once it's just a tag on a card.
+// Neutral slate, not amber — this used to share the same gold as the "Primary" badge, so the two
+// sat right next to each other on a card and read as one blob instead of two distinct facts
+// (which account is your default vs. what this one's earmarked for).
 export const PURPOSE_CHIP_CLASS =
-  "text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20";
+  "text-slate-600 dark:text-slate-300 bg-slate-500/10 border border-slate-500/20";
 
 export const PURPOSE_ICON_META: Record<string, { icon: LucideIcon; tone: IconTone }> = {
   EMERGENCY_FUND:   { icon: ShieldCheck,   tone: "orange" },

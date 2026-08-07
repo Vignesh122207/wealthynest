@@ -6,6 +6,8 @@ import Link from "next/link";
 import {
   AlertCircle,
   ArrowLeftRight,
+  ArrowDown,
+  ArrowUp,
   Banknote,
   Calendar,
   ChevronDown,
@@ -159,7 +161,7 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
     // ── Credit card: premium card design ──────────────────────────────────────
     return (
       <div onClick={onEdit}
-        className="relative rounded-md shadow-sm card-hover animate-fade-in-up cursor-pointer">
+        className="relative h-full rounded-md shadow-sm card-hover animate-fade-in-up cursor-pointer">
         {/* Real, separately-focusable control for the same action the card's plain onClick above
             already does — a role="button" here would nest the Account Actions menu control below
             inside another interactive widget (axe's nested-interactive rule), so
@@ -295,7 +297,11 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
   return (
     <div onClick={onEdit}
       className={cn(
-        "relative rounded-md card-hover animate-fade-in-up flex flex-col cursor-pointer overflow-hidden",
+        "relative h-full rounded-md card-hover animate-fade-in-up flex flex-col cursor-pointer overflow-hidden",
+        // Grid rows auto-size to their tallest sibling, but a card whose Spending rail got
+        // compressed away (0%) doesn't reliably fill that height on its own — h-full plus the
+        // flex-1 spacer at the bottom of the card body (below) claims the rest of the row instead
+        // of leaving a ragged, shorter card next to a taller one.
         // Material You "tonal container" selection state — a full-block tint of the app's own
         // primary token (same pattern AccountStatStrip's Total Balance tile already uses) rather
         // than a border/ring/accent stripe competing for attention. Unselected cards stay a plain
@@ -328,7 +334,11 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
               {account.accountType === "BANK_ACCOUNT" && (
                 account.primary ? (
                   <span title="Primary account"
-                    className="shrink-0 flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-500 bg-amber-500/10 rounded-full px-1.5 py-0.5">
+                    // amber-500 text on a 10%-tint background measures ~2.1:1 — well under WCAG
+                    // AA's 4.5:1 floor for text this small. amber-700 clears it comfortably while
+                    // keeping the same gold "starred" identity; dark mode's amber-400 already had
+                    // enough contrast against the dark card background.
+                    className="shrink-0 flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400 bg-amber-500/10 rounded-full px-1.5 py-0.5">
                     <Star className="w-2.5 h-2.5" fill="currentColor" /> Primary
                   </span>
                 ) : (
@@ -384,7 +394,7 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
           </p>
           {account.belowLowBalanceThreshold && (
             <span title={`Below your ${fmt(account.lowBalanceThreshold ?? 0)} alert threshold`}
-              className="flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-500 bg-amber-500/10 rounded-full px-1.5 py-0.5">
+              className="flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400 bg-amber-500/10 rounded-full px-1.5 py-0.5">
               <AlertCircle className="w-2.5 h-2.5" /> Low
             </span>
           )}
@@ -418,12 +428,15 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
         </div>
       )}
 
+      {/* Lucide arrows, not Unicode ↑/↓ glyphs — a literal arrow character renders off whatever
+          font stack the OS happens to substitute, so its stroke weight/baseline never quite
+          matches the rest of the app's SVG iconography. */}
       <div className="flex items-center gap-4 mb-3 text-xs font-medium tabular-nums">
-        <span className="text-emerald-600 dark:text-emerald-400">
-          ↑ {fmt(account.totalMoneyIn)} <span className="text-muted-foreground/70">in</span>
+        <span className="inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400">
+          <ArrowUp className="w-3 h-3" /> {fmt(account.totalMoneyIn)} <span className="text-muted-foreground/70">in</span>
         </span>
-        <span className="text-red-500 dark:text-red-400">
-          ↓ {fmt(account.totalMoneyOut)} <span className="text-muted-foreground/70">out</span>
+        <span className="inline-flex items-center gap-0.5 text-red-500 dark:text-red-400">
+          <ArrowDown className="w-3 h-3" /> {fmt(account.totalMoneyOut)} <span className="text-muted-foreground/70">out</span>
         </span>
       </div>
 
@@ -436,13 +449,13 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
             return (
               <>
                 {lentAmt > 0 && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-500 font-medium">
-                    ↑ {fmt(lentAmt)} lent out
+                  <span className="inline-flex items-center gap-0.5 text-xs px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-500 font-medium">
+                    <ArrowUp className="w-3 h-3" /> {fmt(lentAmt)} lent out
                   </span>
                 )}
                 {borAmt > 0 && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 font-medium">
-                    ↓ {fmt(borAmt)} borrowed
+                  <span className="inline-flex items-center gap-0.5 text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 font-medium">
+                    <ArrowDown className="w-3 h-3" /> {fmt(borAmt)} borrowed
                   </span>
                 )}
               </>

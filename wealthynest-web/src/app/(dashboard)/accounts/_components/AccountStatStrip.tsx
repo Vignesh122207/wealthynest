@@ -31,10 +31,13 @@ export function AccountStatStrip({
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3 animate-fade-in-up">
+      {/* The one number on this page that actually matters most gets real hero weight (bigger
+          icon + bigger figure) instead of sitting at the same visual size as its own sub-totals
+          (Bank, Cash Wallet, …) right next to it. */}
       <div className="bg-primary/8 rounded-md border border-primary/10 dark:border-primary/20 shadow-soft dark:shadow-none p-4">
-        <PremiumIcon icon={Wallet} tone="blue" size="xs" className="mb-2" />
+        <PremiumIcon icon={Wallet} tone="blue" size="sm" className="mb-2" />
         <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">Total Balance</p>
-        <p className="text-base font-extrabold tabular-nums text-foreground">{fmt(totalAssetsAcrossAccounts)}</p>
+        <p className="text-xl font-extrabold tabular-nums text-foreground">{fmt(totalAssetsAcrossAccounts)}</p>
         <p className="text-[10px] text-muted-foreground">Cash &amp; bank, purpose tags included</p>
       </div>
 

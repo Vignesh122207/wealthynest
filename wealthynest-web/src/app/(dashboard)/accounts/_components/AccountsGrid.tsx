@@ -70,7 +70,7 @@ export function AccountsGrid({
     // Cards → Loans — a lone Bank account and a lone Cash Wallet land in the same row instead of
     // each sitting alone in its own full-width section.
     return (
-      <div className="grid gap-4 lg:grid-cols-2 animate-fade-in-up">
+      <div className="grid items-stretch gap-4 lg:grid-cols-2 animate-fade-in-up">
         {allAccountsOrdered.map(a => renderAccountCard(a))}
         {allAccountsOrdered.length % 2 === 1 && (
           <AddMoreCard label="Account" type="BANK_ACCOUNT" onClick={() => onCreate("BANK_ACCOUNT")} />
@@ -94,7 +94,7 @@ export function AccountsGrid({
             </button>
           </div>
           {bankAccounts.length > 0 ? (
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid items-stretch gap-4 lg:grid-cols-2">
               {bankAccounts.map(a => renderAccountCard(a))}
               {bankAccounts.length % 2 === 1 && (
                 <AddMoreCard label="Bank Account" type="BANK_ACCOUNT" onClick={() => onCreate("BANK_ACCOUNT")} />
@@ -123,7 +123,7 @@ export function AccountsGrid({
             )}
           </div>
           {cashAccounts.length > 0
-            ? <div className="grid gap-4 lg:grid-cols-2">{cashAccounts.map(a => renderAccountCard(a))}</div>
+            ? <div className="grid items-stretch gap-4 lg:grid-cols-2">{cashAccounts.map(a => renderAccountCard(a))}</div>
             : <div className="bg-card border border-dashed border-border rounded-md p-5 text-center">
                 <p className="text-sm text-muted-foreground">No cash wallet</p>
                 <button onClick={() => onCreate("CASH_WALLET")} className="mt-2 text-xs text-emerald-500 dark:text-emerald-400 hover:underline transition-colors">+ Set up</button>
@@ -145,7 +145,7 @@ export function AccountsGrid({
             </button>
           </div>
           {creditCards.length > 0 ? (
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid items-stretch gap-4 lg:grid-cols-2">
               {creditCards.map(a => renderAccountCard(a))}
               {creditCards.length % 2 === 1 && (
                 <AddMoreCard label="Credit Card" type="CREDIT_CARD" onClick={() => onCreate("CREDIT_CARD")} />
@@ -173,7 +173,7 @@ export function AccountsGrid({
             </button>
           </div>
           {loanAccounts.length > 0 ? (
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid items-stretch gap-4 lg:grid-cols-2">
               {loanAccounts.map(a => renderAccountCard(a))}
               {loanAccounts.length % 2 === 1 && (
                 <AddMoreCard label="Loan" type="LOAN" onClick={() => onCreate("LOAN")} />

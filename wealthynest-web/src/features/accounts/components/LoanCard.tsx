@@ -18,7 +18,7 @@ export const LoanCard = memo(function LoanCard({ account: a, onDownload, onEdit,
   const closed      = outstanding <= 0;
   return (
     <div onClick={onEdit}
-      className="relative bg-card rounded-md border border-slate-100/80 dark:border-border/50 shadow-soft dark:shadow-none card-hover p-5 space-y-4 cursor-pointer">
+      className="relative h-full bg-card rounded-md border border-slate-100/80 dark:border-border/50 shadow-soft dark:shadow-none card-hover p-5 space-y-4 cursor-pointer">
       {/* Real, separately-focusable control for the same action the card's plain onClick above
           already does — a role="button" here would nest the Download/Record Payment controls
           below inside another interactive widget (axe's nested-interactive rule), so the card
@@ -75,7 +75,7 @@ export const LoanCard = memo(function LoanCard({ account: a, onDownload, onEdit,
           <span className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{a.apr}% p.a.</span>
         )}
         {a.nextEmiDate && (
-          <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+          <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400">
             Next EMI {formatDate(a.nextEmiDate)}
           </span>
         )}
