@@ -4,6 +4,14 @@ import {resolveGranularityRange, detectRollingGranularity} from "./granularity";
 const today = new Date(2026, 7, 7); // Aug 7, 2026 (month is 0-indexed)
 
 describe("resolveGranularityRange", () => {
+  it("1W resolves to one week back through today", () => {
+    expect(resolveGranularityRange("1W", today)).toEqual({ customStart: "2026-07-31", customEnd: "2026-08-07" });
+  });
+
+  it("1M resolves to one month back through today", () => {
+    expect(resolveGranularityRange("1M", today)).toEqual({ customStart: "2026-07-07", customEnd: "2026-08-07" });
+  });
+
   it("3M resolves to three months back through today", () => {
     expect(resolveGranularityRange("3M", today)).toEqual({ customStart: "2026-05-07", customEnd: "2026-08-07" });
   });
@@ -25,6 +33,14 @@ describe("resolveGranularityRange", () => {
 });
 
 describe("detectRollingGranularity", () => {
+  it("detects 1W", () => {
+    expect(detectRollingGranularity("custom", "2026-07-31", "2026-08-07", today)).toBe("1W");
+  });
+
+  it("detects 1M", () => {
+    expect(detectRollingGranularity("custom", "2026-07-07", "2026-08-07", today)).toBe("1M");
+  });
+
   it("detects a rolling range that exactly matches 3M's computed range", () => {
     expect(detectRollingGranularity("custom", "2026-05-07", "2026-08-07", today)).toBe("3M");
   });
