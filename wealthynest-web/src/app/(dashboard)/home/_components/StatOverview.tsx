@@ -86,11 +86,14 @@ function StatTile({ icon, tone, label, value, deltaText, deltaGood, delay = "del
 // "mostly healthy." Red is reserved for when more budgets have failed than not (<50% on track,
 // the "majority" line); 80% matches the threshold BudgetSection.tsx already uses per-category, so
 // the ring stays on the same scale as the rest of the page instead of inventing a second one.
+// Unlike BudgetSection.tsx's per-category bars, this tile's pct is USED (spent/budgeted), not
+// on-track — so the scale is inverted from a plain progress bar: higher is worse, matching
+// BudgetSection.tsx's own >80% amber / overBudget red thresholds.
 type BudgetTier = "green" | "amber" | "red";
-function budgetTier(pct: number): BudgetTier {
-  if (pct >= 80) return "green";
-  if (pct >= 50) return "amber";
-  return "red";
+function usedTier(pct: number): BudgetTier {
+  if (pct > 100) return "red";
+  if (pct > 80) return "amber";
+  return "green";
 }
 const TIER_HEX:    Record<BudgetTier, string> = { green: "#10b981", amber: "#f59e0b", red: "#ef4444" };
 const TIER_CAPTION: Record<BudgetTier, string> = {
@@ -99,23 +102,23 @@ const TIER_CAPTION: Record<BudgetTier, string> = {
   red:   "text-red-500 dark:text-red-400",
 };
 
-// ── Budget Progress — a ring instead of plain text, showing budgets on track out of total ──
-function BudgetProgressTile({ onTrack, total, emptyLabel, delay = "delay-375" }: {
-  onTrack: number; total: number; emptyLabel: string; delay?: string;
+// ── Budget Used — a ring showing total spend against total budgeted, in currency ──
+function BudgetUsedTile({ spent, budgeted, total, overCount, emptyLabel, fmt, delay = "delay-375" }: {
+  spent: number; budgeted: number; total: number; overCount: number; emptyLabel: string;
+  fmt: (amount: number) => string; delay?: string;
 }) {
-  const overCount = total - onTrack;
   const allOnTrack = total > 0 && overCount === 0;
-  const pct = total > 0 ? (onTrack / total) * 100 : 0;
-  const tier = budgetTier(pct);
+  const pct = budgeted > 0 ? (spent / budgeted) * 100 : 0;
+  const tier = usedTier(pct);
   const ringColor = total === 0 ? "hsl(var(--muted-foreground))" : TIER_HEX[tier];
   const r = 19, c = 2 * Math.PI * r;
-  const offset = c - (pct / 100) * c;
+  const offset = c - (Math.min(pct, 100) / 100) * c;
 
   return (
     <div className={cn("bg-card rounded-2xl p-4 shadow-sm border border-border/50 card-hover animate-fade-in-up", delay)}>
       <div className="flex items-center gap-2 mb-3">
         <PremiumIcon icon={Target} tone="orange" size="sm" />
-        <p className="text-xs font-semibold text-muted-foreground/80 truncate">Budget Progress</p>
+        <p className="text-xs font-semibold text-muted-foreground/80 truncate">Budget Used</p>
       </div>
       <div className="flex items-center gap-3" data-testid="budget-progress-tile">
         <div className="relative w-14 h-14 shrink-0">
@@ -140,8 +143,8 @@ function BudgetProgressTile({ onTrack, total, emptyLabel, delay = "delay-375" }:
           </div>
         </div>
         <div className="min-w-0">
-          <p data-testid="budget-progress-caption" className="text-lg font-bold text-foreground tabular-nums tracking-tight leading-none">
-            {total > 0 ? `${onTrack} of ${total}` : "—"}
+          <p data-testid="budget-progress-caption" className="text-lg font-bold text-foreground tabular-nums tracking-tight leading-none truncate">
+            {total > 0 ? `${fmt(spent)} of ${fmt(budgeted)}` : "—"}
           </p>
           <p className={cn(
             "flex items-center gap-1 text-[11px] font-semibold mt-1.5",
@@ -187,7 +190,8 @@ export function StatOverview({
   const activeBudgets   = isYear ? yearlyBudgets : monthlyBudgets;
   const budgetTotal     = activeBudgets.length;
   const budgetOverCount = activeBudgets.filter(b => b.overBudget || b.paceOverBudget).length;
-  const budgetOnTrack   = budgetTotal - budgetOverCount;
+  const budgetSpent     = activeBudgets.reduce((s, b) => s + b.spent, 0);
+  const budgetBudgeted  = activeBudgets.reduce((s, b) => s + b.budgeted, 0);
 
   // [&>*]:min-w-0 on both grids below — see TwoColRow's identical comment: without it, a large
   // formatted currency value (grid items default to min-width:auto) can push a tile — and the
@@ -255,9 +259,9 @@ export function StatOverview({
         deltaGood={savingsRateDeltaPct != null ? savingsRateDeltaPct >= 0 : undefined}
         delay="delay-300"
       />
-      <BudgetProgressTile onTrack={budgetOnTrack} total={budgetTotal}
+      <BudgetUsedTile spent={budgetSpent} budgeted={budgetBudgeted} total={budgetTotal} overCount={budgetOverCount}
         emptyLabel={isYear ? "No yearly budgets set" : "No monthly budgets set"}
-        delay="delay-375" />
+        fmt={fmt} delay="delay-375" />
     </div>
   );
 }

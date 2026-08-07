@@ -90,16 +90,17 @@ test.describe("Home dashboard — dynamic reflow", () => {
   });
 
   // ── Round 2: Month/Year toggle ──────────────────────────────────────────────
-  test("Month/Year toggle swaps the hero label, stat tile labels, and the Budget Progress ring @regression", async () => {
+  test("Month/Year toggle swaps the hero label, stat tile labels, and the Budget Used ring @regression", async () => {
     // Reuses beforeAll's ₹1,500 this-month expense in the same category to trip this over its
-    // limit — the ring's "0 of 1" below depends on that, not on anything created here.
+    // ₹1,000 limit — the ring's "₹1,500 of ₹1,000" below depends on that, not on anything created here.
     await api.createBudget(accessToken, { categoryId, amount: 1000, budgetType: "MONTHLY" });
 
     await home.gotoHome();
 
     await expect(home.periodNavLabel).toHaveText(/^[A-Za-z]{3} \d{4}$/); // e.g. "Aug 2026"
-    // Month mode: the one MONTHLY budget seeded above (over its limit) is the only budget counted.
-    await expect(home.budgetProgressCaption).toHaveText("0 of 1");
+    // Month mode: the one MONTHLY budget seeded above (spent ₹1,500 against a ₹1,000 limit) is
+    // the only budget counted, so total spent/budgeted equal that single budget's figures.
+    await expect(home.budgetProgressCaption).toHaveText("₹1,500 of ₹1,000");
     // The detail panel below the ring must agree with it — it used to always receive every
     // budget unfiltered regardless of the toggle, so it never actually hit this empty state.
     await expect(home.budgetSection.getByText("No budgets set for this month")).not.toBeVisible();
@@ -110,9 +111,9 @@ test.describe("Home dashboard — dynamic reflow", () => {
     await expect(home.periodNavLabel).toHaveText(/^\d{4}$/); // just the year, no month
     await expect(page.getByText("YTD Income")).toBeVisible();
     await expect(page.getByText("YTD Expenses")).toBeVisible();
-    // Budget Progress follows the toggle like every other tile (see StatOverview's activeBudgets
-    // comment) — Year mode counts only YEARLY budgets, and none were seeded in this file, so it
-    // falls into the "no budgets for this period" empty state rather than repeating Month's count.
+    // Budget Used follows the toggle like every other tile (see StatOverview's activeBudgets
+    // comment) — Year mode sums only YEARLY budgets, and none were seeded in this file, so it
+    // falls into the "no budgets for this period" empty state rather than repeating Month's figures.
     await expect(home.budgetProgressCaption).toHaveText("—");
     // The detail panel must independently reach its own "no yearly budgets" empty state too —
     // before the fix it kept showing the seeded MONTHLY budget's row here instead, contradicting
@@ -123,7 +124,7 @@ test.describe("Home dashboard — dynamic reflow", () => {
 
     await home.switchToMonthMode();
     await expect(home.periodNavLabel).toHaveText(monthLabel!);
-    await expect(home.budgetProgressCaption).toHaveText("0 of 1");
+    await expect(home.budgetProgressCaption).toHaveText("₹1,500 of ₹1,000");
     await expect(home.budgetSection.getByText("No budgets set for this month")).not.toBeVisible();
   });
 
