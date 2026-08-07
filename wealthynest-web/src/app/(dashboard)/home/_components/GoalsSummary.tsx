@@ -4,7 +4,7 @@ import Link from "next/link";
 import {Target, Trophy} from "lucide-react";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {GOAL_COLORS, resolveGoalIcon} from "@/lib/categoryMeta";
-import {lighten, PremiumIcon} from "@/components/icons/PremiumIcon";
+import {PremiumIcon} from "@/components/icons/PremiumIcon";
 import {EmptyState} from "@/components/shared/EmptyState";
 import type {Goal} from "@/features/goals/types/goal.types";
 
@@ -78,24 +78,35 @@ export function GoalsSummary({ goals, isLoading }: GoalsSummaryProps) {
             </span>
           </div>
 
-          {/* Individual goals — icon badge + linear progress rail */}
+          {/* Individual goals — ringed icon progress + target date folded into the subtext */}
           <div className="divide-y divide-border/40">
             {goals.slice(0, 4).map((g, idx) => {
-              const pct       = g.targetAmount > 0 ? Math.min(100, (g.savedAmount / g.targetAmount) * 100) : 0;
-              const done      = g.savedAmount >= g.targetAmount;
-              const color     = done ? "#34C759" : GOAL_COLORS[idx % GOAL_COLORS.length];
-              const fillColor = lighten(color, 0.25);
-              const IconComp  = resolveGoalIcon(g);
-              const dateStr   = g.targetDate
+              const pct      = g.targetAmount > 0 ? Math.min(100, (g.savedAmount / g.targetAmount) * 100) : 0;
+              const done     = g.savedAmount >= g.targetAmount;
+              const color    = done ? "#34C759" : GOAL_COLORS[idx % GOAL_COLORS.length];
+              const IconComp = resolveGoalIcon(g);
+              const dateStr  = g.targetDate
                 ? new Date(g.targetDate).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
                 : null;
+              const r      = 18;
+              const c      = 2 * Math.PI * r;
+              const offset = c - (pct / 100) * c;
 
               return (
                 <div key={g.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                  <PremiumIcon icon={IconComp} hex={color} size="sm" className="shrink-0" />
+                  {/* Ring progress with icon centered */}
+                  <div className="relative w-11 h-11 flex items-center justify-center shrink-0">
+                    <svg width="44" height="44" viewBox="0 0 44 44" style={{ transform: "rotate(-90deg)" }} aria-hidden>
+                      <circle cx="22" cy="22" r={r} fill="none" stroke="hsl(var(--muted))" strokeWidth={4} />
+                      <circle cx="22" cy="22" r={r} fill="none" stroke={color} strokeWidth={4} strokeLinecap="round"
+                        strokeDasharray={c} strokeDashoffset={offset}
+                        style={{ transition: "stroke-dashoffset 1s ease" }} />
+                    </svg>
+                    <PremiumIcon icon={IconComp} hex={color} size="xs" className="absolute" />
+                  </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
                       <div className="flex items-center gap-1.5 min-w-0">
                         <p className="text-sm font-semibold text-foreground truncate">{g.name}</p>
                         {done && <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
@@ -103,12 +114,6 @@ export function GoalsSummary({ goals, isLoading }: GoalsSummaryProps) {
                       <span className="text-xs font-bold text-foreground tabular-nums shrink-0">
                         {pct.toFixed(0)}%
                       </span>
-                    </div>
-                    <div className="h-1.5 bg-muted rounded-full overflow-hidden mb-1">
-                      <div
-                        className="h-full rounded-full transition-all duration-700"
-                        style={{ width: `${pct}%`, backgroundColor: fillColor }}
-                      />
                     </div>
                     <p className="text-xs text-muted-foreground tabular-nums truncate">
                       {fmt(g.savedAmount)} of {fmt(g.targetAmount)}
