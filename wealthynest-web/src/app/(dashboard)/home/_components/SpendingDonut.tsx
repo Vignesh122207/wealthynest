@@ -48,7 +48,7 @@ export function SpendingDonut({ categoryBreakdown, year, month, viewMode, chart,
         </div>
         <Link href="/expenses"
           className="text-[11px] font-semibold text-primary hover:underline transition-colors">
-          See all →
+          View all →
         </Link>
       </div>
 

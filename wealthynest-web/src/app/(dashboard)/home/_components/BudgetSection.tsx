@@ -45,7 +45,7 @@ export function BudgetSection({ budgetSummaries, viewMode, year, month, isLoadin
         </div>
         <Link href="/budgets"
           className="text-xs font-semibold text-primary hover:underline transition-colors">
-          See all →
+          View all →
         </Link>
       </div>
 

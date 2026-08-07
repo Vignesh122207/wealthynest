@@ -43,7 +43,7 @@ export function NetWorthTrend({ history, netWorth, changePct, chart, isLoading }
       <div className="flex items-center justify-between mb-1">
         <h2 className="font-bold text-foreground text-sm">Net Worth Trend</h2>
         <Link href="/assets" className="text-[11px] font-semibold text-primary hover:underline transition-colors">
-          View details →
+          View all →
         </Link>
       </div>
 
