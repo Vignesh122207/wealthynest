@@ -41,7 +41,7 @@ export function NetWorthHero({ netWorth, changePct, changeLabel, history, chart,
           <div className="w-8 h-8 rounded-xl shimmer" />
           <div className="h-4 w-24 rounded shimmer" />
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-5">
           <div className="h-11 w-56 rounded-xl shimmer" />
           <div className="h-20 w-full sm:w-64 lg:w-72 rounded-xl shimmer" />
         </div>
@@ -61,7 +61,9 @@ export function NetWorthHero({ netWorth, changePct, changeLabel, history, chart,
         </Link>
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
+      {/* No justify-between here on purpose — the trend sparkline sits right next to the amount
+          it's tracking, not pushed off to the card's far edge with a wide gap between them. */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-5">
         <div className="min-w-0">
           {/* break-words: a large formatted currency figure (lakhs/crores in INR) is one unbroken
               token with no spaces to wrap on — at this size, on a narrow phone, that can overflow
