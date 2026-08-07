@@ -29,7 +29,7 @@ const GRAD_SAVED     = "dashboard6moSavedGrad";
 export function SixMonthTrend({ trend, chart, isLoading, title = "6-Month Trend" }: SixMonthTrendProps) {
   const { fmt, fmtC } = useAmountFormatter();
   return (
-    <div className="bg-card rounded-xl shadow-soft dark:shadow-none dark:border dark:border-border/50 p-5 h-full flex flex-col animate-fade-in-up card-hover">
+    <div className="bg-card rounded-xl shadow-soft dark:shadow-none dark:border dark:border-border/50 p-4 h-full flex flex-col animate-fade-in-up card-hover">
       <div className="flex items-center justify-between mb-1">
         <div>
           <h2 className="font-bold text-foreground text-sm">{title}</h2>

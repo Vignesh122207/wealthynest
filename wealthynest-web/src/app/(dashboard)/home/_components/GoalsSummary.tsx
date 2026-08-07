@@ -22,7 +22,7 @@ export function GoalsSummary({ goals, isLoading }: GoalsSummaryProps) {
 
   return (
     <div className="bg-card rounded-xl shadow-soft dark:shadow-none dark:border dark:border-border/50 overflow-hidden animate-fade-in-up delay-375 card-hover">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-border/40">
+      <div className="flex items-center justify-between px-4 py-3.5 border-b border-border/40">
         <div className="flex items-center gap-3">
           <h2 className="font-bold text-foreground text-sm">Goals</h2>
           {goals.length > 0 && (
@@ -44,7 +44,7 @@ export function GoalsSummary({ goals, isLoading }: GoalsSummaryProps) {
       </div>
 
       {isLoading ? (
-        <div className="p-5 space-y-3">
+        <div className="p-4 space-y-3">
           {[1, 2, 3].map(i => (
             <div key={i} className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl shimmer shrink-0" />
@@ -64,7 +64,7 @@ export function GoalsSummary({ goals, isLoading }: GoalsSummaryProps) {
           action={<Link href="/goals" className="text-xs font-semibold text-primary hover:underline">Create a goal →</Link>}
         />
       ) : (
-        <div className="p-5">
+        <div className="p-4">
           {/* Overall progress */}
           <div className="flex items-center gap-3 mb-4 p-3 rounded-xl bg-muted/40">
             <div className="flex-1 min-w-0">

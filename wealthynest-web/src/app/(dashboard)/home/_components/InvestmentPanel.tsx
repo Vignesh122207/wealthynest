@@ -109,7 +109,7 @@ export function InvestmentPanel({ investments, chart, isLoading }: InvestmentPan
   ];
 
   return (
-    <div className="bg-card rounded-xl shadow-soft dark:shadow-none dark:border dark:border-border/50 p-5 animate-fade-in-up card-hover">
+    <div className="bg-card rounded-xl shadow-soft dark:shadow-none dark:border dark:border-border/50 p-4 animate-fade-in-up card-hover">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="font-bold text-foreground text-sm">Investment Overview</h2>

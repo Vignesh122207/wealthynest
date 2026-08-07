@@ -52,7 +52,7 @@ function txnLabel(type: string, label: string, description?: string): string {
 
 function TxnSkeleton() {
   return (
-    <div className="flex items-center gap-3 px-5 py-3.5">
+    <div className="flex items-center gap-3 px-4 py-3">
       <div className="w-9 h-9 rounded-xl shimmer shrink-0" />
       <div className="flex-1 space-y-1.5">
         <div className="h-3.5 w-40 rounded-lg shimmer" />
@@ -90,7 +90,7 @@ export function TransactionList({ transactions, isLoading }: TransactionListProp
   const { fmt } = useAmountFormatter();
   return (
     <div className="bg-card rounded-xl shadow-soft dark:shadow-none dark:border dark:border-border/50 overflow-hidden animate-fade-in-up delay-300 flex flex-col h-full card-hover">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-border/40 shrink-0">
+      <div className="flex items-center justify-between px-4 py-3.5 border-b border-border/40 shrink-0">
         <h2 className="font-bold text-foreground text-sm">Recent Transactions</h2>
         <Link href="/expenses" className="text-xs font-semibold text-primary hover:underline transition-colors">
           See all →
@@ -112,7 +112,7 @@ export function TransactionList({ transactions, isLoading }: TransactionListProp
         <div className="divide-y divide-border/40">
           {transactions.map((t) => (
             <div key={t.id}
-              className="flex items-center gap-3 px-5 py-3.5 hover:bg-muted/30 transition-colors">
+              className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors">
               <TxnIcon type={t.type} label={t.label} categoryIcon={t.categoryIcon} categoryColor={t.categoryColor} />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate">
