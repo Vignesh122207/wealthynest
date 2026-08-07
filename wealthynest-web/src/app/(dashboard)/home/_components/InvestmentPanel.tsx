@@ -46,7 +46,7 @@ function holdingName(inv: Investment): string {
 }
 
 export function InvestmentPanel({ investments, chart, isLoading }: InvestmentPanelProps) {
-  const { fmt } = useAmountFormatter();
+  const { fmt, fmtC } = useAmountFormatter();
   const active = useMemo(() => investments.filter(i => i.status === "ACTIVE"), [investments]);
 
   // Mirrors the Investments page's own OverviewTab computation exactly (sum
@@ -191,15 +191,20 @@ export function InvestmentPanel({ investments, chart, isLoading }: InvestmentPan
                     <p className="text-[11px] text-muted-foreground/70 truncate mt-0.5">{INVESTMENT_TYPE_META[h.investmentType].label}</p>
                   </div>
                   <span className={cn(
-                    "inline-flex items-center gap-0.5 font-semibold tabular-nums shrink-0 pl-1.5 pr-2 py-1 rounded-full text-[11px]",
-                    h.gainLossPct >= 0
+                    "inline-flex items-center gap-1 shrink-0 pl-1.5 pr-2 py-1 rounded-full text-[11px] whitespace-nowrap",
+                    h.gainLoss >= 0
                       ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                       : "bg-red-500/10 text-red-500 dark:text-red-400"
                   )}>
-                    {h.gainLossPct >= 0
-                      ? <ArrowUpRight className="w-3 h-3" strokeWidth={2.5} />
-                      : <ArrowDownRight className="w-3 h-3" strokeWidth={2.5} />}
-                    {h.gainLossPct >= 0 ? "+" : ""}{h.gainLossPct.toFixed(1)}%
+                    {h.gainLoss >= 0
+                      ? <ArrowUpRight className="w-3 h-3 shrink-0" strokeWidth={2.5} />
+                      : <ArrowDownRight className="w-3 h-3 shrink-0" strokeWidth={2.5} />}
+                    <span className="font-semibold tabular-nums">
+                      {h.gainLoss >= 0 ? "+" : "-"}{fmtC(Math.abs(h.gainLoss))}
+                    </span>
+                    <span className="font-medium tabular-nums opacity-75">
+                      {h.gainLossPct >= 0 ? "+" : ""}{h.gainLossPct.toFixed(1)}%
+                    </span>
                   </span>
                 </div>
               ))}
