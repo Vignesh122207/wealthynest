@@ -38,7 +38,7 @@ export function SpendingDonut({ categoryBreakdown, year, month, viewMode, chart,
   const total = categoryBreakdown.reduce((s, c) => s + c.amount, 0);
 
   return (
-    <div className="bg-card rounded-xl shadow-soft dark:shadow-none dark:border dark:border-border/50 p-4 h-full flex flex-col animate-fade-in-up card-hover">
+    <div className="bg-card rounded-2xl border border-slate-100/80 dark:border-border/50 shadow-soft dark:shadow-none p-4 h-full flex flex-col animate-fade-in-up card-hover">
       <div className="flex items-center justify-between mb-1">
         <div>
           <h2 className="font-bold text-foreground text-sm">Spending</h2>

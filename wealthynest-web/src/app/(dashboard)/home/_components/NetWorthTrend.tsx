@@ -13,6 +13,7 @@ interface NetWorthTrendProps {
   netWorth:     number | undefined;
   changePct:    number | undefined;
   chart: {
+    isDark:       boolean;
     gridColor:    string;
     axisColor:    string;
     tooltipStyle: React.CSSProperties;
@@ -27,8 +28,18 @@ const GRAD_ID = "dashboardNwGrad";
 
 export function NetWorthTrend({ history, netWorth, changePct, chart, isLoading }: NetWorthTrendProps) {
   const { fmt, fmtC } = useAmountFormatter();
+  // Home-scoped, not a useChartTheme change — that hook also backs Family/Assets/Analytics/
+  // Investments charts, and a plain rgba(0,0,0,x)-based shadow/backdrop-blur only reads as
+  // "premium glass" against a light surface; kept local here instead of widening the shared token.
+  const gridStroke = chart.isDark ? chart.gridColor : "#F1F5F9";
+  const tooltipStyle: React.CSSProperties = {
+    ...chart.tooltipStyle,
+    background: chart.isDark ? "rgba(15, 23, 42, 0.75)" : "rgba(255, 255, 255, 0.75)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+  };
   return (
-    <div className="bg-card rounded-xl shadow-soft dark:shadow-none dark:border dark:border-border/50 p-4 h-full flex flex-col card-hover">
+    <div className="bg-card rounded-2xl border border-slate-100/80 dark:border-border/50 shadow-soft dark:shadow-none p-4 h-full flex flex-col card-hover">
       <div className="flex items-center justify-between mb-1">
         <h2 className="font-bold text-foreground text-sm">Net Worth Trend</h2>
         <Link href="/assets" className="text-[11px] font-semibold text-primary hover:underline transition-colors">
@@ -67,17 +78,17 @@ export function NetWorthTrend({ history, netWorth, changePct, chart, isLoading }
                   <stop offset="100%" stopColor={CHART_COLORS.primary} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={chart.gridColor} vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
               <XAxis dataKey="label" tick={{ fill: chart.axisColor, fontSize: 10 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: chart.axisColor, fontSize: 10 }} axisLine={false} tickLine={false}
                 tickFormatter={(v) => fmtC(v)}
                 width={50} />
               <Tooltip
-                contentStyle={chart.tooltipStyle} labelStyle={chart.labelStyle} itemStyle={chart.itemStyle}
+                contentStyle={tooltipStyle} labelStyle={chart.labelStyle} itemStyle={chart.itemStyle}
                 cursor={chart.cursorStyle}
                 formatter={(v: TooltipValueType | undefined) => [fmt(chartValueToNumber(v)), "Net Worth"]}
               />
-              <ReferenceLine y={0} stroke={chart.gridColor} strokeWidth={1.5} />
+              <ReferenceLine y={0} stroke={gridStroke} strokeWidth={1.5} />
               <Area type="monotone" dataKey="netWorth" stroke={CHART_COLORS.primary} strokeWidth={2.5}
                 fill={`url(#${GRAD_ID})`} dot={{ fill: CHART_COLORS.primary, r: 3, strokeWidth: 0 }}
                 activeDot={{ r: 5, fill: "#a78bfa", strokeWidth: 0 }} />

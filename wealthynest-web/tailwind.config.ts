@@ -43,7 +43,7 @@ const config: Config = {
         // `dark:shadow-none` pairing): a shadow this soft relies on being darker than a light page
         // background to read as elevation at all, which stops working the instant both the card
         // and the page are already dark navy, so dark mode keeps its border-based definition instead.
-        soft: "0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)",
+        soft: "0 10px 15px -3px rgba(0,0,0,0.02), 0 4px 6px -4px rgba(0,0,0,0.02)",
       },
       fontFamily: {
         sans: ["var(--font-jakarta)", "var(--font-inter)", "system-ui", "sans-serif"],

@@ -21,7 +21,7 @@ export function GoalsSummary({ goals, isLoading }: GoalsSummaryProps) {
   const goalsPct       = totalTarget > 0 ? Math.min(100, (totalSaved / totalTarget) * 100) : 0;
 
   return (
-    <div className="bg-card rounded-xl shadow-soft dark:shadow-none dark:border dark:border-border/50 overflow-hidden animate-fade-in-up delay-375 card-hover">
+    <div className="bg-card rounded-2xl border border-slate-100/80 dark:border-border/50 shadow-soft dark:shadow-none overflow-hidden animate-fade-in-up delay-375 card-hover">
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-border/40">
         <div className="flex items-center gap-3">
           <h2 className="font-bold text-foreground text-sm">Goals</h2>
@@ -115,9 +115,17 @@ export function GoalsSummary({ goals, isLoading }: GoalsSummaryProps) {
                       <p className="text-sm font-medium text-foreground truncate">{g.name}</p>
                       {done && <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
                     </div>
-                    <p className="text-xs text-muted-foreground tabular-nums mt-0.5 truncate">
-                      {fmt(g.savedAmount)} of {fmt(g.targetAmount)} · {pct.toFixed(0)}%
-                    </p>
+                    {/* Target and completion on one scannable row instead of a single run-on
+                        string — the amount stays left-anchored under the goal name, the percentage
+                        right-anchored under the target-date column above it. */}
+                    <div className="flex items-center justify-between gap-2 mt-0.5">
+                      <span className="text-xs text-muted-foreground tabular-nums truncate">
+                        {fmt(g.savedAmount)} of {fmt(g.targetAmount)}
+                      </span>
+                      <span className="text-xs font-semibold text-foreground tabular-nums shrink-0">
+                        {pct.toFixed(0)}%
+                      </span>
+                    </div>
                   </div>
 
                   <div className="text-[11px] text-muted-foreground/80 text-right shrink-0 ml-2 whitespace-nowrap">

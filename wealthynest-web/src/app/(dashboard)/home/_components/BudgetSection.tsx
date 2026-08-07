@@ -20,6 +20,12 @@ interface BudgetSectionProps {
 // Matches Recent Transactions' cap exactly
 const DISPLAY_COUNT = 8;
 
+// Soft peachy-coral (Tailwind orange-300) for the over-budget icon ring — warm enough to read as
+// "alert" without the harsh, saturated red the bar/badge used to carry, and close enough in hue to
+// the orange-500 warning bar below that the two read as one coherent alert language, not two
+// clashing signals.
+const OVER_BUDGET_ICON_HEX = "#FDBA74";
+
 export function BudgetSection({ budgetSummaries, viewMode, year, month, isLoading }: BudgetSectionProps) {
   // Caller (home/page.tsx) already filters budgetSummaries to MONTHLY vs YEARLY based on
   // viewMode, matching StatOverview's Budget Progress ring — this just needs to label whichever
@@ -31,7 +37,7 @@ export function BudgetSection({ budgetSummaries, viewMode, year, month, isLoadin
   const visible = [...budgetSummaries].sort((a, b) => b.percentUsed - a.percentUsed).slice(0, DISPLAY_COUNT);
 
   return (
-    <div data-testid="budget-section" className="bg-card rounded-xl shadow-soft dark:shadow-none dark:border dark:border-border/50 p-4 animate-fade-in-up delay-300 h-full flex flex-col card-hover">
+    <div data-testid="budget-section" className="bg-card rounded-2xl border border-slate-100/80 dark:border-border/50 shadow-soft dark:shadow-none p-4 animate-fade-in-up delay-300 h-full flex flex-col card-hover">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h2 className="font-bold text-foreground text-sm">Budget Progress</h2>
@@ -58,21 +64,18 @@ export function BudgetSection({ budgetSummaries, viewMode, year, month, isLoadin
       ) : budgetSummaries.length > 0 ? (
         <div className="flex-1 flex flex-col justify-center space-y-4">
           {visible.map((b) => {
-            const icon     = getCategoryIcon({ name: b.categoryName, icon: b.categoryIcon });
-            const color    = getCategoryColor(b.categoryName, b.categoryColor);
-            const pct      = Math.min(100, b.percentUsed);
-            const barColor = b.overBudget ? "#ef4444" : b.percentUsed > 80 ? "#f59e0b" : color;
+            const icon    = getCategoryIcon({ name: b.categoryName, icon: b.categoryIcon });
+            const color   = getCategoryColor(b.categoryName, b.categoryColor);
+            const pct     = Math.min(100, b.percentUsed); // never past 100 — the fill can't overrun the track even when percentUsed itself is 139
+            const atRisk  = b.overBudget || b.percentUsed > 80;
             return (
               <div key={b.categoryId}>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <PremiumIcon icon={icon} hex={color} size="xs" />
+                    {/* Over-budget now reads from the icon ring itself (a soft coral tint) instead
+                        of a separate "Over" text badge next to every at-risk category name. */}
+                    <PremiumIcon icon={icon} hex={b.overBudget ? OVER_BUDGET_ICON_HEX : color} size="xs" />
                     <span className="text-sm font-medium text-foreground truncate">{b.categoryName}</span>
-                    {b.overBudget && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-500 shrink-0">
-                        Over
-                      </span>
-                    )}
                   </div>
                   <div className="flex items-center gap-3 shrink-0 ml-2">
                     <span className="text-xs text-muted-foreground/70 tabular-nums">
@@ -80,7 +83,7 @@ export function BudgetSection({ budgetSummaries, viewMode, year, month, isLoadin
                     </span>
                     <span className={cn(
                       "text-xs font-bold w-9 text-right tabular-nums",
-                      b.overBudget ? "text-red-500" : b.percentUsed > 80 ? "text-amber-500" : "text-muted-foreground"
+                      atRisk ? "text-orange-600 dark:text-orange-400" : "text-emerald-600 dark:text-emerald-400"
                     )}>
                       {b.percentUsed.toFixed(0)}%
                     </span>
@@ -88,8 +91,8 @@ export function BudgetSection({ budgetSummaries, viewMode, year, month, isLoadin
                 </div>
                 <div className="h-2 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full rounded-full transition-all duration-700"
-                    style={{ width: `${pct}%`, backgroundColor: barColor }}
+                    className={cn("h-full rounded-full transition-all duration-700", atRisk ? "bg-orange-500" : "bg-emerald-500")}
+                    style={{ width: `${pct}%` }}
                   />
                 </div>
               </div>

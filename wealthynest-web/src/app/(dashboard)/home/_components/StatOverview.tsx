@@ -63,10 +63,10 @@ interface TileProps {
 function StatTile({ icon, tone, label, value, deltaText, deltaGood, deltaColorClass, bgTintClass, valueTestId, deltaTestId, delay = "delay-0", primary }: TileProps) {
   return (
     <div className={cn(
-      "rounded-xl p-3.5 card-hover animate-fade-in-up",
+      "rounded-2xl p-3.5 card-hover animate-fade-in-up",
       primary
         ? "bg-primary/[0.045] dark:bg-primary/[0.07] border border-primary/25 shadow-soft dark:shadow-none"
-        : cn(bgTintClass ?? "bg-card", "shadow-soft dark:shadow-none dark:border dark:border-border/50"),
+        : cn(bgTintClass ?? "bg-card", "border border-slate-100/80 dark:border-border/50 shadow-soft dark:shadow-none"),
       delay
     )}>
       <div className="flex items-center gap-2 mb-3">
@@ -172,10 +172,10 @@ export function StatOverview({
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 [&>*]:min-w-0">
         {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className={cn(
-            "rounded-xl p-3.5 space-y-3",
+            "rounded-2xl p-3.5 space-y-3",
             i === 0
               ? "bg-primary/[0.045] dark:bg-primary/[0.07] border border-primary/25 shadow-soft dark:shadow-none"
-              : "bg-card shadow-soft dark:shadow-none dark:border dark:border-border/50"
+              : "bg-card border border-slate-100/80 dark:border-border/50 shadow-soft dark:shadow-none"
           )}>
             <div className="w-8 h-8 rounded-xl shimmer" />
             <div className={cn("rounded-lg shimmer", i === 0 ? "h-7 w-28" : "h-6 w-24")} />

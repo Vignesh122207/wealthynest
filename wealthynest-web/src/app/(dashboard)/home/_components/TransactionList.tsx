@@ -53,7 +53,7 @@ function txnLabel(type: string, label: string, description?: string): string {
 function TxnSkeleton() {
   return (
     <div className="flex items-center gap-3 px-4 py-3">
-      <div className="w-9 h-9 rounded-xl shimmer shrink-0" />
+      <div className="w-9 h-9 rounded-full shimmer shrink-0" />
       <div className="flex-1 space-y-1.5">
         <div className="h-3.5 w-40 rounded-lg shimmer" />
         <div className="h-3 w-24 rounded shimmer" />
@@ -66,30 +66,35 @@ function TxnSkeleton() {
 function TxnIcon({ type, label, categoryIcon, categoryColor }: {
   type: string; label: string; categoryIcon?: string | null; categoryColor?: string | null;
 }) {
+  // Circular badge here only — PremiumIcon's default rounded-xl/rounded-2xl "glossy tile" shape
+  // is the shared system used everywhere else in the app (categories, accounts, goals...); this
+  // overrides just the radius for this one list via className, not the shared component itself.
+  const ring = "w-9 h-9 rounded-full";
+
   // INCOME — mapped Lucide icon per source
   if (type === "INCOME") {
     const src = INCOME_ICON_MAP[label] ?? INCOME_ICON_MAP.OTHER;
-    return <PremiumIcon icon={src.icon} hex={src.color} size="sm" className="w-9 h-9" />;
+    return <PremiumIcon icon={src.icon} hex={src.color} size="sm" className={ring} />;
   }
 
   // EXPENSE — the category's own icon/color first, name-keyword match as fallback
   if (type === "EXPENSE") {
     const icon  = getCategoryIcon({ name: label, icon: categoryIcon });
     const color = getCategoryColor(label, categoryColor ?? undefined);
-    return <PremiumIcon icon={icon} hex={color} size="sm" className="w-9 h-9" />;
+    return <PremiumIcon icon={icon} hex={color} size="sm" className={ring} />;
   }
 
   // TRANSFER / DEBT / ADJUSTMENT
   const t    = TXN_TRANSFER[type];
   const Icon = t ? t.icon : RefreshCw;
   const clr  = t ? t.color : "#94a3b8";
-  return <PremiumIcon icon={Icon} hex={clr} size="sm" className="w-9 h-9" />;
+  return <PremiumIcon icon={Icon} hex={clr} size="sm" className={ring} />;
 }
 
 export function TransactionList({ transactions, isLoading }: TransactionListProps) {
   const { fmt } = useAmountFormatter();
   return (
-    <div className="bg-card rounded-xl shadow-soft dark:shadow-none dark:border dark:border-border/50 overflow-hidden animate-fade-in-up delay-300 flex flex-col h-full card-hover">
+    <div className="bg-card rounded-2xl border border-slate-100/80 dark:border-border/50 shadow-soft dark:shadow-none overflow-hidden animate-fade-in-up delay-300 flex flex-col h-full card-hover">
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-border/40 shrink-0">
         <h2 className="font-bold text-foreground text-sm">Recent Transactions</h2>
         <Link href="/expenses" className="text-xs font-semibold text-primary hover:underline transition-colors">

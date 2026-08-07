@@ -9,6 +9,7 @@ import type {MonthlyTrend} from "@/features/dashboard/types/dashboard.types";
 interface SixMonthTrendProps {
   trend: MonthlyTrend[];
   chart: {
+    isDark:       boolean;
     gridColor:    string;
     axisColor:    string;
     tooltipStyle: React.CSSProperties;
@@ -28,8 +29,16 @@ const GRAD_SAVED     = "dashboard6moSavedGrad";
 
 export function SixMonthTrend({ trend, chart, isLoading, title = "6-Month Trend" }: SixMonthTrendProps) {
   const { fmt, fmtC } = useAmountFormatter();
+  // Same Home-scoped-only rationale as NetWorthTrend.tsx — see that file's comment.
+  const gridStroke = chart.isDark ? chart.gridColor : "#F1F5F9";
+  const tooltipStyle: React.CSSProperties = {
+    ...chart.tooltipStyle,
+    background: chart.isDark ? "rgba(15, 23, 42, 0.75)" : "rgba(255, 255, 255, 0.75)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+  };
   return (
-    <div className="bg-card rounded-xl shadow-soft dark:shadow-none dark:border dark:border-border/50 p-4 h-full flex flex-col animate-fade-in-up card-hover">
+    <div className="bg-card rounded-2xl border border-slate-100/80 dark:border-border/50 shadow-soft dark:shadow-none p-4 h-full flex flex-col animate-fade-in-up card-hover">
       <div className="flex items-center justify-between mb-1">
         <div>
           <h2 className="font-bold text-foreground text-sm">{title}</h2>
@@ -63,13 +72,13 @@ export function SixMonthTrend({ trend, chart, isLoading, title = "6-Month Trend"
                   <stop offset="100%" stopColor={CHART_COLORS.saved} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={chart.gridColor} vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
               <XAxis dataKey="label" tick={{ fill: chart.axisColor, fontSize: 10, fontWeight: 500 }}
                 axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: chart.axisColor, fontSize: 10 }} axisLine={false} tickLine={false}
                 tickFormatter={(v) => fmtC(v)} width={50} />
               <Tooltip
-                contentStyle={chart.tooltipStyle}
+                contentStyle={tooltipStyle}
                 labelStyle={chart.labelStyle}
                 itemStyle={chart.itemStyle}
                 cursor={chart.cursorStyle}
