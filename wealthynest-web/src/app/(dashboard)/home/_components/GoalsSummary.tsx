@@ -21,7 +21,7 @@ export function GoalsSummary({ goals, isLoading }: GoalsSummaryProps) {
   const goalsPct       = totalTarget > 0 ? Math.min(100, (totalSaved / totalTarget) * 100) : 0;
 
   return (
-    <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm animate-fade-in-up delay-375 card-hover">
+    <div className="bg-card rounded-xl shadow-soft dark:shadow-none dark:border dark:border-border/50 overflow-hidden animate-fade-in-up delay-375 card-hover">
       <div className="flex items-center justify-between px-5 py-4 border-b border-border/40">
         <div className="flex items-center gap-3">
           <h2 className="font-bold text-foreground text-sm">Goals</h2>

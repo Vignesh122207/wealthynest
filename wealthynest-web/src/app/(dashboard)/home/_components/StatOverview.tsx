@@ -44,8 +44,14 @@ interface TileProps {
   label: string; value: string;
   deltaText?: string; deltaGood?: boolean;
   /** Overrides the deltaGood-derived green/red color — for tiles with a third (amber) state,
-   * e.g. Budget Used's spent/budgeted line. */
+   * e.g. Budget Used's spent/budgeted line. Also switches that line back to full prominence (see
+   * the deltaColorClass check below): unlike a plain trend blurb, this is the tile's own primary
+   * reading, not a secondary metric to de-emphasize. */
   deltaColorClass?: string;
+  /** Budget Used only — a soft status tint (e.g. "bg-amber-500/10") replacing the plain card
+   * background once usage crosses into amber/red territory, so the card itself flags the alert
+   * instead of only the number inside it. */
+  bgTintClass?: string;
   valueTestId?: string; deltaTestId?: string;
   delay?: string;
   /** Net Worth alone — a soft primary-tinted card + a step-larger value, so it reads as the
@@ -54,11 +60,13 @@ interface TileProps {
   primary?: boolean;
 }
 
-function StatTile({ icon, tone, label, value, deltaText, deltaGood, deltaColorClass, valueTestId, deltaTestId, delay = "delay-0", primary }: TileProps) {
+function StatTile({ icon, tone, label, value, deltaText, deltaGood, deltaColorClass, bgTintClass, valueTestId, deltaTestId, delay = "delay-0", primary }: TileProps) {
   return (
     <div className={cn(
-      "rounded-2xl p-4 shadow-sm border card-hover animate-fade-in-up",
-      primary ? "bg-primary/[0.045] dark:bg-primary/[0.07] border-primary/25" : "bg-card border-border/50",
+      "rounded-xl p-3.5 card-hover animate-fade-in-up",
+      primary
+        ? "bg-primary/[0.045] dark:bg-primary/[0.07] border border-primary/25 shadow-soft dark:shadow-none"
+        : cn(bgTintClass ?? "bg-card", "shadow-soft dark:shadow-none dark:border dark:border-border/50"),
       delay
     )}>
       <div className="flex items-center gap-2 mb-3">
@@ -71,7 +79,12 @@ function StatTile({ icon, tone, label, value, deltaText, deltaGood, deltaColorCl
       )}>{value}</p>
       {deltaText ? (
         <p data-testid={deltaTestId} className={cn(
-          "text-[11px] font-semibold tabular-nums truncate",
+          "tabular-nums truncate",
+          // A plain trend blurb ("+2.3% vs last month") is secondary context — de-emphasized so
+          // the value above it stays the tile's one clear focal point. Budget Used's spent/budgeted
+          // line (the deltaColorClass branch) is the opposite: it's that tile's actual headline
+          // reading, not a footnote, so it keeps full weight/opacity.
+          deltaColorClass ? "text-[11px] font-semibold" : "text-[10px] font-medium opacity-75",
           deltaColorClass ?? (deltaGood ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400")
         )}>
           {deltaText}
@@ -96,20 +109,30 @@ const TIER_CAPTION: Record<BudgetTier, string> = {
   amber: "text-amber-600 dark:text-amber-400",
   red:   "text-red-500 dark:text-red-400",
 };
+// Soft translucent status tint for the card itself, not just its text — amber once past 80% used,
+// shifting to a warmer red/coral once actually over budget, so the card visually flags the alert
+// at a glance instead of requiring you to read the number. Translucent (not a solid hex fill) so
+// it sits correctly over both --card tones without a separate dark-mode value.
+const TIER_BG: Partial<Record<BudgetTier, string>> = {
+  amber: "bg-amber-500/10",
+  red:   "bg-red-500/10",
+};
 
 // ── Budget Used — reuses StatTile so it stays pixel-aligned with every other hero tile ──
 function BudgetUsedTile({ spent, budgeted, total, emptyLabel, fmt, delay = "delay-375" }: {
   spent: number; budgeted: number; total: number; emptyLabel: string;
   fmt: (amount: number) => string; delay?: string;
 }) {
-  const pct = budgeted > 0 ? (spent / budgeted) * 100 : 0;
+  const pct  = budgeted > 0 ? (spent / budgeted) * 100 : 0;
+  const tier = usedTier(pct);
 
   return (
     <StatTile
       icon={Target} tone="orange" label="Budget Used"
       value={total > 0 ? `${Math.round(pct)}%` : "—"}
       deltaText={total > 0 ? `${fmt(spent)} of ${fmt(budgeted)}` : emptyLabel}
-      deltaColorClass={total > 0 ? TIER_CAPTION[usedTier(pct)] : "text-muted-foreground"}
+      deltaColorClass={total > 0 ? TIER_CAPTION[tier] : "text-muted-foreground"}
+      bgTintClass={total > 0 ? TIER_BG[tier] : undefined}
       valueTestId="budget-progress-tile" deltaTestId="budget-progress-caption"
       delay={delay}
     />
@@ -149,8 +172,10 @@ export function StatOverview({
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 [&>*]:min-w-0">
         {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className={cn(
-            "rounded-2xl p-4 shadow-sm border space-y-3",
-            i === 0 ? "bg-primary/[0.045] dark:bg-primary/[0.07] border-primary/25" : "bg-card border-border/50"
+            "rounded-xl p-3.5 space-y-3",
+            i === 0
+              ? "bg-primary/[0.045] dark:bg-primary/[0.07] border border-primary/25 shadow-soft dark:shadow-none"
+              : "bg-card shadow-soft dark:shadow-none dark:border dark:border-border/50"
           )}>
             <div className="w-8 h-8 rounded-xl shimmer" />
             <div className={cn("rounded-lg shimmer", i === 0 ? "h-7 w-28" : "h-6 w-24")} />

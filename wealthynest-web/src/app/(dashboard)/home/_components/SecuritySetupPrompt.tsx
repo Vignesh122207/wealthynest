@@ -36,7 +36,7 @@ export function SecuritySetupPrompt() {
   };
 
   return (
-    <div data-testid="security-setup-prompt" className="animate-fade-in-up rounded-2xl border border-border/50 bg-card p-4 shadow-sm">
+    <div data-testid="security-setup-prompt" className="animate-fade-in-up rounded-xl bg-card shadow-soft dark:shadow-none dark:border dark:border-border/50 p-4">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-2.5">
           <PremiumIcon icon={Lock} tone="indigo" size="xs" />

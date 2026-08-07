@@ -71,7 +71,7 @@ export function WalletOverview({ accounts, isLoading }: WalletOverviewProps) {
     .filter((g): g is NonNullable<typeof g> => g != null);
 
   return (
-    <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm h-full flex flex-col card-hover">
+    <div className="bg-card rounded-xl shadow-soft dark:shadow-none dark:border dark:border-border/50 p-5 h-full flex flex-col card-hover">
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
           <Wallet className="w-4 h-4 text-primary" />

@@ -32,9 +32,13 @@ interface SpendingDonutProps {
 export function SpendingDonut({ categoryBreakdown, year, month, viewMode, chart, onAddExpense, isLoading }: SpendingDonutProps) {
   const label = monthLabel(year, month);
   const { fmt, fmtC } = useAmountFormatter();
+  // Plain const, not useMemo — same rationale as page.tsx's own "cheap array/arithmetic work"
+  // comment: categoryBreakdown never exceeds a couple dozen rows, so summing it every render costs
+  // nothing worth memoizing against.
+  const total = categoryBreakdown.reduce((s, c) => s + c.amount, 0);
 
   return (
-    <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm h-full flex flex-col animate-fade-in-up card-hover">
+    <div className="bg-card rounded-xl shadow-soft dark:shadow-none dark:border dark:border-border/50 p-5 h-full flex flex-col animate-fade-in-up card-hover">
       <div className="flex items-center justify-between mb-1">
         <div>
           <h2 className="font-bold text-foreground text-sm">Spending</h2>
@@ -51,7 +55,7 @@ export function SpendingDonut({ categoryBreakdown, year, month, viewMode, chart,
       {isLoading ? (
         <div className="flex-1 min-h-[180px] rounded-2xl shimmer mt-4" />
       ) : categoryBreakdown.length > 0 ? (
-        <div className="flex-1 flex flex-col justify-center">
+        <div className="flex-1 flex items-center gap-4">
           {/* accessibilityLayer={false} on the chart handles the outer <svg role="application">
               (see SixMonthTrend.tsx's identical wrapper), but <Pie> independently puts its own
               tabindex="0" on its rendered <g class="recharts-pie"> layer for slice-level keyboard
@@ -59,11 +63,11 @@ export function SpendingDonut({ categoryBreakdown, year, month, viewMode, chart,
               layer reads its own `rootTabIndex` prop (default 0), not `tabIndex` — passing
               tabIndex={-1} here is a no-op since <Pie> doesn't forward an unrecognized prop;
               confirmed still failing axe in CI with rootTabIndex still defaulted to 0. */}
-          <div aria-hidden="true">
-          <ResponsiveContainer width="100%" height={160}>
+          <div className="relative w-[136px] h-[136px] shrink-0" aria-hidden="true">
+          <ResponsiveContainer width="100%" height="100%">
             <PieChart accessibilityLayer={false}>
               <Pie data={categoryBreakdown} cx="50%" cy="50%"
-                innerRadius={42} outerRadius={64} paddingAngle={3}
+                innerRadius={48} outerRadius={68} paddingAngle={3}
                 dataKey="amount" strokeWidth={0} rootTabIndex={-1}>
                 {categoryBreakdown.map((c) => (
                   <Cell key={c.categoryId} fill={getCategoryColor(c.categoryName, c.categoryColor)} />
@@ -79,8 +83,16 @@ export function SpendingDonut({ categoryBreakdown, year, month, viewMode, chart,
               />
             </PieChart>
           </ResponsiveContainer>
+          {/* Center total — redundant with the Monthly Expenses stat tile above, so this stays
+              inside the same aria-hidden block as the chart rather than adding a second live
+              reading of the same figure. pointer-events-none so it never intercepts the Pie's own
+              hover/tooltip target underneath it. */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            <span className="text-[9px] font-semibold text-muted-foreground/70 uppercase tracking-wide">Total</span>
+            <span className="text-sm font-bold text-foreground tabular-nums tracking-tight">{fmtC(total)}</span>
           </div>
-          <div className="space-y-1.5 mt-3">
+          </div>
+          <div className="space-y-1.5 min-w-0 flex-1">
             {categoryBreakdown.slice(0, 5).map((c) => {
               const icon  = getCategoryIcon({ name: c.categoryName, icon: c.categoryIcon });
               const color = getCategoryColor(c.categoryName, c.categoryColor);
