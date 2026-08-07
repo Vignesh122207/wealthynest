@@ -11,6 +11,7 @@ import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
 import {StockLogo} from "@/components/icons/StockLogo";
 import {FundLogo} from "@/components/icons/FundLogo";
 import {BankLogo} from "@/components/icons/BankLogo";
+import {EmptyState} from "@/components/shared/EmptyState";
 import {INVESTMENT_TYPE_META} from "@/lib/investmentTypeMeta";
 import type {Investment, InvestmentType} from "@/features/investments/types/investment.types";
 
@@ -21,6 +22,7 @@ interface InvestmentPanelProps {
     labelStyle:   React.CSSProperties;
     itemStyle:    React.CSSProperties;
   };
+  isLoading: boolean;
 }
 
 type Bucket = "Equity" | "Debt" | "Gold" | "Other";
@@ -43,7 +45,7 @@ function holdingName(inv: Investment): string {
   return inv.companyName || inv.symbol || inv.bankName || inv.investmentType.replace(/_/g, " ");
 }
 
-export function InvestmentPanel({ investments, chart }: InvestmentPanelProps) {
+export function InvestmentPanel({ investments, chart, isLoading }: InvestmentPanelProps) {
   const { fmt } = useAmountFormatter();
   const active = useMemo(() => investments.filter(i => i.status === "ACTIVE"), [investments]);
 
@@ -119,6 +121,22 @@ export function InvestmentPanel({ investments, chart }: InvestmentPanelProps) {
         </Link>
       </div>
 
+      {isLoading ? (
+        <div className="space-y-5">
+          <div className="h-[120px] rounded-2xl shimmer" />
+          <div className="grid sm:grid-cols-3 gap-3">
+            {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-20 rounded-2xl shimmer" />)}
+          </div>
+        </div>
+      ) : active.length === 0 ? (
+        <EmptyState
+          icon={TrendingUp}
+          title="No investments yet"
+          description="Track stocks, mutual funds, gold, and more to see your portfolio here."
+          action={<Link href="/investments" className="text-xs font-semibold text-primary hover:underline">Add an investment →</Link>}
+        />
+      ) : (
+      <>
       {allocation.length > 0 && (
         <div className="grid sm:grid-cols-2 gap-5 mb-5">
           {/* Allocation donut */}
@@ -209,6 +227,8 @@ export function InvestmentPanel({ investments, chart }: InvestmentPanelProps) {
           ))}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

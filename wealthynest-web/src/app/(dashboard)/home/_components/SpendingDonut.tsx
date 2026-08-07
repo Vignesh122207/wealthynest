@@ -14,6 +14,12 @@ interface SpendingDonutProps {
   categoryBreakdown: CategorySpending[];
   year:              number;
   month:             number;
+  /** There's no annual category-breakdown endpoint yet — this widget always shows a single
+   * month's data. Month mode's label already says which month; Year mode needs to say so
+   * explicitly too, since every sibling widget on the page (StatOverview, SixMonthTrend,
+   * BudgetSection) does switch to year-scoped figures when this toggles, so silently continuing
+   * to show one month's breakdown here without a label change reads as broken, not as scoped. */
+  viewMode: "month" | "year";
   chart: {
     tooltipStyle: React.CSSProperties;
     labelStyle:   React.CSSProperties;
@@ -23,7 +29,7 @@ interface SpendingDonutProps {
   isLoading:    boolean;
 }
 
-export function SpendingDonut({ categoryBreakdown, year, month, chart, onAddExpense, isLoading }: SpendingDonutProps) {
+export function SpendingDonut({ categoryBreakdown, year, month, viewMode, chart, onAddExpense, isLoading }: SpendingDonutProps) {
   const label = monthLabel(year, month);
   const { fmt, fmtC } = useAmountFormatter();
 
@@ -32,7 +38,9 @@ export function SpendingDonut({ categoryBreakdown, year, month, chart, onAddExpe
       <div className="flex items-center justify-between mb-1">
         <div>
           <h2 className="font-bold text-foreground text-sm">Spending</h2>
-          <p className="text-[11px] text-muted-foreground/80 mt-0.5">By category · {label}</p>
+          <p className="text-[11px] text-muted-foreground/80 mt-0.5">
+            By category · {label}{viewMode === "year" && " only"}
+          </p>
         </div>
         <Link href="/expenses"
           className="text-[11px] font-semibold text-primary hover:underline transition-colors">
@@ -93,6 +101,14 @@ export function SpendingDonut({ categoryBreakdown, year, month, chart, onAddExpe
               </div>
               );
             })}
+            {/* The pie above plots every category — this list caps at 5 to keep the card a fixed
+                height, which otherwise leaves categories 6+ as colored slices with no label
+                anywhere in the widget. */}
+            {categoryBreakdown.length > 5 && (
+              <p className="text-[11px] text-muted-foreground/70 text-center pt-0.5">
+                +{categoryBreakdown.length - 5} more {categoryBreakdown.length - 5 === 1 ? "category" : "categories"}
+              </p>
+            )}
           </div>
         </div>
       ) : (

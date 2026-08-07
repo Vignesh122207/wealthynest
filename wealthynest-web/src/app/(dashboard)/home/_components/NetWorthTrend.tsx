@@ -3,7 +3,7 @@
 import Link from "next/link";
 import {Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, type TooltipValueType, XAxis, YAxis,} from "recharts";
 import {TrendingUp} from "lucide-react";
-import {chartValueToNumber, cn, formatChartTickINR, formatTrendDelta} from "@/lib/utils";
+import {chartValueToNumber, cn, formatTrendDelta} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {CHART_COLORS} from "@/lib/chartColors";
 import type {NetWorthHistoryPoint} from "@/features/networth/types/networth.types";
@@ -26,7 +26,7 @@ interface NetWorthTrendProps {
 const GRAD_ID = "dashboardNwGrad";
 
 export function NetWorthTrend({ history, netWorth, changePct, chart, isLoading }: NetWorthTrendProps) {
-  const { fmt } = useAmountFormatter();
+  const { fmt, fmtC } = useAmountFormatter();
   return (
     <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm h-full flex flex-col card-hover">
       <div className="flex items-center justify-between mb-1">
@@ -70,7 +70,7 @@ export function NetWorthTrend({ history, netWorth, changePct, chart, isLoading }
               <CartesianGrid strokeDasharray="3 3" stroke={chart.gridColor} vertical={false} />
               <XAxis dataKey="label" tick={{ fill: chart.axisColor, fontSize: 10 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: chart.axisColor, fontSize: 10 }} axisLine={false} tickLine={false}
-                tickFormatter={formatChartTickINR}
+                tickFormatter={(v) => fmtC(v)}
                 width={50} />
               <Tooltip
                 contentStyle={chart.tooltipStyle} labelStyle={chart.labelStyle} itemStyle={chart.itemStyle}

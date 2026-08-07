@@ -9,7 +9,8 @@ import {PremiumIcon} from "@/components/icons/PremiumIcon";
 import type {AccountType, WalletAccount} from "@/features/accounts/types/account.types";
 
 interface WalletOverviewProps {
-  accounts: WalletAccount[];
+  accounts:  WalletAccount[];
+  isLoading: boolean;
 }
 
 const TYPE_ORDER: AccountType[] = ["BANK_ACCOUNT", "CASH_WALLET", "CREDIT_CARD", "LOAN"];
@@ -21,14 +22,26 @@ const GROUP_LABEL: Record<AccountType, string> = {
   LOAN:         "Loans",
 };
 
+// Local-midnight-to-local-midnight, not raw Date.now() — same fix SmartAlerts.tsx already applies
+// to its own due-date math (see that file's comment): diffing against the exact current instant
+// instead of today's midnight makes the result drift by up to a day depending purely on what time
+// of day it is, so "due in 2 days" could flip to "due in 1 day" a few hours later with no actual
+// date having changed.
 function daysUntil(dateStr?: string): number | null {
   if (!dateStr) return null;
-  return Math.ceil((new Date(dateStr).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  const due   = new Date(dateStr);
+  const today = new Date();
+  const dueMidnight   = new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime();
+  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  return Math.round((dueMidnight - todayMidnight) / 86_400_000);
 }
 
-export function WalletOverview({ accounts }: WalletOverviewProps) {
+export function WalletOverview({ accounts, isLoading }: WalletOverviewProps) {
   const { fmt } = useAmountFormatter();
-  const active = accounts.filter(a => a.status !== "ARCHIVED");
+  // Matches accounts/page.tsx's own activeAccounts filter exactly — CLOSED is pulled out of the
+  // main total there too (a real-world closed account, not just archived from view), so this
+  // widget's Total Balance agrees with the Accounts page instead of quietly including it.
+  const active = accounts.filter(a => a.status === "ACTIVE");
 
   // Total balance = everything the user actually owns (cash + bank, purpose-tagged or not) —
   // credit cards and loans are liabilities, not counted here.
@@ -69,6 +82,24 @@ export function WalletOverview({ accounts }: WalletOverviewProps) {
         </Link>
       </div>
 
+      {isLoading ? (
+        <div className="mt-2 space-y-4">
+          <div className="h-[68px] rounded-xl shimmer" />
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl shimmer shrink-0" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-3.5 w-28 rounded shimmer" />
+                  <div className="h-3 w-16 rounded shimmer" />
+                </div>
+                <div className="h-3.5 w-16 rounded shimmer" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+      <>
       <div className="mt-2 mb-3 p-3 rounded-xl bg-primary/8 border border-primary/15">
         <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mb-1">Total Balance</p>
         <p className="text-xl font-bold text-foreground tabular-nums">{fmt(totalBalance)}</p>
@@ -101,6 +132,8 @@ export function WalletOverview({ accounts }: WalletOverviewProps) {
           );
         })}
       </div>
+      </>
+      )}
     </div>
   );
 }

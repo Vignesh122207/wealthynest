@@ -90,7 +90,7 @@ export default function DashboardPage() {
   const { data: goals = [] }          = useGoals();
   const { data: categories = [] }       = useCategories("EXPENSE");
   const { data: incomeCategories = [] } = useCategories("INCOME");
-  const { data: investments = [] }    = useInvestments();
+  const { data: investments = [], isLoading: investmentsLoading } = useInvestments();
   const { data: netWorthHistory = [] } = useNetWorthHistory();
   const chart                         = useChartTheme();
 
@@ -222,7 +222,6 @@ export default function DashboardPage() {
   };
 
   const trend          = data?.monthlyTrend ?? [];
-  const hasInvestments = investments.some(i => i.status === "ACTIVE");
   const incomeTrend    = pctChange(data?.monthlyIncome, prevData?.monthlyIncome);
   const expenseTrend   = pctChange(data?.monthlyExpenses, prevData?.monthlyExpenses);
   // Not derived from the dashboard endpoint's totalNetWorth: that field ignores
@@ -400,14 +399,18 @@ export default function DashboardPage() {
             upcomingBills={upcomingBills}
           />
 
-          {/* ── Phase 1: Accounts Overview (left) + Spending chart (right) ── */}
-          {walletAccounts.length > 0 && (
+          {/* ── Phase 1: Accounts Overview (left) + Spending chart (right) ──
+              Shown while still loading (skeleton) too, not just once walletAccounts is non-empty
+              — gating on length alone left this row simply absent (no skeleton) until the accounts
+              query resolved, then popping in below already-rendered widgets. */}
+          {(dataLoading || walletAccounts.length > 0) && (
             <TwoColRow>
-              <WalletOverview accounts={walletAccounts} />
+              <WalletOverview accounts={walletAccounts} isLoading={dataLoading} />
               <SpendingDonut
                 categoryBreakdown={data?.categoryBreakdown ?? []}
                 year={year}
                 month={month}
+                viewMode={viewMode}
                 chart={chart}
                 onAddExpense={() => setQuickModal("expense")}
                 isLoading={dataLoading}
@@ -444,15 +447,16 @@ export default function DashboardPage() {
             />
           </TwoColRow>
 
-          {/* ── Investment Overview (left) + Goals (right) ── */}
-          {hasInvestments ? (
-            <TwoColRow>
-              <InvestmentPanel investments={investments} chart={chart} />
-              <GoalsSummary goals={goals} isLoading={dataLoading} />
-            </TwoColRow>
-          ) : (
+          {/* ── Investment Overview (left) + Goals (right) ──
+              Always both, not gated behind "has active investments" — InvestmentPanel now handles
+              its own empty/loading state internally (matching every other widget on this page),
+              which also removes the layout reflow that gate used to cause: investments defaults to
+              [] before its query resolves, so the old gate showed Goals full-width first and only
+              popped in a second column once investments actually loaded. */}
+          <TwoColRow>
+            <InvestmentPanel investments={investments} chart={chart} isLoading={investmentsLoading} />
             <GoalsSummary goals={goals} isLoading={dataLoading} />
-          )}
+          </TwoColRow>
 
         </div>
       </main>

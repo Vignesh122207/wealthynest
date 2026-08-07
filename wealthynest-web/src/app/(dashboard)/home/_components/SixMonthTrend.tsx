@@ -1,7 +1,7 @@
 "use client";
 
 import {Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, type TooltipValueType, XAxis, YAxis,} from "recharts";
-import {chartValueToNumber, formatCurrencyCompact} from "@/lib/utils";
+import {chartValueToNumber} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {CHART_COLORS} from "@/lib/chartColors";
 import type {MonthlyTrend} from "@/features/dashboard/types/dashboard.types";
@@ -27,7 +27,7 @@ const GRAD_EXPENSES = "dashboard6moExpenseGrad";
 const GRAD_SAVED     = "dashboard6moSavedGrad";
 
 export function SixMonthTrend({ trend, chart, isLoading, title = "6-Month Trend" }: SixMonthTrendProps) {
-  const { fmt } = useAmountFormatter();
+  const { fmt, fmtC } = useAmountFormatter();
   return (
     <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm h-full flex flex-col animate-fade-in-up card-hover">
       <div className="flex items-center justify-between mb-1">
@@ -67,7 +67,7 @@ export function SixMonthTrend({ trend, chart, isLoading, title = "6-Month Trend"
               <XAxis dataKey="label" tick={{ fill: chart.axisColor, fontSize: 10, fontWeight: 500 }}
                 axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: chart.axisColor, fontSize: 10 }} axisLine={false} tickLine={false}
-                tickFormatter={(v) => formatCurrencyCompact(v)} width={50} />
+                tickFormatter={(v) => fmtC(v)} width={50} />
               <Tooltip
                 contentStyle={chart.tooltipStyle}
                 labelStyle={chart.labelStyle}

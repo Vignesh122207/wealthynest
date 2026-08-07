@@ -2,6 +2,7 @@
 
 import {Calendar, CalendarRange, ChevronLeft, ChevronRight, Zap} from "lucide-react";
 import {cn, formatCurrency, getGreeting, monthLabel} from "@/lib/utils";
+import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 
 export type HomeViewMode = "month" | "year";
 
@@ -28,11 +29,16 @@ interface GreetingBannerProps {
 // guard that correctly suppresses the "no data at all" case) — that's worth its own callout instead.
 export function getSavingsInsight(
   income: number | undefined, expenses: number | undefined, savingsRate: number | undefined,
+  // Defaults to the raw (unmasked, INR-locale) formatter so every existing call site/test keeps
+  // its current behavior — the component below passes useAmountFormatter's `fmt` instead, so the
+  // one amount embedded in this insight's copy respects Privacy Mode and the user's currency
+  // exactly like every other number on the page (this was the one spot on Home that didn't).
+  formatAmount: (amount: number) => string = formatCurrency,
 ): string | null {
   if (savingsRate == null) return null;
   if (!income) {
     if (!expenses) return null;
-    return `No income logged this month, but ${formatCurrency(expenses)} in expenses — that's coming out of savings.`;
+    return `No income logged this month, but ${formatAmount(expenses)} in expenses — that's coming out of savings.`;
   }
   if (savingsRate >= 40) return "Outstanding savings rate. You're building real wealth!";
   if (savingsRate >= 25) return "Strong savings discipline. Keep the momentum going.";
@@ -49,7 +55,8 @@ export function GreetingBanner({
 }: GreetingBannerProps) {
   const isYear = viewMode === "year";
   const label  = isYear ? String(year) : monthLabel(year, month);
-  const insight = getSavingsInsight(income, expenses, savingsRate);
+  const { fmt } = useAmountFormatter();
+  const insight = getSavingsInsight(income, expenses, savingsRate, fmt);
 
   return (
     // Always a single row, even on mobile (previously flex-col below sm, which pushed the
