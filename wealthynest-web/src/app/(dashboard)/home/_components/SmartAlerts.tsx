@@ -1,10 +1,8 @@
 "use client";
 
 import type {ReactNode} from "react";
-import Link from "next/link";
 import {AlertTriangle, CreditCard, Gauge, Lightbulb, PartyPopper, TrendingDown, TrendingUp} from "lucide-react";
 import type {LucideIcon} from "lucide-react";
-import {cn} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {PremiumIcon, type IconTone} from "@/components/icons/PremiumIcon";
 import {EmptyState} from "@/components/shared/EmptyState";
@@ -29,20 +27,15 @@ const SEVERITY_RANK: Record<Severity, number> = {
   critical: 0, warning: 1, reminder: 2, positive: 3, opportunity: 4,
 };
 
-// One row per severity: icon tone (matches PremiumIcon's palette), tinted card background, and
-// the left accent border in its resting/hover strength. Adding a fifth insight kind later means
-// adding one branch below that returns one of these ranks — the card shell itself never changes.
-// `group-hover:` deliberately isn't used for the border here — that variant only matches
-// descendants of a hovered `.group`, never the group element itself, so it would've been a
-// silent no-op on the card div that carries `group`. Plain `hover:` on the same element is what
-// actually fires; `group` stays on the card purely so the nested PremiumIcon (a real descendant)
-// can react to `group-hover:` for its own lift/scale.
-const SEVERITY_STYLE: Record<Severity, { tone: IconTone; bg: string; border: string; borderHover: string }> = {
-  critical:    { tone: "red",    bg: "bg-red-500/[0.06]",     border: "border-l-red-500/70",     borderHover: "hover:border-l-red-500" },
-  warning:     { tone: "red",    bg: "bg-red-500/[0.06]",     border: "border-l-red-500/70",     borderHover: "hover:border-l-red-500" },
-  reminder:    { tone: "yellow", bg: "bg-amber-500/[0.06]",   border: "border-l-amber-500/70",   borderHover: "hover:border-l-amber-500" },
-  positive:    { tone: "green",  bg: "bg-emerald-500/[0.06]", border: "border-l-emerald-500/70", borderHover: "hover:border-l-emerald-500" },
-  opportunity: { tone: "blue",   bg: "bg-blue-500/[0.06]",    border: "border-l-blue-500/70",    borderHover: "hover:border-l-blue-500" },
+// One row per severity, mapping to the icon's tone (matches PremiumIcon's palette). Adding a
+// fifth insight kind later means adding one branch below that returns one of these ranks — the
+// card shell itself never changes.
+const SEVERITY_STYLE: Record<Severity, { tone: IconTone }> = {
+  critical:    { tone: "red" },
+  warning:     { tone: "red" },
+  reminder:    { tone: "yellow" },
+  positive:    { tone: "green" },
+  opportunity: { tone: "blue" },
 };
 
 export interface InsightCard {
@@ -50,7 +43,6 @@ export interface InsightCard {
   icon:     LucideIcon;
   title:    string;
   body:     ReactNode;
-  action?:  { label: string; href: string };
 }
 
 interface SmartAlertsRowProps {
@@ -91,7 +83,6 @@ export function SmartAlertsRow({ smartInsights, upcomingBills }: SmartAlertsRowP
         icon: AlertTriangle,
         title: insight.title,
         body: insight.message,
-        action: { label: "View transactions", href: "/expenses" },
       };
     }
     if (insight.kind === "forecast") {
@@ -120,13 +111,6 @@ export function SmartAlertsRow({ smartInsights, upcomingBills }: SmartAlertsRowP
             )}.
           </>
         ),
-        // Budgets shows spend-vs-limit broken out by category — a better landing spot for "go
-        // figure out where to cut back" than a flat transaction list. Category-specific delta
-        // insights below still send you to /expenses, since there you genuinely want that one
-        // category's transactions, not the whole budget picture.
-        action: deficit || belowAverage
-          ? { label: "Review spending", href: "/budgets" }
-          : { label: "Keep it up", href: "/goals" },
       };
     }
     // getCategoryDeltaInsights compares this month's (or its pace-projection, mid-month) spend
@@ -152,9 +136,6 @@ export function SmartAlertsRow({ smartInsights, upcomingBills }: SmartAlertsRowP
           <span className="font-semibold">{insight.category}</span> than last month.
         </>
       ),
-      action: up
-        ? { label: "View transactions", href: "/expenses" }
-        : { label: "Keep it up", href: "/budgets" },
     };
   });
 
@@ -181,7 +162,6 @@ export function SmartAlertsRow({ smartInsights, upcomingBills }: SmartAlertsRowP
           <span className="font-semibold tabular-nums">{fmt(bill.amount)}</span> {isOverdue ? "was due" : "is due"} {whenLabel}.
         </>
       ),
-      action: { label: "Pay now", href: "/expenses" },
     };
   });
 
@@ -212,25 +192,13 @@ export function SmartAlertsRow({ smartInsights, upcomingBills }: SmartAlertsRowP
               <div
                 key={i}
                 data-testid="smart-insight-card"
-                className={cn(
-                  "group flex-1 min-w-60 rounded-xl border-l-4 p-3.5 shadow-sm transition-all duration-200",
-                  "hover:shadow-md hover:-translate-y-0.5",
-                  style.bg, style.border, style.borderHover,
-                )}
+                className="group flex-1 min-w-60 rounded-xl bg-muted/40 p-3.5 shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
               >
                 <div className="flex items-center gap-2 mb-1.5">
                   <PremiumIcon icon={card.icon} tone={style.tone} size="xs" interactive />
                   <span className="text-[11px] font-bold text-foreground/85 leading-tight">{card.title}</span>
                 </div>
                 <p className="text-xs text-foreground/80 leading-snug">{card.body}</p>
-                {card.action && (
-                  <Link
-                    href={card.action.href}
-                    className="mt-2 inline-block text-[11px] font-semibold text-primary underline-offset-2 hover:underline"
-                  >
-                    {card.action.label} →
-                  </Link>
-                )}
               </div>
             );
           })}
