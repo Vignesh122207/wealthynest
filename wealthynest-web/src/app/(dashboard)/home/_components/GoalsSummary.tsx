@@ -65,17 +65,25 @@ export function GoalsSummary({ goals, isLoading }: GoalsSummaryProps) {
         />
       ) : (
         <div className="p-4">
-          {/* Overall progress — figures and completion % on opposing sides */}
-          <div className="flex items-center justify-between gap-4 mb-4 pb-4 border-b border-slate-100/80 dark:border-border/40">
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground font-medium mb-1">Overall</p>
-              <p className="text-sm font-bold text-foreground tabular-nums truncate">
-                {fmt(totalSaved)} <span className="text-muted-foreground font-medium">of {fmt(totalTarget)}</span>
-              </p>
+          {/* Overall progress — figures and completion % on opposing sides, bar below */}
+          <div className="mb-4 pb-4 border-b border-slate-100/80 dark:border-border/40">
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground font-medium mb-1">Overall</p>
+                <p className="text-sm font-bold text-foreground tabular-nums truncate">
+                  {fmt(totalSaved)} <span className="text-muted-foreground font-medium">of {fmt(totalTarget)}</span>
+                </p>
+              </div>
+              <span className="text-2xl font-extrabold text-primary tabular-nums shrink-0">
+                {goalsPct.toFixed(0)}%
+              </span>
             </div>
-            <span className="text-2xl font-extrabold text-primary tabular-nums shrink-0">
-              {goalsPct.toFixed(0)}%
-            </span>
+            <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-3">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-700"
+                style={{ width: `${goalsPct}%` }}
+              />
+            </div>
           </div>
 
           {/* Individual goals — ringed icon progress + target date folded into the subtext */}
