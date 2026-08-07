@@ -6,31 +6,68 @@ import {monthLabel} from "../utils/filterHelpers";
 import {detectRollingGranularity, formatRangeLabel, resolveGranularityRange, type RollingGranularity} from "../utils/granularity";
 import type {DateMode} from "../types/filters.types";
 
-// Unified date-range control — merges what used to be two separate segmented pickers (Month/
-// Year/All/Custom, and a second row of quick rolling ranges) into one row. "This Month"/"This
-// Year" absorb the old Month/Year modes (still calendar-anchored, still navigable with prev/
-// next — that nav lives inline in this same row, scrolling horizontally on narrow screens
-// instead of wrapping to a second line). 1W/1M/3M/6M/YTD are rolling windows ending today —
-// selecting one shows a read-only "31 Jul – 07 Aug" label inline (same slot as the Month/Year
-// nav), never the editable Custom fields, since a rolling pill's whole point is a single click
-// with nothing further to fill in. Custom is a plain pill; selecting it reveals the From/To
-// fields inline below the row (not a popover — that had two real bugs: the row's own
-// overflow-x-auto clipped it, and FormDatePicker's calendar portals to document.body, outside
-// the popover's DOM tree, so picking a day closed the whole popover before the pick registered).
-type PillMode = "month" | "1w" | "1m" | "3m" | "6m" | "ytd" | "year" | "all" | "custom";
-const PILLS: { mode: PillMode; label: string }[] = [
+// Two separate segmented groups, not one merged row: "This Month/This Year/All/Custom" (calendar-
+// anchored + edge cases) and "1W/1M/3M/6M/YTD" (rolling windows ending today) are different kinds
+// of choice, so they get their own visually distinct pill clusters — the rolling group uses a
+// warm copper "premium" selected state instead of this page's usual indigo, so it reads as its
+// own thing at a glance, not a continuation of the first group.
+type CalendarMode = "month" | "year" | "all" | "custom";
+const CALENDAR_PILLS: { mode: CalendarMode; label: string }[] = [
   { mode: "month",  label: "This Month" },
-  { mode: "1w",     label: "1W" },
-  { mode: "1m",     label: "1M" },
-  { mode: "3m",     label: "3M" },
-  { mode: "6m",     label: "6M" },
-  { mode: "ytd",    label: "YTD" },
   { mode: "year",   label: "This Year" },
   { mode: "all",    label: "All" },
   { mode: "custom", label: "Custom" },
 ];
-const ROLLING_TO_PILL: Record<RollingGranularity, PillMode> = { "1W": "1w", "1M": "1m", "3M": "3m", "6M": "6m", YTD: "ytd" };
-const PILL_TO_ROLLING: Partial<Record<PillMode, RollingGranularity>> = { "1w": "1W", "1m": "1M", "3m": "3M", "6m": "6M", ytd: "YTD" };
+const ROLLING_PILLS: { mode: RollingGranularity; label: string }[] = [
+  { mode: "1W", label: "1W" },
+  { mode: "1M", label: "1M" },
+  { mode: "3M", label: "3M" },
+  { mode: "6M", label: "6M" },
+  { mode: "YTD", label: "YTD" },
+];
+
+/** A segmented pill cluster with a sliding active indicator — used twice below (calendar modes in
+ * the app's usual indigo, rolling ranges in copper) rather than duplicating the measure-and-slide
+ * logic for each. `active` may be null when neither group's selection lives in this one — the
+ * indicator just hides itself rather than pointing at nothing. */
+function SegmentedGroup<T extends string>({ options, active, onSelect, theme, testIdPrefix }: {
+  options: { mode: T; label: string }[];
+  active: T | null;
+  onSelect: (mode: T) => void;
+  theme: "indigo" | "copper";
+  testIdPrefix: string;
+}) {
+  const btnRefs = useRef<Partial<Record<T, HTMLButtonElement | null>>>({});
+  const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const btn = active ? btnRefs.current[active] : undefined;
+    setPill(btn ? { left: btn.offsetLeft, width: btn.offsetWidth } : null);
+  }, [active]);
+
+  return (
+    <div className="relative flex items-center h-10 bg-muted/40 border border-border/70 rounded-2xl p-1 shrink-0 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      {pill && (
+        <div aria-hidden
+          className={cn("absolute top-1 h-8 rounded-xl transition-[transform,width] duration-200 ease-out",
+            theme === "copper"
+              ? "bg-gradient-to-br from-[#4a2f1a] to-[#241509] ring-1 ring-[#c17f4e]/45 shadow-[0_2px_8px_rgba(193,127,78,0.25)]"
+              : "bg-indigo-500/12 dark:bg-indigo-500/20 ring-1 ring-inset ring-indigo-500/25")}
+          style={{ transform: `translateX(${pill.left}px)`, width: pill.width }} />
+      )}
+      {options.map(({ mode, label }) => (
+        <button key={mode} ref={el => { btnRefs.current[mode] = el; }} onClick={() => onSelect(mode)}
+          data-testid={`${testIdPrefix}${mode.toLowerCase()}`}
+          className={cn("relative z-[1] px-3 h-8 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors",
+            active === mode
+              ? theme === "copper" ? "text-[#f0c090]" : "text-indigo-600 dark:text-indigo-400"
+              : "text-muted-foreground hover:text-foreground")}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function DateControls({ dateMode, setDateMode, year, setYear, month, setMonth,
   customStart, setCustomStart, customEnd, setCustomEnd }: {
@@ -51,41 +88,32 @@ export function DateControls({ dateMode, setDateMode, year, setYear, month, setM
   };
 
   const rolling = detectRollingGranularity(dateMode, customStart, customEnd, now);
-  const activePill: PillMode =
+
+  // Each group's own active pill — independent, since a selection in one group means nothing is
+  // highlighted in the other (picking "3M" lights up nothing in the This Month/Year/All/Custom
+  // cluster, and vice versa).
+  const activeCalendar: CalendarMode | null =
     dateMode === "month" ? "month" :
     dateMode === "year"  ? "year"  :
     dateMode === "all"   ? "all"   :
-    rolling ? ROLLING_TO_PILL[rolling] :
-    "custom"; // dateMode "custom" with a range that isn't a rolling preset (or nothing picked yet)
+    dateMode === "custom" && !rolling ? "custom" : null;
+  const activeRolling: RollingGranularity | null = rolling;
 
-  const selectPill = (mode: PillMode) => {
-    const granularity = PILL_TO_ROLLING[mode];
-    if (granularity) {
-      const range = resolveGranularityRange(granularity, now);
-      setDateMode("custom"); setCustomStart(range.customStart); setCustomEnd(range.customEnd);
-      return;
-    }
+  const selectCalendar = (mode: CalendarMode) => {
     if (mode === "custom" && rolling) {
       // Only reset when we're coming FROM a rolling preset (e.g. YTD) — its dates are still
-      // sitting in customStart/customEnd, which still matches YTD's own computed range, so
-      // activePill kept resolving back to "ytd" instead of "custom" (the pill visually never
-      // seemed to switch, even though dateMode really had changed). A genuine custom range the
-      // user already typed shouldn't be wiped just for re-opening this pill, so leave it alone
-      // in every other case.
+      // sitting in customStart/customEnd, which still matches YTD's own computed range, so this
+      // group's own active-pill detection kept resolving back to null/wrong here instead of
+      // "custom". A genuine custom range the user already typed is left alone in every other case.
       setCustomStart(""); setCustomEnd("");
     }
-    setDateMode(mode as DateMode); // "month" | "year" | "all" | "custom"
+    setDateMode(mode);
   };
 
-  // Sliding pill (measured off the active button, animated with transform) — the segmented
-  // control this is modeled on (iOS's) always slides its selection, it never just recolors in place.
-  const btnRefs = useRef<Partial<Record<PillMode, HTMLButtonElement | null>>>({});
-  const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
-
-  useLayoutEffect(() => {
-    const btn = btnRefs.current[activePill];
-    if (btn) setPill({ left: btn.offsetLeft, width: btn.offsetWidth });
-  }, [activePill]);
+  const selectRolling = (granularity: RollingGranularity) => {
+    const range = resolveGranularityRange(granularity, now);
+    setDateMode("custom"); setCustomStart(range.customStart); setCustomEnd(range.customEnd);
+  };
 
   const rangeLabel = rolling ? formatRangeLabel(customStart, customEnd) : "";
 
@@ -95,21 +123,10 @@ export function DateControls({ dateMode, setDateMode, year, setYear, month, setM
           (same pattern as a tab strip) rather than breaking the Month/Year navigator onto a
           second line. */}
       <div className="flex items-center gap-2.5 flex-nowrap overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
-        <div className="relative flex items-center h-10 bg-muted/40 border border-border/70 rounded-2xl p-1 shrink-0 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-          {pill && (
-            <div aria-hidden
-              className="absolute top-1 h-8 rounded-xl bg-indigo-500/12 dark:bg-indigo-500/20 ring-1 ring-inset ring-indigo-500/25 transition-[transform,width] duration-200 ease-out"
-              style={{ transform: `translateX(${pill.left}px)`, width: pill.width }} />
-          )}
-          {PILLS.map(({ mode, label }) => (
-            <button key={mode} ref={el => { btnRefs.current[mode] = el; }} onClick={() => selectPill(mode)}
-              data-testid={`date-pill-${mode}`}
-              className={cn("relative z-[1] px-3 h-8 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors",
-                activePill === mode ? "text-indigo-600 dark:text-indigo-400" : "text-muted-foreground hover:text-foreground")}>
-              {label}
-            </button>
-          ))}
-        </div>
+        <SegmentedGroup options={CALENDAR_PILLS} active={activeCalendar} onSelect={selectCalendar}
+          theme="indigo" testIdPrefix="date-mode-" />
+        <SegmentedGroup options={ROLLING_PILLS} active={activeRolling} onSelect={selectRolling}
+          theme="copper" testIdPrefix="date-mode-" />
 
         {dateMode === "month" && (
           <div className="flex items-center gap-2 shrink-0">
@@ -138,13 +155,13 @@ export function DateControls({ dateMode, setDateMode, year, setYear, month, setM
           </div>
         )}
         {rangeLabel && (
-          <div className="flex items-center h-10 px-3.5 rounded-2xl bg-muted/40 border border-border/70 shrink-0">
-            <span className="text-xs font-semibold text-muted-foreground tabular-nums whitespace-nowrap">{rangeLabel}</span>
+          <div className="flex items-center h-10 px-3.5 rounded-2xl bg-gradient-to-br from-[#4a2f1a] to-[#241509] ring-1 ring-[#c17f4e]/45 shrink-0">
+            <span className="text-xs font-semibold text-[#f0c090] tabular-nums whitespace-nowrap">{rangeLabel}</span>
           </div>
         )}
       </div>
 
-      {activePill === "custom" && (
+      {activeCalendar === "custom" && (
         <div className="flex items-center gap-3 flex-wrap">
           <div className="w-44">
             <FormDatePicker label="From" testId="date-range-from" value={customStart} onChange={setCustomStart} placeholder="Start date" />
