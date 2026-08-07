@@ -25,7 +25,6 @@ import {ACCOUNT_TYPE_META} from "@/lib/accountTypeMeta";
 import {PURPOSE_CHIP_CLASS, resolvePurposeLabel} from "@/lib/accountPurposeMeta";
 import {getLifecycleStatusMeta} from "@/lib/lifecycleStatusMeta";
 import {BankLogo} from "@/components/icons/BankLogo";
-import {lighten} from "@/components/icons/PremiumIcon";
 import {getBankMonogram} from "@/lib/bankLogos";
 import {cn, formatDate} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
@@ -303,7 +302,7 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
         // near-borderless surface so the primary account reads as the one elevated block.
         isPrimary
           ? "bg-primary/8 dark:bg-primary/10 border border-primary/10 dark:border-primary/25 shadow-soft dark:shadow-none"
-          : "bg-card border border-slate-200/50 dark:border-border/50 shadow-soft dark:shadow-none",
+          : "bg-card border border-slate-100/80 dark:border-border/50 shadow-soft dark:shadow-none",
       )}>
       {/* Real, separately-focusable control for the same action the card's plain onClick above
           already does — a role="button" here would nest the Account Actions menu control below
@@ -314,11 +313,6 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-20 focus:px-3 focus:py-1.5 focus:rounded-lg focus:bg-primary focus:text-primary-foreground focus:text-xs focus:font-medium">
         Edit {account.name}
       </button>
-      {/* Same premium gradient-edge treatment as the form modal headers, tinted to this account
-          type's own Apple system color — a lighter touch than the credit card's full "physical
-          card" face, but still gives every type its own visible identity rather than just a
-          small icon chip. */}
-      <div className="h-1" style={{ background: `linear-gradient(to right, ${lighten(meta.hex, 0.35)}, ${meta.hex})` }} />
       <div className="p-5 flex-1 flex flex-col">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
