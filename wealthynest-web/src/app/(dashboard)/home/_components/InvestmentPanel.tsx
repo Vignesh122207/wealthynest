@@ -85,7 +85,6 @@ export function InvestmentPanel({ investments, chart, isLoading }: InvestmentPan
       icon: Wallet,
       tone: "gray" as IconTone,
       valueColor: "text-foreground",
-      cardBg: "bg-muted/40",
     },
     {
       key: "current",
@@ -94,7 +93,6 @@ export function InvestmentPanel({ investments, chart, isLoading }: InvestmentPan
       icon: TrendingUp,
       tone: "teal" as IconTone,
       valueColor: "text-primary",
-      cardBg: "bg-primary/8",
     },
     {
       key: "gain",
@@ -103,7 +101,6 @@ export function InvestmentPanel({ investments, chart, isLoading }: InvestmentPan
       icon: isGain ? ArrowUpRight : ArrowDownRight,
       tone: (isGain ? "green" : "red") as IconTone,
       valueColor: isGain ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400",
-      cardBg: isGain ? "bg-emerald-500/8" : "bg-red-500/8",
       sub: `${gainPct >= 0 ? "+" : ""}${gainPct.toFixed(2)}%`,
     },
   ];
@@ -174,58 +171,49 @@ export function InvestmentPanel({ investments, chart, isLoading }: InvestmentPan
           {/* Top holdings */}
           <div className="space-y-2.5">
             <p className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wide">Top Holdings</p>
-            {topHoldings.map((h) => (
-              <div key={h.id} className="flex items-center gap-2 text-xs">
-                {h.investmentType === "STOCK" ? (
-                  <StockLogo symbol={h.symbol} fallbackIcon={INVESTMENT_TYPE_META[h.investmentType].icon} fallbackHex={INVESTMENT_TYPE_META[h.investmentType].hex} size="xs" className="shrink-0" />
-                ) : h.investmentType === "MUTUAL_FUND" ? (
-                  <FundLogo companyName={h.companyName} fallbackIcon={INVESTMENT_TYPE_META[h.investmentType].icon} fallbackHex={INVESTMENT_TYPE_META[h.investmentType].hex} size="xs" className="shrink-0" />
-                ) : (h.investmentType === "BOND" || h.investmentType === "FD") ? (
-                  <BankLogo name={h.bankName} fallbackIcon={INVESTMENT_TYPE_META[h.investmentType].icon} fallbackHex={INVESTMENT_TYPE_META[h.investmentType].hex} size="xs" className="shrink-0" />
-                ) : (
-                  <PremiumIcon icon={INVESTMENT_TYPE_META[h.investmentType].icon} hex={INVESTMENT_TYPE_META[h.investmentType].hex} size="xs" className="shrink-0" />
-                )}
-                <span className="text-foreground font-medium truncate min-w-0 flex-1">{holdingName(h)}</span>
-                <span className={cn(
-                  "font-semibold tabular-nums shrink-0",
-                  h.gainLossPct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"
-                )}>
-                  {h.gainLossPct >= 0 ? "+" : ""}{h.gainLossPct.toFixed(1)}%
-                </span>
-              </div>
-            ))}
+            <div className="divide-y divide-slate-100/80 dark:divide-border/40">
+              {topHoldings.map((h) => (
+                <div key={h.id} className="flex items-center gap-2.5 py-2 first:pt-0 last:pb-0 text-xs">
+                  {h.investmentType === "STOCK" ? (
+                    <StockLogo symbol={h.symbol} fallbackIcon={INVESTMENT_TYPE_META[h.investmentType].icon} fallbackHex={INVESTMENT_TYPE_META[h.investmentType].hex} size="xs" className="shrink-0" />
+                  ) : h.investmentType === "MUTUAL_FUND" ? (
+                    <FundLogo companyName={h.companyName} fallbackIcon={INVESTMENT_TYPE_META[h.investmentType].icon} fallbackHex={INVESTMENT_TYPE_META[h.investmentType].hex} size="xs" className="shrink-0" />
+                  ) : (h.investmentType === "BOND" || h.investmentType === "FD") ? (
+                    <BankLogo name={h.bankName} fallbackIcon={INVESTMENT_TYPE_META[h.investmentType].icon} fallbackHex={INVESTMENT_TYPE_META[h.investmentType].hex} size="xs" className="shrink-0" />
+                  ) : (
+                    <PremiumIcon icon={INVESTMENT_TYPE_META[h.investmentType].icon} hex={INVESTMENT_TYPE_META[h.investmentType].hex} size="xs" className="shrink-0" />
+                  )}
+                  <span className="text-foreground font-semibold truncate min-w-0 flex-1">{holdingName(h)}</span>
+                  <span className={cn(
+                    "font-semibold tabular-nums shrink-0 px-2 py-0.5 rounded-full text-[11px]",
+                    h.gainLossPct >= 0
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                      : "bg-red-500/10 text-red-500 dark:text-red-400"
+                  )}>
+                    {h.gainLossPct >= 0 ? "+" : ""}{h.gainLossPct.toFixed(1)}%
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
-      <div className={cn(allocation.length > 0 && "pt-4 border-t border-border/40")}>
-        {/* Mobile — compact grouped list */}
-        <div className="sm:hidden rounded-2xl border border-border/30 divide-y divide-border/40 overflow-hidden">
-          {summaryStats.map((s) => (
-            <div key={s.key} className="flex items-center gap-3 px-4 py-3.5">
-              <PremiumIcon icon={s.icon} tone={s.tone} size="sm" className="w-9 h-9" />
-              <p className="text-xs text-muted-foreground font-medium flex-1">{s.label}</p>
-              <div className="text-right shrink-0">
-                <p className={cn("text-sm font-bold tabular-nums", s.valueColor)}>{s.value}</p>
-                {s.sub && <p className="text-[11px] text-muted-foreground/80 mt-0.5">{s.sub}</p>}
-              </div>
+      {/* Footer metrics — borderless grid columns, no boxed backgrounds */}
+      <div className={cn(
+        "grid grid-cols-3 gap-4",
+        allocation.length > 0 && "pt-4 border-t border-slate-100/80 dark:border-border/40"
+      )}>
+        {summaryStats.map((s) => (
+          <div key={s.key} className="min-w-0">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <PremiumIcon icon={s.icon} tone={s.tone} size="xs" />
+              <p className="text-[11px] text-muted-foreground font-medium truncate">{s.label}</p>
             </div>
-          ))}
-        </div>
-
-        {/* Desktop — individual cards */}
-        <div className="hidden sm:grid sm:grid-cols-3 gap-3">
-          {summaryStats.map((s) => (
-            <div key={s.key} className={cn("rounded-2xl p-4 border border-border/30", s.cardBg)}>
-              <div className="flex items-center gap-2 mb-2">
-                <PremiumIcon icon={s.icon} tone={s.tone} size="xs" />
-                <p className="text-xs text-muted-foreground/80 font-medium">{s.label}</p>
-              </div>
-              <div className={cn("text-base font-bold tabular-nums", s.valueColor)}>{s.value}</div>
-              {s.sub && <p className="text-[11px] text-muted-foreground/80 mt-1">{s.sub}</p>}
-            </div>
-          ))}
-        </div>
+            <p className={cn("text-sm sm:text-base font-bold tabular-nums truncate", s.valueColor)}>{s.value}</p>
+            {s.sub && <p className="text-[11px] text-muted-foreground/80 mt-0.5">{s.sub}</p>}
+          </div>
+        ))}
       </div>
       </>
       )}

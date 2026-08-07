@@ -4,7 +4,7 @@ import Link from "next/link";
 import {Target, Trophy} from "lucide-react";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {GOAL_COLORS, resolveGoalIcon} from "@/lib/categoryMeta";
-import {PremiumIcon} from "@/components/icons/PremiumIcon";
+import {lighten, PremiumIcon} from "@/components/icons/PremiumIcon";
 import {EmptyState} from "@/components/shared/EmptyState";
 import type {Goal} from "@/features/goals/types/goal.types";
 
@@ -65,73 +65,55 @@ export function GoalsSummary({ goals, isLoading }: GoalsSummaryProps) {
         />
       ) : (
         <div className="p-4">
-          {/* Overall progress */}
-          <div className="flex items-center gap-3 mb-4 p-3 rounded-xl bg-muted/40">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs text-muted-foreground">Overall</span>
-                <span className="text-xs font-bold text-primary tabular-nums">
-                  {fmt(totalSaved)} / {fmt(totalTarget)}
-                </span>
-              </div>
-              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-700 bg-primary"
-                  style={{ width: `${goalsPct}%` }}
-                />
-              </div>
+          {/* Overall progress — figures and completion % on opposing sides */}
+          <div className="flex items-center justify-between gap-4 mb-4 pb-4 border-b border-slate-100/80 dark:border-border/40">
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground font-medium mb-1">Overall</p>
+              <p className="text-sm font-bold text-foreground tabular-nums truncate">
+                {fmt(totalSaved)} <span className="text-muted-foreground font-medium">of {fmt(totalTarget)}</span>
+              </p>
             </div>
-            <span className="text-sm font-bold text-primary tabular-nums shrink-0">
+            <span className="text-2xl font-extrabold text-primary tabular-nums shrink-0">
               {goalsPct.toFixed(0)}%
             </span>
           </div>
 
-          {/* Individual goals — ringed icon + target date */}
+          {/* Individual goals — icon badge + linear progress rail */}
           <div className="divide-y divide-border/40">
             {goals.slice(0, 4).map((g, idx) => {
-              const pct      = g.targetAmount > 0 ? Math.min(100, (g.savedAmount / g.targetAmount) * 100) : 0;
-              const done     = g.savedAmount >= g.targetAmount;
-              const color    = done ? "#34C759" : GOAL_COLORS[idx % GOAL_COLORS.length];
-              const IconComp = resolveGoalIcon(g);
-              const r        = 18;
-              const c        = 2 * Math.PI * r;
-              const offset   = c - (pct / 100) * c;
+              const pct       = g.targetAmount > 0 ? Math.min(100, (g.savedAmount / g.targetAmount) * 100) : 0;
+              const done      = g.savedAmount >= g.targetAmount;
+              const color     = done ? "#34C759" : GOAL_COLORS[idx % GOAL_COLORS.length];
+              const fillColor = lighten(color, 0.25);
+              const IconComp  = resolveGoalIcon(g);
+              const dateStr   = g.targetDate
+                ? new Date(g.targetDate).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
+                : null;
 
               return (
                 <div key={g.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                  {/* Ring progress with icon centered */}
-                  <div className="relative w-11 h-11 flex items-center justify-center shrink-0">
-                    <svg width="44" height="44" viewBox="0 0 44 44" style={{ transform: "rotate(-90deg)" }} aria-hidden>
-                      <circle cx="22" cy="22" r={r} fill="none" stroke="hsl(var(--muted))" strokeWidth={4} />
-                      <circle cx="22" cy="22" r={r} fill="none" stroke={color} strokeWidth={4} strokeLinecap="round"
-                        strokeDasharray={c} strokeDashoffset={offset}
-                        style={{ transition: "stroke-dashoffset 1s ease" }} />
-                    </svg>
-                    <PremiumIcon icon={IconComp} hex={color} size="xs" className="absolute" />
-                  </div>
+                  <PremiumIcon icon={IconComp} hex={color} size="sm" className="shrink-0" />
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-medium text-foreground truncate">{g.name}</p>
-                      {done && <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
-                    </div>
-                    {/* Target and completion on one scannable row instead of a single run-on
-                        string — the amount stays left-anchored under the goal name, the percentage
-                        right-anchored under the target-date column above it. */}
-                    <div className="flex items-center justify-between gap-2 mt-0.5">
-                      <span className="text-xs text-muted-foreground tabular-nums truncate">
-                        {fmt(g.savedAmount)} of {fmt(g.targetAmount)}
-                      </span>
-                      <span className="text-xs font-semibold text-foreground tabular-nums shrink-0">
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate">{g.name}</p>
+                        {done && <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+                      </div>
+                      <span className="text-xs font-bold text-foreground tabular-nums shrink-0">
                         {pct.toFixed(0)}%
                       </span>
                     </div>
-                  </div>
-
-                  <div className="text-[11px] text-muted-foreground/80 text-right shrink-0 ml-2 whitespace-nowrap">
-                    {g.targetDate
-                      ? new Date(g.targetDate).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
-                      : "No date"}
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden mb-1">
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{ width: `${pct}%`, backgroundColor: fillColor }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground tabular-nums truncate">
+                      {fmt(g.savedAmount)} of {fmt(g.targetAmount)}
+                      {dateStr && <span className="text-muted-foreground/70"> · {dateStr}</span>}
+                    </p>
                   </div>
                 </div>
               );
