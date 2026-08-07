@@ -351,6 +351,9 @@ export default function DashboardPage() {
             onNavigateYear={navigateYear}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
+            income={data?.monthlyIncome}
+            expenses={data?.monthlyExpenses}
+            savingsRate={data?.savingsRate}
           />
 
           {/* ── Native-only: nudge toward PIN/fingerprint setup until both are configured ── */}
