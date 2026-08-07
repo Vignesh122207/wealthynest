@@ -19,7 +19,8 @@ export const createAccountSchema = z.object({
   // Optional "what is this money for" tag — only valid when accountType === "BANK_ACCOUNT".
   purpose:      z.preprocess(blankToUndef, z.enum([
     "EMERGENCY_FUND", "RETIREMENT", "EDUCATION", "HOUSE_PURCHASE", "VEHICLE_PURCHASE",
-    "VACATION", "CHILD_FUTURE", "TAX_SAVINGS", "INVESTMENT", "GENERAL_SAVINGS", "CUSTOM",
+    "VACATION", "CHILD_FUTURE", "TAX_SAVINGS", "INVESTMENT", "GENERAL_SAVINGS",
+    "WEDDING", "MEDICAL", "DEBT_PAYOFF", "HOME_RENOVATION", "DAILY_SPENDING", "CUSTOM",
   ]).optional()),
   purposeLabel: z.preprocess(blankToUndef, z.string().max(100).optional()),
   creditLimit:    z.preprocess(blankToUndef, z.coerce.number().positive().optional()),
@@ -69,6 +70,11 @@ export const PURPOSE_OPTIONS = [
   { value: "TAX_SAVINGS",      label: "Tax Savings" },
   { value: "INVESTMENT",       label: "Investment" },
   { value: "GENERAL_SAVINGS",  label: "General Savings" },
+  { value: "WEDDING",          label: "Wedding" },
+  { value: "MEDICAL",          label: "Medical / Health" },
+  { value: "DEBT_PAYOFF",      label: "Debt Payoff" },
+  { value: "HOME_RENOVATION",  label: "Home Renovation" },
+  { value: "DAILY_SPENDING",   label: "Daily Spending" },
   { value: "CUSTOM",           label: "Custom…" },
 ];
 

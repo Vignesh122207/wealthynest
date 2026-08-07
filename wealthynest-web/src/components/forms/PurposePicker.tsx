@@ -9,7 +9,7 @@ import {PURPOSE_ICON_META} from "@/lib/accountPurposeMeta";
 import {DropdownPanel} from "@/components/transactions/DropdownPanel";
 
 // Same icon-per-row picker pattern as the bank/broker name inputs (BankNameInput) — a purpose is
-// chosen from a fixed 11-item list rather than searched, so this is a button+panel picker (like
+// chosen from a fixed 16-item list rather than searched, so this is a button+panel picker (like
 // AccountPicker) instead of a typeahead.
 export function PurposePicker({
   value, onChange, error, label = "Purpose (optional)", placeholder = "What is this money for?",

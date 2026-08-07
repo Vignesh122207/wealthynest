@@ -8,7 +8,8 @@ export type LoanType =
  * Wallet, Credit Card, or Loan. Purely descriptive: never affects balance/net-worth math. */
 export type AccountPurpose =
   | "EMERGENCY_FUND" | "RETIREMENT" | "EDUCATION" | "HOUSE_PURCHASE" | "VEHICLE_PURCHASE"
-  | "VACATION" | "CHILD_FUTURE" | "TAX_SAVINGS" | "INVESTMENT" | "GENERAL_SAVINGS" | "CUSTOM";
+  | "VACATION" | "CHILD_FUTURE" | "TAX_SAVINGS" | "INVESTMENT" | "GENERAL_SAVINGS"
+  | "WEDDING" | "MEDICAL" | "DEBT_PAYOFF" | "HOME_RENOVATION" | "DAILY_SPENDING" | "CUSTOM";
 
 /** ACTIVE (normal use), CLOSED (a real-world terminal event — loan paid off, account closed at
  * the bank; excluded from funding pickers but still counted in historical net worth), ARCHIVED

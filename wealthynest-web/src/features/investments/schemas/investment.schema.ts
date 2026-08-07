@@ -9,7 +9,8 @@ const purposeFields = {
   broker:       z.preprocess(blankToUndef, z.string().max(50).optional()),
   purpose:      z.preprocess(blankToUndef, z.enum([
     "EMERGENCY_FUND", "RETIREMENT", "EDUCATION", "HOUSE_PURCHASE", "VEHICLE_PURCHASE",
-    "VACATION", "CHILD_FUTURE", "TAX_SAVINGS", "INVESTMENT", "GENERAL_SAVINGS", "CUSTOM",
+    "VACATION", "CHILD_FUTURE", "TAX_SAVINGS", "INVESTMENT", "GENERAL_SAVINGS",
+    "WEDDING", "MEDICAL", "DEBT_PAYOFF", "HOME_RENOVATION", "DAILY_SPENDING", "CUSTOM",
   ]).optional()),
   purposeLabel: z.preprocess(blankToUndef, z.string().max(100).optional()),
 };
