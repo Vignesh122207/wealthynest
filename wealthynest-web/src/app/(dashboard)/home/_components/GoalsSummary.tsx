@@ -39,7 +39,7 @@ export function GoalsSummary({ goals, isLoading }: GoalsSummaryProps) {
           )}
         </div>
         <Link href="/goals" className="text-xs font-semibold text-primary hover:underline transition-colors">
-          View all →
+          See all →
         </Link>
       </div>
 

@@ -98,7 +98,7 @@ export function TransactionList({ transactions, isLoading }: TransactionListProp
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-border/40 shrink-0">
         <h2 className="font-bold text-foreground text-sm">Recent Transactions</h2>
         <Link href="/expenses" className="text-xs font-semibold text-primary hover:underline transition-colors">
-          View all →
+          See all →
         </Link>
       </div>
 

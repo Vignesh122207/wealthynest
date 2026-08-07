@@ -16,7 +16,7 @@ interface SpendingDonutProps {
   month:             number;
   /** There's no annual category-breakdown endpoint yet — this widget always shows a single
    * month's data. Month mode's label already says which month; Year mode needs to say so
-   * explicitly too, since every sibling widget on the page (StatOverview, NetWorthHero,
+   * explicitly too, since every sibling widget on the page (StatOverview, SixMonthTrend,
    * BudgetSection) does switch to year-scoped figures when this toggles, so silently continuing
    * to show one month's breakdown here without a label change reads as broken, not as scoped. */
   viewMode: "month" | "year";
@@ -42,13 +42,13 @@ export function SpendingDonut({ categoryBreakdown, year, month, viewMode, chart,
       <div className="flex items-center justify-between mb-1">
         <div>
           <h2 className="font-bold text-foreground text-sm">Spending</h2>
-          <p className="text-xs text-muted-foreground/80 mt-0.5">
+          <p className="text-[11px] text-muted-foreground/80 mt-0.5">
             By category · {label}{viewMode === "year" && " only"}
           </p>
         </div>
         <Link href="/expenses"
-          className="text-xs font-semibold text-primary hover:underline transition-colors">
-          View all →
+          className="text-[11px] font-semibold text-primary hover:underline transition-colors">
+          See all →
         </Link>
       </div>
 
@@ -57,7 +57,7 @@ export function SpendingDonut({ categoryBreakdown, year, month, viewMode, chart,
       ) : categoryBreakdown.length > 0 ? (
         <div className="flex-1 flex items-center gap-4">
           {/* accessibilityLayer={false} on the chart handles the outer <svg role="application">
-              (see NetWorthHero.tsx's identical wrapper), but <Pie> independently puts its own
+              (see SixMonthTrend.tsx's identical wrapper), but <Pie> independently puts its own
               tabindex="0" on its rendered <g class="recharts-pie"> layer for slice-level keyboard
               nav — a second, separate focusable element inside this same aria-hidden div. That
               layer reads its own `rootTabIndex` prop (default 0), not `tabIndex` — passing
@@ -103,7 +103,7 @@ export function SpendingDonut({ categoryBreakdown, year, month, viewMode, chart,
                   <span className="text-xs text-muted-foreground truncate">{c.categoryName}</span>
                 </div>
                 <div className="flex items-center gap-2 shrink-0 ml-2">
-                  <span className="text-xs text-muted-foreground/80 tabular-nums">
+                  <span className="text-[11px] text-muted-foreground/80 tabular-nums">
                     {fmtC(c.amount)}
                   </span>
                   <span className="text-xs font-semibold text-foreground tabular-nums w-8 text-right">
@@ -117,7 +117,7 @@ export function SpendingDonut({ categoryBreakdown, year, month, viewMode, chart,
                 height, which otherwise leaves categories 6+ as colored slices with no label
                 anywhere in the widget. */}
             {categoryBreakdown.length > 5 && (
-              <p className="text-xs text-muted-foreground/70 text-center pt-0.5">
+              <p className="text-[11px] text-muted-foreground/70 text-center pt-0.5">
                 +{categoryBreakdown.length - 5} more {categoryBreakdown.length - 5 === 1 ? "category" : "categories"}
               </p>
             )}

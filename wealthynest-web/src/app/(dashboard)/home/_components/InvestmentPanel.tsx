@@ -91,10 +91,7 @@ export function InvestmentPanel({ investments, chart, isLoading }: InvestmentPan
       label: "Current Value",
       value: fmt(totalCurrent),
       icon: TrendingUp,
-      // Purple — matches the Investments domain tone StatOverview's own tile uses for this exact
-      // metric (portfolio current value), so the color reads as one consistent identity wherever
-      // it shows up on Home rather than a different hue per widget.
-      tone: "purple" as IconTone,
+      tone: "teal" as IconTone,
       valueColor: "text-primary",
     },
     {
@@ -113,7 +110,7 @@ export function InvestmentPanel({ investments, chart, isLoading }: InvestmentPan
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="font-bold text-foreground text-sm">Investment Overview</h2>
-          <p className="text-xs text-muted-foreground/80 mt-0.5">Portfolio performance</p>
+          <p className="text-[11px] text-muted-foreground/80 mt-0.5">Portfolio performance</p>
         </div>
         <Link href="/investments"
           className="text-xs font-semibold text-primary hover:underline transition-colors">
@@ -142,7 +139,7 @@ export function InvestmentPanel({ investments, chart, isLoading }: InvestmentPan
           {/* Allocation donut */}
           <div className="flex items-center gap-4">
             {/* accessibilityLayer={false} on the chart handles the outer <svg role="application">
-                (see NetWorthHero.tsx's identical wrapper), but <Pie> independently puts its own
+                (see SixMonthTrend.tsx's identical wrapper), but <Pie> independently puts its own
                 tabindex="0" on its rendered <g class="recharts-pie"> layer for slice-level keyboard
                 nav — a second, separate focusable element inside this same aria-hidden div. That
                 layer reads its own `rootTabIndex` prop (default 0), not `tabIndex` — passing
@@ -173,7 +170,7 @@ export function InvestmentPanel({ investments, chart, isLoading }: InvestmentPan
 
           {/* Top holdings */}
           <div className="space-y-2.5">
-            <p className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wide">Top Holdings</p>
+            <p className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wide">Top Holdings</p>
             <div className="divide-y divide-slate-100/80 dark:divide-border/40">
               {topHoldings.map((h) => (
                 <div key={h.id} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0 text-xs">
@@ -191,12 +188,12 @@ export function InvestmentPanel({ investments, chart, isLoading }: InvestmentPan
                       to read distinctly from a stock/MF row using the same layout. */}
                   <div className="min-w-0 flex-1">
                     <p className="text-foreground font-semibold truncate">{holdingName(h)}</p>
-                    <p className="text-xs text-muted-foreground/70 truncate mt-0.5">{INVESTMENT_TYPE_META[h.investmentType].label}</p>
+                    <p className="text-[11px] text-muted-foreground/70 truncate mt-0.5">{INVESTMENT_TYPE_META[h.investmentType].label}</p>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
                     <span className="font-bold text-foreground tabular-nums">{fmtC(h.currentValue)}</span>
                     <span className={cn(
-                      "inline-flex items-center gap-0.5 font-semibold tabular-nums px-1.5 py-0.5 rounded-full text-xs",
+                      "inline-flex items-center gap-0.5 font-semibold tabular-nums px-1.5 py-0.5 rounded-full text-[10px]",
                       h.gainLossPct >= 0
                         ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                         : "bg-red-500/10 text-red-500 dark:text-red-400"
@@ -223,11 +220,11 @@ export function InvestmentPanel({ investments, chart, isLoading }: InvestmentPan
           <div key={s.key} className="min-w-0">
             <div className="flex items-center gap-1.5 mb-1.5">
               <PremiumIcon icon={s.icon} tone={s.tone} size="xs" />
-              <p className="text-xs text-muted-foreground font-medium truncate">{s.label}</p>
+              <p className="text-[11px] text-muted-foreground font-medium truncate">{s.label}</p>
             </div>
             <div className="flex items-baseline gap-1.5 min-w-0">
               <p className={cn("text-sm sm:text-base font-bold tabular-nums truncate", s.valueColor)}>{s.value}</p>
-              {s.sub && <p className="text-xs text-muted-foreground/80 shrink-0">{s.sub}</p>}
+              {s.sub && <p className="text-[11px] text-muted-foreground/80 shrink-0">{s.sub}</p>}
             </div>
           </div>
         ))}

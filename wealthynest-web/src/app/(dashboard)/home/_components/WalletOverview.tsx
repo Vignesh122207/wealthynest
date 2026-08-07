@@ -77,7 +77,7 @@ export function WalletOverview({ accounts, isLoading }: WalletOverviewProps) {
           <Wallet className="w-4 h-4 text-primary" />
           <h2 className="font-bold text-foreground text-sm">Accounts Overview</h2>
         </div>
-        <Link href="/accounts" className="text-xs font-semibold text-primary hover:underline transition-colors">
+        <Link href="/accounts" className="text-[11px] font-semibold text-primary hover:underline transition-colors">
           View all →
         </Link>
       </div>
@@ -101,9 +101,9 @@ export function WalletOverview({ accounts, isLoading }: WalletOverviewProps) {
       ) : (
       <>
       <div className="mt-2 mb-3 p-3 rounded-xl bg-primary/8 border border-primary/15">
-        <p className="text-xs text-muted-foreground/70 uppercase tracking-wide mb-1">Total Balance</p>
+        <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mb-1">Total Balance</p>
         <p className="text-xl font-bold text-foreground tabular-nums">{fmt(totalBalance)}</p>
-        <p className="text-xs text-muted-foreground/80 mt-0.5">Cash &amp; bank accounts combined</p>
+        <p className="text-[11px] text-muted-foreground/80 mt-0.5">Cash &amp; bank accounts combined</p>
       </div>
 
       <div className="flex-1 divide-y divide-border/40">
@@ -118,7 +118,7 @@ export function WalletOverview({ accounts, isLoading }: WalletOverviewProps) {
                   {GROUP_LABEL[g.type]}
                 </p>
                 <p className={cn(
-                  "text-xs truncate",
+                  "text-[11px] truncate",
                   urgent ? "text-amber-600 dark:text-amber-400 font-medium" : "text-muted-foreground/70"
                 )}>
                   {urgent && `Due ${g.soonestDue! <= 0 ? "today" : `in ${g.soonestDue}d`} · `}

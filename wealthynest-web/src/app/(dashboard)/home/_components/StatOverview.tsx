@@ -3,6 +3,7 @@
 import {useMemo} from "react";
 import {
     Banknote,
+    Landmark,
     type LucideIcon,
     PiggyBank,
     Receipt,
@@ -15,11 +16,11 @@ import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
 import type {Investment} from "@/features/investments/types/investment.types";
 import type {BudgetSummary} from "@/features/dashboard/types/dashboard.types";
 
-// Net Worth no longer lives in this grid — it's the page's own hero (see NetWorthHero.tsx), pulled
-// out so the most important number on Home doesn't compete for attention against five same-shaped
-// tiles. Everything left here is genuinely secondary, equal-weight context.
 interface StatOverviewProps {
   viewMode:          "month" | "year";
+  netWorth:          number | undefined;
+  prevNetWorth:      number | undefined;
+  netWorthSinceJanTrend: number | undefined;
   investments:       Investment[];
   income:            number | undefined;
   expenses:          number | undefined;
@@ -42,47 +43,54 @@ interface TileProps {
   icon: LucideIcon; tone: IconTone;
   label: string; value: string;
   deltaText?: string; deltaGood?: boolean;
-  /** Overrides the default text-foreground value color — Budget Used only, so its status tier
-   * (green/amber/red) reads from the number itself, matching BudgetSection's own per-category rows
-   * (colored %, neutral amount caption) instead of stacking a second colored line on top of an
-   * already status-tinted card. */
-  valueColorClass?: string;
+  /** Overrides the deltaGood-derived green/red color — for tiles with a third (amber) state,
+   * e.g. Budget Used's spent/budgeted line. Also switches that line back to full prominence (see
+   * the deltaColorClass check below): unlike a plain trend blurb, this is the tile's own primary
+   * reading, not a secondary metric to de-emphasize. */
+  deltaColorClass?: string;
   /** Budget Used only — a soft status tint (e.g. "bg-amber-500/10") replacing the plain card
    * background once usage crosses into amber/red territory, so the card itself flags the alert
    * instead of only the number inside it. */
   bgTintClass?: string;
   valueTestId?: string; deltaTestId?: string;
   delay?: string;
-  /** Grid-span override — Budget Used only, see its own call site for why. */
-  className?: string;
+  /** Net Worth alone — a soft primary-tinted card + a step-larger value, so it reads as the
+   * dashboard's headline number at a glance while staying inside the same 6-up grid as every
+   * other tile (same padding/radius/shadow/icon size — only the tint and value size differ). */
+  primary?: boolean;
 }
 
-function StatTile({ icon, tone, label, value, deltaText, deltaGood, valueColorClass, bgTintClass, valueTestId, deltaTestId, delay = "delay-0", className }: TileProps) {
+function StatTile({ icon, tone, label, value, deltaText, deltaGood, deltaColorClass, bgTintClass, valueTestId, deltaTestId, delay = "delay-0", primary }: TileProps) {
   return (
     <div className={cn(
       "rounded-2xl p-3.5 card-hover animate-fade-in-up",
-      bgTintClass ?? "bg-card", "border border-slate-100/80 dark:border-border/50 shadow-soft dark:shadow-none",
-      delay, className
+      primary
+        ? "bg-primary/[0.045] dark:bg-primary/[0.07] border border-primary/25 shadow-soft dark:shadow-none"
+        : cn(bgTintClass ?? "bg-card", "border border-slate-100/80 dark:border-border/50 shadow-soft dark:shadow-none"),
+      delay
     )}>
       <div className="flex items-center gap-2 mb-3">
         <PremiumIcon icon={icon} tone={tone} size="sm" />
         <p className="text-xs font-semibold text-muted-foreground/80 truncate">{label}</p>
       </div>
       <p data-testid={valueTestId} className={cn(
-        "text-xl font-bold tabular-nums tracking-tight leading-none mb-2",
-        valueColorClass ?? "text-foreground"
+        "font-bold text-foreground tabular-nums tracking-tight leading-none mb-2",
+        primary ? "text-2xl" : "text-xl"
       )}>{value}</p>
       {deltaText ? (
         <p data-testid={deltaTestId} className={cn(
-          "text-xs font-medium tabular-nums truncate",
-          // undefined deltaGood (Budget Used's spent/budgeted caption — its own status already
-          // reads from the colored value above) stays neutral rather than defaulting to red.
-          deltaGood == null ? "text-muted-foreground/80" : deltaGood ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"
+          "tabular-nums truncate",
+          // A plain trend blurb ("+2.3% vs last month") is secondary context — de-emphasized so
+          // the value above it stays the tile's one clear focal point. Budget Used's spent/budgeted
+          // line (the deltaColorClass branch) is the opposite: it's that tile's actual headline
+          // reading, not a footnote, so it keeps full weight/opacity.
+          deltaColorClass ? "text-[11px] font-semibold" : "text-[10px] font-medium opacity-75",
+          deltaColorClass ?? (deltaGood ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400")
         )}>
           {deltaText}
         </p>
       ) : (
-        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">New</span>
+        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">New</span>
       )}
     </div>
   );
@@ -96,7 +104,7 @@ function usedTier(pct: number): BudgetTier {
   if (pct > 80) return "amber";
   return "green";
 }
-const TIER_VALUE_COLOR: Record<BudgetTier, string> = {
+const TIER_CAPTION: Record<BudgetTier, string> = {
   green: "text-emerald-600 dark:text-emerald-400",
   amber: "text-amber-600 dark:text-amber-400",
   red:   "text-red-500 dark:text-red-400",
@@ -110,8 +118,8 @@ const TIER_BG: Partial<Record<BudgetTier, string>> = {
   red:   "bg-red-500/10",
 };
 
-// ── Budget Used — reuses StatTile so it stays pixel-aligned with every other tile ──
-function BudgetUsedTile({ spent, budgeted, total, emptyLabel, fmt, delay = "delay-300" }: {
+// ── Budget Used — reuses StatTile so it stays pixel-aligned with every other hero tile ──
+function BudgetUsedTile({ spent, budgeted, total, emptyLabel, fmt, delay = "delay-375" }: {
   spent: number; budgeted: number; total: number; emptyLabel: string;
   fmt: (amount: number) => string; delay?: string;
 }) {
@@ -122,22 +130,17 @@ function BudgetUsedTile({ spent, budgeted, total, emptyLabel, fmt, delay = "dela
     <StatTile
       icon={Target} tone="orange" label="Budget Used"
       value={total > 0 ? `${Math.round(pct)}%` : "—"}
-      valueColorClass={total > 0 ? TIER_VALUE_COLOR[tier] : undefined}
       deltaText={total > 0 ? `${fmt(spent)} of ${fmt(budgeted)}` : emptyLabel}
+      deltaColorClass={total > 0 ? TIER_CAPTION[tier] : "text-muted-foreground"}
       bgTintClass={total > 0 ? TIER_BG[tier] : undefined}
       valueTestId="budget-progress-tile" deltaTestId="budget-progress-caption"
       delay={delay}
-      // 5 tiles on a 2-column mobile grid otherwise strands this one alone in a 3rd row with an
-      // empty cell beside it — full-width here instead reads as a deliberate "last row" rather
-      // than a layout accident. Reverts to a normal 1-of-5 cell from sm: up, where the grid moves
-      // to 3/5 columns and has room to spare.
-      className="col-span-2 sm:col-span-1"
     />
   );
 }
 
 export function StatOverview({
-  viewMode, investments,
+  viewMode, netWorth, prevNetWorth, netWorthSinceJanTrend, investments,
   income, expenses, savingsRate, prevSavingsRate,
   incomeTrend, expenseTrend,
   ytdIncome, ytdExpenses, ytdIncomeTrend, ytdExpenseTrend, ytdSavingsRate, ytdSavingsRateTrend,
@@ -150,6 +153,7 @@ export function StatOverview({
   const current  = useMemo(() => active.reduce((s, i) => s + i.currentValue,   0), [active]);
   const invGainPct = invested > 0 ? ((current - invested) / invested) * 100 : undefined;
 
+  const nwPct = pctChange(netWorth, prevNetWorth);
   const srPct = pctChange(savingsRate, prevSavingsRate);
 
   // Budget Used follows the Month/Year toggle like every other tile here — Month sums only
@@ -160,21 +164,21 @@ export function StatOverview({
   const budgetSpent    = activeBudgets.reduce((s, b) => s + b.spent, 0);
   const budgetBudgeted = activeBudgets.reduce((s, b) => s + b.budgeted, 0);
 
-  // [&>*]:min-w-0 — see TwoColRow's identical comment: without it, a large formatted currency value
-  // (grid items default to min-width:auto) can push a tile — and the row — wider than its track
-  // instead of the tile's own truncate/tabular-nums layout containing it.
+  // [&>*]:min-w-0 on both grids below — see TwoColRow's identical comment: without it, a large
+  // formatted currency value (grid items default to min-width:auto) can push a tile — and the
+  // row — wider than its track instead of the tile's own truncate/tabular-nums layout containing it.
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 [&>*]:min-w-0">
-        {Array.from({ length: 5 }).map((_, i) => (
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 [&>*]:min-w-0">
+        {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className={cn(
-            "rounded-2xl p-3.5 space-y-3 bg-card border border-slate-100/80 dark:border-border/50 shadow-soft dark:shadow-none",
-            // Matches the real grid's own last-tile span (see BudgetUsedTile's call site below) so
-            // the skeleton's shape doesn't shift once real content swaps in.
-            i === 4 && "col-span-2 sm:col-span-1"
+            "rounded-2xl p-3.5 space-y-3",
+            i === 0
+              ? "bg-primary/[0.045] dark:bg-primary/[0.07] border border-primary/25 shadow-soft dark:shadow-none"
+              : "bg-card border border-slate-100/80 dark:border-border/50 shadow-soft dark:shadow-none"
           )}>
             <div className="w-8 h-8 rounded-xl shimmer" />
-            <div className="h-6 w-24 rounded-lg shimmer" />
+            <div className={cn("rounded-lg shimmer", i === 0 ? "h-7 w-28" : "h-6 w-24")} />
             <div className="h-3 w-16 rounded shimmer" />
           </div>
         ))}
@@ -190,27 +194,35 @@ export function StatOverview({
   const savingsRateDeltaPct = isYear ? ytdSavingsRateTrend : srPct;
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 [&>*]:min-w-0">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 [&>*]:min-w-0">
+      <StatTile
+        icon={Landmark} tone="blue"
+        label="Net Worth" value={netWorth != null ? fmt(netWorth) : "—"}
+        deltaText={isYear ? formatTrendDelta(netWorthSinceJanTrend, "since Jan 1") : formatTrendDelta(nwPct)}
+        deltaGood={(isYear ? netWorthSinceJanTrend : nwPct) != null ? (isYear ? netWorthSinceJanTrend! : nwPct!) >= 0 : undefined}
+        delay="delay-0"
+        primary
+      />
       <StatTile
         icon={TrendingUp} tone="purple"
         label="Investments" value={fmt(current)}
         deltaText={formatTrendDelta(invGainPct, "overall return")}
         deltaGood={invGainPct != null ? invGainPct >= 0 : undefined}
-        delay="delay-0"
+        delay="delay-75"
       />
       <StatTile
         icon={Banknote} tone="green"
         label={isYear ? "YTD Income" : "Monthly Income"} value={displayIncome != null ? fmt(displayIncome) : "—"}
         deltaText={isYear ? formatTrendDelta(incomeDeltaPct, "vs same period last year") : formatTrendDelta(incomeDeltaPct)}
         deltaGood={incomeDeltaPct != null ? incomeDeltaPct >= 0 : undefined}
-        delay="delay-75"
+        delay="delay-150"
       />
       <StatTile
         icon={Receipt} tone="red"
         label={isYear ? "YTD Expenses" : "Monthly Expenses"} value={displayExpenses != null ? fmt(displayExpenses) : "—"}
         deltaText={isYear ? formatTrendDelta(expenseDeltaPct, "vs same period last year") : formatTrendDelta(expenseDeltaPct)}
         deltaGood={expenseDeltaPct != null ? expenseDeltaPct <= 0 : undefined}
-        delay="delay-150"
+        delay="delay-225"
       />
       <StatTile
         icon={PiggyBank} tone="yellow"
@@ -218,11 +230,11 @@ export function StatOverview({
         value={displaySavingsRate != null && displayIncome ? `${displaySavingsRate.toFixed(1)}%` : "—"}
         deltaText={isYear ? formatTrendDelta(savingsRateDeltaPct, "vs last year") : formatTrendDelta(savingsRateDeltaPct)}
         deltaGood={savingsRateDeltaPct != null ? savingsRateDeltaPct >= 0 : undefined}
-        delay="delay-225"
+        delay="delay-300"
       />
       <BudgetUsedTile spent={budgetSpent} budgeted={budgetBudgeted} total={budgetTotal}
         emptyLabel={isYear ? "No yearly budgets set" : "No monthly budgets set"}
-        fmt={fmt} delay="delay-300" />
+        fmt={fmt} delay="delay-375" />
     </div>
   );
 }

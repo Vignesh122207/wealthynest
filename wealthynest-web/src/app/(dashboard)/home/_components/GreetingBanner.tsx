@@ -64,24 +64,13 @@ export function GreetingBanner({
     // line for the row's space and only truncates as a last resort; the controls on the right
     // are shrink-0 and, below sm, collapse into one compact icon-driven pill (see the mobile-only
     // block further down) specifically so they never need to squeeze the greeting to fit.
-    //
-    // The insight chip below is desktop-only (hidden md:inline-flex) on purpose — restored at the
-    // user's request after an earlier pass removed it as a duplicate of SmartAlertsRow's own
-    // pace-forecast card. Below md it stays hidden: there's no room in the mobile row for it (see
-    // the mobile-pill comment further down on that row's real-device-measured no-truncate budget),
-    // and md+ has the space to spare.
-    // h-9 (36px) on every element below — the greeting block, the insight badge, the Month/Year
-    // toggle, and the nav pill — instead of letting each derive its own height from its own
-    // padding/line-height. Those happened to be close (32-36px) but not identical, so `items-center`
-    // was centering each box correctly on its own terms without their *centers* actually landing on
-    // one shared line — a fixed shared height makes that exact rather than approximate.
     <div data-testid="greeting-banner" className="animate-fade-in-up flex flex-row items-center justify-between gap-2 sm:gap-3">
       <div className="min-w-0 flex-1">
-        <div className="flex items-center h-9 gap-2">
-          <span className="inline-flex items-center justify-center h-9 text-xl sm:text-2xl shrink-0 leading-none" aria-hidden>
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-xl shrink-0" aria-hidden>
             {{ morning: "🌤️", afternoon: "☀️", evening: "🌙" }[getGreeting()] ?? "👋"}
           </span>
-          <p className="text-base sm:text-xl lg:text-2xl font-bold text-foreground tracking-tight truncate leading-none">
+          <p className="text-base sm:text-lg lg:text-xl font-bold text-foreground tracking-tight truncate">
             Good {getGreeting()}, {firstName}
           </p>
         </div>
@@ -89,14 +78,14 @@ export function GreetingBanner({
 
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {insight && (
-          <div className="hidden md:inline-flex h-9 items-center gap-2 px-3 rounded-xl bg-primary/8 border border-primary/15">
+          <div className="hidden md:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/8 border border-primary/15">
             <Zap className="w-3.5 h-3.5 text-primary shrink-0" />
             <p className="text-xs font-medium text-primary/90">{insight}</p>
           </div>
         )}
 
         {/* Month/Year switch — sm and up only; mobile gets the single combined pill below */}
-        <div className="hidden sm:flex h-9 items-center gap-0.5 bg-card border border-border/50 rounded-xl p-1 shrink-0">
+        <div className="hidden sm:flex items-center gap-0.5 bg-card border border-border/50 rounded-xl p-1 shrink-0">
           {(["month", "year"] as const).map((mode) => (
             <button
               key={mode}
@@ -113,7 +102,7 @@ export function GreetingBanner({
         </div>
 
         {/* Month/Year navigator — sm and up only; mobile gets the single combined pill below */}
-        <div className="hidden sm:flex h-9 items-center gap-1 bg-card border border-border/50 rounded-xl p-1 shrink-0">
+        <div className="hidden sm:flex items-center gap-1 bg-card border border-border/50 rounded-xl p-1 shrink-0">
           <button
             onClick={() => (isYear ? onNavigateYear(-1) : onNavigate(-1))}
             className="w-7 h-7 rounded-lg bg-muted hover:bg-muted/60 flex items-center justify-center transition-colors"
@@ -149,9 +138,6 @@ export function GreetingBanner({
             className="flex items-center gap-1 text-primary"
           >
             {isYear ? <CalendarRange className="w-3.5 h-3.5 shrink-0" /> : <Calendar className="w-3.5 h-3.5 shrink-0" />}
-            {/* Deliberately kept at 11px rather than the rest of the app's 12px caption floor —
-                this is the one label inside the row whose real-device-measured no-truncate budget
-                the top-of-file comment is about; every other caption on Home has room to spare. */}
             <span data-testid="period-nav-label-mobile" className="text-[11px] font-semibold text-foreground tabular-nums whitespace-nowrap">
               {label}
             </span>
