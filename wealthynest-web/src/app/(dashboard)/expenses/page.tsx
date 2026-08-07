@@ -32,14 +32,11 @@ import {type ExpenseFormValues} from "@/features/expenses/schemas/expense.schema
 import type {Expense, SplitParticipant} from "@/features/expenses/types/expense.types";
 import {exportAllCsv, exportCsv, exportIncomeCsv, exportTransfersCsv} from "@/features/expenses/utils/csvExport";
 import {pad, resolveEffectiveAccountIds} from "@/features/expenses/utils/filterHelpers";
-import {resolveGranularityRange} from "@/features/expenses/utils/granularity";
 import {TypeTabs} from "@/features/expenses/components/TypeTabs";
 import {DateControls} from "@/features/expenses/components/DateControls";
 import {StatCards} from "@/features/expenses/components/StatCards";
 import {Toolbar} from "@/features/expenses/components/Toolbar";
 import {FilterPanel} from "@/features/expenses/components/FilterPanel";
-import {GranularityControl} from "@/features/expenses/components/GranularityControl";
-import {CommandBar} from "@/features/expenses/components/CommandBar";
 import type {Channel, DateMode, SortKey, TxType} from "@/features/expenses/types/filters.types";
 import {pctChange} from "@/lib/utils";
 import {buildUsageCounts, pickSmartDefault, sortByUsage} from "@/lib/mostUsed";
@@ -902,22 +899,6 @@ export default function TransactionsPage() {
       <main className="flex-1 p-4 md:p-5 lg:p-6 pb-36 lg:pb-24 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-4">
 
-        {/* Lightweight natural-language command bar — client-side keyword matching against the
-            filters already below, not a real LLM-backed query engine (see commandParser.ts). */}
-        <CommandBar categories={categories} onApply={(result) => {
-          if (result.granularity) {
-            if (result.granularity === "ALL") {
-              setDateMode("all");
-            } else {
-              const range = resolveGranularityRange(result.granularity, new Date());
-              setDateMode("custom"); setCustomStart(range.customStart); setCustomEnd(range.customEnd);
-            }
-          }
-          if (result.categoryId) setCategoryId(result.categoryId);
-          if (result.txType) setTxType(result.txType);
-          if (result.recurringOnly) setRecurringOnly(true);
-        }} />
-
         {/* Toolbar — search, filters, download — shared across every tab */}
         <Toolbar
           search={search} setSearch={setSearch}
@@ -926,22 +907,14 @@ export default function TransactionsPage() {
           onExport={handleExport}
         />
 
-        {/* Shared date controls + quick rolling-window granularity */}
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <DateControls
-            dateMode={dateMode} setDateMode={setDateMode}
-            year={year} setYear={setYear}
-            month={month} setMonth={setMonth}
-            customStart={customStart} setCustomStart={setCustomStart}
-            customEnd={customEnd} setCustomEnd={setCustomEnd}
-          />
-          <GranularityControl dateMode={dateMode} customStart={customStart} customEnd={customEnd}
-            onSelect={(patch) => {
-              setDateMode(patch.dateMode);
-              if (patch.customStart !== undefined) setCustomStart(patch.customStart);
-              if (patch.customEnd !== undefined) setCustomEnd(patch.customEnd);
-            }} />
-        </div>
+        {/* Unified date-range control — Month/Year/rolling-window/All/Custom in one row */}
+        <DateControls
+          dateMode={dateMode} setDateMode={setDateMode}
+          year={year} setYear={setYear}
+          month={month} setMonth={setMonth}
+          customStart={customStart} setCustomStart={setCustomStart}
+          customEnd={customEnd} setCustomEnd={setCustomEnd}
+        />
 
         {/* Stat cards — always visible, reflect the selected date range regardless of tab */}
         <StatCards
