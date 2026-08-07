@@ -1,8 +1,7 @@
 import {memo} from "react";
 import {ArrowLeftRight, CreditCard, HandCoins, RefreshCw} from "lucide-react";
 import {getCategoryColor, getCategoryIcon, INCOME_ICON_MAP} from "@/lib/categoryMeta";
-import {badgeTextColor} from "@/components/icons/PremiumIcon";
-import {CategoryRing} from "./CategoryRing";
+import {badgeTextColor, PremiumIcon} from "@/components/icons/PremiumIcon";
 import {cn} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {useIsDark} from "@/hooks/useIsDark";
@@ -53,7 +52,7 @@ export const ExpenseRow = memo(function ExpenseRow({ expense, accountName, onEdi
     <button type="button" onClick={onEdit}
       aria-label={`Edit ${title}, ${fmt(expense.amount)}`}
       className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors text-left">
-      <CategoryRing icon={catIcon} hex={catColor} />
+      <PremiumIcon icon={catIcon} hex={catColor} size="sm" className="w-9 h-9" />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-foreground truncate leading-5">{title}</p>
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
@@ -95,7 +94,7 @@ export const IncomeRow = memo(function IncomeRow({ entry, accountName, onEdit, b
     <button type="button" onClick={onEdit}
       aria-label={`Edit ${title}, ${fmt(entry.amount)}`}
       className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors text-left">
-      <CategoryRing icon={src.icon} hex={src.color} />
+      <PremiumIcon icon={src.icon} hex={src.color} size="sm" className="w-9 h-9" />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-foreground truncate leading-5">{title}</p>
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
@@ -140,8 +139,9 @@ export const TransferRow = memo(function TransferRow({ transfer, onEdit, balance
     <button type="button" onClick={onEdit}
       aria-label={`Edit transfer, ${fmt(transfer.amount)}`}
       className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors text-left">
-      <CategoryRing icon={isDebt ? (isIn ? HandCoins : CreditCard) : isAdj ? RefreshCw : ArrowLeftRight}
-        hex={isDebt ? (isIn ? "#14b8a6" : "#f43f5e") : isAdj ? "#8E8E93" : "#5856D6"} />
+      <PremiumIcon icon={isDebt ? (isIn ? HandCoins : CreditCard) : isAdj ? RefreshCw : ArrowLeftRight}
+        hex={isDebt ? (isIn ? "#14b8a6" : "#f43f5e") : undefined}
+        tone={isDebt ? undefined : isAdj ? "gray" : "indigo"} size="sm" className="w-9 h-9" />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-foreground truncate leading-5">{title}</p>
         {isDebt ? (

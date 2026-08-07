@@ -77,7 +77,14 @@ export function DateControls({ dateMode, setDateMode, year, setYear, month, setM
     if (!showCustom) return;
     const onMouseDown = (e: MouseEvent) => {
       const target = e.target as Node;
-      if (!customBtnRef.current?.contains(target) && !popoverRef.current?.contains(target)) setShowCustom(false);
+      if (customBtnRef.current?.contains(target)) return;
+      if (popoverRef.current?.contains(target)) return;
+      // FormDatePicker's own calendar dropdown portals straight to document.body — outside this
+      // popover's DOM subtree — so without this, picking a day in the From/To calendar closed
+      // this whole popover before the inner picker could even register the selection (the click
+      // target is a descendant of neither ref above).
+      if (target instanceof HTMLElement && target.closest('[role="dialog"]')) return;
+      setShowCustom(false);
     };
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") setShowCustom(false); };
     document.addEventListener("mousedown", onMouseDown);
@@ -92,50 +99,54 @@ export function DateControls({ dateMode, setDateMode, year, setYear, month, setM
   const setCustomRangeEnd   = (v: string) => { setCustomEnd(v);   setDateMode("custom"); };
 
   return (
-    // flex-nowrap + overflow-x-auto instead of flex-wrap: on a narrow viewport the row scrolls
-    // horizontally (same pattern as a tab strip) rather than breaking the nav onto a second line.
-    <div className="flex items-center gap-2 flex-nowrap overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
-      <div className="relative flex items-center h-9 bg-muted/60 border border-border rounded-xl p-0.5 shrink-0">
-        {pill && (
-          <div aria-hidden className="absolute top-0.5 h-7 rounded-lg bg-card shadow-sm transition-[transform,width] duration-200 ease-out"
-            style={{ transform: `translateX(${pill.left}px)`, width: pill.width }} />
-        )}
-        {PILLS.map(({ mode, label }) => (
-          <button key={mode} ref={el => { btnRefs.current[mode] = el; }} onClick={() => selectPill(mode)}
-            data-testid={`date-pill-${mode}`}
-            className={cn("relative z-[1] px-2.5 h-7 rounded-lg text-[11px] font-medium whitespace-nowrap transition-colors",
-              activePill === mode ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
-            {label}
-          </button>
-        ))}
-      </div>
+    <div className="flex items-center gap-2">
+      {/* flex-nowrap + overflow-x-auto instead of flex-wrap: on a narrow viewport this strip
+          scrolls horizontally (same pattern as a tab strip) rather than breaking the nav onto a
+          second line. Scoped to just the pills+nav (not the whole row) — an overflow-x-auto
+          ancestor also clips overflow-y, which was cutting off the Custom popover below entirely. */}
+      <div className="flex items-center gap-2 flex-nowrap overflow-x-auto pb-0.5 min-w-0" style={{ scrollbarWidth: "none" }}>
+        <div className="relative flex items-center h-9 bg-muted/60 border border-border rounded-xl p-0.5 shrink-0">
+          {pill && (
+            <div aria-hidden className="absolute top-0.5 h-7 rounded-lg bg-card shadow-sm transition-[transform,width] duration-200 ease-out"
+              style={{ transform: `translateX(${pill.left}px)`, width: pill.width }} />
+          )}
+          {PILLS.map(({ mode, label }) => (
+            <button key={mode} ref={el => { btnRefs.current[mode] = el; }} onClick={() => selectPill(mode)}
+              data-testid={`date-pill-${mode}`}
+              className={cn("relative z-[1] px-2.5 h-7 rounded-lg text-[11px] font-medium whitespace-nowrap transition-colors",
+                activePill === mode ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
+              {label}
+            </button>
+          ))}
+        </div>
 
-      {dateMode === "month" && (
-        <div className="flex items-center gap-2 shrink-0">
-          <button onClick={() => navigateMonth(-1)} aria-label="Previous month"
-            className="w-7 h-7 rounded-lg bg-muted/60 border border-border hover:bg-muted flex items-center justify-center transition-all">
-            <ChevronLeft className="w-3.5 h-3.5 text-muted-foreground" />
-          </button>
-          <span className="text-sm font-semibold text-foreground min-w-[130px] text-center">{monthLabel(year, month)}</span>
-          <button onClick={() => navigateMonth(1)} disabled={isCurrentMonth} aria-label="Next month"
-            className="w-7 h-7 rounded-lg bg-muted/60 border border-border hover:bg-muted flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed">
-            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
-          </button>
-        </div>
-      )}
-      {dateMode === "year" && (
-        <div className="flex items-center gap-2 shrink-0">
-          <button onClick={() => setYear(year - 1)} aria-label="Previous year"
-            className="w-7 h-7 rounded-lg bg-muted/60 border border-border hover:bg-muted flex items-center justify-center transition-all">
-            <ChevronLeft className="w-3.5 h-3.5 text-muted-foreground" />
-          </button>
-          <span className="text-sm font-semibold text-foreground min-w-[48px] text-center">{year}</span>
-          <button onClick={() => setYear(year + 1)} disabled={year >= now.getFullYear()} aria-label="Next year"
-            className="w-7 h-7 rounded-lg bg-muted/60 border border-border hover:bg-muted flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed">
-            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
-          </button>
-        </div>
-      )}
+        {dateMode === "month" && (
+          <div className="flex items-center gap-2 shrink-0">
+            <button onClick={() => navigateMonth(-1)} aria-label="Previous month"
+              className="w-7 h-7 rounded-lg bg-muted/60 border border-border hover:bg-muted flex items-center justify-center transition-all">
+              <ChevronLeft className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+            <span className="text-sm font-semibold text-foreground min-w-[130px] text-center">{monthLabel(year, month)}</span>
+            <button onClick={() => navigateMonth(1)} disabled={isCurrentMonth} aria-label="Next month"
+              className="w-7 h-7 rounded-lg bg-muted/60 border border-border hover:bg-muted flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed">
+              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+          </div>
+        )}
+        {dateMode === "year" && (
+          <div className="flex items-center gap-2 shrink-0">
+            <button onClick={() => setYear(year - 1)} aria-label="Previous year"
+              className="w-7 h-7 rounded-lg bg-muted/60 border border-border hover:bg-muted flex items-center justify-center transition-all">
+              <ChevronLeft className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+            <span className="text-sm font-semibold text-foreground min-w-[48px] text-center">{year}</span>
+            <button onClick={() => setYear(year + 1)} disabled={year >= now.getFullYear()} aria-label="Next year"
+              className="w-7 h-7 rounded-lg bg-muted/60 border border-border hover:bg-muted flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed">
+              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+          </div>
+        )}
+      </div>
 
       <div className="relative shrink-0">
         <button ref={customBtnRef} onClick={() => setShowCustom(v => !v)} aria-label="Custom date range" data-testid="date-pill-custom"

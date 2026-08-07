@@ -3,7 +3,6 @@
 import {useRef, useState} from "react";
 import {Image as ImageIcon, MapPin, Paperclip, Pencil, Split, Trash2, X} from "lucide-react";
 import {PremiumIcon} from "@/components/icons/PremiumIcon";
-import {CategoryRing} from "@/features/expenses/components/CategoryRing";
 import {CategoryTrendChart} from "@/features/expenses/components/CategoryTrendChart";
 import {buildCategoryTrend} from "@/features/expenses/utils/categoryTrend";
 import {useReceiptAttachment} from "@/features/expenses/hooks/useReceiptAttachment";
@@ -75,7 +74,7 @@ export function TransactionDetailDrawer({ expense, accountName, familyMembers, a
       >
         <div className="h-1 bg-gradient-to-r from-indigo-500 via-violet-500 to-blue-500 shrink-0" />
         <div className="flex items-center gap-3 px-5 h-16 border-b border-border shrink-0">
-          <CategoryRing icon={catIcon} hex={catColor} size="lg" />
+          <PremiumIcon icon={catIcon} hex={catColor} size="lg" />
           <div className="min-w-0 flex-1">
             <h3 className="font-bold text-foreground truncate">{title}</h3>
             <p className="text-xs text-muted-foreground">{formatDate(expense.expenseDate)}</p>
