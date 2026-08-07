@@ -44,3 +44,16 @@ export function detectRollingGranularity(
   }
   return null;
 }
+
+/** "31 Jul – 07 Aug 2026" (or "1 Jan – 07 Aug" within the same year) — the read-only label shown
+ * next to a rolling-window pill so 1W/1M/3M/6M/YTD show what they actually resolved to, without
+ * opening the editable Custom range fields (those stay reserved for a genuine custom pick). */
+export function formatRangeLabel(customStart: string, customEnd: string): string {
+  if (!customStart || !customEnd) return "";
+  const start = new Date(`${customStart}T00:00:00`);
+  const end = new Date(`${customEnd}T00:00:00`);
+  const sameYear = start.getFullYear() === end.getFullYear();
+  const startLabel = format(start, sameYear ? "dd MMM" : "dd MMM yyyy");
+  const endLabel = format(end, "dd MMM yyyy");
+  return `${startLabel} – ${endLabel}`;
+}

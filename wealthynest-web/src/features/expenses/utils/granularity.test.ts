@@ -1,5 +1,5 @@
 import {describe, it, expect} from "vitest";
-import {resolveGranularityRange, detectRollingGranularity} from "./granularity";
+import {resolveGranularityRange, detectRollingGranularity, formatRangeLabel} from "./granularity";
 
 const today = new Date(2026, 7, 7); // Aug 7, 2026 (month is 0-indexed)
 
@@ -59,5 +59,21 @@ describe("detectRollingGranularity", () => {
 
   it("returns null for a custom range that doesn't match any granularity", () => {
     expect(detectRollingGranularity("custom", "2026-03-15", "2026-04-20", today)).toBeNull();
+  });
+});
+
+describe("formatRangeLabel", () => {
+  it("omits the year on the start date when both ends fall in the same year", () => {
+    expect(formatRangeLabel("2026-07-31", "2026-08-07")).toBe("31 Jul – 07 Aug 2026");
+  });
+
+  it("includes the year on both ends when they cross a year boundary", () => {
+    expect(formatRangeLabel("2025-12-25", "2026-01-01")).toBe("25 Dec 2025 – 01 Jan 2026");
+  });
+
+  it("returns an empty string when either date is missing", () => {
+    expect(formatRangeLabel("", "2026-08-07")).toBe("");
+    expect(formatRangeLabel("2026-08-07", "")).toBe("");
+    expect(formatRangeLabel("", "")).toBe("");
   });
 });
