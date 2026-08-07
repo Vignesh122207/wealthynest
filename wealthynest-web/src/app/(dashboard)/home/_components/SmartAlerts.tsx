@@ -52,6 +52,20 @@ interface SmartAlertsRowProps {
 
 const MAX_INSIGHTS = 3;
 
+// The anomaly card's body comes verbatim from the server-composed notification message (see
+// getAnomalyInsight's comment) so its wording matches the push notification exactly — unlike the
+// other two insight kinds, it isn't built as JSX here, so it arrives with no bold markup around
+// its currency figures. Highlighting them client-side keeps the shared message text as the single
+// source of truth while still matching the other cards' bold-amount styling.
+export function highlightAmounts(text: string): ReactNode {
+  const parts = text.split(/(₹[\d,]+(?:\.\d+)?)/g);
+  return parts.map((part, i) =>
+    /^₹[\d,]+(?:\.\d+)?$/.test(part)
+      ? <span key={i} className="font-semibold tabular-nums">{part}</span>
+      : part
+  );
+}
+
 // Pure severity-rank sorting front-loads bad news: any month with an anomaly plus a couple of
 // upcoming bills already fills every slot before a genuine positive card (a savings-pace win, a
 // category actually trending down) ever gets considered, even when one exists in the pool — the
@@ -82,7 +96,7 @@ export function SmartAlertsRow({ smartInsights, upcomingBills }: SmartAlertsRowP
         severity: "critical",
         icon: AlertTriangle,
         title: insight.title,
-        body: insight.message,
+        body: highlightAmounts(insight.message),
       };
     }
     if (insight.kind === "forecast") {

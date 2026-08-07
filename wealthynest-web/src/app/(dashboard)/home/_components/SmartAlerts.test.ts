@@ -1,6 +1,7 @@
 import {describe, expect, it} from "vitest";
+import {isValidElement} from "react";
 import {AlertTriangle} from "lucide-react";
-import {selectTopInsights, type InsightCard} from "./SmartAlerts";
+import {highlightAmounts, selectTopInsights, type InsightCard} from "./SmartAlerts";
 
 function card(severity: InsightCard["severity"], title: string): InsightCard {
   return { severity, icon: AlertTriangle, title, body: title };
@@ -46,5 +47,41 @@ describe("selectTopInsights", () => {
     const result = selectTopInsights([critical, warning, positive], 2);
     expect(result[0]).toBe(critical);
     expect(result).toHaveLength(2);
+  });
+});
+
+describe("highlightAmounts", () => {
+  interface SpanProps { children?: string; className?: string; }
+
+  function text(node: ReturnType<typeof highlightAmounts>): string {
+    const parts = Array.isArray(node) ? node : [node];
+    return parts
+      .map((p) => (isValidElement<SpanProps>(p) ? p.props.children : p))
+      .join("");
+  }
+
+  it("wraps every ₹ amount in a bold span, leaving the rest as plain text", () => {
+    const result = highlightAmounts(
+      "A Groceries expense of ₹16000 is well above your usual ₹747 for this category — check it's expected."
+    ) as unknown[];
+
+    expect(text(result as never)).toBe(
+      "A Groceries expense of ₹16000 is well above your usual ₹747 for this category — check it's expected."
+    );
+
+    const spans = result.filter(isValidElement) as React.ReactElement<SpanProps>[];
+    expect(spans.map((s) => s.props.children)).toEqual(["₹16000", "₹747"]);
+    expect(spans.every((s) => s.props.className === "font-semibold tabular-nums")).toBe(true);
+  });
+
+  it("handles comma-grouped and decimal amounts", () => {
+    const result = highlightAmounts("You spent ₹1,20,000.50 more.") as unknown[];
+    const spans = result.filter(isValidElement) as React.ReactElement<SpanProps>[];
+    expect(spans.map((s) => s.props.children)).toEqual(["₹1,20,000.50"]);
+  });
+
+  it("returns the original text untouched when there are no amounts", () => {
+    const result = highlightAmounts("Everything looks fine.");
+    expect(text(result as never)).toBe("Everything looks fine.");
   });
 });
