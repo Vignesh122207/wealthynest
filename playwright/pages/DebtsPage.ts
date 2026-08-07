@@ -14,9 +14,17 @@ export class DebtsPage extends BasePage {
     return this.page.getByTestId(`debt-tab-${id}`);
   }
 
-  /** Every card in the list shares the same data-testid — scope to one contact via .filter(). */
+  /** Every card in the list shares the same data-testid — scope to one contact via .filter().
+   * A SETTLED debt lives inside the collapsed "Settled Debts" section (SettledDebtsSection.tsx,
+   * same pattern as Accounts' Closed section) and isn't in the DOM until that section is
+   * expanded — call settledDebtsToggle.click() first when asserting on a debt you expect to have
+   * just settled. */
   card(contactName: string): Locator {
     return this.page.getByTestId("debt-card").filter({ hasText: contactName });
+  }
+
+  get settledDebtsToggle(): Locator {
+    return this.page.getByText(/Settled Debts/);
   }
 
   private async openCreateModal(type: "LENT" | "BORROWED"): Promise<void> {

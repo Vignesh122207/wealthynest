@@ -24,6 +24,7 @@ import {DebtFormModal} from "./_components/DebtFormModal";
 import {PaymentModal} from "./_components/PaymentModal";
 import {DebtCard} from "./_components/DebtCard";
 import {Summary} from "./_components/Summary";
+import {SettledDebtsSection} from "./_components/SettledDebtsSection";
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -47,6 +48,7 @@ export default function DebtsPage() {
   const [modal,     setModal]     = useState<Modal>(null);
   const [deleteId,  setDeleteId]  = useState<string | null>(null);
   const [paymentId, setPaymentId] = useState<string | null>(null);
+  const [showSettled, setShowSettled] = useState(false);
 
   const { data: debts = [], isLoading, isError, refetch } = useDebts();
   const { data: accountsData }            = useAccounts();
@@ -58,6 +60,10 @@ export default function DebtsPage() {
   const { mutate: deleteDebt, isPending: deleting }  = useDeleteDebt();
 
   const filtered = tab === "ALL" ? debts : debts.filter(d => d.type === tab);
+  // SETTLED debts move to their own collapsed section below (SettledDebtsSection) instead of
+  // staying mixed into the active list — same split as Accounts' active-grid vs. Closed section.
+  const activeFiltered  = filtered.filter(d => d.status !== "SETTLED");
+  const settledFiltered = filtered.filter(d => d.status === "SETTLED");
   const payDebt  = debts.find(d => d.id === paymentId);
   const delDebt  = debts.find(d => d.id === deleteId);
 
@@ -84,7 +90,7 @@ export default function DebtsPage() {
           </div>
         ) : isError ? (
           <QueryErrorState onRetry={() => refetch()} description="Couldn't load your debts. Check your connection and try again." />
-        ) : filtered.length === 0 ? (
+        ) : activeFiltered.length === 0 ? (
           <EmptyState
             icon={Handshake}
             title="No debts here"
@@ -112,7 +118,7 @@ export default function DebtsPage() {
           />
         ) : (
           <div className="space-y-3">
-            {filtered.map(debt => (
+            {activeFiltered.map(debt => (
               <DebtCard
                 key={debt.id}
                 debt={debt}
@@ -121,6 +127,15 @@ export default function DebtsPage() {
               />
             ))}
           </div>
+        )}
+
+        {!isLoading && !isError && (
+          <SettledDebtsSection
+            filteredSettled={settledFiltered}
+            showSettled={showSettled}
+            setShowSettled={setShowSettled}
+            onEdit={debt => setModal({ mode: "edit", debt })}
+          />
         )}
       </PageWrapper>
 

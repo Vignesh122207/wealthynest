@@ -22,6 +22,8 @@ test.describe("Debts", () => {
     await debtsPage.expectStatus(name, "Active");
 
     await debtsPage.recordPayment(name, 5000);
+    // Settling moves the card into the collapsed "Settled Debts" section — expand it first.
+    await debtsPage.settledDebtsToggle.click();
     await debtsPage.expectStatus(name, "Settled");
   });
 
@@ -78,6 +80,8 @@ test.describe("Debts", () => {
 
     await debtsPage.editDebtAmount(name, 500);
 
+    // Settling moves the card into the collapsed "Settled Debts" section — expand it first.
+    await debtsPage.settledDebtsToggle.click();
     await debtsPage.expectStatus(name, "Settled");
   });
 
