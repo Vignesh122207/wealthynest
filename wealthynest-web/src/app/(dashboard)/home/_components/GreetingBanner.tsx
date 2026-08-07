@@ -70,13 +70,18 @@ export function GreetingBanner({
     // pace-forecast card. Below md it stays hidden: there's no room in the mobile row for it (see
     // the mobile-pill comment further down on that row's real-device-measured no-truncate budget),
     // and md+ has the space to spare.
+    // h-9 (36px) on every element below — the greeting block, the insight badge, the Month/Year
+    // toggle, and the nav pill — instead of letting each derive its own height from its own
+    // padding/line-height. Those happened to be close (32-36px) but not identical, so `items-center`
+    // was centering each box correctly on its own terms without their *centers* actually landing on
+    // one shared line — a fixed shared height makes that exact rather than approximate.
     <div data-testid="greeting-banner" className="animate-fade-in-up flex flex-row items-center justify-between gap-2 sm:gap-3">
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="text-xl sm:text-2xl shrink-0" aria-hidden>
+        <div className="flex items-center h-9 gap-2">
+          <span className="inline-flex items-center justify-center h-9 text-xl sm:text-2xl shrink-0 leading-none" aria-hidden>
             {{ morning: "🌤️", afternoon: "☀️", evening: "🌙" }[getGreeting()] ?? "👋"}
           </span>
-          <p className="text-base sm:text-xl lg:text-2xl font-bold text-foreground tracking-tight truncate">
+          <p className="text-base sm:text-xl lg:text-2xl font-bold text-foreground tracking-tight truncate leading-none">
             Good {getGreeting()}, {firstName}
           </p>
         </div>
@@ -84,14 +89,14 @@ export function GreetingBanner({
 
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {insight && (
-          <div className="hidden md:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/8 border border-primary/15">
+          <div className="hidden md:inline-flex h-9 items-center gap-2 px-3 rounded-xl bg-primary/8 border border-primary/15">
             <Zap className="w-3.5 h-3.5 text-primary shrink-0" />
             <p className="text-xs font-medium text-primary/90">{insight}</p>
           </div>
         )}
 
         {/* Month/Year switch — sm and up only; mobile gets the single combined pill below */}
-        <div className="hidden sm:flex items-center gap-0.5 bg-card border border-border/50 rounded-xl p-1 shrink-0">
+        <div className="hidden sm:flex h-9 items-center gap-0.5 bg-card border border-border/50 rounded-xl p-1 shrink-0">
           {(["month", "year"] as const).map((mode) => (
             <button
               key={mode}
@@ -108,7 +113,7 @@ export function GreetingBanner({
         </div>
 
         {/* Month/Year navigator — sm and up only; mobile gets the single combined pill below */}
-        <div className="hidden sm:flex items-center gap-1 bg-card border border-border/50 rounded-xl p-1 shrink-0">
+        <div className="hidden sm:flex h-9 items-center gap-1 bg-card border border-border/50 rounded-xl p-1 shrink-0">
           <button
             onClick={() => (isYear ? onNavigateYear(-1) : onNavigate(-1))}
             className="w-7 h-7 rounded-lg bg-muted hover:bg-muted/60 flex items-center justify-center transition-colors"
