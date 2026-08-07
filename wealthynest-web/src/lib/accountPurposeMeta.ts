@@ -14,8 +14,11 @@ import { PURPOSE_LABELS } from "@/features/accounts/schemas/account.schema";
 // Neutral slate, not amber — this used to share the same gold as the "Primary" badge, so the two
 // sat right next to each other on a card and read as one blob instead of two distinct facts
 // (which account is your default vs. what this one's earmarked for).
+// Dark mode gets its own (lighter, higher-opacity) tint rather than reusing the light-mode
+// bg/border values as-is — slate-500 at 10%/20% opacity over the very dark card background reads
+// as washed out; slate-400 at 15%/25% actually registers as a chip.
 export const PURPOSE_CHIP_CLASS =
-  "text-slate-600 dark:text-slate-300 bg-slate-500/10 border border-slate-500/20";
+  "text-slate-600 dark:text-slate-200 bg-slate-500/10 dark:bg-slate-400/15 border border-slate-500/20 dark:border-slate-400/25";
 
 export const PURPOSE_ICON_META: Record<string, { icon: LucideIcon; tone: IconTone }> = {
   EMERGENCY_FUND:   { icon: ShieldCheck,   tone: "orange" },

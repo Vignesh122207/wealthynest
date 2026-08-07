@@ -349,25 +349,32 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
                 )
               )}
             </div>
-            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-              {account.bankName && account.bankName !== account.name && <p className="text-xs text-muted-foreground">{account.bankName}</p>}
-              {purpose && (
+            {account.bankName && account.bankName !== account.name && (
+              <p className="text-xs text-muted-foreground mt-0.5">{account.bankName}</p>
+            )}
+            {/* Purpose (what the money's for) and Account Number (which account this is) are two
+                different kinds of fact, each on its own line — Purpose first since it's the more
+                meaningful one to scan for. Independently conditional, so an account with no
+                purpose just shows its account number as the next line straight after the bank
+                name, no empty gap left behind. */}
+            {purpose && (
+              <div className="mt-1">
                 <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide", PURPOSE_CHIP_CLASS)}>
                   {purpose}
                 </span>
-              )}
-              {account.accountNumber && (
-                <div className="flex items-center gap-1">
-                  <p className="text-xs text-muted-foreground/80 font-mono">
-                    {revealAcctNum ? account.accountNumber : `•••• ${account.accountNumber.slice(-4)}`}
-                  </p>
-                  <button onClick={e => { e.stopPropagation(); setRevealAcctNum(v => !v); }}
-                    className="text-muted-foreground/30 hover:text-muted-foreground transition-colors">
-                    {revealAcctNum ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                  </button>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
+            {account.accountNumber && (
+              <div className="flex items-center gap-1 mt-1">
+                <p className="text-xs text-muted-foreground/80 font-mono">
+                  {revealAcctNum ? account.accountNumber : `•••• ${account.accountNumber.slice(-4)}`}
+                </p>
+                <button onClick={e => { e.stopPropagation(); setRevealAcctNum(v => !v); }}
+                  className="text-muted-foreground/30 hover:text-muted-foreground transition-colors">
+                  {revealAcctNum ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                </button>
+              </div>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
@@ -464,24 +471,23 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
         </div>
       )}
 
-      {/* Compresses the card's vertical space when there's nothing to show — a 0% rail (unfunded
-          account, or funded but nothing spent yet) carries no information worth a whole row. */}
-      {pct > 0 && (
-        <div className="mb-3">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] text-muted-foreground/80 uppercase tracking-wide">Spending</span>
-            <span className={cn("text-xs font-semibold tabular-nums",
-              pct > 90 ? "text-red-500" : pct > 70 ? "text-amber-500" : "text-muted-foreground/70")}>
-              {pct.toFixed(0)}%
-            </span>
-          </div>
-          <div className="h-1 progress-track rounded-full overflow-hidden">
-            <div className={cn("h-full rounded-full transition-all duration-700",
-              pct > 90 ? "bg-red-500/70" : pct > 70 ? "bg-amber-500/70" : "bg-indigo-500/60")}
-              style={{ width: `${pct}%` }} />
-          </div>
+      {/* Always shown, even at a genuine 0% — an empty track still reads as "this card has a
+          Spending stat," and hiding the row entirely on a funded account left the card looking
+          bare rather than compact. */}
+      <div className="mb-3">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-[10px] text-muted-foreground/80 uppercase tracking-wide">Spending</span>
+          <span className={cn("text-xs font-semibold tabular-nums",
+            pct > 90 ? "text-red-500" : pct > 70 ? "text-amber-500" : "text-muted-foreground/70")}>
+            {pct.toFixed(0)}%
+          </span>
         </div>
-      )}
+        <div className="h-1 progress-track rounded-full overflow-hidden">
+          <div className={cn("h-full rounded-full transition-all duration-700",
+            pct > 90 ? "bg-red-500/70" : pct > 70 ? "bg-amber-500/70" : "bg-indigo-500/60")}
+            style={{ width: `${pct}%` }} />
+        </div>
+      </div>
 
       <div className="flex-1" />
       </div>
