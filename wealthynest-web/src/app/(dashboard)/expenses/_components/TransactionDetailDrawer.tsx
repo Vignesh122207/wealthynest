@@ -26,11 +26,19 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   CASH: "Cash", CREDIT_CARD: "Credit Card", BANK_ACCOUNT: "Bank Account",
 };
 
-/** Right-side detail drawer for a single expense — merchant summary, an honest "no location data"
- * placeholder (this app has no geodata on expenses to show a real map for), a client-side receipt
- * attachment, a real per-transaction split utility, and a category spend trend chart. Expense-only:
- * income/transfer rows still open the existing edit modal directly, since merchant/receipt/split
- * are expense-specific concepts that don't apply to those. */
+// Both sections below are fully built and tested (useReceiptAttachment + its hook tests; the
+// Location section's own honest "no data" placeholder) but not shown yet — Receipt is earmarked
+// as a future premium-tier feature, and Location currently has nothing real to show (this app
+// has no geodata on expenses). Flip these to re-enable rather than deleting the working code.
+const RECEIPTS_ENABLED = false;
+const LOCATION_ENABLED = false;
+
+/** Right-side detail drawer for a single expense — merchant summary, a real per-transaction split
+ * utility, and a category spend trend chart. Also has a location placeholder and a client-side
+ * receipt attachment, both fully built but currently feature-flagged off (RECEIPTS_ENABLED /
+ * LOCATION_ENABLED below) — Receipt is earmarked as a future premium feature, Location has no
+ * real data to show yet. Expense-only: income/transfer rows still open the existing edit modal
+ * directly, since merchant/receipt/split are expense-specific concepts that don't apply to those. */
 export function TransactionDetailDrawer({ expense, accountName, familyMembers, allTimeExpenses, fmt, onClose, onEdit }: TransactionDetailDrawerProps) {
   const catIcon  = getCategoryIcon({ name: expense.categoryName ?? "", icon: expense.categoryIcon });
   const catColor = getCategoryColor(expense.categoryName ?? "", expense.categoryColor);
@@ -107,44 +115,48 @@ export function TransactionDetailDrawer({ expense, accountName, familyMembers, a
             {expense.notes && <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border/60">{expense.notes}</p>}
           </div>
 
-          {/* Location — honest placeholder; this app has no geodata on expenses */}
-          <div className="bg-card border border-border rounded-2xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <PremiumIcon icon={MapPin} tone="red" size="xs" />
-              <h4 className="text-sm font-semibold text-foreground">Location</h4>
-            </div>
-            <div className="h-24 rounded-xl bg-muted/50 border border-dashed border-border flex flex-col items-center justify-center gap-1">
-              <MapPin className="w-5 h-5 text-muted-foreground/40" />
-              <p className="text-[11px] text-muted-foreground/70">No location data for this transaction</p>
-            </div>
-          </div>
-
-          {/* Receipt attachment */}
-          <div className="bg-card border border-border rounded-2xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <PremiumIcon icon={Paperclip} tone="orange" size="xs" />
-              <h4 className="text-sm font-semibold text-foreground">Receipt</h4>
-              <span className="text-[10px] text-muted-foreground/60 ml-auto">Saved on this device</span>
-            </div>
-            {receiptUrl ? (
-              <div className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element -- a browser-local data URL, not a remote/optimizable image */}
-                <img src={receiptUrl} alt="Receipt" className="w-full max-h-48 object-contain rounded-xl border border-border" />
-                <button onClick={removeReceipt} aria-label="Remove receipt"
-                  className="absolute top-2 right-2 w-7 h-7 rounded-lg bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+          {/* Location — honest placeholder; this app has no geodata on expenses. Disabled for now. */}
+          {LOCATION_ENABLED && (
+            <div className="bg-card border border-border rounded-2xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <PremiumIcon icon={MapPin} tone="red" size="xs" />
+                <h4 className="text-sm font-semibold text-foreground">Location</h4>
               </div>
-            ) : (
-              <button type="button" onClick={() => fileInputRef.current?.click()}
-                className="w-full h-20 rounded-xl border border-dashed border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-foreground hover:border-indigo-500/40 transition-colors">
-                <ImageIcon className="w-5 h-5" />
-                <span className="text-[11px]">Attach a receipt photo</span>
-              </button>
-            )}
-            <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
-              onChange={e => { const f = e.target.files?.[0]; if (f) attach(f); e.target.value = ""; }} />
-          </div>
+              <div className="h-24 rounded-xl bg-muted/50 border border-dashed border-border flex flex-col items-center justify-center gap-1">
+                <MapPin className="w-5 h-5 text-muted-foreground/40" />
+                <p className="text-[11px] text-muted-foreground/70">No location data for this transaction</p>
+              </div>
+            </div>
+          )}
+
+          {/* Receipt attachment — earmarked as a future premium feature. Disabled for now. */}
+          {RECEIPTS_ENABLED && (
+            <div className="bg-card border border-border rounded-2xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <PremiumIcon icon={Paperclip} tone="orange" size="xs" />
+                <h4 className="text-sm font-semibold text-foreground">Receipt</h4>
+                <span className="text-[10px] text-muted-foreground/60 ml-auto">Saved on this device</span>
+              </div>
+              {receiptUrl ? (
+                <div className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- a browser-local data URL, not a remote/optimizable image */}
+                  <img src={receiptUrl} alt="Receipt" className="w-full max-h-48 object-contain rounded-xl border border-border" />
+                  <button onClick={removeReceipt} aria-label="Remove receipt"
+                    className="absolute top-2 right-2 w-7 h-7 rounded-lg bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <button type="button" onClick={() => fileInputRef.current?.click()}
+                  className="w-full h-20 rounded-xl border border-dashed border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-foreground hover:border-indigo-500/40 transition-colors">
+                  <ImageIcon className="w-5 h-5" />
+                  <span className="text-[11px]">Attach a receipt photo</span>
+                </button>
+              )}
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) attach(f); e.target.value = ""; }} />
+            </div>
+          )}
 
           {/* Split transaction */}
           <div className="bg-card border border-border rounded-2xl p-4">

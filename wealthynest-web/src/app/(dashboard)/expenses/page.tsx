@@ -41,7 +41,7 @@ import {FilterPanel} from "@/features/expenses/components/FilterPanel";
 import {GranularityControl} from "@/features/expenses/components/GranularityControl";
 import {CommandBar} from "@/features/expenses/components/CommandBar";
 import type {Channel, DateMode, SortKey, TxType} from "@/features/expenses/types/filters.types";
-import {formatCurrency, pctChange} from "@/lib/utils";
+import {pctChange} from "@/lib/utils";
 import {buildUsageCounts, pickSmartDefault, sortByUsage} from "@/lib/mostUsed";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {CURRENCIES, usePrefsStore} from "@/store/preferences.store";
@@ -49,10 +49,6 @@ import {useDebounce} from "@/hooks/useDebounce";
 import {INCOME_SOURCES} from "@/lib/constants";
 import type {IncomeEntry} from "@/features/income/types/income.types";
 import type {AccountTransfer} from "@/features/accounts/types/account.types";
-import {CurrencyToggle} from "@/features/currency/components/CurrencyToggle";
-import {useCurrencyRates} from "@/features/currency/hooks/useCurrencyRates";
-import {convertAmount} from "@/features/currency/utils/convert";
-import type {ConvertibleCurrency} from "@/features/currency/types/currency.types";
 import type {TxRow} from "./_components/types";
 import {ExpensesTabContent} from "./_components/ExpensesTabContent";
 import {IncomeTabContent} from "./_components/IncomeTabContent";
@@ -106,14 +102,6 @@ export default function TransactionsPage() {
   const [viewExpense,      setViewExpense]      = useState<Expense | null>(null);
   const [confirmId,        setConfirmId]        = useState<string | null>(null);
   const [listPage,         setListPage]         = useState(0);
-
-  // Transactions-page-local currency display toggle — deliberately separate from the app-wide
-  // currency preference (which only relabels amounts with a different symbol, never converts
-  // them); this one does real conversion via live rates (see features/currency).
-  const [displayCurrency, setDisplayCurrency] = useState<ConvertibleCurrency>("INR");
-  const { data: currencyRates } = useCurrencyRates();
-  const fmtConverted = (amount: number) =>
-    formatCurrency(convertAmount(amount, displayCurrency, "INR", currencyRates?.rates), displayCurrency);
 
   // Shared toolbar — search, filters drawer
   const [search,           setSearch]           = useState("");
@@ -905,7 +893,7 @@ export default function TransactionsPage() {
           accountName={viewExpense.accountId ? accountMap[viewExpense.accountId] : undefined}
           familyMembers={familyMembers}
           allTimeExpenses={allTimeExpenses}
-          fmt={fmtConverted}
+          fmt={fmt}
           onClose={() => setViewExpense(null)}
           onEdit={() => { setViewExpense(null); setShowCreate(false); setEditExpense(viewExpense); }}
         />
@@ -938,7 +926,7 @@ export default function TransactionsPage() {
           onExport={handleExport}
         />
 
-        {/* Shared date controls + quick rolling-window granularity + currency display toggle */}
+        {/* Shared date controls + quick rolling-window granularity */}
         <div className="flex items-center justify-between flex-wrap gap-3">
           <DateControls
             dateMode={dateMode} setDateMode={setDateMode}
@@ -947,15 +935,12 @@ export default function TransactionsPage() {
             customStart={customStart} setCustomStart={setCustomStart}
             customEnd={customEnd} setCustomEnd={setCustomEnd}
           />
-          <div className="flex items-center gap-2 flex-wrap">
-            <GranularityControl dateMode={dateMode} customStart={customStart} customEnd={customEnd}
-              onSelect={(patch) => {
-                setDateMode(patch.dateMode);
-                if (patch.customStart !== undefined) setCustomStart(patch.customStart);
-                if (patch.customEnd !== undefined) setCustomEnd(patch.customEnd);
-              }} />
-            <CurrencyToggle value={displayCurrency} onChange={setDisplayCurrency} />
-          </div>
+          <GranularityControl dateMode={dateMode} customStart={customStart} customEnd={customEnd}
+            onSelect={(patch) => {
+              setDateMode(patch.dateMode);
+              if (patch.customStart !== undefined) setCustomStart(patch.customStart);
+              if (patch.customEnd !== undefined) setCustomEnd(patch.customEnd);
+            }} />
         </div>
 
         {/* Stat cards — always visible, reflect the selected date range regardless of tab */}
