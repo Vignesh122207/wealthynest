@@ -47,7 +47,7 @@ const IncomeForm       = dynamic(() => import("@/components/transactions/IncomeF
 const TransferFormModal = dynamic(() => import("@/components/transactions/TransferFormModal").then(m => m.TransferFormModal), { ssr: false });
 
 // Lazy-loaded (kept SSR'd, unlike the forms above — these paint on first load, not after a click):
-// each of these four pulls in recharts, and being statically bundled into this route's main chunk
+// each of these three pulls in recharts, and being statically bundled into this route's main chunk
 // was measured — on a real emulator, via direct renderer-process RSS polling — pushing the
 // Capacitor WebView's V8 heap from a ~150MB baseline past 800MB within seconds of any cold launch
 // that reaches /home, crashing on "Ineffective mark-compacts near heap limit" regardless of
@@ -55,9 +55,8 @@ const TransferFormModal = dynamic(() => import("@/components/transactions/Transf
 // parse cost lands only when each one actually mounts, spread across several ticks instead of one
 // synchronous block — and, for a visitor DashboardLayout redirects away before ever rendering
 // {children}, means these chunks are never fetched at all.
-const NetWorthTrend  = dynamic(() => import("./_components/NetWorthTrend").then(m => m.NetWorthTrend));
-const SpendingDonut  = dynamic(() => import("./_components/SpendingDonut").then(m => m.SpendingDonut));
-const SixMonthTrend  = dynamic(() => import("./_components/SixMonthTrend").then(m => m.SixMonthTrend));
+const NetWorthHero    = dynamic(() => import("./_components/NetWorthHero").then(m => m.NetWorthHero));
+const SpendingDonut   = dynamic(() => import("./_components/SpendingDonut").then(m => m.SpendingDonut));
 const InvestmentPanel = dynamic(() => import("./_components/InvestmentPanel").then(m => m.InvestmentPanel));
 
 // ── Quick-add modals ──────────────────────────────────────────────────────────
@@ -352,9 +351,6 @@ export default function DashboardPage() {
             onNavigateYear={navigateYear}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
-            income={data?.monthlyIncome}
-            expenses={data?.monthlyExpenses}
-            savingsRate={data?.savingsRate}
           />
 
           {/* ── Native-only: nudge toward PIN/fingerprint setup until both are configured ── */}
@@ -369,12 +365,19 @@ export default function DashboardPage() {
               description="Couldn't load your monthly totals, budgets, or spending trend. Check your connection and try again." />
           )}
 
-          {/* ── Stat Overview: Net Worth, Investments, Income, Expenses, Savings Rate, Budget Progress ── */}
+          {/* ── Net Worth Hero: the page's one unambiguous focal point ── */}
+          <NetWorthHero
+            netWorth={data?.totalNetWorth}
+            changePct={isYearMode ? netWorthSinceJanTrend : netWorthTrend}
+            changeLabel={isYearMode ? "since Jan 1" : undefined}
+            history={netWorthHistory}
+            chart={chart}
+            isLoading={dataLoading}
+          />
+
+          {/* ── Stat Overview: Investments, Income, Expenses, Savings Rate, Budget Progress ── */}
           <StatOverview
             viewMode={viewMode}
-            netWorth={data?.totalNetWorth}
-            prevNetWorth={prevData?.totalNetWorth}
-            netWorthSinceJanTrend={netWorthSinceJanTrend}
             investments={investments}
             income={data?.monthlyIncome}
             expenses={data?.monthlyExpenses}
@@ -428,23 +431,6 @@ export default function DashboardPage() {
               isLoading={dataLoading}
             />
             <TransactionList transactions={recentTransactions} isLoading={dataLoading} />
-          </TwoColRow>
-
-          {/* ── Phase 3: Net Worth Trend (left) + 6-Month Income/Expense/Savings Trend (right) ── */}
-          <TwoColRow>
-            <NetWorthTrend
-              history={netWorthHistory}
-              netWorth={data?.totalNetWorth}
-              changePct={netWorthTrend}
-              chart={chart}
-              isLoading={dataLoading}
-            />
-            <SixMonthTrend
-              trend={isYearMode ? annualTrendThisYear : trend}
-              chart={chart}
-              isLoading={dataLoading}
-              title={isYearMode ? "12-Month Trend" : "6-Month Trend"}
-            />
           </TwoColRow>
 
           {/* ── Investment Overview (left) + Goals (right) ──

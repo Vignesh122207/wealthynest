@@ -210,7 +210,7 @@ export function SmartAlertsRow({ smartInsights, upcomingBills }: SmartAlertsRowP
               >
                 <div className="flex items-center gap-2 mb-1.5">
                   <PremiumIcon icon={card.icon} tone={style.tone} size="xs" interactive />
-                  <span className="text-[11px] font-bold text-foreground/85 leading-tight">{card.title}</span>
+                  <span className="text-xs font-bold text-foreground/85 leading-tight">{card.title}</span>
                 </div>
                 <p className="text-xs text-foreground/80 leading-snug">{card.body}</p>
               </div>

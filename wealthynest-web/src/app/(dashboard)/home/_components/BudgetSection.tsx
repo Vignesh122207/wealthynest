@@ -41,11 +41,11 @@ export function BudgetSection({ budgetSummaries, viewMode, year, month, isLoadin
       <div className="flex items-center justify-between mb-5">
         <div>
           <h2 className="font-bold text-foreground text-sm">Budget Progress</h2>
-          <p className="text-[11px] text-muted-foreground/80 mt-0.5">{label}</p>
+          <p className="text-xs text-muted-foreground/80 mt-0.5">{label}</p>
         </div>
         <Link href="/budgets"
           className="text-xs font-semibold text-primary hover:underline transition-colors">
-          See all →
+          View all →
         </Link>
       </div>
 
