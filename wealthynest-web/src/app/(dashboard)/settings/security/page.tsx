@@ -821,10 +821,22 @@ function SessionsCard() {
                       </span>
                     )}
                   </p>
-                  <p className="text-[11px] text-muted-foreground/80 mt-0.5">
-                    {s.ipAddress ? `${s.ipAddress} · ` : ""}Last active {formatDate(s.createdAt)}
-                    {s.firstSeenAt && s.firstSeenAt !== s.createdAt && ` · First seen ${formatDate(s.firstSeenAt)}`}
-                  </p>
+                  {/* formatDate only has day granularity, so comparing the raw ISO instants
+                      (which differ down to the millisecond for any session with even one
+                      rotation) showed "First seen" next to an identical-looking "Last active"
+                      date far more often than the two were actually distinguishable — compare
+                      the formatted strings instead, and only show First seen when it would
+                      actually read as a different date. */}
+                  {(() => {
+                    const lastActiveLabel = formatDate(s.createdAt);
+                    const firstSeenLabel = s.firstSeenAt ? formatDate(s.firstSeenAt) : null;
+                    return (
+                      <p className="text-[11px] text-muted-foreground/80 mt-0.5">
+                        {s.ipAddress ? `${s.ipAddress} · ` : ""}Last active {lastActiveLabel}
+                        {firstSeenLabel && firstSeenLabel !== lastActiveLabel && ` · First seen ${firstSeenLabel}`}
+                      </p>
+                    );
+                  })()}
                 </div>
                 {!s.current && (
                   <button onClick={() => revoke(s.id)} disabled={revoking} title="Sign out this device"
