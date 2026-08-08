@@ -2,24 +2,23 @@
 
 import Link from "next/link";
 import {usePathname} from "next/navigation";
-import {ArrowLeftRight, Home, Menu, Wallet} from "lucide-react";
+import {ArrowLeftRight, Home, Menu, Wallet, type LucideIcon} from "lucide-react";
 import {cn} from "@/lib/utils";
 import {PremiumIcon} from "@/components/icons/PremiumIcon";
 import {useUIStore} from "@/store/ui.store";
 
-// Apple-style tab bar: flat square icon badges (not the app's usual per-item rainbow of
-// gradients), neutral gray by default — the copper brand color (matches --primary, see
-// globals.css) is reserved for whichever single tab is currently selected, so it reads as
-// "this one is active" instead of every icon competing for attention at once.
+// "More" opens the Sidebar overlay itself, so its icon carries the same brand copper used for
+// that affordance elsewhere rather than one of the per-item nav gradients below.
 const COPPER_GRADIENT: [string, string] = ["#d98a52", "#a85f30"]; // brand-300 → brand-600
 
+// Gradients match each item's own entry in Sidebar.tsx's NAV_GROUPS — keep the two in sync.
 // Only four slots on mobile — the rest of the app (Investments, Budgets, Debts, Net Worth,
 // Family, Analytics, Reports, Settings, Support) lives behind "More", which opens the same
 // full Sidebar overlay used on desktop.
-const NAV_ITEMS = [
-  { href: "/home",     label: "Home",         icon: Home },
-  { href: "/accounts", label: "Accounts",     icon: Wallet },
-  { href: "/expenses", label: "Transactions", icon: ArrowLeftRight },
+const NAV_ITEMS: { href: string; label: string; icon: LucideIcon; gradient: [string, string] }[] = [
+  { href: "/home",     label: "Home",         icon: Home,          gradient: ["#a855f7", "#6366f1"] },
+  { href: "/accounts", label: "Accounts",     icon: Wallet,        gradient: ["#3b82f6", "#06b6d4"] },
+  { href: "/expenses", label: "Transactions", icon: ArrowLeftRight, gradient: ["#0ea5e9", "#4f46e5"] },
 ];
 
 export function MobileNav() {
@@ -32,7 +31,7 @@ export function MobileNav() {
         className="flex items-center justify-around w-full"
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
-        {NAV_ITEMS.map(({ href, label, icon }) => {
+        {NAV_ITEMS.map(({ href, label, icon, gradient }) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link
@@ -49,8 +48,7 @@ export function MobileNav() {
               )}
               <PremiumIcon
                 icon={icon}
-                gradient={active ? COPPER_GRADIENT : undefined}
-                tone={active ? undefined : "gray"}
+                gradient={gradient}
                 size="xs"
                 selected={active}
                 className="rounded-[7px]"
@@ -86,8 +84,7 @@ export function MobileNav() {
           )}
           <PremiumIcon
             icon={Menu}
-            gradient={mobileMenuOpen ? COPPER_GRADIENT : undefined}
-            tone={mobileMenuOpen ? undefined : "gray"}
+            gradient={COPPER_GRADIENT}
             size="xs"
             selected={mobileMenuOpen}
             className="rounded-[7px]"
