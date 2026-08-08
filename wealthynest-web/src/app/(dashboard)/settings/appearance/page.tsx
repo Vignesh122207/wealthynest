@@ -6,7 +6,7 @@ import {useEffect, useState} from "react";
 import {Header} from "@/components/layout/Header";
 import {PageWrapper} from "@/components/layout/PageWrapper";
 import {PremiumIcon} from "@/components/icons/PremiumIcon";
-import {DirhamSign} from "@/components/icons/DirhamSign";
+import {CurrencyGlyph} from "@/components/icons/CurrencyGlyph";
 import {CURRENCIES, usePrefsStore} from "@/store/preferences.store";
 import {cn} from "@/lib/utils";
 
@@ -83,11 +83,10 @@ export default function AppearancePage() {
                 >
                   {/* w-7 text-lg fit a single glyph (₹/$/€/£) — S$ needs a touch more room, and
                       AED renders its real 2025 dirham sign as an SVG (no shipping font has the
-                      character yet — see DirhamSign's own comment), not the c.symbol text. */}
+                      character yet — see DirhamSign's own comment), sized to match the others'
+                      visual weight rather than the icon's native (much bulkier) proportions. */}
                   <span className="w-10 h-6 flex items-center justify-center shrink-0 text-foreground">
-                    {c.code === "AED"
-                      ? <DirhamSign className="h-4 w-auto" />
-                      : <span className="text-sm font-semibold whitespace-nowrap">{c.symbol}</span>}
+                    <CurrencyGlyph code={c.code} className="h-3 w-auto text-sm font-semibold whitespace-nowrap" />
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className={cn("text-sm font-medium", currency === c.code ? "text-indigo-600 dark:text-indigo-400" : "text-foreground")}>

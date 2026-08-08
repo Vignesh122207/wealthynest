@@ -2,7 +2,8 @@
 
 import {useEffect, useRef, useState} from "react";
 import {cn} from "@/lib/utils";
-import {CURRENCIES, usePrefsStore} from "@/store/preferences.store";
+import {CurrencyGlyph} from "@/components/icons/CurrencyGlyph";
+import {usePrefsStore} from "@/store/preferences.store";
 
 // ─── Shared form chrome — big centered amount, colored header with delete ─────
 
@@ -20,7 +21,6 @@ export function BigAmountInput({ label = "Amount", error, colorClass, inputProps
   label?: string; error?: string; colorClass: string; inputProps: React.ComponentProps<"input">; testId?: string;
 }) {
   const { currency: currCode } = usePrefsStore();
-  const symbol = CURRENCIES.find(c => c.code === currCode)?.symbol ?? "₹";
   const localRef = useRef<HTMLInputElement | null>(null);
   const [len, setLen] = useState(1);
 
@@ -48,7 +48,7 @@ export function BigAmountInput({ label = "Amount", error, colorClass, inputProps
           attribute) keeps the symbol flush against the digits, so the pair reads as one
           unit and recenters together as you type rather than drifting apart. */}
       <div className={cn("flex items-center justify-center gap-0.5 mt-1", colorClass)}>
-        <span className="text-xl font-bold shrink-0">{symbol}</span>
+        <CurrencyGlyph code={currCode} className="h-4 w-auto text-xl font-bold shrink-0" />
         <input type="text" inputMode="decimal" placeholder="0" data-testid={testId}
           ref={(el) => {
             localRef.current = el;

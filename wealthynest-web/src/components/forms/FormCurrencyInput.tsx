@@ -1,7 +1,8 @@
 "use client";
 import {forwardRef, type InputHTMLAttributes, useId} from "react";
 import {cn} from "@/lib/utils";
-import {CURRENCIES, usePrefsStore} from "@/store/preferences.store";
+import {CurrencyGlyph} from "@/components/icons/CurrencyGlyph";
+import {usePrefsStore} from "@/store/preferences.store";
 
 interface FormCurrencyInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
   label?:    string;
@@ -13,7 +14,6 @@ interface FormCurrencyInputProps extends Omit<InputHTMLAttributes<HTMLInputEleme
 export const FormCurrencyInput = forwardRef<HTMLInputElement, FormCurrencyInputProps>(
   ({ label, error, hint, currency, className, onChange, id, ...props }, ref) => {
     const { currency: currCode } = usePrefsStore();
-    const symbol = currency ?? (CURRENCIES.find(c => c.code === currCode)?.symbol ?? "₹");
     const generatedId = useId();
     const inputId = id ?? generatedId;
     const errorId = `${inputId}-error`;
@@ -33,7 +33,7 @@ export const FormCurrencyInput = forwardRef<HTMLInputElement, FormCurrencyInputP
         {label && <label htmlFor={inputId} className="block text-sm font-medium text-muted-foreground">{label}</label>}
         <div className="relative">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium select-none">
-            {symbol}
+            {currency ?? <CurrencyGlyph code={currCode} className="h-3 w-auto" />}
           </span>
           <input
             ref={ref}
