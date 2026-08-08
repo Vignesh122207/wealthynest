@@ -91,7 +91,7 @@ export function getStoredCurrency(): string {
   return "INR";
 }
 
-const CURRENCY_SYMBOLS: Record<string, string> = { INR: "₹", USD: "$", EUR: "€", GBP: "£" };
+const CURRENCY_SYMBOLS: Record<string, string> = { INR: "₹", USD: "$", EUR: "€", GBP: "£", AED: "AED", SGD: "S$" };
 
 /** Standalone currency symbol (no amount) — for CSV headers, masked-privacy placeholders, etc.,
  * where formatCurrency's Intl.NumberFormat output can't be used because there's no number to format. */

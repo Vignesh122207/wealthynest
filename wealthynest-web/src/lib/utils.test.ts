@@ -194,6 +194,8 @@ describe("getStoredCurrency / getCurrencySymbol", () => {
     expect(getCurrencySymbol("USD")).toBe("$");
     expect(getCurrencySymbol("EUR")).toBe("€");
     expect(getCurrencySymbol("GBP")).toBe("£");
+    expect(getCurrencySymbol("AED")).toBe("AED");
+    expect(getCurrencySymbol("SGD")).toBe("S$");
   });
 
   it("falls back to the raw code for an unknown currency", () => {
@@ -217,6 +219,13 @@ describe("formatCurrency", () => {
 
   it("formats USD using US grouping", () => {
     expect(formatCurrency(150000, "USD")).toBe("$150,000");
+  });
+
+  it("formats AED and SGD, the two NRI-corridor currencies added alongside the majors", () => {
+    // Intl.NumberFormat separates an ISO-code currency (no dedicated symbol) from the amount
+    // with a non-breaking space ( ), not a plain one.
+    expect(formatCurrency(150000, "AED")).toBe("AED 150,000");
+    expect(formatCurrency(150000, "SGD")).toBe("SGD 150,000");
   });
 });
 
