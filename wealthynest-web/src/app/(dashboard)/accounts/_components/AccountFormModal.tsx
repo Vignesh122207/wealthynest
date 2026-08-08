@@ -142,6 +142,9 @@ export function AccountFormModal({
                           // visible error anywhere on screen.
                           name: t === "CASH_WALLET" ? "Cash Wallet" : t === "CREDIT_CARD" ? "Credit Card" : t === "LOAN" ? "Loan" : "Bank Account",
                           openingBalance: createForm.getValues("openingBalance"),
+                          // Not type-specific (unlike apr/creditLimit/loanType/purpose above) —
+                          // switching type mid-creation shouldn't silently drop this toggle.
+                          excludeFromNetWorth: createForm.getValues("excludeFromNetWorth"),
                         });
                         setBankInput("");
                       }}
@@ -375,6 +378,17 @@ export function AccountFormModal({
                 </p>
               </div>
             )}
+
+            <label className="flex items-start gap-2.5 py-1 cursor-pointer">
+              <input type="checkbox" {...createForm.register("excludeFromNetWorth")}
+                data-testid="account-exclude-from-net-worth"
+                className="mt-0.5 w-4 h-4 rounded border-border text-indigo-600 focus:ring-indigo-500 shrink-0" />
+              <span className="text-xs text-muted-foreground leading-snug">
+                <span className="font-medium text-foreground">Exclude from Net Worth</span>
+                <br />
+                For a joint account or a company-reimbursed card you still want to track here, but not counted toward your own net worth.
+              </span>
+            </label>
 
             <div className="flex gap-2 pt-1">
               <button type="submit" data-testid="account-form-submit" disabled={creating || updating || adjusting}

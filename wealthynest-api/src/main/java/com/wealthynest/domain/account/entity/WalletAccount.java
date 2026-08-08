@@ -96,4 +96,11 @@ public class WalletAccount extends BaseEntity {
     @Column(name = "is_primary", nullable = false)
     @Builder.Default
     private boolean primary = false;
+
+    /** Opt-out of net worth totals for an account still tracked in-app (a joint account, a
+     * company-reimbursed card) but that shouldn't count toward the user's own net worth. Purely
+     * a display/rollup flag — never affects the account's own balance math. */
+    @Column(name = "exclude_from_net_worth", nullable = false)
+    @Builder.Default
+    private boolean excludeFromNetWorth = false;
 }

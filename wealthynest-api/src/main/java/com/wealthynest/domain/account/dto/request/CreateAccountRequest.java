@@ -36,4 +36,9 @@ public class CreateAccountRequest {
     @Min(1) @Max(28) private Integer emiDay;
     private UUID autopayAccountId;
     private LocalDate loanEndDate;
+
+    // Opt-out of net worth totals — always sent by the edit form (never omitted), so absent
+    // just means "not set yet" on create, defaulting to false via CreateAccountRequest's own
+    // primitive default.
+    private boolean excludeFromNetWorth;
 }

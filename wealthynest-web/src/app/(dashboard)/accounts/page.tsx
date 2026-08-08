@@ -150,7 +150,7 @@ export default function AccountsPage() {
   // fills it in, same as every other required field here.
   const createForm = useForm<CreateAccountForm>({
     resolver: zodResolver(createAccountSchema),
-    defaultValues: { accountType: "CASH_WALLET", name: "Cash Wallet", openingBalance: undefined },
+    defaultValues: { accountType: "CASH_WALLET", name: "Cash Wallet", openingBalance: undefined, excludeFromNetWorth: false },
   });
 
   // getAccounts() returns both ACTIVE and CLOSED rows (a closed account still needs to resolve
@@ -204,6 +204,7 @@ export default function AccountsPage() {
       // has no error slot, so the blocked submit looked like a dead button. Matches the same
       // fallback BankNameInput's own onChange already applies once the user *does* type.
       name: type === "CASH_WALLET" ? "Cash Wallet" : type === "CREDIT_CARD" ? "Credit Card" : type === "LOAN" ? "Loan" : "Bank Account",
+      excludeFromNetWorth: false,
     });
     setModal("create");
   };
@@ -251,6 +252,7 @@ export default function AccountsPage() {
       loanType: account.loanType, principalAmount: account.principalAmount,
       emiAmount: account.emiAmount, emiDay: account.emiDay,
       autopayAccountId: account.autopayAccountId ?? "", loanEndDate: account.loanEndDate,
+      excludeFromNetWorth: account.excludeFromNetWorth ?? false,
     });
     setActualBalance(String(account.currentBalance));
     setModal("edit");

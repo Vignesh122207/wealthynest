@@ -34,6 +34,7 @@ export const createAccountSchema = z.object({
   emiDay:          z.preprocess(blankToUndef, z.coerce.number().min(1).max(28).optional()),
   autopayAccountId: z.preprocess(blankToUndef, z.string().optional()),
   loanEndDate:     z.preprocess(blankToUndef, z.string().optional()),
+  excludeFromNetWorth: z.boolean().optional(),
 }).superRefine((data, ctx) => {
   // bankName stays optional in the shape above (Cash Wallet has no bank concept at all), but is
   // required for every type that actually shows a bank/lender picker — without this, submitting

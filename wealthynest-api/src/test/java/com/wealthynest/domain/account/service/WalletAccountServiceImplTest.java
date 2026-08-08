@@ -323,6 +323,21 @@ class WalletAccountServiceImplTest {
             verify(accountRepository).save(captor.capture());
             assertThat(captor.getValue().isPrimary()).isFalse();
         }
+
+        @Test
+        @DisplayName("excludeFromNetWorth carries through onto the created account")
+        void excludeFromNetWorthCarriesThrough() {
+            when(accountRepository.save(any(WalletAccount.class))).thenAnswer(inv -> withId(inv.getArgument(0)));
+            CreateAccountRequest req = createRequest(AccountType.BANK_ACCOUNT, BigDecimal.ZERO);
+            when(req.isExcludeFromNetWorth()).thenReturn(true);
+
+            AccountResponse response = service.createAccount(userId, req);
+
+            ArgumentCaptor<WalletAccount> captor = ArgumentCaptor.forClass(WalletAccount.class);
+            verify(accountRepository).save(captor.capture());
+            assertThat(captor.getValue().isExcludeFromNetWorth()).isTrue();
+            assertThat(response.isExcludeFromNetWorth()).isTrue();
+        }
     }
 
     // ─── archiveAccount / unarchiveAccount ───────────────────────────────────────
@@ -755,6 +770,21 @@ class WalletAccountServiceImplTest {
             service.updateAccount(accountId, userId, req);
 
             assertThat(account.getLowBalanceThreshold()).isNull();
+        }
+
+        @Test
+        @DisplayName("excludeFromNetWorth is always synced from the request, like lowBalanceThreshold — " +
+                "the edit form's checkbox always submits its current state")
+        void excludeFromNetWorthIsAlwaysSynced() {
+            WalletAccount account = withId(baseAccount(AccountType.BANK_ACCOUNT).excludeFromNetWorth(false).build());
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+            when(accountRepository.save(any())).thenAnswer(a -> a.getArgument(0));
+            CreateAccountRequest req = createRequest(AccountType.BANK_ACCOUNT, null);
+            when(req.isExcludeFromNetWorth()).thenReturn(true);
+
+            service.updateAccount(accountId, userId, req);
+
+            assertThat(account.isExcludeFromNetWorth()).isTrue();
         }
 
         @Test

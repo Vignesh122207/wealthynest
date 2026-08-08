@@ -100,7 +100,7 @@ export function NetWorthTrend({ history, netWorth, changePct, chart, isLoading }
             <TrendingUp className="w-8 h-8 text-muted mb-2" />
             <p className="text-sm font-medium text-foreground">History builds over time</p>
             <p className="text-xs text-muted-foreground/70 mt-1 max-w-xs">
-              A monthly snapshot is taken automatically on the 1st. Come back next month to see your trend here.
+              We started tracking your net worth this month. Check back next month to see the trend line appear.
             </p>
           </div>
         )}

@@ -170,4 +170,15 @@ describe("createAccountSchema", () => {
       expect(result.success).toBe(true);
     });
   });
+
+  describe("excludeFromNetWorth", () => {
+    it("is optional — a payload that omits it is still valid", () => {
+      expect(createAccountSchema.safeParse(baseCashWallet).success).toBe(true);
+    });
+
+    it("accepts an explicit true or false", () => {
+      expect(createAccountSchema.safeParse({ ...baseCashWallet, excludeFromNetWorth: true }).success).toBe(true);
+      expect(createAccountSchema.safeParse({ ...baseCashWallet, excludeFromNetWorth: false }).success).toBe(true);
+    });
+  });
 });

@@ -111,16 +111,24 @@ class NetWorthSnapshotIntegrationTest extends AbstractIntegrationTest {
         }
         assertThat(hasPersonalLoan).as("PERSONAL_LOAN in liability breakdown").isTrue();
 
-        // History is empty before any snapshot job has run.
+        // getHistory eagerly snapshots the *current* month on first fetch (see
+        // NetWorthServiceImpl#ensureCurrentMonthSnapshot) so a brand-new user isn't stuck with an
+        // empty trend for up to two monthly scheduler cycles — before any scheduled job has run,
+        // history already has this one just-created data point.
         MvcResult historyBefore = mockMvc.perform(get("/api/v1/net-worth/history")
                         .header("Authorization", auth(auth.accessToken())))
                 .andExpect(status().isOk())
                 .andReturn();
-        assertThat(objectMapper.readTree(historyBefore.getResponse().getContentAsString()).get("data")).isEmpty();
+        JsonNode historyBeforeData = objectMapper.readTree(historyBefore.getResponse().getContentAsString()).get("data");
+        assertThat(historyBeforeData).hasSize(1);
+        LocalDate thisMonth = LocalDate.now();
+        assertThat(historyBeforeData.get(0).get("year").asInt()).isEqualTo(thisMonth.getYear());
+        assertThat(historyBeforeData.get(0).get("month").asInt()).isEqualTo(thisMonth.getMonthValue());
+        assertThat(historyBeforeData.get(0).get("netWorth").asDouble()).isEqualTo(390000.0);
 
-        // The scheduler snapshots *last* month's figure using the current summary — same job
-        // JobSchedulerService/Admin trigger; called directly here since @Scheduled firing isn't
-        // what's under test.
+        // The scheduler separately snapshots *last* month's figure using the current summary —
+        // same job JobSchedulerService/Admin trigger; called directly here since @Scheduled
+        // firing isn't what's under test.
         snapshotScheduler.takeMonthlySnapshots();
 
         MvcResult historyAfter = mockMvc.perform(get("/api/v1/net-worth/history")
@@ -128,10 +136,13 @@ class NetWorthSnapshotIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
         JsonNode history = objectMapper.readTree(historyAfter.getResponse().getContentAsString()).get("data");
-        assertThat(history).hasSize(1);
+        assertThat(history).hasSize(2); // last month (scheduler) + this month (eager, from the fetch above)
         LocalDate lastMonth = LocalDate.now().minusMonths(1);
         assertThat(history.get(0).get("year").asInt()).isEqualTo(lastMonth.getYear());
         assertThat(history.get(0).get("month").asInt()).isEqualTo(lastMonth.getMonthValue());
         assertThat(history.get(0).get("netWorth").asDouble()).isEqualTo(390000.0);
+        assertThat(history.get(1).get("year").asInt()).isEqualTo(thisMonth.getYear());
+        assertThat(history.get(1).get("month").asInt()).isEqualTo(thisMonth.getMonthValue());
+        assertThat(history.get(1).get("netWorth").asDouble()).isEqualTo(390000.0);
     }
 }

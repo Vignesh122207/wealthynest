@@ -46,6 +46,9 @@ export interface WalletAccount {
   purpose?:           AccountPurpose | null;
   purposeLabel?:      string | null;
   primary?:           boolean;
+  /** Opt-out of net worth totals — for a joint account or a company-reimbursed card still
+   * tracked here but that shouldn't count toward the user's own net worth. */
+  excludeFromNetWorth?: boolean;
   // Credit card fields
   creditLimit?:       number;
   availableCredit?:   number;
@@ -87,6 +90,7 @@ export interface CreateAccountPayload {
   emiDay?:           number;
   autopayAccountId?: string;
   loanEndDate?:      string;
+  excludeFromNetWorth?: boolean;
 }
 
 export interface LoanPaymentResult {

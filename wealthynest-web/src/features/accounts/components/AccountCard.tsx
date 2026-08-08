@@ -331,6 +331,12 @@ export const AccountCard = memo(function AccountCard({ account, linkedDebts = []
                   {statusMeta.label}
                 </span>
               )}
+              {account.excludeFromNetWorth && (
+                <span title="Not counted toward your net worth"
+                  className="shrink-0 text-[9px] font-bold uppercase tracking-wide rounded-full px-1.5 py-0.5 text-slate-600 dark:text-slate-300 bg-slate-500/10">
+                  Excluded
+                </span>
+              )}
               {account.accountType === "BANK_ACCOUNT" && (
                 account.primary ? (
                   <span title="Primary account"

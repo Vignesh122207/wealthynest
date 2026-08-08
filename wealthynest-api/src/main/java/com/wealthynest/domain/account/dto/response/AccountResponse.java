@@ -29,6 +29,7 @@ public class AccountResponse {
     private String     purpose;
     private String     purposeLabel;
     private boolean    primary;
+    private boolean    excludeFromNetWorth;
 
     // Credit card fields (null for non-credit-card accounts)
     private BigDecimal creditLimit;

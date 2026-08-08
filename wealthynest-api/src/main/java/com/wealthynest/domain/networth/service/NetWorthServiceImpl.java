@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -49,6 +50,7 @@ public class NetWorthServiceImpl implements NetWorthService {
         Map<String, BigDecimal> loanOutstandingByType = new LinkedHashMap<>();
         Map<String, Integer>    loanCountByType       = new LinkedHashMap<>();
         for (AccountResponse a : accounts) {
+            if (a.isExcludeFromNetWorth()) continue;
             BigDecimal bal = a.getCurrentBalance() != null ? a.getCurrentBalance() : BigDecimal.ZERO;
             if ("CREDIT_CARD".equals(a.getAccountType())) {
                 BigDecimal outstanding = bal.max(BigDecimal.ZERO); // outstanding is always non-negative
@@ -178,7 +180,7 @@ public class NetWorthServiceImpl implements NetWorthService {
         Map<String, List<PurposeItem>> purposeItems = new LinkedHashMap<>();
         Map<String, String>            purposeLabels = new LinkedHashMap<>();
         for (AccountResponse a : accounts) {
-            if (a.getPurpose() == null) continue;
+            if (a.getPurpose() == null || a.isExcludeFromNetWorth()) continue;
             BigDecimal bal = a.getCurrentBalance() != null ? a.getCurrentBalance() : BigDecimal.ZERO;
             addPurposeItem(purposeItems, purposeLabels, a.getPurpose(), a.getPurposeLabel(), "ACCOUNT", a.getName(), bal);
         }
@@ -258,6 +260,7 @@ public class NetWorthServiceImpl implements NetWorthService {
         BigDecimal walletBalance = BigDecimal.ZERO;
         BigDecimal ccDebt = BigDecimal.ZERO;
         for (AccountResponse a : walletAccountService.getAccountsForUsers(memberIds)) {
+            if (a.isExcludeFromNetWorth()) continue;
             BigDecimal bal = a.getCurrentBalance() != null ? a.getCurrentBalance() : BigDecimal.ZERO;
             if ("CREDIT_CARD".equals(a.getAccountType()) || "LOAN".equals(a.getAccountType())) {
                 ccDebt = ccDebt.add(bal.max(BigDecimal.ZERO));
@@ -288,10 +291,26 @@ public class NetWorthServiceImpl implements NetWorthService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<NetWorthSnapshot> getHistory(UUID userId) {
+        ensureCurrentMonthSnapshot(userId);
         List<NetWorthSnapshot> snaps = new ArrayList<>(snapshotRepository.findLast13ByUserId(userId));
         Collections.reverse(snaps); // return oldest → newest
         return snaps;
+    }
+
+    /** NetWorthSnapshotScheduler only ever writes a snapshot for the *previous* month, on the 1st
+     * — a user who joins mid-month otherwise waits up to ~2 monthly cycles before the trend chart
+     * has the 2 points it needs to render anything. Called on every history fetch but a no-op past
+     * the first call each month, since it only writes when the current month's row is missing. */
+    private void ensureCurrentMonthSnapshot(UUID userId) {
+        LocalDate now = LocalDate.now();
+        int year = now.getYear();
+        int month = now.getMonthValue();
+        if (snapshotRepository.findByUserIdAndYearAndMonth(userId, year, month).isPresent()) return;
+        userRepository.findById(userId).ifPresent(user -> {
+            NetWorthSummaryResponse summary = getSummary(userId, user.getFamilyId());
+            saveSnapshot(userId, summary.getTotalNetWorth(), year, month);
+        });
     }
 }

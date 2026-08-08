@@ -39,6 +39,12 @@ export const LoanCard = memo(function LoanCard({ account: a, onDownload, onEdit,
               {closed && (
                 <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500">Paid off</span>
               )}
+              {a.excludeFromNetWorth && (
+                <span title="Not counted toward your net worth"
+                  className="shrink-0 text-[9px] font-bold uppercase tracking-wide rounded-full px-1.5 py-0.5 text-slate-600 dark:text-slate-300 bg-slate-500/10">
+                  Excluded
+                </span>
+              )}
             </div>
             <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-0.5">Outstanding</p>
           </div>

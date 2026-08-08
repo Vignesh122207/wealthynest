@@ -28,6 +28,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -117,6 +118,51 @@ class NetWorthServiceImplTest {
             NetWorthSummaryResponse summary = service.getSummary(userId, null);
 
             assertThat(summary.getLiquidBalance()).isEqualByComparingTo("1200");
+        }
+    }
+
+    // ─── getSummary: excludeFromNetWorth ─────────────────────────────────────────
+
+    @Nested
+    @DisplayName("getSummary: excludeFromNetWorth")
+    class ExcludeFromNetWorthTests {
+
+        @Test
+        @DisplayName("an excluded bank account contributes nothing to liquid balance or total assets")
+        void excludedBankAccountContributesNothing() {
+            AccountResponse counted  = AccountResponse.builder().accountType("BANK_ACCOUNT").currentBalance(new BigDecimal("10000")).build();
+            AccountResponse excluded = AccountResponse.builder().accountType("BANK_ACCOUNT").currentBalance(new BigDecimal("99999")).excludeFromNetWorth(true).build();
+            when(walletAccountService.getAccounts(userId)).thenReturn(List.of(counted, excluded));
+
+            NetWorthSummaryResponse summary = service.getSummary(userId, null);
+
+            assertThat(summary.getLiquidBalance()).isEqualByComparingTo("10000");
+            assertThat(summary.getTotalAssets()).isEqualByComparingTo("10000");
+        }
+
+        @Test
+        @DisplayName("an excluded loan account contributes nothing to total liabilities")
+        void excludedLoanContributesNothing() {
+            AccountResponse excludedLoan = AccountResponse.builder().accountType("LOAN").loanType("HOME_LOAN")
+                    .currentBalance(new BigDecimal("500000")).excludeFromNetWorth(true).build();
+            when(walletAccountService.getAccounts(userId)).thenReturn(List.of(excludedLoan));
+
+            NetWorthSummaryResponse summary = service.getSummary(userId, null);
+
+            assertThat(summary.getTotalLiabilities()).isEqualByComparingTo("0");
+            assertThat(summary.getLiabilityBreakdown()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("an excluded account is left out of the purpose breakdown too, even when tagged")
+        void excludedAccountLeftOutOfPurposeBreakdown() {
+            AccountResponse excluded = AccountResponse.builder().accountType("BANK_ACCOUNT")
+                    .purpose("EMERGENCY_FUND").currentBalance(new BigDecimal("50000")).excludeFromNetWorth(true).build();
+            when(walletAccountService.getAccounts(userId)).thenReturn(List.of(excluded));
+
+            NetWorthSummaryResponse summary = service.getSummary(userId, null);
+
+            assertThat(summary.getPurposeBreakdown()).isEmpty();
         }
     }
 
@@ -286,6 +332,23 @@ class NetWorthServiceImplTest {
             // 10000(wallet) + 20000(inv) + 5000(assets) - 1000(liabilities) - 500(cc debt) = 33500
             assertThat(result).isEqualByComparingTo("33500");
         }
+
+        @Test
+        @DisplayName("an excluded member account contributes nothing to family net worth")
+        void excludedAccountContributesNothing() {
+            UUID familyId = UUID.randomUUID();
+            UUID member1 = UUID.randomUUID();
+            User u1 = User.builder().build(); ReflectionTestUtils.setField(u1, "id", member1);
+            when(userRepository.findByFamilyId(familyId)).thenReturn(List.of(u1));
+
+            AccountResponse counted  = AccountResponse.builder().accountType("BANK_ACCOUNT").currentBalance(new BigDecimal("10000")).build();
+            AccountResponse excluded = AccountResponse.builder().accountType("BANK_ACCOUNT").currentBalance(new BigDecimal("99999")).excludeFromNetWorth(true).build();
+            when(walletAccountService.getAccountsForUsers(List.of(member1))).thenReturn(List.of(counted, excluded));
+
+            BigDecimal result = service.getFamilyNetWorth(familyId);
+
+            assertThat(result).isEqualByComparingTo("10000");
+        }
     }
 
     // ─── saveSnapshot ────────────────────────────────────────────────────────────
@@ -325,15 +388,59 @@ class NetWorthServiceImplTest {
 
     // ─── getHistory ──────────────────────────────────────────────────────────────
 
-    @Test
-    @DisplayName("getHistory reverses the repository's newest-first order to oldest-first")
-    void getHistoryReversesToOldestFirst() {
-        NetWorthSnapshot newest = NetWorthSnapshot.builder().userId(userId).year(2026).month(6).build();
-        NetWorthSnapshot oldest = NetWorthSnapshot.builder().userId(userId).year(2025).month(1).build();
-        when(snapshotRepository.findLast13ByUserId(userId)).thenReturn(List.of(newest, oldest)); // repo returns newest-first
+    @Nested
+    @DisplayName("getHistory")
+    class GetHistoryTests {
 
-        List<NetWorthSnapshot> result = service.getHistory(userId);
+        @Test
+        @DisplayName("reverses the repository's newest-first order to oldest-first")
+        void getHistoryReversesToOldestFirst() {
+            LocalDate now = LocalDate.now();
+            when(snapshotRepository.findByUserIdAndYearAndMonth(userId, now.getYear(), now.getMonthValue()))
+                    .thenReturn(Optional.of(NetWorthSnapshot.builder().userId(userId)
+                            .year(now.getYear()).month(now.getMonthValue()).build()));
+            NetWorthSnapshot newest = NetWorthSnapshot.builder().userId(userId).year(2026).month(6).build();
+            NetWorthSnapshot oldest = NetWorthSnapshot.builder().userId(userId).year(2025).month(1).build();
+            when(snapshotRepository.findLast13ByUserId(userId)).thenReturn(List.of(newest, oldest)); // repo returns newest-first
 
-        assertThat(result).containsExactly(oldest, newest);
+            List<NetWorthSnapshot> result = service.getHistory(userId);
+
+            assertThat(result).containsExactly(oldest, newest);
+        }
+
+        @Test
+        @DisplayName("eagerly creates a snapshot for the current month when one doesn't exist yet, instead of only ever waiting for the scheduler's previous-month write")
+        void createsCurrentMonthSnapshotWhenMissing() {
+            LocalDate now = LocalDate.now();
+            when(snapshotRepository.findByUserIdAndYearAndMonth(userId, now.getYear(), now.getMonthValue()))
+                    .thenReturn(Optional.empty());
+            User user = User.builder().build();
+            ReflectionTestUtils.setField(user, "id", userId);
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(snapshotRepository.save(any(NetWorthSnapshot.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(snapshotRepository.findLast13ByUserId(userId)).thenReturn(List.of());
+
+            service.getHistory(userId);
+
+            var captor = org.mockito.ArgumentCaptor.forClass(NetWorthSnapshot.class);
+            verify(snapshotRepository).save(captor.capture());
+            assertThat(captor.getValue().getYear()).isEqualTo(now.getYear());
+            assertThat(captor.getValue().getMonth()).isEqualTo(now.getMonthValue());
+        }
+
+        @Test
+        @DisplayName("does not write a snapshot when the current month already has one")
+        void skipsWriteWhenCurrentMonthAlreadyExists() {
+            LocalDate now = LocalDate.now();
+            when(snapshotRepository.findByUserIdAndYearAndMonth(userId, now.getYear(), now.getMonthValue()))
+                    .thenReturn(Optional.of(NetWorthSnapshot.builder().userId(userId)
+                            .year(now.getYear()).month(now.getMonthValue()).build()));
+            when(snapshotRepository.findLast13ByUserId(userId)).thenReturn(List.of());
+
+            service.getHistory(userId);
+
+            verify(snapshotRepository, never()).save(any());
+            verifyNoInteractions(userRepository);
+        }
     }
 }

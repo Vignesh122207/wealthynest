@@ -164,6 +164,7 @@ public class WalletAccountServiceImpl implements WalletAccountService {
                 .apr((isCC || isLoan) ? req.getApr() : null)
                 .purpose(isBank ? req.getPurpose() : null)
                 .purposeLabel(isBank && req.getPurpose() == AccountPurpose.CUSTOM ? req.getPurposeLabel() : null)
+                .excludeFromNetWorth(req.isExcludeFromNetWorth())
                 .build();
         if (req.getAccountType() == AccountType.LOAN) {
             applyLoanFields(account, req, userId);
@@ -199,6 +200,9 @@ public class WalletAccountServiceImpl implements WalletAccountService {
         // alert off", not "leave unchanged". Gated on != null this made it impossible to ever
         // clear an already-set threshold.
         account.setLowBalanceThreshold(req.getLowBalanceThreshold());
+        // Same reasoning as lowBalanceThreshold above — the edit form always submits this
+        // checkbox's current state, so it's synced unconditionally rather than gated on non-null.
+        account.setExcludeFromNetWorth(req.isExcludeFromNetWorth());
         if (isCC && req.getCreditLimit()   != null) account.setCreditLimit(req.getCreditLimit());
         if (isCC && req.getStatementDay()  != null) account.setStatementDay(req.getStatementDay());
         if (isCC && req.getPaymentDueDay() != null) account.setPaymentDueDay(req.getPaymentDueDay());
@@ -462,7 +466,8 @@ public class WalletAccountServiceImpl implements WalletAccountService {
                 .status(account.getStatus().name())
                 .purpose(account.getPurpose() != null ? account.getPurpose().name() : null)
                 .purposeLabel(account.getPurposeLabel())
-                .primary(account.isPrimary());
+                .primary(account.isPrimary())
+                .excludeFromNetWorth(account.isExcludeFromNetWorth());
 
         if (isCreditCard) {
             BigDecimal limit = account.getCreditLimit();
