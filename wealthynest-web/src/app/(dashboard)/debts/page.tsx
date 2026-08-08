@@ -20,6 +20,7 @@ import {
     useUpdateDebt,
 } from "@/features/debts/hooks/useDebts";
 import {groupDebtsByContact} from "@/features/debts/utils/groupByContact";
+import {getRecentContacts} from "@/features/debts/utils/recentContacts";
 import type {DebtPayment, DebtRecord, DebtType} from "@/features/debts/types/debt.types";
 import {useAccounts} from "@/features/accounts/hooks/useAccounts";
 import {DebtFormModal} from "./_components/DebtFormModal";
@@ -72,9 +73,9 @@ export default function DebtsPage() {
   const activeGroups  = useMemo(() => contactGroups.filter(g => g.records.length > 0), [contactGroups]);
   // `filtered` is already in the API's newest-created-first order, so no extra sort is needed here.
   const settledDebts  = useMemo(() => filtered.filter(d => d.status === "SETTLED"), [filtered]);
-  // Suggestions come from the FULL debt list (not tab-filtered) so the autocomplete works the
-  // same regardless of which tab you're adding a transaction from.
-  const contactSuggestions = useMemo(() => groupDebtsByContact(debts).map(g => g.contactName), [debts]);
+  // Quick-pick contacts come from the FULL debt list (not tab-filtered) so it works the same
+  // regardless of which tab you're adding a transaction from.
+  const recentContacts = useMemo(() => getRecentContacts(debts), [debts]);
   const payDebt  = debts.find(d => d.id === paymentId);
   const delDebt  = debts.find(d => d.id === deleteId);
 
@@ -156,7 +157,7 @@ export default function DebtsPage() {
           initial={modal.mode === "edit" ? modal.debt : undefined}
           defaultType={modal.mode === "create" ? modal.defaultType : undefined}
           prefillContact={modal.mode === "create" ? modal.prefillContact : undefined}
-          contactSuggestions={contactSuggestions}
+          recentContacts={recentContacts}
           accounts={accounts}
           saving={modal.mode === "edit" ? updating : creating}
           onClose={() => setModal(null)}

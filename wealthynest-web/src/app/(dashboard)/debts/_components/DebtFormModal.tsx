@@ -15,21 +15,23 @@ import {cn} from "@/lib/utils";
 import {todayLocalISO} from "@/lib/date";
 import {type DebtFormValues, debtSchema} from "@/features/debts/schemas/debt.schema";
 import type {DebtRecord, DebtType} from "@/features/debts/types/debt.types";
+import type {RecentContact} from "@/features/debts/utils/recentContacts";
+import {initialsOf} from "./ContactAvatar";
 
 // ── Debt Form Modal ───────────────────────────────────────────────────────────
 
-export function DebtFormModal({ initial, defaultType, prefillContact, contactSuggestions, accounts, onSave, onDelete, onClose, saving }: {
-  initial?:            DebtRecord;
-  defaultType?:        DebtType;
+export function DebtFormModal({ initial, defaultType, prefillContact, recentContacts, accounts, onSave, onDelete, onClose, saving }: {
+  initial?:         DebtRecord;
+  defaultType?:     DebtType;
   /** Pre-fills contact name/phone on create (e.g. "+ Add" from an existing contact's ledger card)
    * — ignored once editing, since `initial` already owns those fields there. */
-  prefillContact?:     { contactName: string; contactPhone?: string };
-  contactSuggestions?: string[];
-  accounts:            { id: string; name: string; bankName?: string; currentBalance: number; primary?: boolean; accountType: string }[];
-  onSave:              (v: DebtFormValues & { type?: DebtType; accountId?: string }) => void;
-  onDelete?:           () => void;
-  onClose:             () => void;
-  saving:              boolean;
+  prefillContact?:  { contactName: string; contactPhone?: string };
+  recentContacts?:  RecentContact[];
+  accounts:         { id: string; name: string; bankName?: string; currentBalance: number; primary?: boolean; accountType: string }[];
+  onSave:           (v: DebtFormValues & { type?: DebtType; accountId?: string }) => void;
+  onDelete?:        () => void;
+  onClose:          () => void;
+  saving:           boolean;
 }) {
   const today = todayLocalISO();
   const isEdit = !!initial?.id;
@@ -54,6 +56,7 @@ export function DebtFormModal({ initial, defaultType, prefillContact, contactSug
   const isLent = type === "LENT";
   const submit = (v: DebtFormValues) =>
     onSave(isEdit ? v : { ...v, type, accountId: accountId || undefined });
+  const showQuickPick = !isEdit && !prefillContact?.contactName && !!recentContacts?.length;
 
   return (
     <TransactionModalOverlay onDismiss={onClose}>
@@ -86,22 +89,41 @@ export function DebtFormModal({ initial, defaultType, prefillContact, contactSug
               testId="debt-amount-input"
               error={form.formState.errors.amount?.message} inputProps={form.register("amount")} />
 
+            {/* Quick pick — only when creating fresh (not editing, not already prefilled from a
+                contact's own "Log transaction"), so re-transacting with someone doesn't mean
+                retyping their name. Replaces the old browser-native <datalist>, which was easy to
+                miss (only surfaced once you started typing) with something visible immediately. */}
+            {showQuickPick && (
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground/80 mb-2">
+                  Quick pick — or type a new name below
+                </p>
+                <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-0.5 px-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {recentContacts!.slice(0, 10).map(c => (
+                    <button type="button" key={c.contactName} data-testid="debt-quick-pick-chip"
+                      onClick={() => {
+                        form.setValue("contactName", c.contactName, { shouldValidate: true });
+                        form.setValue("contactPhone", c.contactPhone ?? "");
+                      }}
+                      className="flex items-center gap-1.5 h-8 pl-1 pr-3 rounded-full text-xs font-medium shrink-0 whitespace-nowrap border border-border bg-muted/40 text-foreground transition-colors hover:border-indigo-500 hover:bg-indigo-500/10 hover:text-indigo-600 dark:hover:text-indigo-400">
+                      <span className="w-[22px] h-[22px] rounded-full bg-card border border-border flex items-center justify-center text-[9px] font-extrabold shrink-0">
+                        {initialsOf(c.contactName)}
+                      </span>
+                      {c.contactName}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1.5">
                 {isLent ? "Who did you lend to?" : "Who did you borrow from?"}
               </label>
               <input placeholder="Name" data-testid="debt-contact-name-input"
-                list={!isEdit && contactSuggestions?.length ? "debt-contact-suggestions" : undefined}
                 className={cn("w-full h-11 px-3 rounded-xl text-sm bg-background border border-border text-foreground placeholder-muted-foreground/40 outline-none transition-all",
                   isLent ? "focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/40" : "focus:border-red-500 focus:ring-2 focus:ring-red-500/40")}
                 {...form.register("contactName")} />
-              {/* Existing contacts, so re-transacting with someone doesn't mean re-typing their
-                  name from scratch — browser-native, no custom dropdown component needed. */}
-              {!isEdit && contactSuggestions && contactSuggestions.length > 0 && (
-                <datalist id="debt-contact-suggestions">
-                  {contactSuggestions.map(name => <option key={name} value={name} />)}
-                </datalist>
-              )}
               {form.formState.errors.contactName && (
                 <p className="text-xs text-red-500 mt-1">{form.formState.errors.contactName.message}</p>
               )}
