@@ -57,7 +57,10 @@ export function ContactLedgerCard({ group, onEdit, onPayment, onDeletePayment, o
           )}
           <button type="button" data-testid="contact-add-transaction"
             onClick={() => onAddTransaction(group.contactName, group.contactPhone)}
-            className="flex items-center gap-1.5 h-7 px-3 rounded-full text-[11px] font-bold text-white shrink-0 transition-all hover:-translate-y-0.5 bg-gradient-to-br from-[#d99a6c] to-[#9a5a32] shadow-md shadow-[#9a5a32]/40 hover:shadow-lg hover:shadow-[#9a5a32]/50">
+            className="flex items-center gap-1.5 h-7 px-3 rounded-full text-[11px] font-bold shrink-0 transition-all
+              bg-[#9a5a32]/10 text-[#9a5a32] dark:bg-[#e0a374]/[0.14] dark:text-[#e0a374]
+              hover:bg-gradient-to-br hover:from-[#d99a6c] hover:to-[#9a5a32] hover:text-white
+              hover:shadow-md hover:shadow-[#9a5a32]/40 hover:-translate-y-0.5">
             <Receipt className="w-3.5 h-3.5" /> Log transaction
           </button>
         </div>
