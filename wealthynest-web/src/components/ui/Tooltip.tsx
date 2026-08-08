@@ -90,7 +90,14 @@ export function Tooltip({ content, children, side = "top", className }: {
 
 // A small info-icon trigger that reveals a tip on hover/focus/tap — for supplementary
 // guidance (e.g. password rules) that shouldn't cost permanent layout space next to a field.
-export function InfoTooltip({ content, className }: { content: ReactNode; className?: string }) {
+export function InfoTooltip({ content, className, side = "top" }: {
+  content: ReactNode; className?: string;
+  /** Which way the popup opens relative to the trigger. Default "top" is fine once there's a
+   * card/section above the trigger to open into — a trigger sitting at the very top of a page
+   * (right under the sticky Header) needs "bottom" instead, or the popup opens into/behind the
+   * header with nowhere to actually show. */
+  side?: "top" | "bottom";
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -112,7 +119,10 @@ export function InfoTooltip({ content, className }: { content: ReactNode; classN
       {open && (
         <span
           role="tooltip"
-          className="absolute z-20 bottom-full right-0 mb-2 w-56 rounded-xl bg-foreground text-background text-xs leading-relaxed px-3 py-2.5 shadow-xl"
+          className={cn(
+            "absolute z-20 right-0 w-56 rounded-xl bg-foreground text-background text-xs leading-relaxed px-3 py-2.5 shadow-xl",
+            side === "top" ? "bottom-full mb-2" : "top-full mt-2"
+          )}
         >
           {content}
         </span>

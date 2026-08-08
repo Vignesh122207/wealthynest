@@ -90,7 +90,7 @@ export function OverviewTab({ investments, year, onYearChange, incomeHistory, po
               {xirrLoading ? "…" : xirrKnown ? `${xirrPositive ? "+" : ""}${portfolioXirr.toFixed(2)}% XIRR` : "XIRR —"}
             </span>
             <InfoTooltip
-              className="ml-1 align-middle"
+              className="ml-1 align-middle" side="bottom"
               content="XIRR is your annualized return across every buy/sell/redeem, weighted by when each happened. “Overall” is just (current − invested) / invested with no time dimension — a new holding and an old one can show the same Overall Return but very different XIRR." />
           </p>
         </div>

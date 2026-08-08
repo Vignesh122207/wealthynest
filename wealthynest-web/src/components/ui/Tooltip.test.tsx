@@ -41,6 +41,18 @@ describe("InfoTooltip", () => {
     fireEvent.focus(screen.getByRole("button", { name: "More info" }));
     expect(screen.getByRole("tooltip")).toBeInTheDocument();
   });
+
+  it("opens upward by default", () => {
+    render(<InfoTooltip content="Helpful hint" />);
+    fireEvent.focus(screen.getByRole("button", { name: "More info" }));
+    expect(screen.getByRole("tooltip")).toHaveClass("bottom-full");
+  });
+
+  it("opens downward when side=\"bottom\" — for a trigger with nothing above it to open into (e.g. right under a sticky header)", () => {
+    render(<InfoTooltip content="Helpful hint" side="bottom" />);
+    fireEvent.focus(screen.getByRole("button", { name: "More info" }));
+    expect(screen.getByRole("tooltip")).toHaveClass("top-full");
+  });
 });
 
 describe("Tooltip", () => {
