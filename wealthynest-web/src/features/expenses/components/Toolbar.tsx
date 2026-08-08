@@ -51,18 +51,20 @@ export function Toolbar({
         <MonthScrubber dateMode={dateMode} setDateMode={setDateMode} year={year} setYear={setYear} month={month} setMonth={setMonth} />
       </div>
 
-      {/* DIV 3 — utility actions, flush right */}
+      {/* DIV 3 — utility actions, flush right. Tinted with the app's Apple-system-color palette
+          (same TONE_HEX family PremiumIcon uses) instead of a flat muted fill, so this row reads
+          as a set of distinct actions rather than a plain gray block. */}
       <div className="flex items-center gap-2 ml-auto sm:ml-0">
         <button onClick={onOpenFilters} aria-label={activeFilterCount > 0 ? `Filters, ${activeFilterCount} active` : "Filters"}
-          className={cn(ACTION_BASE, "bg-muted border border-border text-muted-foreground hover:bg-muted/70 hover:text-foreground")}>
-          <SlidersHorizontal className="w-4 h-4 text-indigo-500" /> Filters
+          className={cn(ACTION_BASE, "bg-indigo-500/10 border border-indigo-500/25 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/15")}>
+          <SlidersHorizontal className="w-4 h-4" /> Filters
           {activeFilterCount > 0 && (
             <span className="w-4 h-4 rounded-full bg-indigo-600 text-white text-[10px] font-bold flex items-center justify-center">{activeFilterCount}</span>
           )}
         </button>
         <button onClick={onExport} aria-label="Download" title="Export"
-          className={cn(ACTION_BASE, "bg-muted border border-border text-muted-foreground hover:bg-muted/70 hover:text-foreground")}>
-          <Download className="w-4 h-4 text-primary" /> Download
+          className={cn(ACTION_BASE, "bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/15")}>
+          <Download className="w-4 h-4" /> Download
         </button>
       </div>
     </div>

@@ -414,6 +414,43 @@ class ExpenseServiceImplTest {
             assertThat(expense.getDescription()).isEqualTo("Original"); // unchanged
             assertThat(expense.getNotes()).isEqualTo("A note");
         }
+
+        @Test
+        @DisplayName("sets latitude/longitude when the request captures a location")
+        void setsLocationWhenProvided() {
+            Expense expense = withId(baseExpense().build());
+            when(expenseRepository.findById(expenseId)).thenReturn(Optional.of(expense));
+            when(expenseRepository.save(any(Expense.class))).thenAnswer(inv -> inv.getArgument(0));
+            UpdateExpenseRequest req = mock(UpdateExpenseRequest.class);
+            when(req.getLatitude()).thenReturn(12.9716);
+            when(req.getLongitude()).thenReturn(77.5946);
+
+            service.updateExpense(expenseId, userId, req);
+
+            assertThat(expense.getLatitude()).isEqualTo(12.9716);
+            assertThat(expense.getLongitude()).isEqualTo(77.5946);
+        }
+
+        @Test
+        @DisplayName("leaves an existing location untouched when the request doesn't include one")
+        void leavesLocationUnchangedWhenAbsent() {
+            Expense expense = withId(baseExpense().latitude(12.9716).longitude(77.5946).build());
+            when(expenseRepository.findById(expenseId)).thenReturn(Optional.of(expense));
+            when(expenseRepository.save(any(Expense.class))).thenAnswer(inv -> inv.getArgument(0));
+            UpdateExpenseRequest req = mock(UpdateExpenseRequest.class);
+            when(req.getNotes()).thenReturn("A note");
+            // Mockito's default answer special-cases boxed numeric types (Double/Integer/etc.) to
+            // their zero value rather than null (unlike ordinary reference types like BigDecimal),
+            // so an unstubbed getLatitude()/getLongitude() would return 0.0 here, not null — stub
+            // explicit nulls to represent what a real "location not included" request carries.
+            when(req.getLatitude()).thenReturn(null);
+            when(req.getLongitude()).thenReturn(null);
+
+            service.updateExpense(expenseId, userId, req);
+
+            assertThat(expense.getLatitude()).isEqualTo(12.9716);
+            assertThat(expense.getLongitude()).isEqualTo(77.5946);
+        }
     }
 
     // ─── deleteExpense / getExpense ──────────────────────────────────────────────

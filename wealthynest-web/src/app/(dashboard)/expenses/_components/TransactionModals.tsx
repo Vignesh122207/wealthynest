@@ -120,7 +120,8 @@ export function TransactionModals({
               title={`Edit — ${editExpense.description || editExpense.categoryName || "Expense"}`}
               defaultValues={{ categoryId: editExpense.categoryId, accountId: editExpense.accountId ?? "",
                 amount: editExpense.amount, description: editExpense.description ?? "", notes: editExpense.notes ?? "",
-                expenseDate: editExpense.expenseDate }}
+                expenseDate: editExpense.expenseDate, latitude: editExpense.latitude, longitude: editExpense.longitude }}
+              expenseId={editExpense.id}
               {...sharedFormProps}
               onSubmit={handleUpdate} onCancel={() => setEditExpense(null)}
               onDelete={() => { const id = editExpense.id; setEditExpense(null); setConfirmId(id); }}

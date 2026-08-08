@@ -30,4 +30,6 @@ public class ExpenseResponse {
     private String     recurrenceRule;
     private String     paymentMethod;
     private Instant    createdAt;
+    private Double     latitude;
+    private Double     longitude;
 }

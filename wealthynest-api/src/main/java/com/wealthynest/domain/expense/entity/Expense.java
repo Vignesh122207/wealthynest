@@ -26,4 +26,8 @@ public class Expense extends BaseEntity {
     @Column(name = "recurrence_rule", length = 50) private String recurrenceRule;
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_method", length = 30) private PaymentMethod paymentMethod;
+    /** Opt-in, per-transaction — captured only when the user taps "Add current location" in the
+     * expense form. Raw coordinates only (Tier 1: no reverse geocoding, no embedded map). */
+    @Column private Double latitude;
+    @Column private Double longitude;
 }

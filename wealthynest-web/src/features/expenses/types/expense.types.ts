@@ -18,6 +18,8 @@ export interface Expense {
   recurrenceRule?:string;
   paymentMethod?: string;
   createdAt:      string;
+  latitude?:      number;
+  longitude?:     number;
 }
 
 export interface SplitParticipant {
@@ -37,6 +39,8 @@ export interface CreateExpensePayload {
   recurrenceRule?: string;
   paymentMethod?:  string;
   splitWith?:      SplitParticipant[];
+  latitude?:       number;
+  longitude?:      number;
 }
 
 export interface ExpenseFilters {

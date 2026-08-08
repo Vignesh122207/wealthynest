@@ -1,14 +1,16 @@
 "use client";
 
-import {useState} from "react";
-import {Check, Lock, Receipt, Star, Users} from "lucide-react";
+import {useRef, useState} from "react";
+import {Check, Image as ImageIcon, Lock, MapPin, Paperclip, Receipt, Star, Trash2, Users, X} from "lucide-react";
 import {Controller, useForm} from "react-hook-form";
 import {zodResolver} from "@hookform/resolvers/zod";
+import {toast} from "sonner";
 import {FormInput} from "@/components/forms/FormInput";
 import {FormDatePicker} from "@/components/forms/FormDatePicker";
 import {type ExpenseFormValues, expenseSchema} from "@/features/expenses/schemas/expense.schema";
 import type {SplitParticipant} from "@/features/expenses/types/expense.types";
 import type {AccountType} from "@/features/accounts/types/account.types";
+import {useReceiptAttachment} from "@/features/expenses/hooks/useReceiptAttachment";
 import {ACCOUNT_TYPE_META} from "@/lib/accountTypeMeta";
 import {BankLogo} from "@/components/icons/BankLogo";
 import {CategoryPicker} from "./CategoryPicker";
@@ -40,12 +42,20 @@ interface ExpenseFormProps {
   /** Other family members this expense can be split with — omitted (or empty) hides the section
    * entirely, which also covers users not currently in a family. */
   familyMembers?: { id: string; fullName: string }[];
+  /** The expense's real ID — edit mode only. Enables the receipt-attach section, which is keyed
+   * by this ID (useReceiptAttachment/localStorage); create mode has no ID yet, so it's omitted
+   * there and receipts stay attachable only after the expense is saved (via the detail drawer). */
+  expenseId?: string;
 }
 
-export function ExpenseForm({ title, defaultValues, defaultCategoryId, categoryOptions, cashAccounts, bankAccounts, creditAccounts, onSubmit, onCancel, onDelete, isPending, submitLabel, lockedAccount, familyMembers = [] }: ExpenseFormProps) {
+export function ExpenseForm({ title, defaultValues, defaultCategoryId, categoryOptions, cashAccounts, bankAccounts, creditAccounts, onSubmit, onCancel, onDelete, isPending, submitLabel, lockedAccount, familyMembers = [], expenseId }: ExpenseFormProps) {
   const hasAccounts = cashAccounts.length > 0 || bankAccounts.length > 0 || creditAccounts.length > 0;
   const primaryBankAccount = bankAccounts.find(a => a.primary);
   const { fmtExact } = useAmountFormatter();
+
+  const [locating, setLocating] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { dataUrl: receiptUrl, attach, remove: removeReceipt } = useReceiptAttachment(expenseId);
 
   const [splitOpen, setSplitOpen] = useState(false);
   const [splitWith, setSplitWith] = useState<Set<string>>(new Set());
@@ -69,6 +79,40 @@ export function ExpenseForm({ title, defaultValues, defaultCategoryId, categoryO
     // personalized beats a hardcoded guess, since everyone's top spending category differs.
     defaultValues: { expenseDate: todayLocalISO(), accountId: defaultAccountId, categoryId: defaultCategoryId, ...defaultValues },
   });
+
+  // Opt-in, per-transaction — only ever captured when the user explicitly taps the button below,
+  // never automatically. Works in both create and edit (unlike the receipt section above, this
+  // doesn't need an expense ID to exist yet).
+  const latitude  = form.watch("latitude");
+  const longitude = form.watch("longitude");
+  const hasLocation = latitude != null && longitude != null;
+
+  const captureLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error("Location isn't available in this browser.");
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        form.setValue("latitude", pos.coords.latitude, { shouldDirty: true });
+        form.setValue("longitude", pos.coords.longitude, { shouldDirty: true });
+        setLocating(false);
+      },
+      err => {
+        setLocating(false);
+        toast.error(err.code === err.PERMISSION_DENIED
+          ? "Location permission denied — you can still save the expense without it."
+          : "Couldn't get your current location.");
+      },
+      { timeout: 10000, maximumAge: 60000 },
+    );
+  };
+
+  const clearLocation = () => {
+    form.setValue("latitude", undefined, { shouldDirty: true });
+    form.setValue("longitude", undefined, { shouldDirty: true });
+  };
 
   // Instant "insufficient balance" feedback before the round-trip to the server (which enforces
   // the same rule authoritatively). originalAmount gives back this expense's own old amount when
@@ -123,6 +167,51 @@ export function ExpenseForm({ title, defaultValues, defaultCategoryId, categoryO
 
           <FormInput label="Notes (optional)" placeholder="Any extra detail worth keeping"
             {...form.register("notes")} />
+
+          <div>
+            <label className="block text-sm font-medium text-muted-foreground mb-1.5">Location (optional)</label>
+            {hasLocation ? (
+              <div className="flex items-center gap-2 h-11 px-3 rounded-xl border border-border bg-muted/40 text-sm text-foreground">
+                <MapPin className="w-4 h-4 text-red-500 shrink-0" />
+                <span className="flex-1 truncate text-xs text-muted-foreground tabular-nums">{latitude?.toFixed(5)}, {longitude?.toFixed(5)}</span>
+                <button type="button" onClick={clearLocation} aria-label="Remove location"
+                  className="text-muted-foreground/60 hover:text-foreground transition-colors shrink-0">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button type="button" onClick={captureLocation} disabled={locating}
+                className="flex items-center gap-2 h-11 px-3 w-full rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:text-foreground hover:border-indigo-500/40 transition-colors disabled:opacity-60">
+                <MapPin className="w-4 h-4" /> {locating ? "Getting location…" : "Add current location"}
+              </button>
+            )}
+          </div>
+
+          {expenseId && (
+            <div>
+              <label className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground mb-1.5">
+                <Paperclip className="w-3.5 h-3.5" /> Receipt (optional)
+              </label>
+              {receiptUrl ? (
+                <div className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- a browser-local data URL, not a remote/optimizable image */}
+                  <img src={receiptUrl} alt="Receipt" className="w-full max-h-40 object-contain rounded-xl border border-border" />
+                  <button type="button" onClick={removeReceipt} aria-label="Remove receipt"
+                    className="absolute top-2 right-2 w-7 h-7 rounded-lg bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <button type="button" onClick={() => fileInputRef.current?.click()}
+                  className="w-full h-16 rounded-xl border border-dashed border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-foreground hover:border-indigo-500/40 transition-colors">
+                  <ImageIcon className="w-4 h-4" />
+                  <span className="text-[11px]">Attach a receipt photo</span>
+                </button>
+              )}
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) attach(f); e.target.value = ""; }} />
+            </div>
+          )}
 
           {lockedAccount ? (
             <div>

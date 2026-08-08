@@ -32,7 +32,7 @@ export function MonthScrubber({ dateMode, setDateMode, year, setYear, month, set
       </button>
       <span data-testid="scrubber-label"
         className={cn("text-sm px-1 min-w-[104px] text-center whitespace-nowrap transition-colors",
-          isActive ? "font-semibold text-foreground" : "font-medium text-muted-foreground")}>
+          isActive ? "font-semibold text-blue-600 dark:text-blue-400" : "font-medium text-muted-foreground")}>
         {monthLabel(year, month)}
       </span>
       <button type="button" onClick={() => navigate(1)} disabled={isCurrentMonth} aria-label="Next month" data-testid="scrubber-next"

@@ -10,6 +10,7 @@ import {
     X
 } from "lucide-react";
 import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
+import {BankLogo} from "@/components/icons/BankLogo";
 import {getCategoryColor, getCategoryIcon} from "@/lib/categoryMeta";
 import {ACCOUNT_TYPE_META} from "@/lib/accountTypeMeta";
 import {cn} from "@/lib/utils";
@@ -40,7 +41,7 @@ export function FilterPanel({
   sortKey: SortKey; setSortKey: (v: SortKey) => void;
   incomeSort: "newest"|"oldest"|"high"|"low"; setIncomeSort: (v: "newest"|"oldest"|"high"|"low") => void;
   transferSort: "newest"|"oldest"|"high"|"low"; setTransferSort: (v: "newest"|"oldest"|"high"|"low") => void;
-  allAccounts: { id: string; name: string; accountType?: string; status?: "ACTIVE" | "CLOSED" | "ARCHIVED" }[]; selectedAccountIds: string[]; setSelectedAccountIds: (v: string[] | ((p: string[]) => string[])) => void;
+  allAccounts: { id: string; name: string; accountType?: string; bankName?: string; status?: "ACTIVE" | "CLOSED" | "ARCHIVED" }[]; selectedAccountIds: string[]; setSelectedAccountIds: (v: string[] | ((p: string[]) => string[])) => void;
   onClearAll: () => void; activeFilterCount: number;
 }) {
   if (!open) return null;
@@ -143,7 +144,10 @@ export function FilterPanel({
                         selectedAccountIds.includes(a.id) ? "bg-indigo-500/15 border-indigo-500/40 text-indigo-600 dark:text-indigo-400"
                           : isClosed ? "bg-muted/30 border-border text-muted-foreground/60 hover:text-muted-foreground"
                           : "bg-muted/60 border-border text-muted-foreground hover:text-foreground")}>
-                      {meta && <PremiumIcon icon={meta.icon} hex={meta.hex} size="xs" className={isClosed ? "opacity-50" : undefined} />}
+                      {meta && (
+                        <BankLogo name={a.bankName} fallbackIcon={meta.icon} fallbackHex={meta.hex} size="xs"
+                          className={isClosed ? "opacity-50" : undefined} />
+                      )}
                       {a.name}
                       {isClosed && <span className="text-[10px] text-muted-foreground/70">· Closed</span>}
                     </button>

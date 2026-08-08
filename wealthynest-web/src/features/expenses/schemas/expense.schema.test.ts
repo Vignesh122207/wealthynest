@@ -64,4 +64,27 @@ describe("expenseSchema", () => {
     expect(expenseSchema.safeParse(valid).success).toBe(true);
     expect(expenseSchema.safeParse({ ...valid, notes: "Paid in two installments" }).success).toBe(true);
   });
+
+  it("treats latitude/longitude as optional", () => {
+    expect(expenseSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it("accepts valid latitude/longitude", () => {
+    const result = expenseSchema.safeParse({ ...valid, latitude: 12.9716, longitude: 77.5946 });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.latitude).toBe(12.9716);
+      expect(result.data.longitude).toBe(77.5946);
+    }
+  });
+
+  it("rejects an out-of-range latitude", () => {
+    expect(expenseSchema.safeParse({ ...valid, latitude: 91, longitude: 0 }).success).toBe(false);
+    expect(expenseSchema.safeParse({ ...valid, latitude: -91, longitude: 0 }).success).toBe(false);
+  });
+
+  it("rejects an out-of-range longitude", () => {
+    expect(expenseSchema.safeParse({ ...valid, latitude: 0, longitude: 181 }).success).toBe(false);
+    expect(expenseSchema.safeParse({ ...valid, latitude: 0, longitude: -181 }).success).toBe(false);
+  });
 });
