@@ -483,5 +483,30 @@ class ExpenseServiceImplTest {
 
             assertThat(response.getCategoryName()).isEqualTo("Groceries");
         }
+
+        // Regression: buildResponse() (the branch enrich() takes when the category DOES resolve —
+        // i.e. almost always, in real usage) manually reconstructs ExpenseResponse field-by-field
+        // via its builder. It's a real bug pattern: adding a field to ExpenseResponse/Expense isn't
+        // enough on its own — buildResponse() silently drops any field not explicitly copied there,
+        // even though expenseMapper.toResponse() (and the other tests in this file, which stub
+        // categoryRepository.findById() to return empty by default and so never hit this branch)
+        // mapped it correctly. latitude/longitude were dropped exactly this way until this test.
+        @Test
+        @DisplayName("getExpense's category-enriched response still carries every other field (regression: buildResponse used to silently drop fields it didn't explicitly copy)")
+        void getExpenseEnrichmentPreservesAllFields() {
+            Expense expense = withId(baseExpense().debt(true).latitude(12.9716).longitude(77.5946).build());
+            when(expenseRepository.findById(expenseId)).thenReturn(Optional.of(expense));
+            when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(
+                    Category.builder().name("Groceries").icon("cart").color("#22c55e").type(CategoryType.EXPENSE).build()));
+            when(expenseMapper.toResponse(expense)).thenReturn(ExpenseResponse.builder()
+                    .id(expenseId).categoryId(categoryId).amount(expense.getAmount())
+                    .debt(true).latitude(12.9716).longitude(77.5946).build());
+
+            ExpenseResponse response = service.getExpense(expenseId, userId);
+
+            assertThat(response.isDebt()).isTrue();
+            assertThat(response.getLatitude()).isEqualTo(12.9716);
+            assertThat(response.getLongitude()).isEqualTo(77.5946);
+        }
     }
 }

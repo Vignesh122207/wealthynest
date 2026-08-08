@@ -226,8 +226,9 @@ public class ExpenseServiceImpl implements ExpenseService {
             .categoryName(cat.getName()).categoryIcon(cat.getIcon()).categoryColor(cat.getColor())
             .amount(r.getAmount()).currency(r.getCurrency())
             .description(r.getDescription()).notes(r.getNotes())
-            .expenseDate(r.getExpenseDate()).recurring(r.isRecurring())
+            .expenseDate(r.getExpenseDate()).recurring(r.isRecurring()).debt(r.isDebt())
             .recurrenceRule(r.getRecurrenceRule()).paymentMethod(r.getPaymentMethod())
-            .createdAt(r.getCreatedAt()).build();
+            .createdAt(r.getCreatedAt())
+            .latitude(r.getLatitude()).longitude(r.getLongitude()).build();
     }
 }
