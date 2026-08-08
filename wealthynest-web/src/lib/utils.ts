@@ -91,11 +91,14 @@ export function getStoredCurrency(): string {
   return "INR";
 }
 
-// AED/SGD have no dedicated glyph Intl.NumberFormat actually renders (formatCurrency below
-// prints "AED 1,234" / "SGD 1,234", not a symbol) — using the ISO code here too, instead of an
-// informal symbol like "S$" that formatCurrency would never actually produce, keeps this in sync
-// with what a user sees everywhere else in the app.
-const CURRENCY_SYMBOLS: Record<string, string> = { INR: "₹", USD: "$", EUR: "€", GBP: "£", AED: "AED", SGD: "SGD" };
+// formatCurrency's Intl.NumberFormat prints "AED 1,234"/"SGD 1,234" (no locale ships a dedicated
+// glyph for either), but "S$" is still the everyday informal notation for Singapore Dollar
+// wherever it's written by hand, so it's kept here for these plain-text contexts (CSV headers,
+// masked-privacy placeholders, filter chips, amount-input prefixes). AED has no informal ASCII
+// equivalent in the same way, so it stays as the ISO code in this text-only map — its real
+// symbol (the Central Bank's 2025 dirham sign) is rendered as an SVG, not text; see
+// components/icons/DirhamSign.tsx and its one caller in Settings → Appearance's currency picker.
+const CURRENCY_SYMBOLS: Record<string, string> = { INR: "₹", USD: "$", EUR: "€", GBP: "£", AED: "AED", SGD: "S$" };
 
 /** Standalone currency symbol (no amount) — for CSV headers, masked-privacy placeholders, etc.,
  * where formatCurrency's Intl.NumberFormat output can't be used because there's no number to format. */
