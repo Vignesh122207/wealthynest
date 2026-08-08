@@ -103,7 +103,7 @@ export function ExpenseForm({ title, defaultValues, defaultCategoryId, categoryO
     <div className="rounded-3xl overflow-hidden border border-border shadow-2xl animate-scale-in bg-card">
       <div className="h-1.5 bg-gradient-to-r from-rose-500 to-red-600" />
       <div className="p-5">
-        <FormModalHeader icon={Receipt} tone="red"
+        <FormModalHeader icon={Receipt} tone="red" size="sm"
           title={title} onDelete={onDelete} onClose={onCancel} />
         <form onSubmit={form.handleSubmit(handleValidatedSubmit)} className="space-y-4">
           <BigAmountInput colorClass="text-red-500 dark:text-red-400" testId="expense-amount-input"

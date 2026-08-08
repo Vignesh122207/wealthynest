@@ -108,7 +108,7 @@ export function IncomeForm({ onSubmit, onCancel, onDelete, isPending, accounts, 
     <div className="rounded-3xl overflow-hidden border border-border shadow-2xl animate-scale-in bg-card">
       <div className="h-1.5 bg-gradient-to-r from-emerald-500 to-teal-600" />
       <div className="p-5">
-        <FormModalHeader icon={Wallet} tone="emerald"
+        <FormModalHeader icon={Wallet} tone="emerald" size="sm"
           title={isEdit ? "Edit Income" : "Add Income"} onDelete={onDelete} onClose={onCancel} />
         <form onSubmit={form.handleSubmit(handleValidatedSubmit)} className="space-y-4">
           <BigAmountInput colorClass="text-emerald-500 dark:text-emerald-400" testId="income-amount-input"

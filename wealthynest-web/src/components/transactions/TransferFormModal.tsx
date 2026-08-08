@@ -86,7 +86,7 @@ export function TransferFormModal({ onSubmit, onCancel, onDelete, isPending, acc
     <div className="rounded-3xl overflow-hidden border border-border shadow-2xl animate-scale-in bg-card">
       <div className="h-1.5 bg-gradient-to-r from-indigo-500 to-blue-600" />
       <div className="p-5">
-        <FormModalHeader icon={ArrowLeftRight} tone="indigo"
+        <FormModalHeader icon={ArrowLeftRight} tone="indigo" size="sm"
           title={title ?? (isEdit ? "Edit Transfer" : "New Transfer")} onDelete={onDelete} onClose={onCancel} />
         <form onSubmit={form.handleSubmit(handleValidatedSubmit)} className="space-y-4">
           <BigAmountInput colorClass="text-indigo-500 dark:text-indigo-400" testId="transfer-amount-input"

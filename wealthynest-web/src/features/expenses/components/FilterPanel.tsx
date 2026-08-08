@@ -40,7 +40,7 @@ export function FilterPanel({
   sortKey: SortKey; setSortKey: (v: SortKey) => void;
   incomeSort: "newest"|"oldest"|"high"|"low"; setIncomeSort: (v: "newest"|"oldest"|"high"|"low") => void;
   transferSort: "newest"|"oldest"|"high"|"low"; setTransferSort: (v: "newest"|"oldest"|"high"|"low") => void;
-  allAccounts: { id: string; name: string; accountType?: string }[]; selectedAccountIds: string[]; setSelectedAccountIds: (v: string[] | ((p: string[]) => string[])) => void;
+  allAccounts: { id: string; name: string; accountType?: string; status?: "ACTIVE" | "CLOSED" | "ARCHIVED" }[]; selectedAccountIds: string[]; setSelectedAccountIds: (v: string[] | ((p: string[]) => string[])) => void;
   onClearAll: () => void; activeFilterCount: number;
 }) {
   if (!open) return null;
@@ -77,29 +77,6 @@ export function FilterPanel({
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-3">
-          {/* Sort */}
-          <div className="bg-card border border-border rounded-xl p-3">
-            {sectionLabel(ArrowUpDown, "Sort by", "indigo")}
-            {txType === "income" ? (
-              <SortPills value={incomeSort} onChange={setIncomeSort} options={[
-                { value: "newest", label: "Newest" }, { value: "oldest", label: "Oldest" },
-                { value: "high",   label: "Highest" }, { value: "low",    label: "Lowest" },
-              ]} />
-            ) : txType === "transfers" ? (
-              <SortPills value={transferSort} onChange={setTransferSort} options={[
-                { value: "newest", label: "Newest" }, { value: "oldest", label: "Oldest" },
-                { value: "high",   label: "Highest" }, { value: "low",    label: "Lowest" },
-              ]} />
-            ) : (
-              <SortPills value={sortKey} onChange={setSortKey} options={[
-                { value: "date-desc",   label: "Newest" },
-                { value: "date-asc",    label: "Oldest" },
-                { value: "amount-desc", label: "Highest" },
-                { value: "amount-asc",  label: "Lowest" },
-              ]} />
-            )}
-          </div>
-
           {showExpenseFilters && (
             <>
               <div className="bg-card border border-border rounded-xl p-3">
@@ -145,7 +122,39 @@ export function FilterPanel({
                   })}
                 </div>
               </div>
+            </>
+          )}
 
+          {/* Account filter applies to every tab (selectedAccountIds is shared page state, and its
+              chip shows up on Expenses/Income/All too — see page.tsx's accountChips) — used to only
+              render here when txType === "transfers", so it was only ever reachable by round-
+              tripping through the Transfers tab even though it filtered every other tab too. */}
+          {allAccounts.length > 0 && (
+            <div className="bg-card border border-border rounded-xl p-3">
+              {sectionLabel(Wallet, "Accounts", "cyan")}
+              <div className="flex flex-wrap gap-1.5">
+                {allAccounts.map(a => {
+                  const meta = a.accountType ? ACCOUNT_TYPE_META[a.accountType as keyof typeof ACCOUNT_TYPE_META] : undefined;
+                  const isClosed = a.status === "CLOSED";
+                  return (
+                    <button key={a.id}
+                      onClick={() => setSelectedAccountIds(prev => prev.includes(a.id) ? prev.filter(id => id !== a.id) : [...prev, a.id])}
+                      className={cn("flex items-center gap-1.5 pl-1.5 pr-3 h-8 rounded-lg text-xs font-medium border transition-all",
+                        selectedAccountIds.includes(a.id) ? "bg-indigo-500/15 border-indigo-500/40 text-indigo-600 dark:text-indigo-400"
+                          : isClosed ? "bg-muted/30 border-border text-muted-foreground/60 hover:text-muted-foreground"
+                          : "bg-muted/60 border-border text-muted-foreground hover:text-foreground")}>
+                      {meta && <PremiumIcon icon={meta.icon} hex={meta.hex} size="xs" className={isClosed ? "opacity-50" : undefined} />}
+                      {a.name}
+                      {isClosed && <span className="text-[10px] text-muted-foreground/70">· Closed</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {showExpenseFilters && (
+            <>
               <div className="bg-card border border-border rounded-xl p-3">
                 {sectionLabel(IndianRupee, "Amount range", "green")}
                 <div className="flex items-center gap-2">
@@ -172,29 +181,28 @@ export function FilterPanel({
             </>
           )}
 
-          {/* Account filter applies to every tab (selectedAccountIds is shared page state, and its
-              chip shows up on Expenses/Income/All too — see page.tsx's accountChips) — used to only
-              render here when txType === "transfers", so it was only ever reachable by round-
-              tripping through the Transfers tab even though it filtered every other tab too. */}
-          {allAccounts.length > 0 && (
-            <div className="bg-card border border-border rounded-xl p-3">
-              {sectionLabel(Wallet, "Accounts", "cyan")}
-              <div className="flex flex-wrap gap-1.5">
-                {allAccounts.map(a => {
-                  const meta = a.accountType ? ACCOUNT_TYPE_META[a.accountType as keyof typeof ACCOUNT_TYPE_META] : undefined;
-                  return (
-                    <button key={a.id}
-                      onClick={() => setSelectedAccountIds(prev => prev.includes(a.id) ? prev.filter(id => id !== a.id) : [...prev, a.id])}
-                      className={cn("flex items-center gap-1.5 pl-1.5 pr-3 h-8 rounded-lg text-xs font-medium border transition-all",
-                        selectedAccountIds.includes(a.id) ? "bg-indigo-500/15 border-indigo-500/40 text-indigo-600 dark:text-indigo-400" : "bg-muted/60 border-border text-muted-foreground hover:text-foreground")}>
-                      {meta && <PremiumIcon icon={meta.icon} hex={meta.hex} size="xs" />}
-                      {a.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          {/* Sort — last: it reorders the already-narrowed set rather than narrowing it further. */}
+          <div className="bg-card border border-border rounded-xl p-3">
+            {sectionLabel(ArrowUpDown, "Sort by", "indigo")}
+            {txType === "income" ? (
+              <SortPills value={incomeSort} onChange={setIncomeSort} options={[
+                { value: "newest", label: "Newest" }, { value: "oldest", label: "Oldest" },
+                { value: "high",   label: "Highest" }, { value: "low",    label: "Lowest" },
+              ]} />
+            ) : txType === "transfers" ? (
+              <SortPills value={transferSort} onChange={setTransferSort} options={[
+                { value: "newest", label: "Newest" }, { value: "oldest", label: "Oldest" },
+                { value: "high",   label: "Highest" }, { value: "low",    label: "Lowest" },
+              ]} />
+            ) : (
+              <SortPills value={sortKey} onChange={setSortKey} options={[
+                { value: "date-desc",   label: "Newest" },
+                { value: "date-asc",    label: "Oldest" },
+                { value: "amount-desc", label: "Highest" },
+                { value: "amount-asc",  label: "Lowest" },
+              ]} />
+            )}
+          </div>
         </div>
 
         <div className="p-5 border-t border-border shrink-0">

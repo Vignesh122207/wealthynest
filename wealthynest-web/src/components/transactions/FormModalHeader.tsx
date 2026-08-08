@@ -1,18 +1,22 @@
 "use client";
 
 import {type LucideIcon, Trash2, X} from "lucide-react";
-import {type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
+import {type IconSize, type IconTone, PremiumIcon} from "@/components/icons/PremiumIcon";
 
-export function FormModalHeader({ icon, tone, hex, title, onDelete, onClose }: {
+export function FormModalHeader({ icon, tone, hex, size = "md", title, onDelete, onClose }: {
   icon: LucideIcon;
   /** Named palette tone, or a raw hex for callers with per-item dynamic colors (e.g. account
    * types) that don't map onto one of the fixed IconTone values. Provide exactly one. */
   tone?: IconTone; hex?: string;
+  /** Defaults to "md" (this component's long-standing look, used by Budgets/Goals/Debts/Assets/
+   * Family/etc.) — pass "sm" for a callers that wants a smaller header icon without affecting
+   * every other consumer. */
+  size?: IconSize;
   title: string; onDelete?: () => void; onClose: () => void;
 }) {
   return (
     <div className="flex items-center gap-3 mb-4">
-      <PremiumIcon icon={icon} tone={tone} hex={hex} size="md" className="w-10 h-10" />
+      <PremiumIcon icon={icon} tone={tone} hex={hex} size={size} className={size === "md" ? "w-10 h-10" : undefined} />
       <h3 className="font-semibold text-foreground text-base flex-1 truncate">{title}</h3>
       {onDelete && (
         <div className="relative group shrink-0">
