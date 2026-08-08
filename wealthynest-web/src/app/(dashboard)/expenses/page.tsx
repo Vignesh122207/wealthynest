@@ -910,6 +910,20 @@ export default function TransactionsPage() {
       <main className="flex-1 p-4 md:p-5 lg:p-6 pb-36 lg:pb-24 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-4">
 
+        {/* Stat cards — always visible, reflect the selected date range regardless of tab.
+            Shown first: orients the user with period totals before they start picking a tab
+            or reaching for search/filters. */}
+        <StatCards
+          income={statTotals.income} expenses={statTotals.expenses}
+          incomeDelta={statTotals.incomeDelta} expensesDelta={statTotals.expensesDelta}
+          netSavingsDelta={statTotals.netSavingsDelta}
+          transactionCount={mergedRows.length}
+        />
+
+        {/* Type tabs — pick the dataset before reaching for tools that scope to it (e.g.
+            FilterPanel's fields change based on txType). */}
+        <TypeTabs value={txType} onChange={v => { setTxType(v); }} counts={txTypeCounts} />
+
         {/* Toolbar — search, date range, filters, download — shared across every tab */}
         <Toolbar
           search={search} setSearch={setSearch}
@@ -922,17 +936,6 @@ export default function TransactionsPage() {
           customStart={customStart} setCustomStart={setCustomStart}
           customEnd={customEnd} setCustomEnd={setCustomEnd}
         />
-
-        {/* Stat cards — always visible, reflect the selected date range regardless of tab */}
-        <StatCards
-          income={statTotals.income} expenses={statTotals.expenses}
-          incomeDelta={statTotals.incomeDelta} expensesDelta={statTotals.expensesDelta}
-          netSavingsDelta={statTotals.netSavingsDelta}
-          transactionCount={mergedRows.length}
-        />
-
-        {/* Type tabs */}
-        <TypeTabs value={txType} onChange={v => { setTxType(v); }} counts={txTypeCounts} />
 
         <FilterPanel
           open={showFilterPanel} onClose={() => setShowFilterPanel(false)} txType={txType}
