@@ -25,6 +25,7 @@ import {useAccounts} from "@/features/accounts/hooks/useAccounts";
 import {DebtFormModal} from "./_components/DebtFormModal";
 import {PaymentModal} from "./_components/PaymentModal";
 import {ContactLedgerCard} from "./_components/ContactLedgerCard";
+import {SettledDebtsSection} from "./_components/SettledDebtsSection";
 import {Summary} from "./_components/Summary";
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -66,6 +67,11 @@ export default function DebtsPage() {
   // instead of N disconnected ones — grouped from the tab-filtered list, so a LENT/BORROWED tab
   // still hides a contact entirely when none of their records match.
   const contactGroups = useMemo(() => groupDebtsByContact(filtered), [filtered]);
+  // A contact with nothing active left doesn't get their own ledger card — see
+  // SettledDebtsSection.tsx for where their history goes instead.
+  const activeGroups  = useMemo(() => contactGroups.filter(g => g.records.length > 0), [contactGroups]);
+  // `filtered` is already in the API's newest-created-first order, so no extra sort is needed here.
+  const settledDebts  = useMemo(() => filtered.filter(d => d.status === "SETTLED"), [filtered]);
   // Suggestions come from the FULL debt list (not tab-filtered) so the autocomplete works the
   // same regardless of which tab you're adding a transaction from.
   const contactSuggestions = useMemo(() => groupDebtsByContact(debts).map(g => g.contactName), [debts]);
@@ -95,7 +101,7 @@ export default function DebtsPage() {
           </div>
         ) : isError ? (
           <QueryErrorState onRetry={() => refetch()} description="Couldn't load your debts. Check your connection and try again." />
-        ) : contactGroups.length === 0 ? (
+        ) : activeGroups.length === 0 && settledDebts.length === 0 ? (
           <EmptyState
             icon={Handshake}
             title="No debts here"
@@ -123,7 +129,7 @@ export default function DebtsPage() {
           />
         ) : (
           <div className="space-y-5">
-            {contactGroups.map(group => (
+            {activeGroups.map(group => (
               <ContactLedgerCard
                 key={group.key}
                 group={group}
@@ -134,6 +140,12 @@ export default function DebtsPage() {
                   setModal({ mode: "create", defaultType: "LENT", prefillContact: { contactName, contactPhone } })}
               />
             ))}
+            <SettledDebtsSection
+              settledDebts={settledDebts}
+              onEdit={debt => setModal({ mode: "edit", debt })}
+              onPayment={debt => setPaymentId(debt.id)}
+              onDeletePayment={(debt, payment) => setDeletePaymentTarget({ debt, payment })}
+            />
           </div>
         )}
       </PageWrapper>

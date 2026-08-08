@@ -1,7 +1,6 @@
 "use client";
 
-import {useState} from "react";
-import {ChevronDown, Plus} from "lucide-react";
+import {Receipt} from "lucide-react";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {cn} from "@/lib/utils";
 import type {DebtPayment, DebtRecord} from "@/features/debts/types/debt.types";
@@ -17,36 +16,35 @@ interface ContactLedgerCardProps {
   onAddTransaction: (contactName: string, contactPhone?: string) => void;
 }
 
-// One flat, bordered ledger per person — the contact's identity (avatar, name) and the
-// settled-history disclosure live once at this level, in the header and footer of a single
-// container. DebtTransactionRow renders each transaction as a plain divided row rather than its
-// own bordered card, so avatar/name/status chrome isn't repeated per transaction underneath.
+// One flat, bordered ledger per person, ACTIVE relationships only — a contact with nothing active
+// left doesn't get a card here at all (see page.tsx's activeGroups filter); their settled history
+// lives in the page-level SettledDebtsSection instead. The contact's identity (avatar, name) lives
+// once at this level; DebtTransactionRow renders each transaction as a plain divided row rather
+// than its own bordered card, so avatar/name/status chrome isn't repeated per transaction underneath.
 export function ContactLedgerCard({ group, onEdit, onPayment, onDeletePayment, onAddTransaction }: ContactLedgerCardProps) {
   const { fmt } = useAmountFormatter();
-  const [showSettled, setShowSettled] = useState(false);
 
   // Sub-rupee netAmount drift (float remainders) shouldn't read as "still owed" — treat anything
   // under a rupee as settled up.
   const isSettledUp = Math.abs(group.netAmount) < 1;
   const isOwedToYou = group.netAmount > 0;
-  const totalCount  = group.records.length + group.settledRecords.length;
 
   // Payoff ring reflects the whole relationship (active + settled), not any single transaction —
-  // one aggregate signal instead of a per-row progress ring repeated N times.
+  // a contact you've paid off 2 of 3 transactions with still shows 2/3 progress here, even though
+  // the settled 2 no longer render as rows on this card.
   const allRecords   = [...group.records, ...group.settledRecords];
   const totalAmount  = allRecords.reduce((s, d) => s + d.amount, 0);
   const totalSettled = allRecords.reduce((s, d) => s + d.amountSettled, 0);
   const payoffPct    = totalAmount > 0 ? Math.min((totalSettled / totalAmount) * 100, 100) : 0;
-  const fullySettled = group.records.length === 0;
 
   return (
     <div data-testid="contact-ledger-card" className="bg-card border border-border rounded-2xl overflow-hidden">
       <div className="flex items-center gap-3 p-4">
-        <ContactAvatar name={group.contactName} isLent={group.netAmount >= 0} pct={payoffPct} settled={fullySettled} overdue={group.hasOverdue} />
+        <ContactAvatar name={group.contactName} isLent={group.netAmount >= 0} pct={payoffPct} overdue={group.hasOverdue} />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-foreground truncate">{group.contactName}</p>
           <p className={cn("text-[11px]", group.hasOverdue ? "text-red-500 font-medium" : "text-muted-foreground")}>
-            {totalCount} transaction{totalCount !== 1 ? "s" : ""}{group.hasOverdue && " · overdue"}
+            {group.records.length} transaction{group.records.length !== 1 ? "s" : ""}{group.hasOverdue && " · overdue"}
           </p>
         </div>
         <div className="flex flex-col items-end gap-1.5 shrink-0">
@@ -59,39 +57,19 @@ export function ContactLedgerCard({ group, onEdit, onPayment, onDeletePayment, o
           )}
           <button type="button" data-testid="contact-add-transaction"
             onClick={() => onAddTransaction(group.contactName, group.contactPhone)}
-            className="flex items-center gap-1.5 h-7 px-3 rounded-full text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 border border-transparent hover:bg-indigo-600 hover:text-white hover:border-indigo-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-500/30 transition-all">
-            <Plus className="w-3.5 h-3.5" /> Log transaction
+            className="flex items-center gap-1.5 h-7 px-3 rounded-full text-[11px] font-bold text-white shrink-0 transition-all hover:-translate-y-0.5 bg-gradient-to-br from-[#d99a6c] to-[#9a5a32] shadow-md shadow-[#9a5a32]/40 hover:shadow-lg hover:shadow-[#9a5a32]/50">
+            <Receipt className="w-3.5 h-3.5" /> Log transaction
           </button>
         </div>
       </div>
 
-      {totalCount > 0 && (
-        <div className="border-t border-border/50 divide-y divide-border/50">
-          {group.records.map(debt => (
-            <DebtTransactionRow key={debt.id} debt={debt}
-              onEdit={() => onEdit(debt)} onPayment={() => onPayment(debt)}
-              onDeletePayment={p => onDeletePayment(debt, p)} />
-          ))}
-
-          {/* SETTLED isn't strictly terminal (editing the amount back up can revert it to
-              Partial/Active — see debts.spec.ts), so this reuses DebtTransactionRow as-is (still
-              editable) rather than a stripped-down, history-only row. */}
-          {group.settledRecords.length > 0 && (
-            <>
-              <button type="button" onClick={() => setShowSettled(v => !v)}
-                className="w-full flex items-center gap-2 px-4 py-2.5 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors">
-                <span>Settled Debts ({group.settledRecords.length})</span>
-                <ChevronDown className={cn("w-3 h-3 transition-transform", showSettled && "rotate-180")} />
-              </button>
-              {showSettled && group.settledRecords.map(debt => (
-                <DebtTransactionRow key={debt.id} debt={debt}
-                  onEdit={() => onEdit(debt)} onPayment={() => onPayment(debt)}
-                  onDeletePayment={p => onDeletePayment(debt, p)} />
-              ))}
-            </>
-          )}
-        </div>
-      )}
+      <div className="border-t border-border/50 divide-y divide-border/50">
+        {group.records.map(debt => (
+          <DebtTransactionRow key={debt.id} debt={debt}
+            onEdit={() => onEdit(debt)} onPayment={() => onPayment(debt)}
+            onDeletePayment={p => onDeletePayment(debt, p)} />
+        ))}
+      </div>
     </div>
   );
 }

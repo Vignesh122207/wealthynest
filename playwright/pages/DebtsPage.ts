@@ -14,29 +14,38 @@ export class DebtsPage extends BasePage {
     return this.page.getByTestId(`debt-tab-${id}`);
   }
 
-  /** Every transaction row shares the same data-testid — scope to one contact through their
-   * ledger card (ContactLedgerCard.tsx) rather than matching row text, since a row no longer
-   * repeats the contact's name (that lives once in the ledger card's own header — see
+  /** Every ACTIVE transaction row shares the same data-testid — scope to one contact through
+   * their ledger card (ContactLedgerCard.tsx) rather than matching row text, since an active row
+   * doesn't repeat the contact's name (that lives once in the ledger card's own header — see
    * groupByContact.ts). If that contact has more than one active transaction, this can match more
    * than one element; most flows in this suite only ever give a contact a single transaction, so
-   * this stays their entry point. A SETTLED transaction lives inside that contact's own collapsed
-   * "Settled Debts" disclosure (ContactLedgerCard.tsx, same pattern as Accounts' Closed section)
-   * and isn't in the DOM until expanded — call settledToggleFor(contactName).click() first when
-   * asserting on one you expect to have just settled. */
+   * this stays their entry point. A contact with nothing active left has no ledger card at all —
+   * see settledRow() for a transaction that's already SETTLED. */
   card(contactName: string): Locator {
     return this.contactCard(contactName).getByTestId("debt-card");
   }
 
-  /** The per-person ledger card (ContactLedgerCard.tsx) — one per contact, wrapping that
-   * person's active + settled transactions. Scope contact-level actions (add another
-   * transaction, expand their settled section) through this rather than the page globally, since
-   * multiple contacts' cards coexist in this suite's shared debt list. */
+  /** The per-person ledger card (ContactLedgerCard.tsx) — one per contact with at least one
+   * ACTIVE/PARTIAL transaction. Scope contact-level actions (add another transaction) through
+   * this rather than the page globally, since multiple contacts' cards coexist in this suite's
+   * shared debt list. Resolves to nothing once a contact has nothing active left — see
+   * settledRow() for their history at that point. */
   contactCard(contactName: string): Locator {
     return this.page.getByTestId("contact-ledger-card").filter({ hasText: contactName });
   }
 
-  settledToggleFor(contactName: string): Locator {
-    return this.contactCard(contactName).getByText(/Settled Debts/);
+  /** The single page-level Settled section (SettledDebtsSection.tsx, same pattern as Accounts'
+   * Closed Accounts) — there's exactly one of these on the page, not one per contact. */
+  settledSectionToggle(): Locator {
+    return this.page.getByTestId("settled-section-toggle");
+  }
+
+  /** A settled transaction's row inside the page-level Settled section. Unlike an active row (see
+   * card()), a settled row DOES carry the contact's name in its own text — the section has no
+   * per-contact header to supply identity otherwise (SettledDebtsSection.tsx's showContact) — so
+   * this can filter by hasText directly. Not in the DOM until settledSectionToggle().click(). */
+  settledRow(contactName: string): Locator {
+    return this.page.getByTestId("settled-debts-section").getByTestId("debt-card").filter({ hasText: contactName });
   }
 
   private async openCreateModal(type: "LENT" | "BORROWED"): Promise<void> {
@@ -76,12 +85,16 @@ export class DebtsPage extends BasePage {
     await waitForDialogClosed(this.page);
   }
 
-  /** Expands the payment-history chip on a contact's (single-transaction) card and deletes its
-   * one logged payment. Assumes exactly one payment exists — this suite never needs to
-   * disambiguate between several on the same transaction. */
+  /** Expands the payment-history chip on a contact's (single-transaction) row and deletes its one
+   * logged payment. Assumes exactly one payment exists — this suite never needs to disambiguate
+   * between several on the same transaction. Tries the active ledger card first, falling back to
+   * the settled row — this is called on both a still-PARTIAL debt (still on its active card) and
+   * an already-SETTLED one (moved to the page-level Settled section) across this suite. */
   async deleteOnlyPayment(contactName: string): Promise<void> {
-    await this.card(contactName).getByTestId("debt-payment-history-toggle").click();
-    await this.card(contactName).getByTestId("debt-payment-delete").click();
+    const activeRow = this.card(contactName);
+    const row = (await activeRow.count()) > 0 ? activeRow : this.settledRow(contactName);
+    await row.getByTestId("debt-payment-history-toggle").click();
+    await row.getByTestId("debt-payment-delete").click();
     await Promise.all([
       waitForApiResponse(this.page, "/payments", "DELETE"),
       this.page.getByTestId(TEST_IDS.confirmDialog.confirm).click(),
@@ -151,7 +164,10 @@ export class DebtsPage extends BasePage {
   }
 
   async expectStatus(contactName: string, status: "Active" | "Partial" | "Settled"): Promise<void> {
-    await expect(this.card(contactName).getByText(status, { exact: true })).toBeVisible();
+    // A SETTLED debt has moved out of the contact's ledger card into the page-level Settled
+    // section (see settledRow()'s own comment) — everything else is still on their active card.
+    const scope = status === "Settled" ? this.settledRow(contactName) : this.card(contactName);
+    await expect(scope.getByText(status, { exact: true })).toBeVisible();
   }
 
   async expectNetPosition(contactName: string, text: string | RegExp): Promise<void> {

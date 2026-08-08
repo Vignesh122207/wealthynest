@@ -1,11 +1,10 @@
-import {Check} from "lucide-react";
 import {TONE_HEX} from "@/components/icons/PremiumIcon";
 
 // ── Contact avatar — neutral 2-letter monogram (round, not a colored badge); `pct` wraps it in
 // a payoff-progress ring (conic-gradient) instead of a separate progress bar elsewhere on the
-// card, `settled` adds a small check badge over the ring, `overdue` adds a pulsing alert dot on
-// the opposite corner (the two never coincide — a fully settled contact has no active overdue
-// record by definition).
+// card, `overdue` adds a pulsing alert dot. A fully settled contact doesn't get a card at all
+// (see page.tsx's activeGroups filter) — their history lives in the page-level Settled section
+// instead — so there's no "settled" badge state here to render.
 
 function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -14,8 +13,8 @@ function initialsOf(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export function ContactAvatar({ name, isLent, size = 44, pct, settled, overdue }: {
-  name: string; isLent: boolean; size?: number; pct?: number; settled?: boolean; overdue?: boolean;
+export function ContactAvatar({ name, isLent, size = 44, pct, overdue }: {
+  name: string; isLent: boolean; size?: number; pct?: number; overdue?: boolean;
 }) {
   const initials = initialsOf(name);
   const hex = isLent ? TONE_HEX.emerald : TONE_HEX.red;
@@ -35,12 +34,6 @@ export function ContactAvatar({ name, isLent, size = 44, pct, settled, overdue }
       }}>
         {badge}
       </div>
-      {settled && (
-        <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center ring-2 ring-[hsl(var(--card))]"
-          style={{ background: hex }}>
-          <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
-        </span>
-      )}
       {overdue && (
         <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-red-500 ring-2 ring-[hsl(var(--card))] animate-pulse" />
       )}

@@ -22,8 +22,8 @@ test.describe("Debts", () => {
     await debtsPage.expectStatus(name, "Active");
 
     await debtsPage.recordPayment(name, 5000);
-    // Settling moves the card into the contact's own collapsed "Settled Debts" section — expand it first.
-    await debtsPage.settledToggleFor(name).click();
+    // Settling moves it into the page-level Settled section (SettledDebtsSection.tsx) — expand it first.
+    await debtsPage.settledSectionToggle().click();
     await debtsPage.expectStatus(name, "Settled");
   });
 
@@ -80,8 +80,8 @@ test.describe("Debts", () => {
 
     await debtsPage.editDebtAmount(name, 500);
 
-    // Settling moves the card into the contact's own collapsed "Settled Debts" section — expand it first.
-    await debtsPage.settledToggleFor(name).click();
+    // Settling moves it into the page-level Settled section (SettledDebtsSection.tsx) — expand it first.
+    await debtsPage.settledSectionToggle().click();
     await debtsPage.expectStatus(name, "Settled");
   });
 
@@ -150,7 +150,7 @@ test.describe("Debts", () => {
     await debtsPage.gotoDebts();
     await debtsPage.createDebt({ type: "LENT", contactName: name, amount: 3000 });
     await debtsPage.recordPayment(name, 3000);
-    await debtsPage.settledToggleFor(name).click();
+    await debtsPage.settledSectionToggle().click();
     await debtsPage.expectStatus(name, "Settled");
 
     await debtsPage.deleteOnlyPayment(name);

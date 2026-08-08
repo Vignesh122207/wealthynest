@@ -19,12 +19,15 @@ function fmtShortDate(iso: string) {
 // name) already lives once on ContactLedgerCard's header, so this only carries what's specific to
 // THIS transaction: what it was for, when, and its own payoff state. Two affordances stay
 // separate from the row's own edit-click: the pay/log pill and the payment-history disclosure
-// both stopPropagation so they don't also open the edit modal.
-export function DebtTransactionRow({ debt, onEdit, onPayment, onDeletePayment }: {
+// both stopPropagation so they don't also open the edit modal. `showContact` is for the
+// page-level Settled section (SettledDebtsSection.tsx), which has no per-contact header to supply
+// identity, so the row names who it was with instead of the usual generic "Money lent/borrowed".
+export function DebtTransactionRow({ debt, onEdit, onPayment, onDeletePayment, showContact }: {
   debt:             DebtRecord;
   onEdit:           () => void;
   onPayment:        () => void;
   onDeletePayment?: (payment: DebtPayment) => void;
+  showContact?:     boolean;
 }) {
   const { fmt } = useAmountFormatter();
   const [expanded, setExpanded] = useState(false);
@@ -41,7 +44,14 @@ export function DebtTransactionRow({ debt, onEdit, onPayment, onDeletePayment }:
 
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-foreground truncate">
-            {debt.description || (isLent ? "Money lent" : "Money borrowed")}
+            {showContact ? (
+              <>
+                {debt.contactName}
+                {debt.description && <span className="font-normal text-muted-foreground"> · {debt.description}</span>}
+              </>
+            ) : (
+              debt.description || (isLent ? "Money lent" : "Money borrowed")
+            )}
           </p>
           <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
             {fmtShortDate(debt.debtDate ?? debt.createdAt)}
@@ -67,9 +77,9 @@ export function DebtTransactionRow({ debt, onEdit, onPayment, onDeletePayment }:
           <button type="button" data-testid="debt-card-pay-button"
             onClick={e => { e.stopPropagation(); onPayment(); }}
             className={cn(
-              "flex items-center gap-1 h-6 px-2 rounded-full text-[11px] font-semibold transition-colors shrink-0",
-              isLent ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
-                     : "text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20"
+              "flex items-center gap-1.5 h-7 px-3 rounded-full text-[11px] font-bold text-white shrink-0 transition-all hover:-translate-y-0.5",
+              isLent ? "bg-gradient-to-br from-emerald-500 to-emerald-700 shadow-md shadow-emerald-500/40 hover:shadow-lg hover:shadow-emerald-500/50"
+                     : "bg-gradient-to-br from-red-500 to-red-700 shadow-md shadow-red-500/40 hover:shadow-lg hover:shadow-red-500/50"
             )}>
             <Banknote className="w-3 h-3" /> {isLent ? "Log payment" : "Pay back"}
           </button>
