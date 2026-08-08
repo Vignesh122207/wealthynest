@@ -31,11 +31,12 @@ import {useFamilyMembers} from "@/features/family/hooks/useFamily";
 import {type ExpenseFormValues} from "@/features/expenses/schemas/expense.schema";
 import type {Expense, SplitParticipant} from "@/features/expenses/types/expense.types";
 import {exportAllCsv, exportCsv, exportIncomeCsv, exportTransfersCsv} from "@/features/expenses/utils/csvExport";
-import {pad, resolveEffectiveAccountIds} from "@/features/expenses/utils/filterHelpers";
+import {monthLabel, pad, resolveEffectiveAccountIds} from "@/features/expenses/utils/filterHelpers";
 import {detectRollingGranularity, formatRangeLabel, rollingGranularityLabel} from "@/features/expenses/utils/granularity";
 import {TypeTabs} from "@/features/expenses/components/TypeTabs";
 import {StatCards} from "@/features/expenses/components/StatCards";
 import {Toolbar} from "@/features/expenses/components/Toolbar";
+import {MobileDateStrip} from "@/features/expenses/components/MobileDateStrip";
 import {FilterPanel} from "@/features/expenses/components/FilterPanel";
 import type {Channel, DateMode, SortKey, TxType} from "@/features/expenses/types/filters.types";
 import {pctChange} from "@/lib/utils";
@@ -751,6 +752,18 @@ export default function TransactionsPage() {
   // here used to show for all three regardless of which was actually picked. Resolving the actual
   // dates (or "All time") instead means the chip always names the filter that's really applied.
   const rollingGranularity = detectRollingGranularity(dateMode, customStart, customEnd, new Date());
+
+  // Mirrors dateChips' own custom-branch resolution below (rolling preset name, else the actual
+  // picked range, else "All time") — the mobile hero card (StatCards) needs a label for every
+  // dateMode, not just the ones that produce a chip, since "month" mode never gets one there.
+  const periodLabel = dateMode === "month" ? monthLabel(year, month)
+    : dateMode === "year" ? `Year ${year}`
+    : dateMode === "custom"
+      ? (rollingGranularity ? rollingGranularityLabel(rollingGranularity)
+        : (customStart || customEnd) ? (formatRangeLabel(customStart, customEnd) || "Custom range")
+        : "All time")
+    : "All time";
+
   const dateChips: { label: string; clear: () => void }[] = [];
   if (dateMode === "year")   dateChips.push({ label: `Year ${year}`, clear: () => setDateMode("month") });
   if (dateMode === "custom") {
@@ -907,22 +920,28 @@ export default function TransactionsPage() {
         />
       )}
 
-      <main className="flex-1 p-4 md:p-5 lg:p-6 pb-36 lg:pb-24 overflow-auto">
+      <main className="flex-1 p-4 md:p-5 lg:p-6 pb-64 lg:pb-24 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-4">
 
         {/* Stat cards — always visible, reflect the selected date range regardless of tab.
             Shown first: orients the user with period totals before they start picking a tab
-            or reaching for search/filters. */}
+            or reaching for search/filters. On mobile this renders as a single hero card instead
+            of the desktop's four-tile grid — see StatCards' own lg:hidden/hidden lg:grid split. */}
         <StatCards
           income={statTotals.income} expenses={statTotals.expenses}
           incomeDelta={statTotals.incomeDelta} expensesDelta={statTotals.expensesDelta}
           netSavingsDelta={statTotals.netSavingsDelta}
           transactionCount={mergedRows.length}
+          periodLabel={periodLabel}
         />
 
         {/* Type tabs — pick the dataset before reaching for tools that scope to it (e.g.
-            FilterPanel's fields change based on txType). */}
-        <TypeTabs value={txType} onChange={v => { setTxType(v); }} counts={txTypeCounts} />
+            FilterPanel's fields change based on txType). Desktop only: mobile switches type via
+            FilterPanel's own Type section instead (there's no room for a tab row there once the
+            hero card and toolbar are accounted for), see FilterPanel.tsx. */}
+        <div className="hidden lg:block">
+          <TypeTabs value={txType} onChange={v => { setTxType(v); }} counts={txTypeCounts} />
+        </div>
 
         {/* Toolbar — search, date range, filters, download — shared across every tab */}
         <Toolbar
@@ -937,8 +956,17 @@ export default function TransactionsPage() {
           customEnd={customEnd} setCustomEnd={setCustomEnd}
         />
 
+        {/* Mobile-only persistent period picker — stacked above the shared FloatingActionButton,
+            never repositioning it (see MobileDateStrip's own comment). Lower z-index than
+            FilterPanel's backdrop, so opening Filters already covers it with no extra guard needed. */}
+        <MobileDateStrip
+          dateMode={dateMode} setDateMode={setDateMode}
+          year={year} setYear={setYear} month={month} setMonth={setMonth}
+          customStart={customStart} setCustomStart={setCustomStart} customEnd={customEnd} setCustomEnd={setCustomEnd}
+        />
+
         <FilterPanel
-          open={showFilterPanel} onClose={() => setShowFilterPanel(false)} txType={txType}
+          open={showFilterPanel} onClose={() => setShowFilterPanel(false)} txType={txType} onTxTypeChange={setTxType}
           categories={categories} categoryId={categoryId} setCategoryId={setCategoryId}
           payChannel={payChannel} setPayChannel={setPayChannel}
           minAmount={minAmount} setMinAmount={setMinAmount} maxAmount={maxAmount} setMaxAmount={setMaxAmount}

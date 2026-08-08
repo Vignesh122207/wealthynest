@@ -48,7 +48,7 @@ export function DateRangeCapsule({ dateMode, setDateMode, customStart, setCustom
     <div className={cn("relative flex items-center h-10 bg-muted p-0.5 rounded-xl shrink-0", className)}>
       {pill && (
         <div aria-hidden
-          className="absolute top-0.5 h-9 rounded-lg bg-blue-500/15 shadow-sm transition-[transform,width] duration-200 ease-out"
+          className="absolute top-0.5 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-700 shadow-md shadow-indigo-500/40 transition-[transform,width] duration-200 ease-out"
           style={{ transform: `translateX(${pill.left}px)`, width: pill.width }} />
       )}
       {ROLLING_PILLS.map(g => {
@@ -57,8 +57,8 @@ export function DateRangeCapsule({ dateMode, setDateMode, customStart, setCustom
           <button key={g} type="button" ref={el => { btnRefs.current[g] = el; }} onClick={() => selectRolling(g)}
             data-testid={`date-mode-${g.toLowerCase()}`}
             title={`${rollingGranularityLabel(g)} (${formatRangeLabel(range.customStart, range.customEnd)})`}
-            className={cn("relative z-[1] px-4 h-9 rounded-lg text-xs font-medium whitespace-nowrap transition-colors",
-              active === g ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground hover:text-foreground")}>
+            className={cn("relative z-[1] px-4 h-9 rounded-lg text-xs font-bold whitespace-nowrap transition-colors",
+              active === g ? "text-white" : "text-muted-foreground hover:text-foreground")}>
             {g}
           </button>
         );
@@ -66,8 +66,8 @@ export function DateRangeCapsule({ dateMode, setDateMode, customStart, setCustom
       <button type="button" ref={el => { btnRefs.current.custom = el; customTriggerRef.current = el; }}
         onClick={() => setCustomOpen(v => !v)} data-testid="date-mode-custom" title={customLabel}
         aria-haspopup="dialog" aria-expanded={customOpen}
-        className={cn("relative z-[1] px-4 h-9 rounded-lg text-xs font-medium whitespace-nowrap truncate max-w-[150px] transition-colors",
-          active === "custom" ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground hover:text-foreground")}>
+        className={cn("relative z-[1] px-4 h-9 rounded-lg text-xs font-bold whitespace-nowrap truncate max-w-[150px] transition-colors",
+          active === "custom" ? "text-white" : "text-muted-foreground hover:text-foreground")}>
         {customLabel}
       </button>
 
