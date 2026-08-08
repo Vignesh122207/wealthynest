@@ -30,6 +30,7 @@ export function useCreateAccount() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.GOALS });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.NET_WORTH_SUMMARY });
       toast.success("Account created");
     },
     onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to create account")),
@@ -45,6 +46,7 @@ export function useUpdateAccount() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.GOALS });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.NET_WORTH_SUMMARY });
       toast.success("Account updated");
     },
     onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to update account")),
@@ -59,6 +61,7 @@ export function useArchiveAccount() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.GOALS });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.NET_WORTH_SUMMARY });
       toast.success("Account archived");
     },
     onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to archive account")),
@@ -73,6 +76,7 @@ export function useUnarchiveAccount() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.GOALS });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.NET_WORTH_SUMMARY });
       toast.success("Account restored");
     },
     onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to restore account")),
@@ -87,6 +91,7 @@ export function useCloseAccount() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.GOALS });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.NET_WORTH_SUMMARY });
       toast.success("Account closed");
     },
     onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to close account")),
@@ -114,6 +119,7 @@ export function useDeleteAccount() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.GOALS });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.NET_WORTH_SUMMARY });
       toast.success("Account deleted");
     },
     // The API only ever 409s here when the account has real history — surface its own message
@@ -150,6 +156,7 @@ export function useTransfer() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.GOALS });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.NET_WORTH_SUMMARY });
       toast.success("Transfer recorded");
     },
     onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to record transfer")),
@@ -166,6 +173,7 @@ export function useUpdateTransfer() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.GOALS });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.NET_WORTH_SUMMARY });
       toast.success("Transfer updated");
     },
     onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to update transfer")),
@@ -181,6 +189,7 @@ export function useDeleteTransfer() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.GOALS });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.NET_WORTH_SUMMARY });
       toast.success("Transfer deleted");
     },
     onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to delete transfer")),
@@ -215,6 +224,7 @@ export function useAdjustBalance() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.NET_WORTH_SUMMARY });
       toast.success("Balance adjusted");
     },
     onError: (e: unknown) => toast.error(apiErrorMessage(e, "Failed to adjust balance")),

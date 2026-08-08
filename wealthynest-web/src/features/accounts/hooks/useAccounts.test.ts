@@ -43,7 +43,7 @@ describe("useAccounts", () => {
 });
 
 describe("useCreateAccount", () => {
-  it("invalidates ACCOUNTS, DASHBOARD, and GOALS on success", async () => {
+  it("invalidates ACCOUNTS, DASHBOARD, GOALS, and NET_WORTH_SUMMARY on success", async () => {
     mockedApi.createAccount.mockResolvedValue(sampleAccount);
     const { Wrapper, queryClient } = createQueryClientWrapper();
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
@@ -55,6 +55,10 @@ describe("useCreateAccount", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEYS.ACCOUNTS });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEYS.DASHBOARD });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEYS.GOALS });
+    // A new account (e.g. one created with excludeFromNetWorth toggled) changes the net-worth
+    // total — without this, the Net Worth page kept showing stale figures until an unrelated
+    // refetch happened to occur.
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEYS.NET_WORTH_SUMMARY });
     expect(toast.success).toHaveBeenCalledWith("Account created");
   });
 
@@ -86,7 +90,7 @@ describe("useCreateAccount", () => {
 });
 
 describe("useDeleteAccount", () => {
-  it("invalidates ACCOUNTS, DASHBOARD, and GOALS on success — only ever succeeds for a zero-history account", async () => {
+  it("invalidates ACCOUNTS, DASHBOARD, GOALS, and NET_WORTH_SUMMARY on success — only ever succeeds for a zero-history account", async () => {
     mockedApi.deleteAccount.mockResolvedValue(undefined);
     const { Wrapper, queryClient } = createQueryClientWrapper();
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
@@ -99,6 +103,7 @@ describe("useDeleteAccount", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEYS.ACCOUNTS });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEYS.DASHBOARD });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEYS.GOALS });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEYS.NET_WORTH_SUMMARY });
   });
 
   it("surfaces the API's own 409 message when the account has history", async () => {
@@ -116,7 +121,7 @@ describe("useDeleteAccount", () => {
 });
 
 describe("useCloseAccount", () => {
-  it("invalidates ACCOUNTS, DASHBOARD, and GOALS on success", async () => {
+  it("invalidates ACCOUNTS, DASHBOARD, GOALS, and NET_WORTH_SUMMARY on success", async () => {
     mockedApi.closeAccount.mockResolvedValue({ id: "a1", status: "CLOSED" } as never);
     const { Wrapper, queryClient } = createQueryClientWrapper();
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
@@ -129,11 +134,12 @@ describe("useCloseAccount", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEYS.ACCOUNTS });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEYS.DASHBOARD });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEYS.GOALS });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEYS.NET_WORTH_SUMMARY });
   });
 });
 
 describe("useTransfer", () => {
-  it("invalidates ACCOUNTS, TRANSFERS, DASHBOARD, and GOALS on success", async () => {
+  it("invalidates ACCOUNTS, TRANSFERS, DASHBOARD, GOALS, and NET_WORTH_SUMMARY on success", async () => {
     mockedApi.transfer.mockResolvedValue({
       id: "t1", fromAccountId: "a1", fromAccountName: "Checking", toAccountId: "a2", toAccountName: "Savings",
       amount: 500, transferDate: "2026-06-01", createdAt: "2026-06-01", adjustment: false, debt: false,
@@ -146,6 +152,7 @@ describe("useTransfer", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEYS.TRANSFERS });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEYS.NET_WORTH_SUMMARY });
     expect(toast.success).toHaveBeenCalledWith("Transfer recorded");
   });
 });
