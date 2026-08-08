@@ -3,7 +3,7 @@
 import {useForm} from "react-hook-form";
 import {zodResolver} from "@hookform/resolvers/zod";
 import {z} from "zod";
-import {Loader2, Lock, LogOut, Trash2} from "lucide-react";
+import {Download, Loader2, Lock, LogOut, Trash2} from "lucide-react";
 import Link from "next/link";
 import {useState} from "react";
 import {Header} from "@/components/layout/Header";
@@ -119,6 +119,17 @@ export default function ProfilePage() {
           <div>
             <p className="text-[11px] font-semibold text-red-600 dark:text-red-400 uppercase tracking-widest px-1 mb-1.5">Danger Zone</p>
             <div className="bg-card border border-red-500/20 rounded-2xl overflow-hidden divide-y divide-border/60">
+              <Link
+                href="/reports?tab=export"
+                data-testid="profile-export-data-link"
+                className="w-full flex items-center gap-3.5 px-4 py-3.5 hover:bg-muted/40 transition-colors text-left"
+              >
+                <PremiumIcon icon={Download} tone="indigo" size="sm" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-foreground">Export your data</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Download everything as CSV before you close your account</p>
+                </div>
+              </Link>
               <button
                 onClick={() => setShowLogout(true)}
                 data-testid="profile-signout-trigger"
@@ -157,7 +168,14 @@ export default function ProfilePage() {
 
       {showClose && (
         <ConfirmDialog open title="Close your account?"
-          description="Your account will be deactivated immediately and you will be signed out. Your data is retained. Only an admin can reactivate your account."
+          description={<>
+            Your account will be deactivated immediately and you will be signed out. Your data is
+            retained and only an admin can reactivate your account — but if you want a copy for
+            yourself,{" "}
+            <Link href="/reports?tab=export" className="text-indigo-600 dark:text-indigo-400 hover:underline">
+              export your data first
+            </Link>.
+          </>}
           confirmLabel="Yes, close account" danger
           typeToConfirm="CLOSE"
           onConfirm={() => closeAccount()}
