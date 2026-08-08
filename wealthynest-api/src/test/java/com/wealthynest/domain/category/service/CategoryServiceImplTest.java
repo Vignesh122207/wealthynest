@@ -102,6 +102,22 @@ class CategoryServiceImplTest {
         }
 
         @Test
+        @DisplayName("blocks creating a category whose name already exists (system, own, or family) for the same type")
+        void blocksDuplicateActiveName() {
+            when(categoryRepository.findArchivedForRevive(any(), any(), any(), any())).thenReturn(Optional.empty());
+            when(categoryRepository.existsActiveDuplicate("Groceries", CategoryType.EXPENSE, userId, null, null))
+                    .thenReturn(true);
+            CreateCategoryRequest req = mock(CreateCategoryRequest.class);
+            when(req.getName()).thenReturn("Groceries");
+            when(req.getType()).thenReturn(CategoryType.EXPENSE);
+
+            assertThatThrownBy(() -> service.createCategory(userId, null, req))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("Groceries");
+            verify(categoryRepository, never()).save(any());
+        }
+
+        @Test
         @DisplayName("a family-scoped creation sets familyId on the new category")
         void familyScopedCreationSetsFamilyId() {
             UUID familyId = UUID.randomUUID();
@@ -176,6 +192,36 @@ class CategoryServiceImplTest {
             service.updateCategory(categoryId, userId, familyId, req);
 
             assertThat(shared.getName()).isEqualTo("Renamed");
+        }
+
+        @Test
+        @DisplayName("blocks renaming into a name that collides with another active category")
+        void blocksRenameIntoDuplicateName() {
+            Category category = withId(Category.builder().userId(userId).name("Original").type(CategoryType.EXPENSE).build());
+            when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
+            when(categoryRepository.existsActiveDuplicate("Shopping", CategoryType.EXPENSE, userId, null, categoryId))
+                    .thenReturn(true);
+            UpdateCategoryRequest req = mock(UpdateCategoryRequest.class);
+            when(req.getName()).thenReturn("Shopping");
+
+            assertThatThrownBy(() -> service.updateCategory(categoryId, userId, null, req))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("Shopping");
+            verify(categoryRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("renaming to the same name (case-insensitive) skips the duplicate check")
+        void renamingToSameNameSkipsDuplicateCheck() {
+            Category category = withId(Category.builder().userId(userId).name("Groceries").type(CategoryType.EXPENSE).build());
+            when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
+            when(categoryRepository.save(any(Category.class))).thenAnswer(inv -> inv.getArgument(0));
+            UpdateCategoryRequest req = mock(UpdateCategoryRequest.class);
+            when(req.getName()).thenReturn("groceries");
+
+            service.updateCategory(categoryId, userId, null, req);
+
+            verify(categoryRepository, never()).existsActiveDuplicate(any(), any(), any(), any(), any());
         }
 
         @Test

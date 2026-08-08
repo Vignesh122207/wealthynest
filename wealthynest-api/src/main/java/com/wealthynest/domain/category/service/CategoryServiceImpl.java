@@ -54,6 +54,11 @@ public class CategoryServiceImpl implements CategoryService {
             return categoryMapper.toResponse(categoryRepository.save(revived));
         }
 
+        if (categoryRepository.existsActiveDuplicate(request.getName(), request.getType(), userId, familyId, null)) {
+            throw new BusinessException(
+                    "A category named \"" + request.getName() + "\" already exists", HttpStatus.CONFLICT);
+        }
+
         Category category = categoryMapper.toEntity(request);
         // Always record the creator; familyId additionally shares it with the family while the
         // creator is a member (and lets it revert to personal if they later leave).
@@ -67,6 +72,11 @@ public class CategoryServiceImpl implements CategoryService {
     @CacheEvict(value = "categories", allEntries = true)
     public CategoryResponse updateCategory(UUID categoryId, UUID userId, UUID familyId, UpdateCategoryRequest request) {
         Category category = findEditableAndValidateOwner(categoryId, userId, familyId, "System categories cannot be edited");
+        if (request.getName() != null && !request.getName().equalsIgnoreCase(category.getName())
+                && categoryRepository.existsActiveDuplicate(request.getName(), category.getType(), userId, familyId, categoryId)) {
+            throw new BusinessException(
+                    "A category named \"" + request.getName() + "\" already exists", HttpStatus.CONFLICT);
+        }
         if (request.getName()  != null) category.setName(request.getName());
         if (request.getIcon()  != null) category.setIcon(request.getIcon());
         if (request.getColor() != null) category.setColor(request.getColor());

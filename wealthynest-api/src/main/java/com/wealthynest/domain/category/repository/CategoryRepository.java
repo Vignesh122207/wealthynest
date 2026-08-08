@@ -41,6 +41,22 @@ public interface CategoryRepository extends JpaRepository<Category, UUID> {
     Optional<Category> findArchivedForRevive(@Param("name") String name, @Param("type") CategoryType type,
                                              @Param("userId") UUID userId, @Param("familyId") UUID familyId);
 
+    /**
+     * True if an active category with this name+type is already visible to the caller — a system
+     * category, one of their own, or their family's. Used to block creating/renaming into a name
+     * that would show as a confusing duplicate in every picker across the app. excludeId lets
+     * updateCategory check without tripping over the row being renamed itself.
+     */
+    @Query("""
+        SELECT COUNT(c) > 0 FROM Category c
+        WHERE c.archived = false AND LOWER(c.name) = LOWER(:name) AND c.type = :type
+          AND (:excludeId IS NULL OR c.id <> :excludeId)
+          AND (c.system = true OR c.userId = :userId OR (:familyId IS NOT NULL AND c.familyId = :familyId))
+        """)
+    boolean existsActiveDuplicate(@Param("name") String name, @Param("type") CategoryType type,
+                                   @Param("userId") UUID userId, @Param("familyId") UUID familyId,
+                                   @Param("excludeId") UUID excludeId);
+
     @Modifying
     @Query("UPDATE Category c SET c.familyId = :familyId WHERE c.userId = :userId AND c.familyId IS NULL AND c.system = false")
     void migrateUserCategoriesToFamily(@Param("familyId") UUID familyId, @Param("userId") UUID userId);
