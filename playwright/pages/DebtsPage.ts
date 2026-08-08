@@ -14,17 +14,17 @@ export class DebtsPage extends BasePage {
     return this.page.getByTestId(`debt-tab-${id}`);
   }
 
-  /** Every transaction card in the list shares the same data-testid — scope to one contact via
-   * .filter(). Repeat transactions with the same person are grouped onto one ledger card
-   * (ContactLedgerCard.tsx, groupByContact.ts) — if that contact has more than one active
-   * transaction, this can match more than one element; most flows in this suite only ever give a
-   * contact a single transaction, so this stays their entry point. A SETTLED transaction lives
-   * inside that contact's own collapsed "Settled Debts" section (SettledDebtsSection.tsx, same
-   * pattern as Accounts' Closed section) and isn't in the DOM until expanded — call
-   * settledToggleFor(contactName).click() first when asserting on one you expect to have just
-   * settled. */
+  /** Every transaction row shares the same data-testid — scope to one contact through their
+   * ledger card (ContactLedgerCard.tsx) rather than matching row text, since a row no longer
+   * repeats the contact's name (that lives once in the ledger card's own header — see
+   * groupByContact.ts). If that contact has more than one active transaction, this can match more
+   * than one element; most flows in this suite only ever give a contact a single transaction, so
+   * this stays their entry point. A SETTLED transaction lives inside that contact's own collapsed
+   * "Settled Debts" disclosure (ContactLedgerCard.tsx, same pattern as Accounts' Closed section)
+   * and isn't in the DOM until expanded — call settledToggleFor(contactName).click() first when
+   * asserting on one you expect to have just settled. */
   card(contactName: string): Locator {
-    return this.page.getByTestId("debt-card").filter({ hasText: contactName });
+    return this.contactCard(contactName).getByTestId("debt-card");
   }
 
   /** The per-person ledger card (ContactLedgerCard.tsx) — one per contact, wrapping that
