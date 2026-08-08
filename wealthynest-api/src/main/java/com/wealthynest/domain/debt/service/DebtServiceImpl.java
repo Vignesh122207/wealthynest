@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -167,9 +168,14 @@ public class DebtServiceImpl implements DebtService {
             accountBalanceGuard.validateSufficientBalance(record.getAccountId(), userId, request.getAmount(), BigDecimal.ZERO);
         }
 
+        // A payment can be logged as having happened on an earlier date rather than always dating
+        // it to whenever it was typed in — same optional-with-today-default shape as
+        // CreateDebtRequest's debtDate. Feeds both the linked transfer's date and the payment's
+        // own paidAt so the two stay consistent with each other.
+        LocalDate paidDate = request.getPaidAt() != null ? request.getPaidAt() : LocalDate.now();
+
         UUID linkedEntryId = null;
         if (record.getAccountId() != null) {
-            LocalDate today = LocalDate.now();
             String label = (request.getNote() != null && !request.getNote().isBlank())
                     ? request.getNote()
                     : (record.getType() == DebtType.LENT
@@ -186,7 +192,7 @@ public class DebtServiceImpl implements DebtService {
                     .debt(true)
                     .debtContactName(record.getContactName())
                     .debtLabel("REPAID")
-                    .transferDate(today)
+                    .transferDate(paidDate)
                     .build();
             linkedEntryId = transferRepository.save(transfer).getId();
         }
@@ -196,6 +202,7 @@ public class DebtServiceImpl implements DebtService {
                 .amount(request.getAmount())
                 .note(request.getNote())
                 .linkedEntryId(linkedEntryId)
+                .paidAt(paidDate.atStartOfDay().toInstant(ZoneOffset.UTC))
                 .build();
         debtPaymentRepository.save(payment);
 

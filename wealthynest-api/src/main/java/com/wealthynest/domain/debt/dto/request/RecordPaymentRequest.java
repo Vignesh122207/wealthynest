@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Getter
 public class RecordPaymentRequest {
@@ -14,4 +15,9 @@ public class RecordPaymentRequest {
 
     @Size(max = 255)
     private String note;
+
+    /** Defaults to today (DebtServiceImpl#recordPayment) when omitted — lets a payment be logged
+     * as having happened on an earlier date instead of always dating it to whenever it was typed
+     * in, same as CreateDebtRequest's debtDate. */
+    private LocalDate paidAt;
 }

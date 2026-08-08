@@ -173,4 +173,33 @@ test.describe("Debts", () => {
     await debtsPage.expectStatus(name, "Active");
     await debtsPage.expectNetPosition(name, "You owe ₹1,000");
   });
+
+  // ─── Payment date selection ────────────────────────────────────────────────
+
+  test("logging a payment lets you pick the date it happened, not just today @regression", async ({ debtsPage }) => {
+    const name = faker.person.fullName();
+    const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    await debtsPage.gotoDebts();
+    await debtsPage.createDebt({ type: "LENT", contactName: name, amount: 1000 });
+
+    await debtsPage.recordPayment(name, 1000, undefined, fiveDaysAgo);
+
+    // Settling moves it into the page-level Settled section (SettledDebtsSection.tsx) — expand it first.
+    await debtsPage.settledSectionToggle().click();
+    await debtsPage.expectStatus(name, "Settled");
+  });
+
+  // PaymentModal's own zod schema rejects a paidAt after today, same shape as debtSchema's
+  // due-date-before-debt-date check — asserts the inline message fires before any request goes out.
+  test("a future-dated payment is rejected client-side @regression", async ({ debtsPage }) => {
+    const name = faker.person.fullName();
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    await debtsPage.gotoDebts();
+    await debtsPage.createDebt({ type: "LENT", contactName: name, amount: 1000 });
+
+    await debtsPage.attemptFutureDatedPayment(name, 500, tomorrow);
+
+    await debtsPage.expectValidationError("Date can't be in the future");
+    await debtsPage.expectStatus(name, "Active");
+  });
 });

@@ -23,8 +23,9 @@ export interface UpdateDebtPayload {
 }
 
 export interface RecordPaymentPayload {
-  amount: number;
-  note?:  string;
+  amount:  number;
+  note?:   string;
+  paidAt?: string;
 }
 
 export const debtsApi = {

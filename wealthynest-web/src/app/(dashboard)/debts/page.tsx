@@ -188,8 +188,8 @@ export default function DebtsPage() {
           debt={payDebt}
           saving={paying}
           onClose={() => setPaymentId(null)}
-          onSave={(amt, note) =>
-            recordPay({ id: payDebt.id, payload: { amount: amt, note } },
+          onSave={(amt, note, paidAt) =>
+            recordPay({ id: payDebt.id, payload: { amount: amt, note, paidAt } },
               { onSuccess: () => setPaymentId(null) })
           }
         />

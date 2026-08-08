@@ -1,14 +1,17 @@
 "use client";
 
 import {useState} from "react";
-import {useForm} from "react-hook-form";
+import {Controller, useForm} from "react-hook-form";
 import {zodResolver} from "@hookform/resolvers/zod";
+import {z} from "zod";
 import {Check, Wallet} from "lucide-react";
 import {TransactionModalOverlay} from "@/components/transactions/TransactionModalOverlay";
 import {FormCurrencyInput} from "@/components/forms/FormCurrencyInput";
+import {FormDatePicker} from "@/components/forms/FormDatePicker";
 import {FormInput} from "@/components/forms/FormInput";
-import {positiveAmountSchema, type PositiveAmountFormValues} from "@/components/forms/positiveAmountSchema";
+import {positiveAmountSchema} from "@/components/forms/positiveAmountSchema";
 import {cn, formatCurrency} from "@/lib/utils";
+import {todayLocalISO} from "@/lib/date";
 import type {DebtRecord} from "@/features/debts/types/debt.types";
 import {ContactAvatar} from "./ContactAvatar";
 
@@ -16,21 +19,32 @@ import {ContactAvatar} from "./ContactAvatar";
 
 export function PaymentModal({ debt, onSave, onClose, saving }: {
   debt:    DebtRecord;
-  onSave:  (amount: number, note: string) => void;
+  onSave:  (amount: number, note: string, paidAt: string) => void;
   onClose: () => void;
   saving:  boolean;
 }) {
   const isLent = debt.type === "LENT";
   const [note, setNote] = useState("");
+  const today = todayLocalISO();
 
-  const form = useForm<PositiveAmountFormValues>({
-    resolver: zodResolver(positiveAmountSchema(debt.amountRemaining,
-      `Cannot ${isLent ? "receive" : "pay"} more than ${formatCurrency(debt.amountRemaining)} remaining.`)),
-    defaultValues: { amount: debt.amountRemaining },
+  // Extends the shared positive-amount schema with a date field local to this modal — the other
+  // callers of positiveAmountSchema (loan payment, goal savings) don't need one, so this stays
+  // here rather than growing the shared factory for a single call site.
+  const schema = positiveAmountSchema(debt.amountRemaining,
+    `Cannot ${isLent ? "receive" : "pay"} more than ${formatCurrency(debt.amountRemaining)} remaining.`
+  ).extend({
+    paidAt: z.string().min(1, "Date is required")
+      .refine(v => v <= today, "Date can't be in the future"),
+  });
+  type PaymentFormValues = z.input<typeof schema>;
+
+  const form = useForm<PaymentFormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: { amount: debt.amountRemaining, paidAt: today },
   });
   const amount = Number(form.watch("amount") || 0);
 
-  const handleSubmit = ({ amount }: PositiveAmountFormValues) => onSave(Number(amount), note);
+  const handleSubmit = ({ amount, paidAt }: PaymentFormValues) => onSave(Number(amount), note, paidAt);
 
   return (
     <TransactionModalOverlay onDismiss={onClose}>
@@ -69,6 +83,10 @@ export function PaymentModal({ debt, onSave, onClose, saving }: {
           <FormCurrencyInput label={isLent ? "Amount Received" : "Amount Paying"}
             data-testid="debt-payment-amount-input"
             error={form.formState.errors.amount?.message} {...form.register("amount")} />
+          <Controller control={form.control} name="paidAt" render={({ field, fieldState }) => (
+            <FormDatePicker label="Date" value={field.value} onChange={field.onChange} onBlur={field.onBlur}
+              error={fieldState.error?.message} placeholder="Pick date" testId="debt-payment-date-input" />
+          )} />
           <FormInput label="Note (optional)" placeholder="e.g. UPI transfer" value={note}
             onChange={e => setNote(e.target.value)} />
 

@@ -28,6 +28,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -489,6 +491,50 @@ class DebtServiceImplTest {
 
             verify(transferRepository, never()).save(any());
             assertThat(paymentCaptor.getValue().getLinkedEntryId()).isNull();
+        }
+
+        @Test
+        @DisplayName("when paidAt is provided, the linked transfer and the payment's own paidAt use that date instead of today")
+        void usesProvidedPaidAtForTransferAndPayment() {
+            DebtRecord record = withId(baseRecord().type(DebtType.BORROWED).accountId(accountId)
+                    .amount(new BigDecimal("1000")).build());
+            when(debtRecordRepository.findByIdAndUserId(debtId, userId)).thenReturn(Optional.of(record));
+            LocalDate backdated = LocalDate.now().minusDays(5);
+            RecordPaymentRequest req = mock(RecordPaymentRequest.class);
+            when(req.getAmount()).thenReturn(new BigDecimal("300"));
+            lenient().when(req.getNote()).thenReturn(null);
+            when(req.getPaidAt()).thenReturn(backdated);
+            stubSaveEcho();
+            stubEmptyPaymentsAndTransfer();
+            ArgumentCaptor<DebtPayment> paymentCaptor = ArgumentCaptor.forClass(DebtPayment.class);
+            when(debtPaymentRepository.save(paymentCaptor.capture())).thenAnswer(inv -> inv.getArgument(0));
+
+            service.recordPayment(debtId, userId, req);
+
+            ArgumentCaptor<AccountTransfer> transferCaptor = ArgumentCaptor.forClass(AccountTransfer.class);
+            verify(transferRepository).save(transferCaptor.capture());
+            assertThat(transferCaptor.getValue().getTransferDate()).isEqualTo(backdated);
+            assertThat(paymentCaptor.getValue().getPaidAt())
+                    .isEqualTo(backdated.atStartOfDay().toInstant(ZoneOffset.UTC));
+        }
+
+        @Test
+        @DisplayName("when paidAt is omitted, the payment's own paidAt defaults to today")
+        void defaultsPaidAtToToday() {
+            DebtRecord record = withId(baseRecord().accountId(null).amount(new BigDecimal("1000")).build());
+            when(debtRecordRepository.findByIdAndUserId(debtId, userId)).thenReturn(Optional.of(record));
+            RecordPaymentRequest req = mock(RecordPaymentRequest.class);
+            when(req.getAmount()).thenReturn(new BigDecimal("300"));
+            lenient().when(req.getPaidAt()).thenReturn(null);
+            stubSaveEcho();
+            stubEmptyPaymentsAndTransfer();
+            ArgumentCaptor<DebtPayment> paymentCaptor = ArgumentCaptor.forClass(DebtPayment.class);
+            when(debtPaymentRepository.save(paymentCaptor.capture())).thenAnswer(inv -> inv.getArgument(0));
+
+            service.recordPayment(debtId, userId, req);
+
+            assertThat(paymentCaptor.getValue().getPaidAt())
+                    .isEqualTo(LocalDate.now().atStartOfDay().toInstant(ZoneOffset.UTC));
         }
     }
 

@@ -120,10 +120,13 @@ export class DebtsPage extends BasePage {
     await this.page.getByTestId("debt-form-submit").click();
   }
 
-  async recordPayment(contactName: string, amount: number, note?: string): Promise<void> {
+  /** `paidAt` defaults to today in the modal itself (PaymentModal.tsx) — only pass it to
+   * backdate the payment to an earlier date. */
+  async recordPayment(contactName: string, amount: number, note?: string, paidAt?: string): Promise<void> {
     await this.card(contactName).getByTestId("debt-card-pay-button").click();
     await this.page.getByTestId("debt-payment-amount-input").fill(String(amount));
     if (note) await this.page.getByLabel("Note (optional)").fill(note);
+    if (paidAt) await pickDate(this.page, "debt-payment-date-input", paidAt);
     await Promise.all([
       waitForApiResponse(this.page, "/payments", "POST"),
       this.page.getByTestId("debt-payment-submit").click(),
@@ -183,6 +186,16 @@ export class DebtsPage extends BasePage {
   async attemptOverpay(contactName: string, amount: number): Promise<void> {
     await this.card(contactName).getByTestId("debt-card-pay-button").click();
     await this.page.getByTestId("debt-payment-amount-input").fill(String(amount));
+    await this.page.getByTestId("debt-payment-submit").click();
+  }
+
+  /** Opens the payment modal, picks a future date, and submits — no network wait, since the
+   * date field's own client-side check (PaymentModal's zod schema) should block the submit
+   * before any request fires. */
+  async attemptFutureDatedPayment(contactName: string, amount: number, futureDateIso: string): Promise<void> {
+    await this.card(contactName).getByTestId("debt-card-pay-button").click();
+    await this.page.getByTestId("debt-payment-amount-input").fill(String(amount));
+    await pickDate(this.page, "debt-payment-date-input", futureDateIso);
     await this.page.getByTestId("debt-payment-submit").click();
   }
 }
