@@ -4,6 +4,7 @@ import {useState} from "react";
 import {Banknote, ChevronDown, ChevronUp, Trash2} from "lucide-react";
 import {cn} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
+import {isDebtOverdue} from "@/features/debts/utils/isOverdue";
 import type {DebtPayment, DebtRecord} from "@/features/debts/types/debt.types";
 
 const STATUS_LABEL: Record<DebtRecord["status"], string> = {
@@ -29,7 +30,7 @@ export function DebtTransactionRow({ debt, onEdit, onPayment, onDeletePayment }:
   const [expanded, setExpanded] = useState(false);
   const isLent    = debt.type === "LENT";
   const isSettled = debt.status === "SETTLED";
-  const overdue   = !!debt.dueDate && new Date(debt.dueDate) < new Date() && !isSettled;
+  const overdue   = isDebtOverdue(debt);
 
   return (
     <div data-testid="debt-card" className={cn(isSettled && "opacity-60")}>

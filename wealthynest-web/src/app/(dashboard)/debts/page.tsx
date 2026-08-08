@@ -83,7 +83,7 @@ export default function DebtsPage() {
       <Header title="Debt Tracker" subtitle="Track money you've lent or borrowed, and keep tabs on payoff progress" />
       <PageWrapper>
 
-        {debts.length > 0 && <Summary debts={debts} />}
+        {debts.length > 0 && <Summary debts={debts} onSelectTab={setTab} />}
 
         {/* Tabs — shared TabBar template, same as Investments/Accounts/Transactions. */}
         <TabBar items={tabs} value={tab} onChange={setTab} testIdPrefix="debt-tab" />

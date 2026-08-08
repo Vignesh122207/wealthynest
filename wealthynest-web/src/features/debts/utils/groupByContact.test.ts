@@ -77,4 +77,30 @@ describe("groupDebtsByContact", () => {
   it("returns an empty array for no debts", () => {
     expect(groupDebtsByContact([])).toEqual([]);
   });
+
+  // ─── hasOverdue ──────────────────────────────────────────────────────────────
+
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  it("flags hasOverdue when any active record is past its due date", () => {
+    const groups = groupDebtsByContact([
+      debt({ contactName: "Alice", status: "ACTIVE", dueDate: yesterday }),
+    ]);
+    expect(groups[0].hasOverdue).toBe(true);
+  });
+
+  it("does not flag hasOverdue for a SETTLED record past its due date", () => {
+    const groups = groupDebtsByContact([
+      debt({ contactName: "Alice", status: "SETTLED", amountSettled: 1000, amountRemaining: 0, dueDate: yesterday }),
+    ]);
+    expect(groups[0].hasOverdue).toBe(false);
+  });
+
+  it("sorts a contact with an overdue record ahead of others, overriding most-recent-activity order", () => {
+    const groups = groupDebtsByContact([
+      debt({ contactName: "Bob" }),
+      debt({ contactName: "Alice", dueDate: yesterday }),
+    ]);
+    expect(groups.map(g => g.contactName)).toEqual(["Alice", "Bob"]);
+  });
 });

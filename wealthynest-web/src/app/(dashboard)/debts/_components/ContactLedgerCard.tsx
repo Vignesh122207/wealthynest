@@ -42,11 +42,11 @@ export function ContactLedgerCard({ group, onEdit, onPayment, onDeletePayment, o
   return (
     <div data-testid="contact-ledger-card" className="bg-card border border-border rounded-2xl overflow-hidden">
       <div className="flex items-center gap-3 p-4">
-        <ContactAvatar name={group.contactName} isLent={group.netAmount >= 0} pct={payoffPct} settled={fullySettled} />
+        <ContactAvatar name={group.contactName} isLent={group.netAmount >= 0} pct={payoffPct} settled={fullySettled} overdue={group.hasOverdue} />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-foreground truncate">{group.contactName}</p>
-          <p className="text-[11px] text-muted-foreground">
-            {totalCount} transaction{totalCount !== 1 ? "s" : ""}
+          <p className={cn("text-[11px]", group.hasOverdue ? "text-red-500 font-medium" : "text-muted-foreground")}>
+            {totalCount} transaction{totalCount !== 1 ? "s" : ""}{group.hasOverdue && " · overdue"}
           </p>
         </div>
         <div className="flex flex-col items-end gap-1.5 shrink-0">
@@ -59,8 +59,8 @@ export function ContactLedgerCard({ group, onEdit, onPayment, onDeletePayment, o
           )}
           <button type="button" data-testid="contact-add-transaction"
             onClick={() => onAddTransaction(group.contactName, group.contactPhone)}
-            className="flex items-center gap-1 h-6 px-2 rounded-full text-[11px] font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 transition-colors">
-            <Plus className="w-3 h-3" /> Add
+            className="flex items-center gap-1.5 h-7 px-3 rounded-full text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 border border-transparent hover:bg-indigo-600 hover:text-white hover:border-indigo-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-500/30 transition-all">
+            <Plus className="w-3.5 h-3.5" /> Log transaction
           </button>
         </div>
       </div>

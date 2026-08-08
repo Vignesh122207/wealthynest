@@ -2,16 +2,18 @@ import {ArrowDownLeft, ArrowUpRight} from "lucide-react";
 import {PremiumIcon} from "@/components/icons/PremiumIcon";
 import {cn} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
-import type {DebtRecord} from "@/features/debts/types/debt.types";
+import type {DebtRecord, DebtType} from "@/features/debts/types/debt.types";
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 // One fused hero card on both mobile and desktop — Net leads as the actual answer to "am I
 // ahead or behind right now" (with a lent-vs-borrowed proportion bar under it), "You're owed"/
 // "You owe" sit as flanking detail rather than three equally-weighted cards. Responsive via
 // flex-direction alone (stacked on mobile, side-by-side on desktop) instead of two separate
-// mobile/desktop markup branches — same card, same hierarchy, at every width.
+// mobile/desktop markup branches — same card, same hierarchy, at every width. Each flank already
+// visually promises "this is the Lent/Borrowed split" — onSelectTab makes that literal, jumping
+// to the matching tab instead of sitting there as inert text.
 
-export function Summary({ debts }: { debts: DebtRecord[] }) {
+export function Summary({ debts, onSelectTab }: { debts: DebtRecord[]; onSelectTab: (type: DebtType) => void }) {
   const { fmt } = useAmountFormatter();
   const active      = debts.filter(d => d.status !== "SETTLED");
   const lentAmt     = active.filter(d => d.type === "LENT")    .reduce((s, d) => s + d.amountRemaining, 0);
@@ -52,22 +54,24 @@ export function Summary({ debts }: { debts: DebtRecord[] }) {
 
       {/* Flanking detail */}
       <div className="flex flex-row sm:flex-col gap-4 pt-1 sm:pt-0 sm:pl-6">
-        <div className="flex items-center gap-2.5 flex-1 sm:flex-initial min-w-0">
+        <button type="button" data-testid="debt-summary-lent" onClick={() => onSelectTab("LENT")}
+          className="flex items-center gap-2.5 flex-1 sm:flex-initial min-w-0 text-left rounded-xl -m-1 p-1 transition-colors hover:bg-muted/50">
           <PremiumIcon icon={ArrowUpRight} tone="emerald" size="sm" className="w-8 h-8 shrink-0" />
           <div className="min-w-0">
             <p className="text-[11px] text-muted-foreground">You&apos;re owed</p>
             <p className="text-sm font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{fmt(lentAmt)}</p>
             <p className="text-[10px] text-muted-foreground/80">{lentCount} active</p>
           </div>
-        </div>
-        <div className="flex items-center gap-2.5 flex-1 sm:flex-initial min-w-0">
+        </button>
+        <button type="button" data-testid="debt-summary-borrowed" onClick={() => onSelectTab("BORROWED")}
+          className="flex items-center gap-2.5 flex-1 sm:flex-initial min-w-0 text-left rounded-xl -m-1 p-1 transition-colors hover:bg-muted/50">
           <PremiumIcon icon={ArrowDownLeft} tone="red" size="sm" className="w-8 h-8 shrink-0" />
           <div className="min-w-0">
             <p className="text-[11px] text-muted-foreground">You owe</p>
             <p className="text-sm font-bold tabular-nums text-red-600 dark:text-red-400">{fmt(borrowAmt)}</p>
             <p className="text-[10px] text-muted-foreground/80">{borrowCount} active</p>
           </div>
-        </div>
+        </button>
       </div>
     </div>
   );
