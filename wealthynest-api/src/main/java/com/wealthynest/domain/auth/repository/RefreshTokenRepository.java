@@ -25,6 +25,13 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
     List<RefreshToken> findByUserIdAndSessionId(UUID userId, UUID sessionId);
     boolean existsByUserIdAndSessionId(UUID userId, UUID sessionId);
 
+    /** Earliest createdAt per session lineage, across every row (active, rotated-out, and revoked)
+     * — listSessions' own query only sees the current active row per session, whose createdAt is
+     * really "last rotated"/"last active", not when that device first signed in. One grouped query
+     * for every session at once instead of one MIN() per session in a loop. */
+    @Query("SELECT r.sessionId, MIN(r.createdAt) FROM RefreshToken r WHERE r.userId = :userId GROUP BY r.sessionId")
+    List<Object[]> findFirstSeenByUserIdGroupedBySession(@Param("userId") UUID userId);
+
     @Modifying
     @Query("UPDATE RefreshToken r SET r.revoked = true WHERE r.userId = :userId")
     void revokeAllByUserId(UUID userId);

@@ -655,6 +655,8 @@ public class AuthServiceImpl implements AuthService {
         // RefreshToken); collapse those back into a single "Active sessions" entry.
         Map<UUID, List<RefreshToken>> bySession = tokens.stream()
                 .collect(Collectors.groupingBy(RefreshToken::getSessionId, LinkedHashMap::new, Collectors.toList()));
+        Map<UUID, Instant> firstSeenBySession = refreshTokenRepository.findFirstSeenByUserIdGroupedBySession(userId)
+                .stream().collect(Collectors.toMap(row -> (UUID) row[0], row -> (Instant) row[1]));
         return bySession.values().stream()
                 .map(group -> {
                     RefreshToken latest = group.get(0); // input is createdAt desc, so this is the newest in the group
@@ -665,6 +667,7 @@ public class AuthServiceImpl implements AuthService {
                             .ipAddress(latest.getIpAddress())
                             .userAgent(latest.getUserAgent())
                             .createdAt(latest.getCreatedAt())
+                            .firstSeenAt(firstSeenBySession.getOrDefault(latest.getSessionId(), latest.getCreatedAt()))
                             .expiresAt(latest.getExpiresAt())
                             .current(current)
                             .build();

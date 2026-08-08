@@ -1418,6 +1418,43 @@ class AuthServiceImplTest {
         }
 
         @Test
+        @DisplayName("listSessions reports firstSeenAt from the session's earliest row, distinct from " +
+                "createdAt (the current active row's own, more recent, rotation timestamp)")
+        void listSessionsReportsFirstSeenSeparatelyFromCreatedAt() {
+            UUID sessionId = UUID.randomUUID();
+            Instant firstLogin  = Instant.now().minusSeconds(90_000); // a much older original sign-in
+            Instant lastRotated = Instant.now();
+            RefreshToken active = RefreshToken.builder().userId(userId).sessionId(sessionId)
+                    .tokenHash(hash("active")).createdAt(lastRotated).build();
+            when(refreshTokenRepository.findByUserIdAndRevokedFalseAndExpiresAtAfterOrderByCreatedAtDesc(eq(userId), any()))
+                    .thenReturn(java.util.List.of(active));
+            when(refreshTokenRepository.findFirstSeenByUserIdGroupedBySession(userId))
+                    .thenReturn(java.util.List.<Object[]>of(new Object[]{ sessionId, firstLogin }));
+
+            var sessions = service.listSessions(userId, null);
+
+            assertThat(sessions).hasSize(1);
+            assertThat(sessions.get(0).getCreatedAt()).isEqualTo(lastRotated);
+            assertThat(sessions.get(0).getFirstSeenAt()).isEqualTo(firstLogin);
+        }
+
+        @Test
+        @DisplayName("listSessions falls back to createdAt for firstSeenAt when the grouped query has no row for that session")
+        void listSessionsFallsBackToCreatedAtWhenFirstSeenMissing() {
+            UUID sessionId = UUID.randomUUID();
+            Instant createdAt = Instant.now();
+            RefreshToken active = RefreshToken.builder().userId(userId).sessionId(sessionId)
+                    .tokenHash(hash("active")).createdAt(createdAt).build();
+            when(refreshTokenRepository.findByUserIdAndRevokedFalseAndExpiresAtAfterOrderByCreatedAtDesc(eq(userId), any()))
+                    .thenReturn(java.util.List.of(active));
+            when(refreshTokenRepository.findFirstSeenByUserIdGroupedBySession(userId)).thenReturn(java.util.List.of());
+
+            var sessions = service.listSessions(userId, null);
+
+            assertThat(sessions.get(0).getFirstSeenAt()).isEqualTo(createdAt);
+        }
+
+        @Test
         @DisplayName("revokeSession throws for a session that doesn't belong to this user")
         void revokeSessionThrowsForWrongUser() {
             when(refreshTokenRepository.existsByUserIdAndSessionId(eq(userId), any())).thenReturn(false);

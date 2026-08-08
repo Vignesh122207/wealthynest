@@ -37,7 +37,12 @@ export interface Session {
   id:        string;
   ipAddress?: string;
   userAgent?: string;
+  /** Really "last active" — the current active row's own rotation timestamp. See firstSeenAt
+   * for when this device/session first signed in. */
   createdAt: string;
+  /** Earliest login across this session's whole lineage (survives token rotation) — lets two
+   * same-browser sessions be told apart instead of showing identical rows. */
+  firstSeenAt: string;
   expiresAt: string;
   current:   boolean;
 }

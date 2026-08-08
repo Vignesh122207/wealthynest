@@ -823,6 +823,7 @@ function SessionsCard() {
                   </p>
                   <p className="text-[11px] text-muted-foreground/80 mt-0.5">
                     {s.ipAddress ? `${s.ipAddress} · ` : ""}Last active {formatDate(s.createdAt)}
+                    {s.firstSeenAt && s.firstSeenAt !== s.createdAt && ` · First seen ${formatDate(s.firstSeenAt)}`}
                   </p>
                 </div>
                 {!s.current && (
