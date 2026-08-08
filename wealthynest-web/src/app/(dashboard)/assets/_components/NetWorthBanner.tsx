@@ -5,12 +5,16 @@ import type {NetWorthSummary} from "@/features/networth/types/networth.types";
 
 // ─── Net Worth Banner ─────────────────────────────────────────────────────────
 
-export function NetWorthBanner({ summary, loadingSum, nwDelta, nwDeltaPct, debtRatio, fmt, fmtC }: {
+export function NetWorthBanner({ summary, loadingSum, nwDelta, nwDeltaPct, debtRatio, unsecuredDebtRatio, fmt, fmtC }: {
   summary:    NetWorthSummary | undefined;
   loadingSum: boolean;
   nwDelta:    number | null;
   nwDeltaPct: number | null;
   debtRatio:  number;
+  /** Same ratio, but numerator excludes home/car/gold-loan debt secured against an asset this
+   * page already counts — used to color and caption the bar so a healthy mortgage doesn't read
+   * as a debt-reduction warning the way a credit card balance should. */
+  unsecuredDebtRatio: number;
   fmt:  (n: number) => string;
   fmtC: (n: number) => string;
 }) {
@@ -65,17 +69,21 @@ export function NetWorthBanner({ summary, loadingSum, nwDelta, nwDeltaPct, debtR
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-xs text-muted-foreground/80">Debt-to-Asset Ratio</span>
             <span className={cn("text-xs font-bold tabular-nums",
-              debtRatio > 50 ? "text-red-600 dark:text-red-400" : debtRatio > 30 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400")}>
+              unsecuredDebtRatio > 50 ? "text-red-600 dark:text-red-400" : unsecuredDebtRatio > 30 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400")}>
               {debtRatio.toFixed(1)}%
             </span>
           </div>
           <div className="h-2 bg-muted/60 rounded-full overflow-hidden">
             <div className={cn("h-full rounded-full transition-all",
-              debtRatio > 50 ? "bg-red-500" : debtRatio > 30 ? "bg-amber-500" : "bg-emerald-500")}
+              unsecuredDebtRatio > 50 ? "bg-red-500" : unsecuredDebtRatio > 30 ? "bg-amber-500" : "bg-emerald-500")}
               style={{ width: `${debtRatio}%` }} />
           </div>
           <p className="text-xs text-muted-foreground/80 mt-1">
-            {debtRatio <= 30 ? "Healthy ratio — keep it up!" : debtRatio <= 50 ? "Moderate — consider reducing debt." : "High — prioritise debt reduction."}
+            {unsecuredDebtRatio <= 30
+              ? "Healthy — includes any home, car or gold loan, which are secured against assets you own."
+              : unsecuredDebtRatio <= 50
+                ? "Moderate unsecured debt (credit cards, personal loans) — consider paying it down."
+                : "High unsecured debt — prioritise paying down credit cards or personal loans. A home/car/gold loan on its own isn't flagged here."}
           </p>
         </div>
       )}

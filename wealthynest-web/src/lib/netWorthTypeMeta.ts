@@ -75,3 +75,22 @@ export const LIABILITY_TYPE_ICON_OPTIONS = LIABILITY_TYPES.map(t => ({ ...t, ...
 export function typeLabel(types: { value: string; label: string }[], val: string): string {
   return types.find(t => t.value === val)?.label ?? val;
 }
+
+// A home/car/gold loan is secured against an asset the Net Worth page already counts (real
+// estate, vehicle, gold) — normal, healthy leverage, unlike a credit card or personal loan.
+const SECURED_LIABILITY_TYPES = new Set(["HOME_LOAN", "CAR_LOAN", "GOLD_LOAN"]);
+
+/** Debt-to-asset ratio computed only from unsecured/revolving liabilities (credit cards,
+ * personal/education/business loans, etc.) — used to color/caption the Net Worth page's ratio
+ * bar so a serviced mortgage doesn't read as a "prioritise debt reduction" warning the way an
+ * actual unsecured balance should. */
+export function unsecuredDebtRatio(
+  liabilityBreakdown: { liabilityType: string; totalOutstanding: number }[],
+  totalAssets: number
+): number {
+  if (totalAssets <= 0) return 0;
+  const unsecured = liabilityBreakdown
+    .filter((b) => !SECURED_LIABILITY_TYPES.has(b.liabilityType))
+    .reduce((sum, b) => sum + b.totalOutstanding, 0);
+  return Math.min(100, (unsecured / totalAssets) * 100);
+}

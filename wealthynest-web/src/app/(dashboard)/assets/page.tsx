@@ -20,7 +20,7 @@ import {useNetWorthHistory, useNetWorthSummary} from "@/features/networth/hooks/
 import type {Asset} from "@/features/assets/types/asset.types";
 import type {CreateLiabilityPayload, Liability} from "@/features/liability/types/liability.types";
 import {ASSET_TYPES} from "@/lib/constants";
-import {typeLabel} from "@/lib/netWorthTypeMeta";
+import {typeLabel, unsecuredDebtRatio} from "@/lib/netWorthTypeMeta";
 import {withCategoricalColors} from "@/lib/chartColors";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {INV_TYPE_META, INVESTMENT_TYPE_KEYS} from "./_components/netWorthMeta";
@@ -117,6 +117,7 @@ export default function NetWorthPage() {
 
   const debtRatio = summary && summary.totalAssets > 0
     ? Math.min(100, (summary.totalLiabilities / summary.totalAssets) * 100) : 0;
+  const unsecuredRatio = unsecuredDebtRatio(summary?.liabilityBreakdown ?? [], summary?.totalAssets ?? 0);
 
   const handleCreateAsset = (v: AssetFormValues) =>
     createAsset({ ...v, currentValue: Number(v.currentValue) },
@@ -215,7 +216,7 @@ export default function NetWorthPage() {
         <div className="max-w-7xl mx-auto space-y-5">
 
         <NetWorthBanner summary={summary} loadingSum={loadingSum} nwDelta={nwDelta} nwDeltaPct={nwDeltaPct}
-          debtRatio={debtRatio} fmt={fmt} fmtC={fmtC} />
+          debtRatio={debtRatio} unsecuredDebtRatio={unsecuredRatio} fmt={fmt} fmtC={fmtC} />
 
         {/* ── Top Section: Auto-Linked + Allocation Chart ─────────────────── */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
