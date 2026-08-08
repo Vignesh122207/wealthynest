@@ -44,7 +44,7 @@ interface TransactionModalsProps {
   setEditExpense: (e: Expense | null) => void;
   defaultExpenseCategoryId: string | undefined;
   handleCreate: (values: ExpenseFormValues, splitWith?: SplitParticipant[]) => void;
-  handleUpdate: (values: ExpenseFormValues) => void;
+  handleUpdate: (values: ExpenseFormValues, splitWith?: SplitParticipant[], clearLocation?: boolean) => void;
   creating: boolean;
   updating: boolean;
 

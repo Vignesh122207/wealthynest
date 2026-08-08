@@ -41,6 +41,9 @@ export interface CreateExpensePayload {
   splitWith?:      SplitParticipant[];
   latitude?:       number;
   longitude?:      number;
+  /** Update-only — explicitly clears a previously-saved location. See the same field on the
+   * backend's UpdateExpenseRequest for why a plain absent latitude/longitude can't signal this. */
+  clearLocation?:  boolean;
 }
 
 export interface ExpenseFilters {

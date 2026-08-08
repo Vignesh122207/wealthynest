@@ -31,7 +31,10 @@ interface ExpenseFormProps {
   cashAccounts:       { id: string; name: string; currentBalance: number }[];
   bankAccounts:       { id: string; name: string; bankName?: string; currentBalance: number; primary?: boolean }[];
   creditAccounts:     { id: string; name: string; bankName?: string; currentBalance: number }[];
-  onSubmit:           (v: ExpenseFormValues, splitWith?: SplitParticipant[]) => void;
+  /** clearLocation is true only when editing an expense that HAD a location and the user just
+   * removed it — a plain absent latitude/longitude in `v` is otherwise indistinguishable from
+   * "the user never touched this field," which a partial update must leave alone. */
+  onSubmit:           (v: ExpenseFormValues, splitWith?: SplitParticipant[], clearLocation?: boolean) => void;
   onCancel:           () => void;
   onDelete?:          () => void;
   isPending:          boolean;
@@ -140,7 +143,11 @@ export function ExpenseForm({ title, defaultValues, defaultCategoryId, categoryO
           }))
           .filter(s => s.shareAmount > 0)
       : [];
-    onSubmit(values, shares.length > 0 ? shares : undefined);
+    // The only way latitude goes from present (defaultValues, i.e. an existing saved location) to
+    // absent (values, i.e. after the form's own state) is the "Remove location" button below —
+    // capturing a NEW location never un-sets it, so this reliably means "explicitly cleared."
+    const clearLocation = defaultValues?.latitude != null && values.latitude == null;
+    onSubmit(values, shares.length > 0 ? shares : undefined, clearLocation);
   };
 
   return (

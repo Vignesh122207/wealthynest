@@ -536,11 +536,11 @@ export default function TransactionsPage() {
     );
   };
 
-  const handleUpdate = (values: ExpenseFormValues) => {
+  const handleUpdate = (values: ExpenseFormValues, _splitWith?: SplitParticipant[], clearLocation?: boolean) => {
     if (!editExpense) return;
     const accountId = values.accountId || undefined;
     updateExpense(
-      { id: editExpense.id, payload: { ...values, amount: Number(values.amount), accountId, paymentMethod: resolvePaymentMethod(accountId) } },
+      { id: editExpense.id, payload: { ...values, amount: Number(values.amount), accountId, paymentMethod: resolvePaymentMethod(accountId), clearLocation } },
       { onSuccess: () => setEditExpense(null) }
     );
   };

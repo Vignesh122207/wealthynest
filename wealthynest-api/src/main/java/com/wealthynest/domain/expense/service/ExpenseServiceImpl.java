@@ -88,8 +88,13 @@ public class ExpenseServiceImpl implements ExpenseService {
         if (request.getRecurring()     != null) expense.setRecurring(request.getRecurring());
         if (request.getRecurrenceRule()!= null) expense.setRecurrenceRule(request.getRecurrenceRule());
         if (request.getPaymentMethod() != null) expense.setPaymentMethod(request.getPaymentMethod());
-        if (request.getLatitude()      != null) expense.setLatitude(request.getLatitude());
-        if (request.getLongitude()     != null) expense.setLongitude(request.getLongitude());
+        if (Boolean.TRUE.equals(request.getClearLocation())) {
+            expense.setLatitude(null);
+            expense.setLongitude(null);
+        } else {
+            if (request.getLatitude()  != null) expense.setLatitude(request.getLatitude());
+            if (request.getLongitude() != null) expense.setLongitude(request.getLongitude());
+        }
         boolean accountChanged = request.getAccountId() != null && !request.getAccountId().equals(previousAccountId);
         if (accountChanged) {
             accountOwnershipGuard.validateAccountOwnership(request.getAccountId(), userId);

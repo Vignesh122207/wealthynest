@@ -23,4 +23,9 @@ public class UpdateExpenseRequest {
     private PaymentMethod paymentMethod;
     @DecimalMin("-90.0")  @DecimalMax("90.0")  private Double latitude;
     @DecimalMin("-180.0") @DecimalMax("180.0") private Double longitude;
+    /** Explicit "remove the location" signal — a plain partial-update null-check can't tell "field
+     * omitted, leave it alone" apart from "field cleared to nothing" for an optional numeric field
+     * with no natural empty representation (unlike e.g. notes, where an empty string already means
+     * "cleared"). Omitted/false leaves any existing location untouched. */
+    private Boolean clearLocation;
 }

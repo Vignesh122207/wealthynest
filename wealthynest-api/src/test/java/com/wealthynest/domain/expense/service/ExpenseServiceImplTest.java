@@ -451,6 +451,27 @@ class ExpenseServiceImplTest {
             assertThat(expense.getLatitude()).isEqualTo(12.9716);
             assertThat(expense.getLongitude()).isEqualTo(77.5946);
         }
+
+        // Regression: a request with clearLocation unset/false and no latitude/longitude is
+        // structurally identical, over the wire, to a request that's explicitly asking to remove a
+        // location — both arrive as "latitude/longitude simply absent from the JSON body" (the
+        // frontend can't send an "unset" numeric field any other way). Without this flag, the
+        // null-check partial-update pattern used for every other field silently treats "clear it"
+        // the same as "didn't touch it", leaving the old location stuck forever.
+        @Test
+        @DisplayName("clearLocation=true removes an existing location even though latitude/longitude are absent from the request")
+        void clearLocationRemovesExistingLocation() {
+            Expense expense = withId(baseExpense().latitude(12.9716).longitude(77.5946).build());
+            when(expenseRepository.findById(expenseId)).thenReturn(Optional.of(expense));
+            when(expenseRepository.save(any(Expense.class))).thenAnswer(inv -> inv.getArgument(0));
+            UpdateExpenseRequest req = mock(UpdateExpenseRequest.class);
+            when(req.getClearLocation()).thenReturn(true);
+
+            service.updateExpense(expenseId, userId, req);
+
+            assertThat(expense.getLatitude()).isNull();
+            assertThat(expense.getLongitude()).isNull();
+        }
     }
 
     // ─── deleteExpense / getExpense ──────────────────────────────────────────────
