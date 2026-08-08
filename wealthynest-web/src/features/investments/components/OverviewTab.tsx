@@ -4,6 +4,7 @@ import {useMemo, useState} from "react";
 import {BarChart3, Info} from "lucide-react";
 import {Cell, Pie, PieChart, ResponsiveContainer, Tooltip, type TooltipValueType} from "recharts";
 import {EmptyState} from "@/components/shared/EmptyState";
+import {InfoTooltip} from "@/components/ui/Tooltip";
 import {chartValueToNumber, cn, formatDate} from "@/lib/utils";
 import {useAmountFormatter} from "@/hooks/useAmountFormatter";
 import {useChartTheme} from "@/hooks/useChartTheme";
@@ -85,9 +86,12 @@ export function OverviewTab({ investments, year, onYearChange, incomeHistory, po
               {gainUp ? "▲" : "▼"} {gainUp ? "+" : ""}{fmt(totalGain)} ({gainPct >= 0 ? "+" : ""}{gainPct.toFixed(2)}%) overall
             </span>
             {" · "}
-            <span className={xirrColorClass} title="Money-weighted return across every buy/sell/redeem, not just current vs. invested">
+            <span className={xirrColorClass}>
               {xirrLoading ? "…" : xirrKnown ? `${xirrPositive ? "+" : ""}${portfolioXirr.toFixed(2)}% XIRR` : "XIRR —"}
             </span>
+            <InfoTooltip
+              className="ml-1 align-middle"
+              content="XIRR is your annualized return across every buy/sell/redeem, weighted by when each happened. “Overall” is just (current − invested) / invested with no time dimension — a new holding and an old one can show the same Overall Return but very different XIRR." />
           </p>
         </div>
 
