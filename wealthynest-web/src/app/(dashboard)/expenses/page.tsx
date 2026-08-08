@@ -33,7 +33,6 @@ import type {Expense, SplitParticipant} from "@/features/expenses/types/expense.
 import {exportAllCsv, exportCsv, exportIncomeCsv, exportTransfersCsv} from "@/features/expenses/utils/csvExport";
 import {monthLabel, pad, resolveEffectiveAccountIds} from "@/features/expenses/utils/filterHelpers";
 import {detectRollingGranularity, formatRangeLabel, rollingGranularityLabel} from "@/features/expenses/utils/granularity";
-import {TypeTabs} from "@/features/expenses/components/TypeTabs";
 import {StatCards} from "@/features/expenses/components/StatCards";
 import {Toolbar} from "@/features/expenses/components/Toolbar";
 import {MobileDateStrip} from "@/features/expenses/components/MobileDateStrip";
@@ -935,15 +934,10 @@ export default function TransactionsPage() {
           periodLabel={periodLabel}
         />
 
-        {/* Type tabs — pick the dataset before reaching for tools that scope to it (e.g.
-            FilterPanel's fields change based on txType). Desktop only: mobile switches type via
-            FilterPanel's own Type section instead (there's no room for a tab row there once the
-            hero card and toolbar are accounted for), see FilterPanel.tsx. */}
-        <div className="hidden lg:block">
-          <TypeTabs value={txType} onChange={v => { setTxType(v); }} counts={txTypeCounts} />
-        </div>
-
-        {/* Toolbar — search, date range, filters, download — shared across every tab */}
+        {/* Toolbar — search, date range, type, filters, download — shared across every tab.
+            Type switching lives inside here now (Toolbar's own Type button, desktop only) —
+            TypeTabs was removed entirely; mobile switches type via FilterPanel's Type section
+            instead (there's no room for it in the mobile toolbar), see FilterPanel.tsx. */}
         <Toolbar
           search={search} setSearch={setSearch}
           onOpenFilters={() => setShowFilterPanel(true)}
@@ -952,6 +946,7 @@ export default function TransactionsPage() {
           dateMode={dateMode} setDateMode={setDateMode}
           year={year} setYear={setYear}
           month={month} setMonth={setMonth}
+          txType={txType} onTxTypeChange={setTxType} txTypeCounts={txTypeCounts}
           customStart={customStart} setCustomStart={setCustomStart}
           customEnd={customEnd} setCustomEnd={setCustomEnd}
         />

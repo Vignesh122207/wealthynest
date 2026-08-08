@@ -51,10 +51,10 @@ function MiniMonth({ cursorDate, pendingStart, effectiveEnd, onDayClick, onDayHo
             <button key={iso} type="button" data-testid={`range-day-${iso}`}
               onClick={() => onDayClick(day)} onMouseEnter={() => onDayHover(day)}
               className={cn("h-7 w-full mx-auto text-xs transition-colors",
-                (isStart || isEnd) && "bg-primary text-primary-foreground font-bold rounded-full",
-                inBetween && "bg-primary/12 text-foreground",
+                (isStart || isEnd) && "bg-gradient-to-br from-indigo-500 to-indigo-700 text-white font-bold rounded-full shadow-sm shadow-indigo-500/40",
+                inBetween && "bg-indigo-500/12 text-foreground",
                 !isStart && !isEnd && !inBetween && "text-foreground hover:bg-muted rounded-full",
-                !isStart && !isEnd && !inBetween && isToday && "ring-1 ring-primary/60")}>
+                !isStart && !isEnd && !inBetween && isToday && "ring-1 ring-indigo-500/60")}>
               {format(day, "d")}
             </button>
           );
@@ -160,7 +160,7 @@ export function DualCalendarRangePicker({ customStart, customEnd, onApply, onCle
               <button key={m} type="button" data-testid={`range-month-${cursor.getFullYear()}-${String(i + 1).padStart(2, "0")}`}
                 onClick={() => { setCursor(new Date(cursor.getFullYear(), i, 1)); setView("range"); }}
                 className={cn("h-9 rounded-lg text-xs font-medium transition-all",
-                  i === cursor.getMonth() ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted")}>
+                  i === cursor.getMonth() ? "bg-gradient-to-br from-indigo-500 to-indigo-700 text-white shadow-sm shadow-indigo-500/40" : "text-foreground hover:bg-muted")}>
                 {m}
               </button>
             ))}
@@ -188,7 +188,7 @@ export function DualCalendarRangePicker({ customStart, customEnd, onApply, onCle
               <button key={yr} type="button" data-testid={`range-year-${yr}`}
                 onClick={() => { setCursor(new Date(yr, cursor.getMonth(), 1)); setView("month"); }}
                 className={cn("h-9 rounded-lg text-xs font-medium transition-all",
-                  yr === cursor.getFullYear() ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted")}>
+                  yr === cursor.getFullYear() ? "bg-gradient-to-br from-indigo-500 to-indigo-700 text-white shadow-sm shadow-indigo-500/40" : "text-foreground hover:bg-muted")}>
                 {yr}
               </button>
             ))}
@@ -204,7 +204,7 @@ export function DualCalendarRangePicker({ customStart, customEnd, onApply, onCle
         </button>
         <button type="button" data-testid="range-apply" disabled={!pendingStart || !pendingEnd}
           onClick={() => { if (pendingStart && pendingEnd) onApply(format(pendingStart, "yyyy-MM-dd"), format(pendingEnd, "yyyy-MM-dd")); }}
-          className="h-7 px-3 rounded-lg text-xs font-semibold bg-primary text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-all">
+          className="h-7 px-3 rounded-lg text-xs font-semibold text-white bg-gradient-to-br from-indigo-600 to-indigo-500 shadow-sm shadow-indigo-500/40 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none hover:shadow-md transition-all">
           Apply
         </button>
       </div>

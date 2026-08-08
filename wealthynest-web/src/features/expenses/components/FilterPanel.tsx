@@ -16,23 +16,8 @@ import {ACCOUNT_TYPE_META} from "@/lib/accountTypeMeta";
 import {cn} from "@/lib/utils";
 import {SortPills} from "./SortPills";
 import type {Channel, SortKey, TxType} from "../types/filters.types";
+import {TX_TYPE_COLOR, TX_TYPE_LABEL, TX_TYPE_OPTIONS} from "../utils/txTypeMeta";
 import type {Category} from "@/features/categories/types/category.types";
-
-// Same per-type colors as TypeTabs (see TAB_COLOR there) — the mobile-only Type section below
-// stands in for that tab bar (hidden lg:block on this page), so it needs to read as the same
-// control, not a different one.
-const TYPE_COLOR: Record<TxType, string> = {
-  all:       "#475569",
-  expenses:  "#e11d48",
-  income:    "#059669",
-  transfers: "#4f46e5",
-};
-const TYPE_OPTIONS: { value: TxType; label: string }[] = [
-  { value: "all",       label: "All" },
-  { value: "expenses",  label: "Expenses" },
-  { value: "income",    label: "Income" },
-  { value: "transfers", label: "Transfers" },
-];
 
 export function FilterPanel({
   open, onClose, txType, onTxTypeChange,
@@ -48,8 +33,8 @@ export function FilterPanel({
   onClearAll, activeFilterCount,
 }: {
   open: boolean; onClose: () => void; txType: TxType;
-  /** Only wired up on mobile (the Type section below is `lg:hidden`) — desktop still switches
-   * type via TypeTabs, which stays visible there. */
+  /** Only wired up on mobile (the Type section below is `lg:hidden`) — desktop switches type via
+   * Toolbar's own Type button instead. */
   onTxTypeChange: (v: TxType) => void;
   categories: Category[]; categoryId: string; setCategoryId: (v: string) => void;
   payChannel: Channel; setPayChannel: (v: Channel) => void;
@@ -97,20 +82,20 @@ export function FilterPanel({
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-3">
-          {/* Type — mobile only. Desktop keeps TypeTabs visible above the Toolbar, so this would
-              just duplicate it there; on mobile, TypeTabs is hidden and this is the only way left
-              to switch between All/Expenses/Income/Transfers. */}
+          {/* Type — mobile only. Desktop has its own dedicated Type button in the Toolbar now, so
+              this would just duplicate it there; on mobile there's no equivalent, so this stays
+              the only way to switch between All/Expenses/Income/Transfers. */}
           <div className="bg-card border border-border rounded-xl p-3 lg:hidden">
             {sectionLabel(SlidersHorizontal, "Type", "gray")}
             <div className="flex flex-wrap gap-1.5">
-              {TYPE_OPTIONS.map(({ value, label }) => {
+              {TX_TYPE_OPTIONS.map(value => {
                 const active = txType === value;
                 return (
                   <button key={value} onClick={() => onTxTypeChange(value)}
                     className={cn("px-3 h-8 rounded-lg text-xs font-bold border transition-all",
                       active ? "text-white border-transparent" : "bg-muted/60 border-border text-muted-foreground hover:text-foreground")}
-                    style={active ? { backgroundColor: TYPE_COLOR[value] } : undefined}>
-                    {label}
+                    style={active ? { backgroundColor: TX_TYPE_COLOR[value] } : undefined}>
+                    {TX_TYPE_LABEL[value]}
                   </button>
                 );
               })}

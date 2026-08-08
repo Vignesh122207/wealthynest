@@ -25,19 +25,19 @@ export function MonthScrubber({ dateMode, setDateMode, year, setYear, month, set
   };
 
   return (
-    <div className={cn("flex items-center gap-0.5 h-10 shrink-0", className)}>
+    <div className={cn("flex items-center gap-0.5 h-9 shrink-0", className)}>
       <button type="button" onClick={() => navigate(-1)} aria-label="Previous month" data-testid="scrubber-prev"
-        className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground/70 hover:text-foreground transition-colors">
-        <ChevronLeft className="w-4 h-4" />
+        className="w-7 h-7 rounded-md hover:bg-muted flex items-center justify-center text-muted-foreground/70 hover:text-foreground transition-colors">
+        <ChevronLeft className="w-3.5 h-3.5" />
       </button>
       <span data-testid="scrubber-label"
-        className={cn("text-sm px-1 min-w-[104px] text-center whitespace-nowrap transition-colors",
+        className={cn("text-xs px-1 min-w-[98px] text-center whitespace-nowrap transition-colors",
           isActive ? "font-semibold text-blue-600 dark:text-blue-400" : "font-medium text-muted-foreground")}>
         {monthLabel(year, month)}
       </span>
       <button type="button" onClick={() => navigate(1)} disabled={isCurrentMonth} aria-label="Next month" data-testid="scrubber-next"
-        className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground/70 hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent">
-        <ChevronRight className="w-4 h-4" />
+        className="w-7 h-7 rounded-md hover:bg-muted flex items-center justify-center text-muted-foreground/70 hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent">
+        <ChevronRight className="w-3.5 h-3.5" />
       </button>
     </div>
   );
