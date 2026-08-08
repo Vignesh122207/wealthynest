@@ -80,7 +80,10 @@ export default function AppearancePage() {
                       : "hover:bg-muted/50"
                   )}
                 >
-                  <span className="text-lg w-7 text-center shrink-0">{c.symbol}</span>
+                  {/* w-7 text-lg fit a single glyph (₹/$/€/£) — AED/SGD have no dedicated glyph
+                      and render as the 3-letter code instead, so this needs to be wide enough
+                      not to wrap/clip them. */}
+                  <span className="text-sm font-semibold w-10 text-center shrink-0 whitespace-nowrap">{c.symbol}</span>
                   <div className="flex-1 min-w-0">
                     <p className={cn("text-sm font-medium", currency === c.code ? "text-indigo-600 dark:text-indigo-400" : "text-foreground")}>
                       {c.label}

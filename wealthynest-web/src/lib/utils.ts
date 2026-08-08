@@ -91,7 +91,11 @@ export function getStoredCurrency(): string {
   return "INR";
 }
 
-const CURRENCY_SYMBOLS: Record<string, string> = { INR: "₹", USD: "$", EUR: "€", GBP: "£", AED: "AED", SGD: "S$" };
+// AED/SGD have no dedicated glyph Intl.NumberFormat actually renders (formatCurrency below
+// prints "AED 1,234" / "SGD 1,234", not a symbol) — using the ISO code here too, instead of an
+// informal symbol like "S$" that formatCurrency would never actually produce, keeps this in sync
+// with what a user sees everywhere else in the app.
+const CURRENCY_SYMBOLS: Record<string, string> = { INR: "₹", USD: "$", EUR: "€", GBP: "£", AED: "AED", SGD: "SGD" };
 
 /** Standalone currency symbol (no amount) — for CSV headers, masked-privacy placeholders, etc.,
  * where formatCurrency's Intl.NumberFormat output can't be used because there's no number to format. */

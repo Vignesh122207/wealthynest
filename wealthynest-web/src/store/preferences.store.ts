@@ -7,9 +7,11 @@ export const CURRENCIES = [
   { code: "EUR", label: "Euro (€)",               symbol: "€" },
   { code: "GBP", label: "British Pound (£)",      symbol: "£" },
   // The two largest NRI remittance corridors into India — added alongside the majors above so
-  // NRI households don't stop at "close enough" with USD/EUR/GBP.
+  // NRI households don't stop at "close enough" with USD/EUR/GBP. Neither has a glyph
+  // formatCurrency's Intl.NumberFormat actually renders (it prints "AED 1,234"/"SGD 1,234", not
+  // a symbol) — symbol is the ISO code for both, so this list matches what a user actually sees.
   { code: "AED", label: "UAE Dirham (AED)",       symbol: "AED" },
-  { code: "SGD", label: "Singapore Dollar (S$)",  symbol: "S$" },
+  { code: "SGD", label: "Singapore Dollar (S$)",  symbol: "SGD" },
 ] as const;
 
 export type CurrencyCode = typeof CURRENCIES[number]["code"];

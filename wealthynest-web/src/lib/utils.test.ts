@@ -195,7 +195,7 @@ describe("getStoredCurrency / getCurrencySymbol", () => {
     expect(getCurrencySymbol("EUR")).toBe("€");
     expect(getCurrencySymbol("GBP")).toBe("£");
     expect(getCurrencySymbol("AED")).toBe("AED");
-    expect(getCurrencySymbol("SGD")).toBe("S$");
+    expect(getCurrencySymbol("SGD")).toBe("SGD");
   });
 
   it("falls back to the raw code for an unknown currency", () => {
